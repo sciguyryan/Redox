@@ -1,0 +1,28 @@
+[package]
+name = "redox"
+version = "0.1.0"
+authors = ["Ryan Jones-Ward <sciguyryan@gmail.com>"]
+edition = "2021"
+readme = "README.md"
+description = "A new toy virtual machine, assembler and compiler, written in Rust."
+license = "LGPL 2.1"
+repository = "https://github.com/sciguyryan/Redox"
+homepage = "https://github.com/sciguyryan/Redox"
+build = "build.rs"
+publish = false
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+[target.'cfg(windows)'.build-dependencies]
+winres = "0.1.12"
+
+[profile.dev]
+opt-level = 0
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true
+#panic = "abort"
