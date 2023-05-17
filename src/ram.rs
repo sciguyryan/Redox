@@ -1,7 +1,10 @@
 use bitflags::bitflags;
+use prettytable::{row, Table};
+use std::fmt::{self, Display};
 
 bitflags! {
-    pub struct MemoryAccess: u8 {
+    #[derive(Clone, Debug)]
+    pub struct MemoryPermission: u8 {
         /// None.
         const N = 1 << 0;
         /// Public read.
@@ -17,6 +20,13 @@ bitflags! {
     }
 }
 
+impl Display for MemoryPermission {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct MemoryRegion {
     /// The start position of this memory region.
     pub start: usize,
@@ -25,7 +35,7 @@ pub struct MemoryRegion {
     pub end: usize,
 
     /// The access flags for this memory region.
-    pub access: MemoryAccess,
+    pub permissions: MemoryPermission,
 
     /// The unique memory sequence identifier for this memory region.
     pub seq_id: usize,
@@ -35,23 +45,17 @@ pub struct MemoryRegion {
 }
 
 impl MemoryRegion {
-    pub fn set_end(&mut self, end: usize) {
-        self.end = end;
-    }
-}
-
-impl MemoryRegion {
     pub fn new(
         start: usize,
         end: usize,
-        access: MemoryAccess,
+        access: MemoryPermission,
         seq_id: usize,
         name: String,
     ) -> Self {
         Self {
             start,
             end,
-            access,
+            permissions: access,
             seq_id,
             name,
         }
@@ -59,7 +63,7 @@ impl MemoryRegion {
 }
 
 pub struct RAM {
-    /// The raw byte storage of the memory module.
+    /// The raw byte storage of this memory module.
     storage: Vec<u8>,
     /// A list of memory regions and their associated permissions.
     memory_regions: Vec<MemoryRegion>,
@@ -77,75 +81,81 @@ impl RAM {
             seq_id: 0,
         };
 
-        // Read and write permissions are set
-        // for the entire root memory block.
-        ram.add_memory_region(0, ram.len() - 1, MemoryAccess::R | MemoryAccess::W, "Root");
+        // Set the root read and write permissions for the first (root) memory block.
+        ram.add_memory_region(
+            0,
+            ram.len() - 1,
+            MemoryPermission::R | MemoryPermission::W,
+            "Root",
+        );
 
         ram
     }
 
+    /// Add memory region with specific permissions to the memory region list.
+    ///
+    /// # Arguments
+    ///
+    /// * `start` - The starting index of the memory region.
+    /// * `end` - The ending index of the memory region.
+    /// * `access` - The [`MemoryAccessPerms`] for the specific memory region.
+    /// * `name` - A string giving the name of this memory region.
     fn add_memory_region(
         &mut self,
         start: usize,
         end: usize,
-        access: MemoryAccess,
+        access: MemoryPermission,
         name: &str,
     ) -> usize {
+        let old_seq_id = self.seq_id;
         self.memory_regions.push(MemoryRegion::new(
             start,
             end,
             access,
-            self.seq_id,
+            old_seq_id,
             name.to_string(),
         ));
 
         self.seq_id += 1;
 
-        self.resize_root_memory_region();
-
-        self.memory_regions.last().unwrap().seq_id
-    }
-
-    pub fn get(&mut self, pos: usize) -> &u8 {
-        &0
-    }
-
-    pub fn get_clone(&mut self, pos: usize) -> u8 {
-        0
-    }
-
-    pub fn get_range(&mut self, start: usize, len: usize) -> &[u8] {
-        &[0]
-    }
-
-    pub fn get_range_clone(&mut self, start: usize, len: usize) -> Vec<u8> {
-        Vec::new()
-    }
-
-    /// Resize the root memory region to equal the maximum memory bound.
-    fn resize_root_memory_region(&mut self) {
-        let mut max_end = 0;
-        for r in &self.memory_regions {
-            if r.end > max_end {
-                max_end = r.end;
-            }
-        }
-
-        let mut root = self.memory_regions.get_mut(0).expect("");
-        root.end = max_end;
-    }
-
-    pub fn set(&mut self, pos: usize, value: u8) {}
-
-    pub fn set_range(&mut self, pos: usize, value: u8) {}
-
-    pub fn len(&self) -> usize {
-        self.storage.len()
+        old_seq_id
     }
 
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
+
+    pub fn get_memory_region(&self, seq_id: usize) -> Option<&MemoryRegion> {
+        self.memory_regions.iter().find(|r| r.seq_id == seq_id)
+    }
+
+    pub fn get_memory_regions(&self) -> Vec<MemoryRegion> {
+        self.memory_regions.to_vec()
+    }
+
+    pub fn get_ptr(&mut self, _pos: usize) -> &u8 {
+        &0
+    }
+
+    pub fn get_clone(&mut self, _pos: usize) -> u8 {
+        0
+    }
+
+    pub fn get_range_ptr(&mut self, _start: usize, _len: usize) -> &[u8] {
+        &[0]
+    }
+
+    pub fn get_range_clone(&mut self, _start: usize, _len: usize) -> Vec<u8> {
+        Vec::new()
+    }
+
+    pub fn len(&self) -> usize {
+        self.storage.len()
+    }
+
+    pub fn set(&mut self, _pos: usize, _value: u8) {}
+
+    pub fn set_range(&mut self, _pos: usize, _value: u8) {}
 
     pub fn print(&self) {
         println!("{:?}", self.storage);
@@ -159,5 +169,24 @@ impl RAM {
         }
 
         println!("{:?}", self.storage[start..len].to_vec());
+    }
+
+    pub fn print_memory_regions(&self) {
+        let mut table = Table::new();
+
+        // |             0,64400 |            R, W |          0 |            Root|
+        table.add_row(row!["Start", "End", "Permissions", "ID", "Name"]);
+
+        for region in &self.memory_regions {
+            table.add_row(row![
+                region.start,
+                region.end,
+                region.permissions,
+                region.seq_id,
+                region.name
+            ]);
+        }
+
+        table.printstd();
     }
 }
