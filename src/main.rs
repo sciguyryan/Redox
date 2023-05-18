@@ -1,5 +1,6 @@
-pub mod cpu;
-pub mod ram;
+mod cpu;
+mod data_access_type;
+mod ram;
 mod security_context;
 pub mod vm;
 

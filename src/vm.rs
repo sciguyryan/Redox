@@ -1,13 +1,13 @@
-use crate::ram::RAM;
+use crate::ram::Ram;
 
 pub struct VirtualMachine {
-    pub ram: RAM,
+    pub ram: Ram,
 }
 
 impl VirtualMachine {
     pub fn new(memory: usize) -> Self {
         Self {
-            ram: RAM::new(memory),
+            ram: Ram::new(memory),
         }
     }
 }

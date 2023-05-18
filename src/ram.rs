@@ -2,6 +2,8 @@ use bitflags::bitflags;
 use prettytable::{row, Table};
 use std::fmt::{self, Display};
 
+use crate::{data_access_type::DataAccessType, security_context::SecurityContext};
+
 bitflags! {
     #[derive(Clone, Debug)]
     pub struct MemoryPermission: u8 {
@@ -62,7 +64,7 @@ impl MemoryRegion {
     }
 }
 
-pub struct RAM {
+pub struct Ram {
     /// The raw byte storage of this memory module.
     storage: Vec<u8>,
     /// A list of memory regions and their associated permissions.
@@ -71,7 +73,7 @@ pub struct RAM {
     seq_id: usize,
 }
 
-impl RAM {
+impl Ram {
     // https://stackoverflow.com/questions/15045375/what-enforces-memory-protection-in-an-os
 
     pub fn new(size: usize) -> Self {
@@ -121,6 +123,7 @@ impl RAM {
         old_seq_id
     }
 
+    /// Checks whether the allocated memory has a size greater than 0.
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -133,11 +136,11 @@ impl RAM {
         self.memory_regions.to_vec()
     }
 
-    pub fn get_ptr(&mut self, _pos: usize) -> &u8 {
+    pub fn get_byte_ptr(&mut self, _pos: usize) -> &u8 {
         &0
     }
 
-    pub fn get_clone(&mut self, _pos: usize) -> u8 {
+    pub fn get_byte_clone(&mut self, _pos: usize) -> u8 {
         0
     }
 
@@ -188,5 +191,83 @@ impl RAM {
         }
 
         table.printstd();
+    }
+
+    fn get_memory_permissions(&self, start: usize, end: usize) -> Vec<&MemoryRegion> {
+        let mut regions = Vec::new();
+
+        for r in self.memory_regions.iter().rev() {
+            // The first case is a match where the range is -completely- within a region.
+            // No cross-region permission issues can arise here.
+            // The second case is a cross-region match, additional checks will need to be
+            // made to ensure the correct permissions are applied.
+            if (start >= r.start && end <= r.end) || (start <= r.end && r.start <= end) {
+                regions.push(r);
+                continue;
+            }
+        }
+
+        regions
+    }
+
+    fn validate_access(
+        &self,
+        start: usize,
+        end: usize,
+        access_type: DataAccessType,
+        context: SecurityContext,
+        is_exec: bool,
+    ) {
+        // System security contexts are permitted to do anything.
+        if context == SecurityContext::System {
+            return;
+        }
+
+        if start >= self.len() || end >= self.len() {
+            panic!(
+                "the memory location is outside of the memory bounds. Start = {start}, End = {end}"
+            );
+        }
+
+        // If we have an address range that intersects one or more memory
+        // regions then we need to choose the access flags from the region
+        // that has the highest permissions of those that were returned.
+        // The logic being that the highest permissions will need to be met
+        // for access to be granted to any point within the range.
+        let mut has_required_perms = true;
+
+        // We can safely assume that we will always have a memory region here
+        // since the root memory region will always be present.
+        let regions = self.get_memory_permissions(start, end);
+        let mut permission_region = regions.first().expect("");
+
+        for r in &regions {
+            // Does the region have greater permissions than the current one?
+            if r.permissions.0 > permission_region.permissions.0 {
+                permission_region = r;
+            }
+        }
+
+        let permissions = &permission_region.permissions;
+
+        // We also need to check the read/write/execute permissions on
+        // the region, depending on what has been requested.
+        // If the request has a user context of system then it will be granted
+        // the permissions automatically.
+        has_required_perms &= match access_type {
+            DataAccessType::Execute => permissions.intersects(MemoryPermission::EX) && is_exec,
+            DataAccessType::Read => {
+                permissions.intersects(MemoryPermission::R)
+                    || permissions.intersects(MemoryPermission::PR)
+            }
+            DataAccessType::Write => {
+                permissions.intersects(MemoryPermission::W)
+                    || permissions.intersects(MemoryPermission::PW)
+            }
+        };
+
+        if !has_required_perms {
+            panic!("attempted to access memory without the correct security context or access flags. Access Type = {access_type:?}, Executable = {is_exec}, permissions = {permissions}.");
+        }
     }
 }

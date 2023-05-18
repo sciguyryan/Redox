@@ -1,3 +1,4 @@
+#[derive(Debug, Eq, PartialEq)]
 pub enum SecurityContext {
     /// Direct execution of a command, usually via the CPU.
     System,

@@ -1,3 +1,3 @@
-pub struct CPU {}
+pub struct Cpu {}
 
-impl CPU {}
+impl Cpu {}
