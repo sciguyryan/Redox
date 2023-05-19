@@ -133,18 +133,19 @@ impl Ram {
         index <= self.len()
     }
 
-    pub fn get_memory_region(&self, seq_id: usize) -> Option<&MemoryRegion> {
+    pub fn get_region(&self, seq_id: usize) -> Option<&MemoryRegion> {
         self.memory_regions.iter().find(|r| r.seq_id == seq_id)
     }
 
-    pub fn get_all_memory_regions(&self) -> Vec<MemoryRegion> {
+    pub fn get_regions(&self) -> Vec<MemoryRegion> {
         self.memory_regions.to_vec()
     }
 
-    fn get_matching_memory_regions(&self, start: usize, end: usize) -> Vec<&MemoryRegion> {
+    /// Note regions are in reversed order (newest first).
+    fn get_matching_regions(&self, start: usize, end: usize) -> Vec<&MemoryRegion> {
         let mut regions = Vec::new();
 
-        for r in self.memory_regions.iter() {
+        for r in self.memory_regions.iter().rev() {
             // The first case is a match where the range is -completely- within a region.
             // No cross-region permission issues can arise here.
             // The second case is a cross-region match, additional checks will need to be
@@ -157,12 +158,36 @@ impl Ram {
         regions
     }
 
-    fn get_topmost_matching_memory_region(&self, start: usize, end: usize) -> &MemoryRegion {
-        // There should never be an instance where this isn't safe since a root
-        // memory region should always be present.
-        self.get_matching_memory_regions(start, end)
-            .last()
-            .expect("failed to get topmost memory region")
+    fn get_matching_region_with_highest_permissions(
+        &self,
+        start: usize,
+        end: usize,
+    ) -> &MemoryRegion {
+        let mut regions = self.get_matching_regions(start, end);
+
+        // The unwrap here should be safe since there should always be at least one
+        // matching memory region.
+        let region = regions.pop().unwrap();
+
+        // The first case is a match where the range is -completely- within a region.
+        // No cross-region permission issues can arise here.
+        if start >= region.start && end <= region.end {
+            return region;
+        }
+
+        // The second case is a cross-region match. This is where the range
+        // is not contained completely within a single region. In theory this should
+        // never occur, but it's best to be safe.
+        assert!(!regions.is_empty(), "a coordinate was specified that fell outside the bounds of one region, but not into another");
+        let region_2 = regions.pop().unwrap();
+
+        // Here the memory region with the highest permissions out of the two topmost
+        // regions will be returned.
+        if region.permissions.0 > region_2.permissions.0 {
+            region
+        } else {
+            region_2
+        }
     }
 
     pub fn get_byte_ptr(&self, pos: usize, context: SecurityContext) -> &u8 {
@@ -264,7 +289,7 @@ impl Ram {
         // region will always be present, with its default permissions.
         // We want to loop at the topmost layer when considering the permissions
         // applicable to this memory region.
-        let region = self.get_topmost_matching_memory_region(start, end);
+        let region = self.get_matching_region_with_highest_permissions(start, end);
         let permissions = &region.permissions;
 
         // We also need to check the read/write/execute permissions on
@@ -321,7 +346,7 @@ mod tests_ram {
             "failed to correctly initialize RAM"
         );
 
-        let regions = ram.get_all_memory_regions();
+        let regions = ram.get_regions();
         let root_region = MemoryRegion::new(
             0,
             size - 1,
