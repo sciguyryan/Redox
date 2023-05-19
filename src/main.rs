@@ -6,10 +6,12 @@ pub mod vm;
 
 use vm::VirtualMachine;
 
+use crate::security_context::SecurityContext;
+
 fn main() {
     let mut vm = VirtualMachine::new(64_000);
 
-    vm.ram.set(0, 0x12);
+    vm.ram.set(0, 0x12, SecurityContext::System);
 
     vm.ram.print_range(0, 10);
 
