@@ -137,8 +137,32 @@ impl Ram {
         self.memory_regions.iter().find(|r| r.seq_id == seq_id)
     }
 
-    pub fn get_memory_regions(&self) -> Vec<MemoryRegion> {
+    pub fn get_all_memory_regions(&self) -> Vec<MemoryRegion> {
         self.memory_regions.to_vec()
+    }
+
+    fn get_matching_memory_regions(&self, start: usize, end: usize) -> Vec<&MemoryRegion> {
+        let mut regions = Vec::new();
+
+        for r in self.memory_regions.iter() {
+            // The first case is a match where the range is -completely- within a region.
+            // No cross-region permission issues can arise here.
+            // The second case is a cross-region match, additional checks will need to be
+            // made to ensure the correct permissions are applied.
+            if (start >= r.start && end <= r.end) || (start <= r.end && r.start <= end) {
+                regions.push(r);
+            }
+        }
+
+        regions
+    }
+
+    fn get_topmost_matching_memory_region(&self, start: usize, end: usize) -> &MemoryRegion {
+        // There should never be an instance where this isn't safe since a root
+        // memory region should always be present.
+        self.get_matching_memory_regions(start, end)
+            .last()
+            .expect("failed to get topmost memory region")
     }
 
     pub fn get_byte_ptr(&self, pos: usize, context: SecurityContext) -> &u8 {
@@ -219,22 +243,6 @@ impl Ram {
         table.printstd();
     }
 
-    fn get_memory_permissions(&self, start: usize, end: usize) -> Vec<&MemoryRegion> {
-        let mut regions = Vec::new();
-
-        for r in self.memory_regions.iter().rev() {
-            // The first case is a match where the range is -completely- within a region.
-            // No cross-region permission issues can arise here.
-            // The second case is a cross-region match, additional checks will need to be
-            // made to ensure the correct permissions are applied.
-            if (start >= r.start && end <= r.end) || (start <= r.end && r.start <= end) {
-                regions.push(r);
-            }
-        }
-
-        regions
-    }
-
     fn validate_access(
         &self,
         start: usize,
@@ -249,11 +257,6 @@ impl Ram {
             );
         }
 
-        // System-level security contexts are permitted to do anything.
-        if context == SecurityContext::System {
-            return;
-        }
-
         // We always assume that we have value valid access permissions.
         let mut has_required_perms = true;
 
@@ -261,23 +264,27 @@ impl Ram {
         // region will always be present, with its default permissions.
         // We want to loop at the topmost layer when considering the permissions
         // applicable to this memory region.
-        let regions = self.get_memory_permissions(start, end);
-        let permission_region = regions.last().expect("");
-        let permissions = &permission_region.permissions;
+        let region = self.get_topmost_matching_memory_region(start, end);
+        let permissions = &region.permissions;
 
         // We also need to check the read/write/execute permissions on
         // the region, depending on what has been requested.
         // If the request has a user context of system then it will be granted
         // the permissions automatically.
         has_required_perms &= match access_type {
-            DataAccessType::Execute => permissions.intersects(MemoryPermission::EX) && is_exec,
+            DataAccessType::Execute => {
+                (permissions.intersects(MemoryPermission::EX) && is_exec)
+                    || context == SecurityContext::System
+            }
             DataAccessType::Read => {
                 permissions.intersects(MemoryPermission::R)
-                    || permissions.intersects(MemoryPermission::PR)
+                    || (permissions.intersects(MemoryPermission::PR)
+                        && context == SecurityContext::System)
             }
             DataAccessType::Write => {
                 permissions.intersects(MemoryPermission::W)
-                    || permissions.intersects(MemoryPermission::PW)
+                    || (permissions.intersects(MemoryPermission::PW)
+                        && context == SecurityContext::System)
             }
         };
 
@@ -314,7 +321,7 @@ mod tests_ram {
             "failed to correctly initialize RAM"
         );
 
-        let regions = ram.get_memory_regions();
+        let regions = ram.get_all_memory_regions();
         let root_region = MemoryRegion::new(
             0,
             size - 1,
