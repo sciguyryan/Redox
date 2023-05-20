@@ -210,22 +210,22 @@ impl Ram {
             .find(|r| pos >= r.start && pos <= r.end)
     }
 
-    pub fn get_byte_ptr(&self, index: usize, context: &SecurityContext) -> &u8 {
-        self.assert_point_in_bounds(index);
+    pub fn get_byte_ptr(&self, pos: usize, context: &SecurityContext) -> &u8 {
+        self.assert_point_in_bounds(pos);
 
         // Check whether the memory region has read permissions.
-        self.validate_access(index, &DataAccessType::Read, context, false);
+        self.validate_access(pos, &DataAccessType::Read, context, false);
 
-        &self.storage[index]
+        &self.storage[pos]
     }
 
-    pub fn get_byte_clone(&self, index: usize, context: &SecurityContext) -> u8 {
-        assert!(self.is_in_bounds(index));
+    pub fn get_byte_clone(&self, pos: usize, context: &SecurityContext) -> u8 {
+        assert!(self.is_in_bounds(pos));
 
         // Check whether the memory region has read permissions.
-        self.validate_access(index, &DataAccessType::Read, context, false);
+        self.validate_access(pos, &DataAccessType::Read, context, false);
 
-        self.storage[index]
+        self.storage[pos]
     }
 
     pub fn get_range_ptr(&self, start: usize, len: usize, context: &SecurityContext) -> &[u8] {
@@ -254,9 +254,27 @@ impl Ram {
         self.storage.len()
     }
 
-    pub fn set(&mut self, _pos: usize, _value: u8, _context: SecurityContext) {}
+    pub fn set(&mut self, pos: usize, value: u8, context: &SecurityContext) {
+        self.assert_point_in_bounds(pos);
 
-    pub fn set_range(&mut self, _pos: usize, _value: u8, _context: SecurityContext) {}
+        // Check whether the memory region has write permissions.
+        self.validate_access(pos, &DataAccessType::Write, context, false);
+
+        self.storage[pos] = value;
+    }
+
+    pub fn set_range(&mut self, start: usize, values: &[u8], context: &SecurityContext) {
+        let end = start + values.len();
+        self.assert_point_in_bounds(start);
+        self.assert_point_in_bounds(end);
+
+        // Check whether the memory region has write permissions.
+        self.validate_access_range(start, end, &DataAccessType::Write, context, false);
+
+        for (i, b) in values.iter().enumerate() {
+            self.storage[start + i] = *b;
+        }
+    }
 
     pub fn print(&self) {
         println!("{:?}", self.storage);
@@ -294,8 +312,13 @@ impl Ram {
         point: usize,
         access_type: &DataAccessType,
         context: &SecurityContext,
-        is_exec: bool,
+        exec: bool,
     ) {
+        // System-level contexts are permitted to do anything, without limitation.
+        if *context == SecurityContext::System {
+            return;
+        }
+
         // There will always have a memory region here since the root memory
         // region will always be present, with its default permissions.
         // We want to look at the topmost layer when considering the permissions
@@ -310,10 +333,7 @@ impl Ram {
         // If the request has a user context of system then it will be granted
         // the permissions automatically.
         let has_required_perms = match access_type {
-            DataAccessType::Execute => {
-                (permissions.intersects(MemoryPermission::EX) && is_exec)
-                    || *context == SecurityContext::System
-            }
+            DataAccessType::Execute => permissions.intersects(MemoryPermission::EX) && exec,
             DataAccessType::Read => {
                 permissions.intersects(MemoryPermission::R)
                     || (permissions.intersects(MemoryPermission::PR)
@@ -327,7 +347,7 @@ impl Ram {
         };
 
         if !has_required_perms {
-            panic!("attempted to access memory without the correct security context or access flags. Access Type = {access_type:?}, Executable = {is_exec}, permissions = {permissions}.");
+            panic!("attempted to access memory without the correct security context or access flags. Access Type = {access_type:?}, Executable = {exec}, permissions = {permissions}.");
         }
     }
 
@@ -338,10 +358,10 @@ impl Ram {
         len: usize,
         access_type: &DataAccessType,
         context: &SecurityContext,
-        is_exec: bool,
+        exec: bool,
     ) {
         for i in start..(start + len) {
-            self.validate_access(i, access_type, context, is_exec);
+            self.validate_access(i, access_type, context, exec);
         }
     }
 }
@@ -357,7 +377,7 @@ mod tests_ram {
 
     use super::Ram;
 
-    struct TestEntry {
+    struct TestEntryRead {
         pub start: usize,
         pub end: usize,
         pub context: SecurityContext,
@@ -365,7 +385,7 @@ mod tests_ram {
         pub fail_message: String,
     }
 
-    impl TestEntry {
+    impl TestEntryRead {
         pub fn new(
             start: usize,
             end: usize,
@@ -390,6 +410,39 @@ mod tests_ram {
         }
     }
 
+    struct TestEntryWrite {
+        pub start: usize,
+        pub values: Vec<u8>,
+        pub context: SecurityContext,
+        pub should_panic: bool,
+        pub fail_message: String,
+    }
+
+    impl TestEntryWrite {
+        pub fn new(
+            start: usize,
+            values: Vec<u8>,
+            context: SecurityContext,
+            should_panic: bool,
+            fail_message: &str,
+        ) -> Self {
+            Self {
+                start,
+                values,
+                context,
+                should_panic,
+                fail_message: fail_message.to_string(),
+            }
+        }
+
+        pub fn fail_message(&self, did_panic: bool) -> String {
+            format!(
+                "Start: {}, Values: {:?}, Context: {:?}, Should Panic? {}. Panicked? {did_panic}. Message = {}",
+                self.start, self.values, self.context, self.should_panic, self.fail_message
+            )
+        }
+    }
+
     fn get_test_ram_instance() -> Ram {
         let mut ram = Ram::new(100);
 
@@ -399,6 +452,24 @@ mod tests_ram {
             MemoryPermission::PR | MemoryPermission::PW,
             "Private",
         );
+
+        ram
+    }
+
+    fn get_test_nested_ram_instance() -> Ram {
+        let mut ram = Ram::new(100);
+
+        // Layer 1 - a private read/write region.
+        ram.add_memory_region(
+            50,
+            100,
+            MemoryPermission::PR | MemoryPermission::PW,
+            "Private",
+        );
+
+        // Layer 2 - a public read/write region. This one should take precedence.
+        // This should make the entire memory region public read/write.
+        ram.add_memory_region(50, 100, MemoryPermission::R | MemoryPermission::W, "Public");
 
         ram
     }
@@ -432,45 +503,220 @@ mod tests_ram {
         assert_eq!(regions, vec![root_region]);
     }
 
-    /// Test region-based permissions.
+    /// Test basic reading and writing.
     #[test]
-    fn test_region_permissions() {
+    fn test_read_write() {
+        let mut ram = get_test_ram_instance();
+
+        // Read/write a single byte.
+        let byte = 0xff;
+        ram.set(0, byte, &SecurityContext::System);
+        assert_eq!(
+            byte,
+            *ram.get_byte_ptr(0, &SecurityContext::System),
+            "failed to read correct value from memory"
+        );
+
+        // Read/write a range of bytes.
+        let input: Vec<u8> = (0..50).collect();
+        ram.set_range(0, &input, &SecurityContext::System);
+        assert_eq!(
+            &input,
+            ram.get_range_ptr(0, 50, &SecurityContext::System),
+            "failed to read correct values from memory"
+        );
+    }
+
+    /// Test reading with region-based permissions.
+    #[test]
+    fn test_region_read_permissions() {
         let ram = get_test_ram_instance();
 
         let tests = [
-            TestEntry::new(
+            TestEntryRead::new(
                 0,
                 50,
                 SecurityContext::User,
                 false,
-                "failed to read R|W memory with user context",
+                "failed to read from R|W memory with user context",
             ),
-            TestEntry::new(
+            TestEntryRead::new(
                 0,
                 51,
                 SecurityContext::User,
                 true,
-                "succeeded in reading PR|PW memory with user context",
+                "succeeded in reading from PR|PW memory with user context",
             ),
-            TestEntry::new(
+            TestEntryRead::new(
                 0,
                 50,
                 SecurityContext::System,
                 false,
-                "failed to read R|W memory with system context",
+                "failed to read from R|W memory with system context",
             ),
-            TestEntry::new(
+            TestEntryRead::new(
                 0,
                 51,
                 SecurityContext::System,
                 false,
-                "failed to read PR|PW memory with system context",
+                "failed to read from PR|PW memory with system context",
             ),
         ];
 
         for test in tests {
             let result = panic::catch_unwind(|| {
                 _ = ram.get_range_clone(test.start, test.end, &test.context);
+            });
+
+            let did_panic = result.is_err();
+            assert_eq!(
+                did_panic,
+                test.should_panic,
+                "{}",
+                test.fail_message(did_panic)
+            );
+        }
+    }
+
+    /// Test writing with region-based permissions.
+    #[test]
+    fn test_region_write_permissions() {
+        let tests = [
+            TestEntryWrite::new(
+                0,
+                vec![0; 50],
+                SecurityContext::User,
+                false,
+                "failed to write to R|W memory with user context",
+            ),
+            TestEntryWrite::new(
+                0,
+                vec![0; 51],
+                SecurityContext::User,
+                true,
+                "succeeded in writing to PR|PW memory with user context",
+            ),
+            TestEntryWrite::new(
+                0,
+                vec![0; 50],
+                SecurityContext::System,
+                false,
+                "failed to write to R|W memory with system context",
+            ),
+            TestEntryWrite::new(
+                0,
+                vec![0; 51],
+                SecurityContext::System,
+                false,
+                "failed to write to PR|PW memory with system context",
+            ),
+        ];
+
+        for test in tests {
+            let result = panic::catch_unwind(|| {
+                let mut ram = get_test_ram_instance();
+                ram.set_range(test.start, &test.values, &test.context);
+            });
+
+            let did_panic = result.is_err();
+            assert_eq!(
+                did_panic,
+                test.should_panic,
+                "{}",
+                test.fail_message(did_panic)
+            );
+        }
+    }
+
+    /// Test reading with region-based permissions with a more complex memory region layout
+    #[test]
+    fn test_region_read_correct_permissions() {
+        let ram = get_test_nested_ram_instance();
+
+        let tests = [
+            TestEntryRead::new(
+                0,
+                50,
+                SecurityContext::User,
+                false,
+                "failed to read from R|W memory with user context",
+            ),
+            TestEntryRead::new(
+                0,
+                51,
+                SecurityContext::User,
+                false,
+                "succeeded in reading from R|W memory with user context",
+            ),
+            TestEntryRead::new(
+                0,
+                50,
+                SecurityContext::System,
+                false,
+                "failed to read from R|W memory with system context",
+            ),
+            TestEntryRead::new(
+                0,
+                51,
+                SecurityContext::System,
+                false,
+                "failed to read from R|W memory with system context",
+            ),
+        ];
+
+        for test in tests {
+            let result = panic::catch_unwind(|| {
+                _ = ram.get_range_clone(test.start, test.end, &test.context);
+            });
+
+            let did_panic = result.is_err();
+            assert_eq!(
+                did_panic,
+                test.should_panic,
+                "{}",
+                test.fail_message(did_panic)
+            );
+        }
+    }
+
+    /// Test writing with region-based permissions with a more complex memory region layout
+    #[test]
+    fn test_region_write_correct_permissions() {
+        let tests = [
+            TestEntryWrite::new(
+                0,
+                vec![0; 50],
+                SecurityContext::User,
+                false,
+                "failed to write to R|W memory with user context",
+            ),
+            TestEntryWrite::new(
+                0,
+                vec![0; 51],
+                SecurityContext::User,
+                false,
+                "succeeded in writing to R|W memory with user context",
+            ),
+            TestEntryWrite::new(
+                0,
+                vec![0; 50],
+                SecurityContext::System,
+                false,
+                "failed to write to R|W memory with system context",
+            ),
+            TestEntryWrite::new(
+                0,
+                vec![0; 51],
+                SecurityContext::System,
+                false,
+                "failed to write to R|W memory with system context",
+            ),
+        ];
+
+        for test in tests {
+            let result = panic::catch_unwind(|| {
+                let mut ram = get_test_nested_ram_instance();
+                ram.set_range(test.start, &test.values, &test.context);
             });
 
             let did_panic = result.is_err();
