@@ -123,20 +123,56 @@ impl Ram {
         old_seq_id
     }
 
-    /// Checks whether the allocated memory has a size greater than 0.
+    /// Assert that a specific memory position is within the valid memory region.
+    ///
+    /// # Arguments
+    ///
+    /// * `pos` - The point in memory to be checked.
+    #[inline]
+    fn assert_point_in_bounds(&self, pos: usize) {
+        assert!(
+            self.is_in_bounds(pos),
+            "The memory location is outside of the valid memory bounds. Point = {pos}"
+        );
+    }
+
+    /// Checks whether the allocated memory region has a size greater than 0.
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
-    /// Check if a specific memory location is within the valid memory bounds.
-    fn is_in_bounds(&self, index: usize) -> bool {
-        index <= self.len()
+    /// Checks whether a specific memory position is within the valid memory region bounds.
+    ///
+    /// # Arguments
+    ///
+    /// * `pos` - The point in memory to be checked.
+    ///
+    /// # Returns
+    ///
+    /// True if the memory region is within the valid memory region bounds, false otherwise.
+    #[inline]
+    fn is_in_bounds(&self, pos: usize) -> bool {
+        pos <= self.len()
     }
 
+    /// Get a specific memory region, by its id.
+    ///
+    /// # Arguments
+    ///
+    /// * `seq_id` - The unique id for the region.
+    ///
+    /// # Returns
+    ///
+    /// An [`Option`] containing a reference to the [`MemoryRegion`] object if found, [`None`] otherwise.
     pub fn get_region(&self, seq_id: usize) -> Option<&MemoryRegion> {
         self.memory_regions.iter().find(|r| r.seq_id == seq_id)
     }
 
+    /// Get a vector containing a clone of the current [`MemoryRegion`] objects for this instance.
+    ///
+    /// # Returns
+    ///
+    /// A vector containing copies of each of the [`MemoryRegion`] objects present in this object instance.
     pub fn get_regions(&self) -> Vec<MemoryRegion> {
         self.memory_regions.to_vec()
     }
@@ -158,74 +194,58 @@ impl Ram {
         regions
     }
 
-    fn get_matching_region_with_highest_permissions(
-        &self,
-        start: usize,
-        end: usize,
-    ) -> &MemoryRegion {
-        let mut regions = self.get_matching_regions(start, end);
-
-        // The unwrap here should be safe since there should always be at least one
-        // matching memory region.
-        let region = regions.pop().unwrap();
-
-        // The first case is a match where the range is -completely- within a region.
-        // No cross-region permission issues can arise here.
-        if start >= region.start && end <= region.end {
-            return region;
-        }
-
-        // The second case is a cross-region match. This is where the range
-        // is not contained completely within a single region. In theory this should
-        // never occur, but it's best to be safe.
-        assert!(!regions.is_empty(), "a coordinate was specified that fell outside the bounds of one region, but not into another");
-        let region_2 = regions.pop().unwrap();
-
-        // Here the memory region with the highest permissions out of the two topmost
-        // regions will be returned.
-        if region.permissions.0 > region_2.permissions.0 {
-            region
-        } else {
-            region_2
-        }
+    /// Try to find the top-most (newest) memory region that is applicable to a given point in memory.
+    ///
+    /// # Arguments
+    ///
+    /// * `pos` - The point in memory to be checked.
+    ///
+    /// # Returns
+    ///
+    /// An Option containing a reference to the [`MemoryRegion`] instance that is applicable to the point in memory, or None if one wasn't found.
+    fn get_topmost_matching_region(&self, pos: usize) -> Option<&MemoryRegion> {
+        self.memory_regions
+            .iter()
+            .rev()
+            .find(|r| pos >= r.start && pos <= r.end)
     }
 
-    pub fn get_byte_ptr(&self, pos: usize, context: SecurityContext) -> &u8 {
-        assert!(self.is_in_bounds(pos));
+    pub fn get_byte_ptr(&self, index: usize, context: &SecurityContext) -> &u8 {
+        self.assert_point_in_bounds(index);
 
         // Check whether the memory region has read permissions.
-        self.validate_access(pos, pos, DataAccessType::Read, context, false);
+        self.validate_access(index, &DataAccessType::Read, context, false);
 
-        &self.storage[pos]
+        &self.storage[index]
     }
 
-    pub fn get_byte_clone(&self, pos: usize, context: SecurityContext) -> u8 {
-        assert!(self.is_in_bounds(pos));
+    pub fn get_byte_clone(&self, index: usize, context: &SecurityContext) -> u8 {
+        assert!(self.is_in_bounds(index));
 
         // Check whether the memory region has read permissions.
-        self.validate_access(pos, pos, DataAccessType::Read, context, false);
+        self.validate_access(index, &DataAccessType::Read, context, false);
 
-        self.storage[pos]
+        self.storage[index]
     }
 
-    pub fn get_range_ptr(&self, start: usize, len: usize, context: SecurityContext) -> &[u8] {
+    pub fn get_range_ptr(&self, start: usize, len: usize, context: &SecurityContext) -> &[u8] {
         let end = start + len;
-        assert!(self.is_in_bounds(start));
-        assert!(self.is_in_bounds(end));
+        self.assert_point_in_bounds(start);
+        self.assert_point_in_bounds(end);
 
         // Check whether the memory region has read permissions.
-        self.validate_access(start, end, DataAccessType::Read, context, false);
+        self.validate_access_range(start, end, &DataAccessType::Read, context, false);
 
         &self.storage[start..end]
     }
 
-    pub fn get_range_clone(&self, start: usize, len: usize, context: SecurityContext) -> Vec<u8> {
+    pub fn get_range_clone(&self, start: usize, len: usize, context: &SecurityContext) -> Vec<u8> {
         let end = start + len;
-        assert!(self.is_in_bounds(start));
-        assert!(self.is_in_bounds(end));
+        self.assert_point_in_bounds(start);
+        self.assert_point_in_bounds(end);
 
         // Check whether the memory region has read permissions.
-        self.validate_access(start, end, DataAccessType::Read, context, false);
+        self.validate_access_range(start, end, &DataAccessType::Read, context, false);
 
         self.storage[start..end].to_vec()
     }
@@ -244,8 +264,8 @@ impl Ram {
 
     pub fn print_range(&self, start: usize, len: usize) {
         let end = start + len;
-        assert!(self.is_in_bounds(start));
-        assert!(self.is_in_bounds(end));
+        self.assert_point_in_bounds(start);
+        self.assert_point_in_bounds(end);
 
         println!("{:?}", self.storage[start..end].to_vec());
     }
@@ -268,48 +288,41 @@ impl Ram {
         table.printstd();
     }
 
+    #[inline]
     fn validate_access(
         &self,
-        start: usize,
-        end: usize,
-        access_type: DataAccessType,
-        context: SecurityContext,
+        point: usize,
+        access_type: &DataAccessType,
+        context: &SecurityContext,
         is_exec: bool,
     ) {
-        if !self.is_in_bounds(start) || !self.is_in_bounds(end) {
-            panic!(
-                "one or more memory locations are outside of the memory bounds. Start = {start}, End = {end}"
-            );
-        }
-
-        // We always assume that we have value valid access permissions.
-        let mut has_required_perms = true;
-
         // There will always have a memory region here since the root memory
         // region will always be present, with its default permissions.
-        // We want to loop at the topmost layer when considering the permissions
+        // We want to look at the topmost layer when considering the permissions
         // applicable to this memory region.
-        let region = self.get_matching_region_with_highest_permissions(start, end);
+        let region = self
+            .get_topmost_matching_region(point)
+            .expect("no matching region was found");
         let permissions = &region.permissions;
 
         // We also need to check the read/write/execute permissions on
         // the region, depending on what has been requested.
         // If the request has a user context of system then it will be granted
         // the permissions automatically.
-        has_required_perms &= match access_type {
+        let has_required_perms = match access_type {
             DataAccessType::Execute => {
                 (permissions.intersects(MemoryPermission::EX) && is_exec)
-                    || context == SecurityContext::System
+                    || *context == SecurityContext::System
             }
             DataAccessType::Read => {
                 permissions.intersects(MemoryPermission::R)
                     || (permissions.intersects(MemoryPermission::PR)
-                        && context == SecurityContext::System)
+                        && *context == SecurityContext::System)
             }
             DataAccessType::Write => {
                 permissions.intersects(MemoryPermission::W)
                     || (permissions.intersects(MemoryPermission::PW)
-                        && context == SecurityContext::System)
+                        && *context == SecurityContext::System)
             }
         };
 
@@ -317,16 +330,78 @@ impl Ram {
             panic!("attempted to access memory without the correct security context or access flags. Access Type = {access_type:?}, Executable = {is_exec}, permissions = {permissions}.");
         }
     }
+
+    #[inline]
+    fn validate_access_range(
+        &self,
+        start: usize,
+        len: usize,
+        access_type: &DataAccessType,
+        context: &SecurityContext,
+        is_exec: bool,
+    ) {
+        for i in start..(start + len) {
+            self.validate_access(i, access_type, context, is_exec);
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests_ram {
+    use std::panic;
+
     use crate::{
         ram::{MemoryPermission, MemoryRegion},
         security_context::SecurityContext,
     };
 
     use super::Ram;
+
+    struct TestEntry {
+        pub start: usize,
+        pub end: usize,
+        pub context: SecurityContext,
+        pub should_panic: bool,
+        pub fail_message: String,
+    }
+
+    impl TestEntry {
+        pub fn new(
+            start: usize,
+            end: usize,
+            context: SecurityContext,
+            should_panic: bool,
+            fail_message: &str,
+        ) -> Self {
+            Self {
+                start,
+                end,
+                context,
+                should_panic,
+                fail_message: fail_message.to_string(),
+            }
+        }
+
+        pub fn fail_message(&self, did_panic: bool) -> String {
+            format!(
+                "Start: {}, End: {}, Context: {:?}, Should Panic? {}. Panicked? {did_panic}. Message = {}",
+                self.start, self.end, self.context, self.should_panic, self.fail_message
+            )
+        }
+    }
+
+    fn get_test_ram_instance() -> Ram {
+        let mut ram = Ram::new(100);
+
+        ram.add_memory_region(
+            50,
+            100,
+            MemoryPermission::PR | MemoryPermission::PW,
+            "Private",
+        );
+
+        ram
+    }
 
     /// Test the basic aspects of creating a RAM module.
     #[test]
@@ -341,7 +416,7 @@ mod tests_ram {
         );
 
         assert_eq!(
-            ram.get_range_ptr(0, size - 1, SecurityContext::System),
+            ram.get_range_ptr(0, size - 1, &SecurityContext::System),
             vec![0x0; size - 1],
             "failed to correctly initialize RAM"
         );
@@ -355,5 +430,56 @@ mod tests_ram {
             "Root".to_string(),
         );
         assert_eq!(regions, vec![root_region]);
+    }
+
+    /// Test region-based permissions.
+    #[test]
+    fn test_region_permissions() {
+        let ram = get_test_ram_instance();
+
+        let tests = [
+            TestEntry::new(
+                0,
+                50,
+                SecurityContext::User,
+                false,
+                "failed to read R|W memory with user context",
+            ),
+            TestEntry::new(
+                0,
+                51,
+                SecurityContext::User,
+                true,
+                "succeeded in reading PR|PW memory with user context",
+            ),
+            TestEntry::new(
+                0,
+                50,
+                SecurityContext::System,
+                false,
+                "failed to read R|W memory with system context",
+            ),
+            TestEntry::new(
+                0,
+                51,
+                SecurityContext::System,
+                false,
+                "failed to read PR|PW memory with system context",
+            ),
+        ];
+
+        for test in tests {
+            let result = panic::catch_unwind(|| {
+                _ = ram.get_range_clone(test.start, test.end, &test.context);
+            });
+
+            let did_panic = result.is_err();
+            assert_eq!(
+                did_panic,
+                test.should_panic,
+                "{}",
+                test.fail_message(did_panic)
+            );
+        }
     }
 }

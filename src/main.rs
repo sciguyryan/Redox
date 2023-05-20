@@ -1,3 +1,5 @@
+#![crate_name = "redox"]
+
 mod cpu;
 mod data_access_type;
 mod ram;
