@@ -228,6 +228,15 @@ impl Ram {
         self.storage[pos]
     }
 
+    pub fn get_instruction_first_byte_ptr(&self, pos: usize, context: &SecurityContext) -> &u8 {
+        self.assert_point_in_bounds(pos);
+
+        // Check whether the memory region has read permissions.
+        self.validate_access(pos, &DataAccessType::Execute, context, true);
+
+        &self.storage[pos]
+    }
+
     pub fn get_range_ptr(&self, start: usize, len: usize, context: &SecurityContext) -> &[u8] {
         let end = start + len;
         self.assert_point_in_bounds(start);
@@ -418,23 +427,35 @@ mod tests_ram {
             match self.test_type {
                 TestType::Read => {
                     format!(
-                        "Start: {}, End: {}, Context: {:?}, Should Panic? {}. Panicked? {did_panic}. Message = {}",
+                        "Read Failed - Start: {}, End: {}, Context: {:?}, Should Panic? {}. Panicked? {did_panic}. Message = {}",
                         self.start, self.end.unwrap(), self.context, self.should_panic, self.fail_message
                     )
                 }
                 TestType::Write => {
                     format!(
-                        "Start: {}, Values: {:?}, Context: {:?}, Should Panic? {}. Panicked? {did_panic}. Message = {}",
+                        "Write Failed - Start: {}, Values: {:?}, Context: {:?}, Should Panic? {}. Panicked? {did_panic}. Message = {}",
                         self.start, self.values.clone().unwrap(), self.context, self.should_panic, self.fail_message
                     )
                 }
-                TestType::Execute => todo!(),
+                TestType::Execute => {
+                    format!(
+                        "Execute Failed - Start: {}, Context: {:?}, Should Panic? {}. Panicked? {did_panic}. Message = {}",
+                        self.start, self.context, self.should_panic, self.fail_message
+                    )
+                }
             }
         }
     }
 
     fn get_test_ram_instance() -> Ram {
         let mut ram = Ram::new(100);
+
+        ram.add_memory_region(
+            0,
+            25,
+            MemoryPermission::R | MemoryPermission::W | MemoryPermission::EX,
+            "Public Execution",
+        );
 
         ram.add_memory_region(
             50,
@@ -515,6 +536,65 @@ mod tests_ram {
             ram.get_range_ptr(0, 50, &SecurityContext::System),
             "failed to read correct values from memory"
         );
+    }
+
+    /// Test execution with region-based permissions.
+    #[test]
+    fn test_region_execute_permissions() {
+        let ram = get_test_ram_instance();
+
+        let tests = [
+            TestEntry::new(
+                TestType::Execute,
+                0,
+                None,
+                None,
+                SecurityContext::User,
+                false,
+                "failed to get an executable byte from memory, with user context",
+            ),
+            TestEntry::new(
+                TestType::Execute,
+                51,
+                None,
+                None,
+                SecurityContext::User,
+                true,
+                "succeeded in getting an executable byte from memory, with user context",
+            ),
+            TestEntry::new(
+                TestType::Execute,
+                0,
+                None,
+                None,
+                SecurityContext::System,
+                false,
+                "failed to get an executable byte from EX memory, with system context",
+            ),
+            TestEntry::new(
+                TestType::Execute,
+                51,
+                None,
+                None,
+                SecurityContext::System,
+                false,
+                "failed to get an executable byte from non-EX memory, with system context",
+            ),
+        ];
+
+        for test in tests {
+            let result = panic::catch_unwind(|| {
+                ram.get_instruction_first_byte_ptr(test.start, &test.context);
+            });
+
+            let did_panic = result.is_err();
+            assert_eq!(
+                did_panic,
+                test.should_panic,
+                "{}",
+                test.fail_message(did_panic)
+            );
+        }
     }
 
     /// Test reading with region-based permissions.
