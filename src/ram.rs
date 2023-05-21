@@ -377,57 +377,36 @@ mod tests_ram {
 
     use super::Ram;
 
-    struct TestEntryRead {
+    enum TestType {
+        Read,
+        Write,
+        Execute,
+    }
+
+    struct TestEntry {
+        pub test_type: TestType,
         pub start: usize,
-        pub end: usize,
+        pub end: Option<usize>,
+        pub values: Option<Vec<u8>>,
         pub context: SecurityContext,
         pub should_panic: bool,
         pub fail_message: String,
     }
 
-    impl TestEntryRead {
+    impl TestEntry {
         pub fn new(
+            test_type: TestType,
             start: usize,
-            end: usize,
+            end: Option<usize>,
+            values: Option<Vec<u8>>,
             context: SecurityContext,
             should_panic: bool,
             fail_message: &str,
         ) -> Self {
             Self {
+                test_type,
                 start,
                 end,
-                context,
-                should_panic,
-                fail_message: fail_message.to_string(),
-            }
-        }
-
-        pub fn fail_message(&self, did_panic: bool) -> String {
-            format!(
-                "Start: {}, End: {}, Context: {:?}, Should Panic? {}. Panicked? {did_panic}. Message = {}",
-                self.start, self.end, self.context, self.should_panic, self.fail_message
-            )
-        }
-    }
-
-    struct TestEntryWrite {
-        pub start: usize,
-        pub values: Vec<u8>,
-        pub context: SecurityContext,
-        pub should_panic: bool,
-        pub fail_message: String,
-    }
-
-    impl TestEntryWrite {
-        pub fn new(
-            start: usize,
-            values: Vec<u8>,
-            context: SecurityContext,
-            should_panic: bool,
-            fail_message: &str,
-        ) -> Self {
-            Self {
-                start,
                 values,
                 context,
                 should_panic,
@@ -436,10 +415,21 @@ mod tests_ram {
         }
 
         pub fn fail_message(&self, did_panic: bool) -> String {
-            format!(
-                "Start: {}, Values: {:?}, Context: {:?}, Should Panic? {}. Panicked? {did_panic}. Message = {}",
-                self.start, self.values, self.context, self.should_panic, self.fail_message
-            )
+            match self.test_type {
+                TestType::Read => {
+                    format!(
+                        "Start: {}, End: {}, Context: {:?}, Should Panic? {}. Panicked? {did_panic}. Message = {}",
+                        self.start, self.end.unwrap(), self.context, self.should_panic, self.fail_message
+                    )
+                }
+                TestType::Write => {
+                    format!(
+                        "Start: {}, Values: {:?}, Context: {:?}, Should Panic? {}. Panicked? {did_panic}. Message = {}",
+                        self.start, self.values.clone().unwrap(), self.context, self.should_panic, self.fail_message
+                    )
+                }
+                TestType::Execute => todo!(),
+            }
         }
     }
 
@@ -533,30 +523,38 @@ mod tests_ram {
         let ram = get_test_ram_instance();
 
         let tests = [
-            TestEntryRead::new(
+            TestEntry::new(
+                TestType::Read,
                 0,
-                50,
+                Some(50),
+                None,
                 SecurityContext::User,
                 false,
                 "failed to read from R|W memory with user context",
             ),
-            TestEntryRead::new(
+            TestEntry::new(
+                TestType::Read,
                 0,
-                51,
+                Some(51),
+                None,
                 SecurityContext::User,
                 true,
                 "succeeded in reading from PR|PW memory with user context",
             ),
-            TestEntryRead::new(
+            TestEntry::new(
+                TestType::Read,
                 0,
-                50,
+                Some(50),
+                None,
                 SecurityContext::System,
                 false,
                 "failed to read from R|W memory with system context",
             ),
-            TestEntryRead::new(
+            TestEntry::new(
+                TestType::Read,
                 0,
-                51,
+                Some(51),
+                None,
                 SecurityContext::System,
                 false,
                 "failed to read from PR|PW memory with system context",
@@ -565,7 +563,7 @@ mod tests_ram {
 
         for test in tests {
             let result = panic::catch_unwind(|| {
-                _ = ram.get_range_clone(test.start, test.end, &test.context);
+                _ = ram.get_range_clone(test.start, test.end.unwrap(), &test.context);
             });
 
             let did_panic = result.is_err();
@@ -582,30 +580,38 @@ mod tests_ram {
     #[test]
     fn test_region_write_permissions() {
         let tests = [
-            TestEntryWrite::new(
+            TestEntry::new(
+                TestType::Write,
                 0,
-                vec![0; 50],
+                None,
+                Some(vec![0; 50]),
                 SecurityContext::User,
                 false,
                 "failed to write to R|W memory with user context",
             ),
-            TestEntryWrite::new(
+            TestEntry::new(
+                TestType::Write,
                 0,
-                vec![0; 51],
+                None,
+                Some(vec![0; 51]),
                 SecurityContext::User,
                 true,
                 "succeeded in writing to PR|PW memory with user context",
             ),
-            TestEntryWrite::new(
+            TestEntry::new(
+                TestType::Write,
                 0,
-                vec![0; 50],
+                None,
+                Some(vec![0; 50]),
                 SecurityContext::System,
                 false,
                 "failed to write to R|W memory with system context",
             ),
-            TestEntryWrite::new(
+            TestEntry::new(
+                TestType::Write,
                 0,
-                vec![0; 51],
+                None,
+                Some(vec![0; 51]),
                 SecurityContext::System,
                 false,
                 "failed to write to PR|PW memory with system context",
@@ -615,7 +621,7 @@ mod tests_ram {
         for test in tests {
             let result = panic::catch_unwind(|| {
                 let mut ram = get_test_ram_instance();
-                ram.set_range(test.start, &test.values, &test.context);
+                ram.set_range(test.start, &test.values.clone().unwrap(), &test.context);
             });
 
             let did_panic = result.is_err();
@@ -634,30 +640,38 @@ mod tests_ram {
         let ram = get_test_nested_ram_instance();
 
         let tests = [
-            TestEntryRead::new(
+            TestEntry::new(
+                TestType::Read,
                 0,
-                50,
+                Some(50),
+                None,
                 SecurityContext::User,
                 false,
                 "failed to read from R|W memory with user context",
             ),
-            TestEntryRead::new(
+            TestEntry::new(
+                TestType::Read,
                 0,
-                51,
+                Some(51),
+                None,
                 SecurityContext::User,
                 false,
                 "succeeded in reading from R|W memory with user context",
             ),
-            TestEntryRead::new(
+            TestEntry::new(
+                TestType::Read,
                 0,
-                50,
+                Some(50),
+                None,
                 SecurityContext::System,
                 false,
                 "failed to read from R|W memory with system context",
             ),
-            TestEntryRead::new(
+            TestEntry::new(
+                TestType::Read,
                 0,
-                51,
+                Some(51),
+                None,
                 SecurityContext::System,
                 false,
                 "failed to read from R|W memory with system context",
@@ -666,7 +680,7 @@ mod tests_ram {
 
         for test in tests {
             let result = panic::catch_unwind(|| {
-                _ = ram.get_range_clone(test.start, test.end, &test.context);
+                _ = ram.get_range_clone(test.start, test.end.unwrap(), &test.context);
             });
 
             let did_panic = result.is_err();
@@ -683,30 +697,38 @@ mod tests_ram {
     #[test]
     fn test_region_write_correct_permissions() {
         let tests = [
-            TestEntryWrite::new(
+            TestEntry::new(
+                TestType::Write,
                 0,
-                vec![0; 50],
+                None,
+                Some(vec![0; 50]),
                 SecurityContext::User,
                 false,
                 "failed to write to R|W memory with user context",
             ),
-            TestEntryWrite::new(
+            TestEntry::new(
+                TestType::Write,
                 0,
-                vec![0; 51],
+                None,
+                Some(vec![0; 51]),
                 SecurityContext::User,
                 false,
                 "succeeded in writing to R|W memory with user context",
             ),
-            TestEntryWrite::new(
+            TestEntry::new(
+                TestType::Write,
                 0,
-                vec![0; 50],
+                None,
+                Some(vec![0; 50]),
                 SecurityContext::System,
                 false,
                 "failed to write to R|W memory with system context",
             ),
-            TestEntryWrite::new(
+            TestEntry::new(
+                TestType::Write,
                 0,
-                vec![0; 51],
+                None,
+                Some(vec![0; 51]),
                 SecurityContext::System,
                 false,
                 "failed to write to R|W memory with system context",
@@ -716,7 +738,7 @@ mod tests_ram {
         for test in tests {
             let result = panic::catch_unwind(|| {
                 let mut ram = get_test_nested_ram_instance();
-                ram.set_range(test.start, &test.values, &test.context);
+                ram.set_range(test.start, &test.values.clone().unwrap(), &test.context);
             });
 
             let did_panic = result.is_err();
