@@ -2,7 +2,9 @@ use bitflags::bitflags;
 use prettytable::{row, Table};
 use std::fmt::{self, Display};
 
-use crate::{data_access_type::DataAccessType, security_context::SecurityContext};
+use crate::security_context::SecurityContext;
+
+use super::data_access_type::DataAccessType;
 
 bitflags! {
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -64,7 +66,7 @@ impl MemoryRegion {
     }
 }
 
-pub struct Ram {
+pub struct Memory {
     /// The raw byte storage of this memory module.
     storage: Vec<u8>,
     /// A list of memory regions and their associated permissions.
@@ -73,7 +75,7 @@ pub struct Ram {
     seq_id: usize,
 }
 
-impl Ram {
+impl Memory {
     // https://stackoverflow.com/questions/15045375/what-enforces-memory-protection-in-an-os
 
     pub fn new(size: usize) -> Self {
@@ -237,6 +239,15 @@ impl Ram {
         &self.storage[pos]
     }
 
+    pub fn get_u32(&self, pos: usize, context: &SecurityContext) -> u32 {
+        let bytes: [u8; 4] = self
+            .get_range_ptr(pos, pos + 4, context)
+            .try_into()
+            .expect("failed to create a u32 from memory bytes");
+
+        u32::from_le_bytes(bytes)
+    }
+
     pub fn get_range_ptr(&self, start: usize, len: usize, context: &SecurityContext) -> &[u8] {
         let end = start + len;
         self.assert_point_in_bounds(start);
@@ -283,6 +294,12 @@ impl Ram {
         for (i, b) in values.iter().enumerate() {
             self.storage[start + i] = *b;
         }
+    }
+
+    pub fn set_u32(&mut self, pos: usize, value: u32, context: &SecurityContext) {
+        let bytes = u32::to_le_bytes(value);
+
+        self.set_range(pos, &bytes, context);
     }
 
     pub fn print(&self) {
@@ -379,12 +396,9 @@ impl Ram {
 mod tests_ram {
     use std::panic;
 
-    use crate::{
-        ram::{MemoryPermission, MemoryRegion},
-        security_context::SecurityContext,
-    };
+    use crate::{mem::memory::MemoryRegion, security_context::SecurityContext};
 
-    use super::Ram;
+    use super::{Memory, MemoryPermission};
 
     enum TestType {
         Read,
@@ -447,8 +461,8 @@ mod tests_ram {
         }
     }
 
-    fn get_test_ram_instance() -> Ram {
-        let mut ram = Ram::new(100);
+    fn get_test_ram_instance() -> Memory {
+        let mut ram = Memory::new(100);
 
         ram.add_memory_region(
             0,
@@ -467,8 +481,8 @@ mod tests_ram {
         ram
     }
 
-    fn get_test_nested_ram_instance() -> Ram {
-        let mut ram = Ram::new(100);
+    fn get_test_nested_ram_instance() -> Memory {
+        let mut ram = Memory::new(100);
 
         // Layer 1 - a private read/write region.
         ram.add_memory_region(
@@ -489,7 +503,7 @@ mod tests_ram {
     #[test]
     fn test_ram_creation() {
         let size = 100;
-        let ram = Ram::new(size);
+        let ram = Memory::new(size);
 
         assert_eq!(
             ram.len(),
@@ -829,5 +843,16 @@ mod tests_ram {
                 test.fail_message(did_panic)
             );
         }
+    }
+
+    /// Test a u32 round-trip by writing to and reading from memory.
+    #[test]
+    fn test_read_write_u32() {
+        let mut ram = get_test_ram_instance();
+
+        let input = 0xDEADBEEF;
+        ram.set_u32(0, input, &SecurityContext::User);
+
+        assert_eq!(input, ram.get_u32(0, &SecurityContext::User));
     }
 }

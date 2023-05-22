@@ -1,8 +1,8 @@
 #![crate_name = "redox"]
 
 mod cpu;
-mod data_access_type;
-mod ram;
+mod mem;
+mod reg;
 mod security_context;
 pub mod vm;
 
