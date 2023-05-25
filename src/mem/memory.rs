@@ -2,9 +2,7 @@ use bitflags::bitflags;
 use prettytable::{row, Table};
 use std::fmt::{self, Display};
 
-use crate::security_context::SecurityContext;
-
-use super::data_access_type::DataAccessType;
+use crate::{data_access_type::DataAccessType, security_context::SecurityContext};
 
 bitflags! {
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -233,7 +231,7 @@ impl Memory {
     pub fn get_instruction_first_byte_ptr(&self, pos: usize, context: &SecurityContext) -> &u8 {
         self.assert_point_in_bounds(pos);
 
-        // Check whether the memory region has read permissions.
+        // Check whether the memory region has execution permissions.
         self.validate_access(pos, &DataAccessType::Execute, context, true);
 
         &self.storage[pos]
@@ -341,6 +339,7 @@ impl Memory {
         exec: bool,
     ) {
         // System-level contexts are permitted to do anything, without limitation.
+        // NOTE: This might end up being replaced with a ring-permission type system.
         if *context == SecurityContext::System {
             return;
         }

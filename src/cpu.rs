@@ -1,17 +1,19 @@
 use crate::{mem::memory::Memory, reg::registers::Registers};
 
 pub struct Cpu {
-    pub registers: Registers,
+    pub registers_u32: Registers,
+    pub is_halted: bool,
 }
 
 impl Cpu {
     pub fn new() -> Self {
         Self {
-            registers: Registers::new(),
+            registers_u32: Registers::new(),
+            is_halted: false,
         }
     }
 
-    pub fn run(&mut self, vm: &mut Memory) {
+    pub fn run(&mut self, vm: &mut Memory, mem_seq_id: usize) {
         // Do something fun here.
     }
 }

@@ -14,6 +14,6 @@ impl VirtualMachine {
     }
 
     pub fn run(&mut self) {
-        self.cpu.run(&mut self.ram);
+        self.cpu.run(&mut self.ram, 0);
     }
 }

@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
-use super::register::Register;
+use super::register::{Register, RegisterPermission, RegisterValue};
 
-pub enum RegisterNames {
+#[derive(Debug, Eq, PartialEq, Hash)]
+pub enum RegisterId {
     // [ User Registers ] //
     /// Data register 1.
     R1,
@@ -35,13 +36,18 @@ pub enum RegisterNames {
 }
 
 pub struct Registers {
-    pub registers: HashMap<RegisterNames, Register>,
+    pub registers: HashMap<RegisterId, Register>,
 }
 
 impl Registers {
     pub fn new() -> Self {
+        let rw_permissions = RegisterPermission::R | RegisterPermission::W;
+
         Self {
-            registers: HashMap::new(),
+            registers: HashMap::from([(
+                RegisterId::R1,
+                Register::new(RegisterId::R1, rw_permissions, RegisterValue::U32(0)),
+            )]),
         }
     }
 }
