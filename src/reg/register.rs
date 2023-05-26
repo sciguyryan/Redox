@@ -51,12 +51,14 @@ impl Register {
     }
 
     pub fn read(&self, context: &SecurityContext) -> &RegisterValue {
+        // Check whether the register has read permissions.
         self.validate_access(&DataAccessType::Read, context);
 
         &self.value
     }
 
     pub fn write(&mut self, value: RegisterValue, context: &SecurityContext) {
+        // Check whether the register has write permissions.
         self.validate_access(&DataAccessType::Write, context);
 
         let is_type_matching = match value {

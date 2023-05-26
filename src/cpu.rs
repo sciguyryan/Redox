@@ -8,7 +8,7 @@ pub struct Cpu {
 impl Cpu {
     pub fn new() -> Self {
         Self {
-            registers_u32: Registers::new(),
+            registers_u32: Registers::default(),
             is_halted: false,
         }
     }
