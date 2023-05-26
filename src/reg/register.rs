@@ -6,7 +6,7 @@ use crate::{data_access_type::DataAccessType, security_context::SecurityContext}
 use super::registers::RegisterId;
 
 bitflags! {
-    #[derive(Clone, Debug, Eq, PartialEq)]
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub struct RegisterPermission: u8 {
         /// None.
         const N = 1 << 0;
@@ -27,22 +27,17 @@ impl Display for RegisterPermission {
     }
 }
 
-pub enum RegisterValue {
-    Float(f32),
-    U32(u32),
-}
-
-pub struct Register {
+pub struct RegisterU32 {
     /// The ID of this register.
     pub id: RegisterId,
     /// The permissions of this register.
     pub permissions: RegisterPermission,
     /// The value of this register.
-    value: RegisterValue,
+    value: u32,
 }
 
-impl Register {
-    pub fn new(id: RegisterId, permissions: RegisterPermission, value: RegisterValue) -> Self {
+impl RegisterU32 {
+    pub fn new(id: RegisterId, permissions: RegisterPermission, value: u32) -> Self {
         Self {
             id,
             permissions,
@@ -50,25 +45,79 @@ impl Register {
         }
     }
 
-    pub fn read(&self, context: &SecurityContext) -> &RegisterValue {
+    pub fn read(&self, context: &SecurityContext) -> &u32 {
         // Check whether the register has read permissions.
         self.validate_access(&DataAccessType::Read, context);
 
         &self.value
     }
 
-    pub fn write(&mut self, value: RegisterValue, context: &SecurityContext) {
+    pub fn write(&mut self, value: u32, context: &SecurityContext) {
         // Check whether the register has write permissions.
         self.validate_access(&DataAccessType::Write, context);
 
-        let is_type_matching = match value {
-            RegisterValue::Float(_) => matches!(self.value, RegisterValue::Float(_)),
-            RegisterValue::U32(_) => matches!(self.value, RegisterValue::U32(_)),
+        self.value = value;
+    }
+
+    #[inline]
+    fn validate_access(&self, access_type: &DataAccessType, context: &SecurityContext) {
+        // System-level contexts are permitted to do anything, without limitation.
+        // NOTE: This might end up being replaced with a ring-permission type system.
+        if *context == SecurityContext::System {
+            return;
+        }
+
+        let permissions = &self.permissions;
+
+        // We need to check the read-write permissions on the specific register.
+        let has_required_perms = match access_type {
+            DataAccessType::Read => {
+                permissions.intersects(RegisterPermission::R)
+                    || (permissions.intersects(RegisterPermission::PR)
+                        && *context == SecurityContext::System)
+            }
+            DataAccessType::Write => {
+                permissions.intersects(RegisterPermission::W)
+                    || (permissions.intersects(RegisterPermission::PW)
+                        && *context == SecurityContext::System)
+            }
+            DataAccessType::Execute => panic!("Invalid access type specified."),
         };
 
-        if !is_type_matching {
-            panic!("attempted to change register value type");
+        if !has_required_perms {
+            panic!("attempted to access memory without the correct security context or access flags. Register = {:?}, Access Type = {access_type:?}, permissions = {permissions}.", self.id);
         }
+    }
+}
+
+pub struct RegisterF32 {
+    /// The ID of this register.
+    pub id: RegisterId,
+    /// The permissions of this register.
+    pub permissions: RegisterPermission,
+    /// The value of this register.
+    value: f32,
+}
+
+impl RegisterF32 {
+    pub fn new(id: RegisterId, permissions: RegisterPermission, value: f32) -> Self {
+        Self {
+            id,
+            permissions,
+            value,
+        }
+    }
+
+    pub fn read(&self, context: &SecurityContext) -> &f32 {
+        // Check whether the register has read permissions.
+        self.validate_access(&DataAccessType::Read, context);
+
+        &self.value
+    }
+
+    pub fn write(&mut self, value: f32, context: &SecurityContext) {
+        // Check whether the register has write permissions.
+        self.validate_access(&DataAccessType::Write, context);
 
         self.value = value;
     }

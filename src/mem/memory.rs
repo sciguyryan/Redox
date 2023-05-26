@@ -392,7 +392,7 @@ impl Memory {
 }
 
 #[cfg(test)]
-mod tests_ram {
+mod tests_memory {
     use std::panic;
 
     use crate::{mem::memory::MemoryRegion, security_context::SecurityContext};

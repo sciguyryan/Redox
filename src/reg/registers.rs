@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::register::{Register, RegisterPermission, RegisterValue};
+use super::register::{RegisterF32, RegisterPermission, RegisterU32};
 
 #[derive(Debug, Eq, PartialEq, Hash)]
 #[repr(u8)]
@@ -64,14 +64,18 @@ pub enum RegisterId {
     T0,
 }
 
-macro_rules! register {
-    ($a:expr, $b:expr, $c:expr) => {{
-        ($a, Register::new($a, $b.clone(), $c))
+macro_rules! register_u32 {
+    ($b:expr, $c:expr, $d:expr) => {{
+        use super::register::RegisterU32;
+        ($b, RegisterU32::new($b, $c.clone(), $d))
     }};
 }
 
 pub struct Registers {
-    pub registers: HashMap<RegisterId, Register>,
+    /// A hashmap of the u32 registers.
+    pub registers_u32: HashMap<RegisterId, RegisterU32>,
+    /// A hashmap of the f32 registers.
+    pub registers_f32: HashMap<RegisterId, RegisterF32>,
 }
 
 impl Registers {
@@ -81,25 +85,26 @@ impl Registers {
         let prpw = RegisterPermission::PR | RegisterPermission::PW;
 
         Self {
-            registers: HashMap::from([
+            registers_u32: HashMap::from([
                 // [ User Registers ] //
-                register!(RegisterId::R1, &rw, RegisterValue::U32(0)),
-                register!(RegisterId::R2, &rw, RegisterValue::U32(0)),
-                register!(RegisterId::R3, &rw, RegisterValue::U32(0)),
-                register!(RegisterId::R4, &rw, RegisterValue::U32(0)),
-                register!(RegisterId::R5, &rw, RegisterValue::U32(0)),
-                register!(RegisterId::R6, &rw, RegisterValue::U32(0)),
-                register!(RegisterId::R7, &rw, RegisterValue::U32(0)),
-                register!(RegisterId::R8, &rw, RegisterValue::U32(0)),
+                register_u32!(RegisterId::R1, &rw, 0),
+                register_u32!(RegisterId::R2, &rw, 0),
+                register_u32!(RegisterId::R3, &rw, 0),
+                register_u32!(RegisterId::R4, &rw, 0),
+                register_u32!(RegisterId::R5, &rw, 0),
+                register_u32!(RegisterId::R6, &rw, 0),
+                register_u32!(RegisterId::R7, &rw, 0),
+                register_u32!(RegisterId::R8, &rw, 0),
                 // [System Registers] //
-                register!(RegisterId::AC, &rw, RegisterValue::U32(0)),
-                register!(RegisterId::IP, &rw, RegisterValue::U32(0)),
-                register!(RegisterId::SP, &prpw, RegisterValue::U32(0)),
-                register!(RegisterId::FP, &prpw, RegisterValue::U32(0)),
-                register!(RegisterId::FL, &prpw, RegisterValue::U32(0)),
-                //register!(RegisterId::T0, &prpw, RegisterValue::U32(0)),
-                register!(RegisterId::PC, &rpw, RegisterValue::U32(0)),
+                register_u32!(RegisterId::AC, &rw, 0),
+                register_u32!(RegisterId::IP, &rw, 0),
+                register_u32!(RegisterId::SP, &prpw, 0),
+                register_u32!(RegisterId::FP, &prpw, 0),
+                register_u32!(RegisterId::FL, &prpw, 0),
+                //register!(RegisterId::T0, &prpw, 0),
+                register_u32!(RegisterId::PC, &rpw, 0),
             ]),
+            registers_f32: HashMap::new(),
         }
     }
 }
