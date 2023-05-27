@@ -161,121 +161,226 @@ mod tests_registers {
 
     use super::{RegisterF32, RegisterPermission, RegisterU32};
 
-    /// Test the reading of a (u32) register.
+    enum TestType {
+        Read,
+        Write,
+    }
+
+    /// Test the reading and writing of a (u32) register.
     #[test]
-    fn test_register_read_u32() {
+    fn test_register_u32() {
         let rw = RegisterPermission::R | RegisterPermission::W;
         let prpw = RegisterPermission::PR | RegisterPermission::PW;
 
         let tests = [
-            (10, rw, SecurityContext::User, false),
-            (10, rw, SecurityContext::System, false),
-            (10, prpw, SecurityContext::User, true),
-            (10, prpw, SecurityContext::System, false),
+            (
+                TestType::Read,
+                10,
+                None,
+                10,
+                rw,
+                SecurityContext::User,
+                false,
+            ),
+            (
+                TestType::Read,
+                10,
+                None,
+                10,
+                rw,
+                SecurityContext::System,
+                false,
+            ),
+            (
+                TestType::Read,
+                10,
+                None,
+                10,
+                prpw,
+                SecurityContext::User,
+                true,
+            ),
+            (
+                TestType::Read,
+                10,
+                None,
+                10,
+                prpw,
+                SecurityContext::System,
+                false,
+            ),
+            (
+                TestType::Write,
+                0,
+                Some(10),
+                10,
+                rw,
+                SecurityContext::User,
+                false,
+            ),
+            (
+                TestType::Write,
+                0,
+                Some(10),
+                10,
+                rw,
+                SecurityContext::System,
+                false,
+            ),
+            (
+                TestType::Write,
+                0,
+                Some(10),
+                10,
+                prpw,
+                SecurityContext::User,
+                true,
+            ),
+            (
+                TestType::Write,
+                0,
+                Some(10),
+                10,
+                prpw,
+                SecurityContext::System,
+                false,
+            ),
         ];
 
         for test in tests {
             let result = panic::catch_unwind(|| {
-                let register = RegisterU32::new(RegisterId::R1, test.1, 10);
-                *register.read(&test.2)
+                let mut register = RegisterU32::new(RegisterId::R1, test.4, test.1);
+
+                if matches!(test.0, TestType::Write) {
+                    register.write(test.2.unwrap(), &test.5);
+                }
+
+                *register.read(&test.5)
             });
 
             let did_panic = result.is_err();
-            assert_eq!(
-                did_panic,
-                test.3,
-                "Read Failed - Expected Value: {}, Got Value: {}, Context: {:?}, Should Panic? {}, Panicked? {did_panic}.",
-                test.0, result.unwrap(), test.2, test.3
-            );
+            if did_panic != test.6 {
+                let message = match test.0 {
+                    TestType::Read => format!(
+                        "Read Failed - Expected Value: {}, Got Value: {}, Context: {:?}, Should Panic? {}, Panicked? {did_panic}.",
+                        test.1, result.unwrap(), test.5, test.6
+                    ),
+                    TestType::Write => format!(
+                        "Write Failed - Expected Value: {}, Got Value: {}, Context: {:?}, Should Panic? {}, Panicked? {did_panic}.",
+                        test.2.unwrap(), result.unwrap(), test.5, test.6
+                    ),
+                };
+                panic!("{message}");
+            }
         }
     }
 
-    /// Test the writing of a (u32) register.
+    /// Test the reading and writing of a (f32) register.
     #[test]
-    fn test_register_write_u32() {
+    fn test_register_f32() {
         let rw = RegisterPermission::R | RegisterPermission::W;
         let prpw = RegisterPermission::PR | RegisterPermission::PW;
 
         let tests = [
-            (10, rw, SecurityContext::User, false),
-            (10, rw, SecurityContext::System, false),
-            (10, prpw, SecurityContext::User, true),
-            (10, prpw, SecurityContext::System, false),
+            (
+                TestType::Read,
+                10f32,
+                None,
+                10f32,
+                rw,
+                SecurityContext::User,
+                false,
+            ),
+            (
+                TestType::Read,
+                10f32,
+                None,
+                10f32,
+                rw,
+                SecurityContext::System,
+                false,
+            ),
+            (
+                TestType::Read,
+                10f32,
+                None,
+                10f32,
+                prpw,
+                SecurityContext::User,
+                true,
+            ),
+            (
+                TestType::Read,
+                10f32,
+                None,
+                10f32,
+                prpw,
+                SecurityContext::System,
+                false,
+            ),
+            (
+                TestType::Write,
+                0f32,
+                Some(10f32),
+                10f32,
+                rw,
+                SecurityContext::User,
+                false,
+            ),
+            (
+                TestType::Write,
+                0f32,
+                Some(10f32),
+                10f32,
+                rw,
+                SecurityContext::System,
+                false,
+            ),
+            (
+                TestType::Write,
+                0f32,
+                Some(10f32),
+                10f32,
+                prpw,
+                SecurityContext::User,
+                true,
+            ),
+            (
+                TestType::Write,
+                0f32,
+                Some(10f32),
+                10f32,
+                prpw,
+                SecurityContext::System,
+                false,
+            ),
         ];
 
         for test in tests {
             let result = panic::catch_unwind(|| {
-                let mut register = RegisterU32::new(RegisterId::R1, test.1, 0);
-                register.write(test.0, &test.2);
-                *register.read(&test.2)
+                let mut register = RegisterF32::new(RegisterId::R1, test.4, test.1);
+
+                if matches!(test.0, TestType::Write) {
+                    register.write(test.2.unwrap(), &test.5);
+                }
+
+                *register.read(&test.5)
             });
 
             let did_panic = result.is_err();
-            assert_eq!(
-                did_panic,
-                test.3,
-                "Write Failed - Expected Value: {}, Got Value: {}, Context: {:?}, Should Panic? {}, Panicked? {did_panic}.",
-                test.0, result.unwrap(), test.2, test.3
-            );
-        }
-    }
-
-    /// Test the reading of a (f32) register.
-    #[test]
-    fn test_register_read_f32() {
-        let rw = RegisterPermission::R | RegisterPermission::W;
-        let prpw = RegisterPermission::PR | RegisterPermission::PW;
-
-        let tests = [
-            (10f32, rw, SecurityContext::User, false),
-            (10f32, rw, SecurityContext::System, false),
-            (10f32, prpw, SecurityContext::User, true),
-            (10f32, prpw, SecurityContext::System, false),
-        ];
-
-        for test in tests {
-            let result = panic::catch_unwind(|| {
-                let register = RegisterF32::new(RegisterId::R1, test.1, 10f32);
-                *register.read(&test.2)
-            });
-
-            let did_panic = result.is_err();
-            assert_eq!(
-                did_panic,
-                test.3,
-                "Read Failed - Expected Value: {}, Got Value: {}, Context: {:?}, Should Panic? {}, Panicked? {did_panic}.",
-                test.0, result.unwrap(), test.2, test.3
-            );
-        }
-    }
-
-    /// Test the writing of a (f32) register.
-    #[test]
-    fn test_register_write_f32() {
-        let rw = RegisterPermission::R | RegisterPermission::W;
-        let prpw = RegisterPermission::PR | RegisterPermission::PW;
-
-        let tests = [
-            (10f32, rw, SecurityContext::User, false),
-            (10f32, rw, SecurityContext::System, false),
-            (10f32, prpw, SecurityContext::User, true),
-            (10f32, prpw, SecurityContext::System, false),
-        ];
-
-        for test in tests {
-            let result = panic::catch_unwind(|| {
-                let mut register = RegisterF32::new(RegisterId::R1, test.1, 0f32);
-                register.write(test.0, &test.2);
-                *register.read(&test.2)
-            });
-
-            let did_panic = result.is_err();
-            assert_eq!(
-                did_panic,
-                test.3,
-                "Write Failed - Expected Value: {}, Got Value: {}, Context: {:?}, Should Panic? {}, Panicked? {did_panic}.",
-                test.0, result.unwrap(), test.2, test.3
-            );
+            if did_panic != test.6 {
+                let message = match test.0 {
+                    TestType::Read => format!(
+                        "Read Failed - Expected Value: {}, Got Value: {}, Context: {:?}, Should Panic? {}, Panicked? {did_panic}.",
+                        test.1, result.unwrap(), test.5, test.6
+                    ),
+                    TestType::Write => format!(
+                        "Write Failed - Expected Value: {}, Got Value: {}, Context: {:?}, Should Panic? {}, Panicked? {did_panic}.",
+                        test.2.unwrap(), result.unwrap(), test.5, test.6
+                    ),
+                };
+                panic!("{message}");
+            }
         }
     }
 }
