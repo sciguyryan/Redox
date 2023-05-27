@@ -181,6 +181,7 @@ mod tests_registers {
                 rw,
                 SecurityContext::User,
                 false,
+                "failed to read a value from a u32 R|W register, with user context",
             ),
             (
                 TestType::Read,
@@ -190,6 +191,7 @@ mod tests_registers {
                 rw,
                 SecurityContext::System,
                 false,
+                "failed to read a value from a u32 R|W register, with system context",
             ),
             (
                 TestType::Read,
@@ -199,6 +201,7 @@ mod tests_registers {
                 prpw,
                 SecurityContext::User,
                 true,
+                "succeeded in reading a value from a u32 PR|PW register, with user context",
             ),
             (
                 TestType::Read,
@@ -208,6 +211,7 @@ mod tests_registers {
                 prpw,
                 SecurityContext::System,
                 false,
+                "failed to read a value from a u32 PR|PW register, with system context",
             ),
             (
                 TestType::Write,
@@ -217,6 +221,7 @@ mod tests_registers {
                 rw,
                 SecurityContext::User,
                 false,
+                "failed to write a value to a u32 R|W register, with user context",
             ),
             (
                 TestType::Write,
@@ -226,6 +231,7 @@ mod tests_registers {
                 rw,
                 SecurityContext::System,
                 false,
+                "failed to write a value to a u32 R|W register, with system context",
             ),
             (
                 TestType::Write,
@@ -235,6 +241,7 @@ mod tests_registers {
                 prpw,
                 SecurityContext::User,
                 true,
+                "succeeded in writing a value to a u32 PR|PW register, with user context",
             ),
             (
                 TestType::Write,
@@ -244,6 +251,7 @@ mod tests_registers {
                 prpw,
                 SecurityContext::System,
                 false,
+                "failed to write a value to a u32 R|W register, with system context",
             ),
         ];
 
@@ -266,8 +274,8 @@ mod tests_registers {
                         test.1, result.unwrap(), test.5, test.6
                     ),
                     TestType::Write => format!(
-                        "Write Failed - Expected Value: {}, Got Value: {}, Context: {:?}, Should Panic? {}, Panicked? {did_panic}.",
-                        test.2.unwrap(), result.unwrap(), test.5, test.6
+                        "Write Failed - Expected Value: {}, Got Value: {}, Context: {:?}, Should Panic? {}, Panicked? {did_panic}. Message: {}",
+                        test.2.unwrap(), result.unwrap(), test.5, test.6, test.7
                     ),
                 };
                 panic!("{message}");
@@ -290,6 +298,7 @@ mod tests_registers {
                 rw,
                 SecurityContext::User,
                 false,
+                "failed to read a value from a f32 R|W register, with user context",
             ),
             (
                 TestType::Read,
@@ -299,6 +308,7 @@ mod tests_registers {
                 rw,
                 SecurityContext::System,
                 false,
+                "failed to read a value from a f32 R|W register, with system context",
             ),
             (
                 TestType::Read,
@@ -308,6 +318,7 @@ mod tests_registers {
                 prpw,
                 SecurityContext::User,
                 true,
+                "succeeded in reading a value from a f32 PR|PW register, with user context",
             ),
             (
                 TestType::Read,
@@ -317,6 +328,7 @@ mod tests_registers {
                 prpw,
                 SecurityContext::System,
                 false,
+                "failed to read a value from a f32 PR|PW register, with system context",
             ),
             (
                 TestType::Write,
@@ -326,6 +338,7 @@ mod tests_registers {
                 rw,
                 SecurityContext::User,
                 false,
+                "failed to write a value to a f32 R|W register, with user context",
             ),
             (
                 TestType::Write,
@@ -335,6 +348,7 @@ mod tests_registers {
                 rw,
                 SecurityContext::System,
                 false,
+                "failed to write a value to a f32 R|W register, with system context",
             ),
             (
                 TestType::Write,
@@ -344,6 +358,7 @@ mod tests_registers {
                 prpw,
                 SecurityContext::User,
                 true,
+                "succeeded in writing a value to a f32 PR|PW register, with user context",
             ),
             (
                 TestType::Write,
@@ -353,6 +368,7 @@ mod tests_registers {
                 prpw,
                 SecurityContext::System,
                 false,
+                "failed to write a value to a u32 R|W register, with system context",
             ),
         ];
 
@@ -371,12 +387,12 @@ mod tests_registers {
             if did_panic != test.6 {
                 let message = match test.0 {
                     TestType::Read => format!(
-                        "Read Failed - Expected Value: {}, Got Value: {}, Context: {:?}, Should Panic? {}, Panicked? {did_panic}.",
-                        test.1, result.unwrap(), test.5, test.6
+                        "Read Failed - Expected Value: {}, Got Value: {}, Context: {:?}, Should Panic? {}, Panicked? {did_panic}. Message: {}",
+                        test.1, result.unwrap(), test.5, test.6, test.7
                     ),
                     TestType::Write => format!(
-                        "Write Failed - Expected Value: {}, Got Value: {}, Context: {:?}, Should Panic? {}, Panicked? {did_panic}.",
-                        test.2.unwrap(), result.unwrap(), test.5, test.6
+                        "Write Failed - Expected Value: {}, Got Value: {}, Context: {:?}, Should Panic? {}, Panicked? {did_panic}. Message: {}",
+                        test.2.unwrap(), result.unwrap(), test.5, test.6, test.7
                     ),
                 };
                 panic!("{message}");
