@@ -152,3 +152,130 @@ impl RegisterF32 {
         }
     }
 }
+
+#[cfg(test)]
+mod tests_registers {
+    use std::panic;
+
+    use crate::{reg::registers::RegisterId, security_context::SecurityContext};
+
+    use super::{RegisterF32, RegisterPermission, RegisterU32};
+
+    /// Test the reading of a (u32) register.
+    #[test]
+    fn test_register_read_u32() {
+        let rw = RegisterPermission::R | RegisterPermission::W;
+        let prpw = RegisterPermission::PR | RegisterPermission::PW;
+
+        let tests = [
+            (10, rw, SecurityContext::User, false),
+            (10, rw, SecurityContext::System, false),
+            (10, prpw, SecurityContext::User, true),
+            (10, prpw, SecurityContext::System, false),
+        ];
+
+        for test in tests {
+            let result = panic::catch_unwind(|| {
+                let register = RegisterU32::new(RegisterId::R1, test.1, 10);
+                *register.read(&test.2)
+            });
+
+            let did_panic = result.is_err();
+            assert_eq!(
+                did_panic,
+                test.3,
+                "Read Failed - Expected Value: {}, Got Value: {}, Context: {:?}, Should Panic? {}, Panicked? {did_panic}.",
+                test.0, result.unwrap(), test.2, test.3
+            );
+        }
+    }
+
+    /// Test the writing of a (u32) register.
+    #[test]
+    fn test_register_write_u32() {
+        let rw = RegisterPermission::R | RegisterPermission::W;
+        let prpw = RegisterPermission::PR | RegisterPermission::PW;
+
+        let tests = [
+            (10, rw, SecurityContext::User, false),
+            (10, rw, SecurityContext::System, false),
+            (10, prpw, SecurityContext::User, true),
+            (10, prpw, SecurityContext::System, false),
+        ];
+
+        for test in tests {
+            let result = panic::catch_unwind(|| {
+                let mut register = RegisterU32::new(RegisterId::R1, test.1, 0);
+                register.write(test.0, &test.2);
+                *register.read(&test.2)
+            });
+
+            let did_panic = result.is_err();
+            assert_eq!(
+                did_panic,
+                test.3,
+                "Write Failed - Expected Value: {}, Got Value: {}, Context: {:?}, Should Panic? {}, Panicked? {did_panic}.",
+                test.0, result.unwrap(), test.2, test.3
+            );
+        }
+    }
+
+    /// Test the reading of a (f32) register.
+    #[test]
+    fn test_register_read_f32() {
+        let rw = RegisterPermission::R | RegisterPermission::W;
+        let prpw = RegisterPermission::PR | RegisterPermission::PW;
+
+        let tests = [
+            (10f32, rw, SecurityContext::User, false),
+            (10f32, rw, SecurityContext::System, false),
+            (10f32, prpw, SecurityContext::User, true),
+            (10f32, prpw, SecurityContext::System, false),
+        ];
+
+        for test in tests {
+            let result = panic::catch_unwind(|| {
+                let register = RegisterF32::new(RegisterId::R1, test.1, 10f32);
+                *register.read(&test.2)
+            });
+
+            let did_panic = result.is_err();
+            assert_eq!(
+                did_panic,
+                test.3,
+                "Read Failed - Expected Value: {}, Got Value: {}, Context: {:?}, Should Panic? {}, Panicked? {did_panic}.",
+                test.0, result.unwrap(), test.2, test.3
+            );
+        }
+    }
+
+    /// Test the writing of a (f32) register.
+    #[test]
+    fn test_register_write_f32() {
+        let rw = RegisterPermission::R | RegisterPermission::W;
+        let prpw = RegisterPermission::PR | RegisterPermission::PW;
+
+        let tests = [
+            (10f32, rw, SecurityContext::User, false),
+            (10f32, rw, SecurityContext::System, false),
+            (10f32, prpw, SecurityContext::User, true),
+            (10f32, prpw, SecurityContext::System, false),
+        ];
+
+        for test in tests {
+            let result = panic::catch_unwind(|| {
+                let mut register = RegisterF32::new(RegisterId::R1, test.1, 0f32);
+                register.write(test.0, &test.2);
+                *register.read(&test.2)
+            });
+
+            let did_panic = result.is_err();
+            assert_eq!(
+                did_panic,
+                test.3,
+                "Write Failed - Expected Value: {}, Got Value: {}, Context: {:?}, Should Panic? {}, Panicked? {did_panic}.",
+                test.0, result.unwrap(), test.2, test.3
+            );
+        }
+    }
+}
