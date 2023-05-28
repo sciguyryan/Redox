@@ -153,17 +153,81 @@ impl RegisterF32 {
     }
 }
 
+pub trait RegisterTypes {}
+impl RegisterTypes for RegisterF32 {}
+impl RegisterTypes for RegisterU32 {}
+
 #[cfg(test)]
 mod tests_registers {
-    use std::panic;
+    use std::{
+        fmt::{Debug, Display},
+        panic,
+    };
 
     use crate::{reg::registers::RegisterId, security_context::SecurityContext};
 
     use super::{RegisterF32, RegisterPermission, RegisterU32};
 
+    trait RegisterValueTest {}
+    impl RegisterValueTest for f32 {}
+    impl RegisterValueTest for u32 {}
+
     enum TestType {
         Read,
         Write,
+    }
+
+    struct TestEntry<T: RegisterValueTest + Display + Debug> {
+        pub test_type: TestType,
+        pub initial_value: T,
+        pub write_value: Option<T>,
+        pub expected_value: T,
+        pub permissions: RegisterPermission,
+        pub context: SecurityContext,
+        pub should_panic: bool,
+        pub fail_message: String,
+    }
+
+    impl<T: RegisterValueTest + Display + Debug> TestEntry<T> {
+        #[allow(clippy::too_many_arguments)]
+        pub fn new(
+            test_type: TestType,
+            initial_value: T,
+            write_value: Option<T>,
+            expected_value: T,
+            permissions: &RegisterPermission,
+            context: SecurityContext,
+            should_panic: bool,
+            fail_message: &str,
+        ) -> Self {
+            Self {
+                test_type,
+                initial_value,
+                write_value,
+                expected_value,
+                permissions: *permissions,
+                context,
+                should_panic,
+                fail_message: fail_message.to_string(),
+            }
+        }
+
+        pub fn fail_message(&self, got_value: Option<T>, did_panic: bool) -> String {
+            match self.test_type {
+                TestType::Read => {
+                    format!(
+                        "Read Failed - Expected Value: {}, Got Value: {:?}, Context: {:?}, Should Panic? {}, Panicked? {did_panic}. Message: {}",
+                        self.initial_value, got_value, self.context, self.should_panic, did_panic
+                    )
+                }
+                TestType::Write => {
+                    format!(
+                        "Write Failed - Expected Value: {}, Got Value: {:?}, Context: {:?}, Should Panic? {}, Panicked? {did_panic}. Message: {}",
+                        self.initial_value, got_value, self.context, self.should_panic, self.fail_message
+                    )
+                }
+            }
+        }
     }
 
     /// Test the reading and writing of a (u32) register.
@@ -173,82 +237,82 @@ mod tests_registers {
         let prpw = RegisterPermission::PR | RegisterPermission::PW;
 
         let tests = [
-            (
+            TestEntry::new(
                 TestType::Read,
                 10,
                 None,
                 10,
-                rw,
+                &rw,
                 SecurityContext::User,
                 false,
                 "failed to read a value from a u32 R|W register, with user context",
             ),
-            (
+            TestEntry::new(
                 TestType::Read,
                 10,
                 None,
                 10,
-                rw,
+                &rw,
                 SecurityContext::System,
                 false,
                 "failed to read a value from a u32 R|W register, with system context",
             ),
-            (
+            TestEntry::new(
                 TestType::Read,
                 10,
                 None,
                 10,
-                prpw,
+                &prpw,
                 SecurityContext::User,
                 true,
                 "succeeded in reading a value from a u32 PR|PW register, with user context",
             ),
-            (
+            TestEntry::new(
                 TestType::Read,
                 10,
                 None,
                 10,
-                prpw,
+                &prpw,
                 SecurityContext::System,
                 false,
                 "failed to read a value from a u32 PR|PW register, with system context",
             ),
-            (
+            TestEntry::new(
                 TestType::Write,
                 0,
                 Some(10),
                 10,
-                rw,
+                &rw,
                 SecurityContext::User,
                 false,
                 "failed to write a value to a u32 R|W register, with user context",
             ),
-            (
+            TestEntry::new(
                 TestType::Write,
                 0,
                 Some(10),
                 10,
-                rw,
+                &rw,
                 SecurityContext::System,
                 false,
                 "failed to write a value to a u32 R|W register, with system context",
             ),
-            (
+            TestEntry::new(
                 TestType::Write,
                 0,
                 Some(10),
                 10,
-                prpw,
+                &prpw,
                 SecurityContext::User,
                 true,
                 "succeeded in writing a value to a u32 PR|PW register, with user context",
             ),
-            (
+            TestEntry::new(
                 TestType::Write,
                 0,
                 Some(10),
                 10,
-                prpw,
+                &prpw,
                 SecurityContext::System,
                 false,
                 "failed to write a value to a u32 R|W register, with system context",
@@ -257,29 +321,32 @@ mod tests_registers {
 
         for test in tests {
             let result = panic::catch_unwind(|| {
-                let mut register = RegisterU32::new(RegisterId::R1, test.4, test.1);
+                let mut register =
+                    RegisterU32::new(RegisterId::R1, test.permissions, test.initial_value);
 
-                if matches!(test.0, TestType::Write) {
-                    register.write(test.2.unwrap(), &test.5);
+                if matches!(test.test_type, TestType::Write) {
+                    register.write(test.write_value.unwrap(), &test.context);
                 }
 
-                *register.read(&test.5)
+                let value = *register.read(&test.context);
+
+                // Check that the read value is correct.
+                assert_eq!(
+                    value,
+                    test.expected_value,
+                    "{}",
+                    test.fail_message(Some(value), false)
+                );
             });
 
+            // Check whether we panicked, and if we should have.
             let did_panic = result.is_err();
-            if did_panic != test.6 {
-                let message = match test.0 {
-                    TestType::Read => format!(
-                        "Read Failed - Expected Value: {}, Got Value: {}, Context: {:?}, Should Panic? {}, Panicked? {did_panic}.",
-                        test.1, result.unwrap(), test.5, test.6
-                    ),
-                    TestType::Write => format!(
-                        "Write Failed - Expected Value: {}, Got Value: {}, Context: {:?}, Should Panic? {}, Panicked? {did_panic}. Message: {}",
-                        test.2.unwrap(), result.unwrap(), test.5, test.6, test.7
-                    ),
-                };
-                panic!("{message}");
-            }
+            assert_eq!(
+                did_panic,
+                test.should_panic,
+                "{}",
+                test.fail_message(None, did_panic)
+            );
         }
     }
 
@@ -290,82 +357,82 @@ mod tests_registers {
         let prpw = RegisterPermission::PR | RegisterPermission::PW;
 
         let tests = [
-            (
+            TestEntry::new(
                 TestType::Read,
                 10f32,
                 None,
                 10f32,
-                rw,
+                &rw,
                 SecurityContext::User,
                 false,
-                "failed to read a value from a f32 R|W register, with user context",
+                "failed to read a value from a u32 R|W register, with user context",
             ),
-            (
+            TestEntry::new(
                 TestType::Read,
                 10f32,
                 None,
                 10f32,
-                rw,
+                &rw,
                 SecurityContext::System,
                 false,
-                "failed to read a value from a f32 R|W register, with system context",
+                "failed to read a value from a u32 R|W register, with system context",
             ),
-            (
+            TestEntry::new(
                 TestType::Read,
                 10f32,
                 None,
                 10f32,
-                prpw,
+                &prpw,
                 SecurityContext::User,
                 true,
-                "succeeded in reading a value from a f32 PR|PW register, with user context",
+                "succeeded in reading a value from a u32 PR|PW register, with user context",
             ),
-            (
+            TestEntry::new(
                 TestType::Read,
                 10f32,
                 None,
                 10f32,
-                prpw,
+                &prpw,
                 SecurityContext::System,
                 false,
-                "failed to read a value from a f32 PR|PW register, with system context",
+                "failed to read a value from a u32 PR|PW register, with system context",
             ),
-            (
+            TestEntry::new(
                 TestType::Write,
                 0f32,
                 Some(10f32),
                 10f32,
-                rw,
+                &rw,
                 SecurityContext::User,
                 false,
-                "failed to write a value to a f32 R|W register, with user context",
+                "failed to write a value to a u32 R|W register, with user context",
             ),
-            (
+            TestEntry::new(
                 TestType::Write,
                 0f32,
                 Some(10f32),
                 10f32,
-                rw,
+                &rw,
                 SecurityContext::System,
                 false,
-                "failed to write a value to a f32 R|W register, with system context",
+                "failed to write a value to a u32 R|W register, with system context",
             ),
-            (
+            TestEntry::new(
                 TestType::Write,
                 0f32,
                 Some(10f32),
                 10f32,
-                prpw,
+                &prpw,
                 SecurityContext::User,
                 true,
-                "succeeded in writing a value to a f32 PR|PW register, with user context",
+                "succeeded in writing a value to a u32 PR|PW register, with user context",
             ),
-            (
+            TestEntry::new(
                 TestType::Write,
                 0f32,
                 Some(10f32),
                 10f32,
-                prpw,
+                &prpw,
                 SecurityContext::System,
                 false,
                 "failed to write a value to a u32 R|W register, with system context",
@@ -374,29 +441,32 @@ mod tests_registers {
 
         for test in tests {
             let result = panic::catch_unwind(|| {
-                let mut register = RegisterF32::new(RegisterId::R1, test.4, test.1);
+                let mut register =
+                    RegisterF32::new(RegisterId::R1, test.permissions, test.initial_value);
 
-                if matches!(test.0, TestType::Write) {
-                    register.write(test.2.unwrap(), &test.5);
+                if matches!(test.test_type, TestType::Write) {
+                    register.write(test.write_value.unwrap(), &test.context);
                 }
 
-                *register.read(&test.5)
+                let value = *register.read(&test.context);
+
+                // Check that the read value is correct.
+                assert_eq!(
+                    value,
+                    test.expected_value,
+                    "{}",
+                    test.fail_message(Some(value), false)
+                );
             });
 
+            // Check whether we panicked, and if we should have.
             let did_panic = result.is_err();
-            if did_panic != test.6 {
-                let message = match test.0 {
-                    TestType::Read => format!(
-                        "Read Failed - Expected Value: {}, Got Value: {}, Context: {:?}, Should Panic? {}, Panicked? {did_panic}. Message: {}",
-                        test.1, result.unwrap(), test.5, test.6, test.7
-                    ),
-                    TestType::Write => format!(
-                        "Write Failed - Expected Value: {}, Got Value: {}, Context: {:?}, Should Panic? {}, Panicked? {did_panic}. Message: {}",
-                        test.2.unwrap(), result.unwrap(), test.5, test.6, test.7
-                    ),
-                };
-                panic!("{message}");
-            }
+            assert_eq!(
+                did_panic,
+                test.should_panic,
+                "{}",
+                test.fail_message(None, did_panic)
+            );
         }
     }
 }
