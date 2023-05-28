@@ -212,21 +212,16 @@ mod tests_registers {
             }
         }
 
-        pub fn fail_message(&self, got_value: Option<T>, did_panic: bool) -> String {
-            match self.test_type {
-                TestType::Read => {
-                    format!(
-                        "Read Failed - Expected Value: {}, Got Value: {:?}, Context: {:?}, Should Panic? {}, Panicked? {did_panic}. Message: {}",
-                        self.initial_value, got_value, self.context, self.should_panic, did_panic
-                    )
-                }
-                TestType::Write => {
-                    format!(
-                        "Write Failed - Expected Value: {}, Got Value: {:?}, Context: {:?}, Should Panic? {}, Panicked? {did_panic}. Message: {}",
-                        self.initial_value, got_value, self.context, self.should_panic, self.fail_message
-                    )
-                }
-            }
+        pub fn fail_message(&self, id: usize, got_value: Option<T>, panicked: bool) -> String {
+            let test_type = match self.test_type {
+                TestType::Read => "Read",
+                TestType::Write => "Write"
+            };
+
+            format!(
+                "{test_type} Test {id} Failed - Expected: {:?}, Got: {got_value:?}, Should Panic? {}, Panicked? {panicked}. Message = {}",
+                self.expected_value, self.should_panic, self.fail_message
+            )
         }
     }
 
@@ -319,7 +314,7 @@ mod tests_registers {
             ),
         ];
 
-        for test in tests {
+        for (i, test) in tests.iter().enumerate() {
             let result = panic::catch_unwind(|| {
                 let mut register =
                     RegisterU32::new(RegisterId::R1, test.permissions, test.initial_value);
@@ -335,7 +330,7 @@ mod tests_registers {
                     value,
                     test.expected_value,
                     "{}",
-                    test.fail_message(Some(value), false)
+                    test.fail_message(i, Some(value), false)
                 );
             });
 
@@ -345,7 +340,7 @@ mod tests_registers {
                 did_panic,
                 test.should_panic,
                 "{}",
-                test.fail_message(None, did_panic)
+                test.fail_message(i, None, did_panic)
             );
         }
     }
@@ -439,7 +434,7 @@ mod tests_registers {
             ),
         ];
 
-        for test in tests {
+        for (i, test) in tests.iter().enumerate() {
             let result = panic::catch_unwind(|| {
                 let mut register =
                     RegisterF32::new(RegisterId::R1, test.permissions, test.initial_value);
@@ -455,7 +450,7 @@ mod tests_registers {
                     value,
                     test.expected_value,
                     "{}",
-                    test.fail_message(Some(value), false)
+                    test.fail_message(i, Some(value), false)
                 );
             });
 
@@ -465,7 +460,7 @@ mod tests_registers {
                 did_panic,
                 test.should_panic,
                 "{}",
-                test.fail_message(None, did_panic)
+                test.fail_message(i, None, did_panic)
             );
         }
     }

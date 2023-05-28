@@ -433,28 +433,17 @@ mod tests_memory {
             }
         }
 
-        pub fn fail_message(&self, did_panic: bool) -> String {
-            /*match self.test_type {
-                TestType::Read => {
-                    format!(
-                        "Read Failed - Expected: {}, Got: {}, Context: {:?}, Should Panic? {}, Panicked? {did_panic}. Message = {}",
-                        self.start, self.end.unwrap(), self.context, self.should_panic, self.fail_message
-                    )
-                }
-                TestType::Write => {
-                    format!(
-                        "Write Failed - Start: {}, End: {}, Values: {:?}, Context: {:?}, Should Panic? {}, Panicked? {did_panic}. Message = {}",
-                        self.start, self.values.clone(), self.context, self.should_panic, self.fail_message
-                    )
-                }
-                TestType::Execute => {
-                    format!(
-                        "Execute Failed - Start: {}, Context: {:?}, Should Panic? {}, Panicked? {did_panic}. Message = {}",
-                        self.start, self.context, self.should_panic, self.fail_message
-                    )
-                }
-            }*/
-            "".to_string()
+        pub fn fail_message(&self, id: usize, did_panic: bool, values: &[u8]) -> String {
+            let test_type = match self.test_type {
+                TestType::Read => "Read",
+                TestType::Write => "Write",
+                TestType::Execute => "Execute"
+            };
+
+            format!(
+                "{test_type} Test {id} Failed - Expected: {:?}, Got: {:?}, Should Panic? {}, Panicked? {did_panic}. Message = {}",
+                self.expected_values, values, self.should_panic, self.fail_message
+            )
         }
     }
 
@@ -619,16 +608,16 @@ mod tests_memory {
             ),
         ];
 
-        for test in tests {
+        for (i, test) in tests.iter().enumerate() {
             let result = panic::catch_unwind(|| {
-                let value = *ram.get_instruction_first_byte_ptr(test.start, &test.context);
+                let value = vec![*ram.get_instruction_first_byte_ptr(test.start, &test.context)];
 
                 // Check that the read value is correct.
                 assert_eq!(
-                    vec![value],
+                    value,
                     test.expected_values,
                     "{}",
-                    test.fail_message(false)
+                    test.fail_message(i, false, &value)
                 );
             });
 
@@ -638,7 +627,7 @@ mod tests_memory {
                 did_panic,
                 test.should_panic,
                 "{}",
-                test.fail_message(did_panic)
+                test.fail_message(i, did_panic, &[])
             );
         }
     }
@@ -691,12 +680,12 @@ mod tests_memory {
             ),
         ];
 
-        for test in tests {
+        for (i, test) in tests.iter().enumerate() {
             let result = panic::catch_unwind(|| {
                 let values = ram.get_range_clone(test.start, test.end, &test.context);
 
                 // Check that the read value is correct.
-                assert_eq!(values, test.expected_values, "{}", test.fail_message(false));
+                assert_eq!(values, test.expected_values, "{}", test.fail_message(i, false, &values));
             });
 
             // Check whether we panicked, and if we should have.
@@ -705,7 +694,7 @@ mod tests_memory {
                 did_panic,
                 test.should_panic,
                 "{}",
-                test.fail_message(did_panic)
+                test.fail_message(i, did_panic, &[])
             );
         }
     }
@@ -756,7 +745,7 @@ mod tests_memory {
             ),
         ];
 
-        for test in tests {
+        for (i, test) in tests.iter().enumerate() {
             let result = panic::catch_unwind(|| {
                 let mut ram = get_test_ram_instance();
                 ram.set_range(
@@ -768,7 +757,7 @@ mod tests_memory {
                 let values = ram.get_range_clone(test.start, test.end, &test.context);
 
                 // Check that the read value is correct.
-                assert_eq!(values, test.expected_values, "{}", test.fail_message(false));
+                assert_eq!(values, test.expected_values, "{}", test.fail_message(i, false, &values));
             });
 
             // Check whether we panicked, and if we should have.
@@ -777,7 +766,7 @@ mod tests_memory {
                 did_panic,
                 test.should_panic,
                 "{}",
-                test.fail_message(did_panic)
+                test.fail_message(i, did_panic, &[])
             );
         }
     }
@@ -830,12 +819,12 @@ mod tests_memory {
             ),
         ];
 
-        for test in tests {
+        for (i, test) in tests.iter().enumerate() {
             let result = panic::catch_unwind(|| {
                 let values = ram.get_range_clone(test.start, test.end, &test.context);
 
                 // Check that the read value is correct.
-                assert_eq!(values, test.expected_values, "{}", test.fail_message(false));
+                assert_eq!(values, test.expected_values, "{}", test.fail_message(i, false, &values));
             });
 
             // Check whether we panicked, and if we should have.
@@ -844,7 +833,7 @@ mod tests_memory {
                 did_panic,
                 test.should_panic,
                 "{}",
-                test.fail_message(did_panic)
+                test.fail_message(i, did_panic, &[])
             );
         }
     }
@@ -895,7 +884,7 @@ mod tests_memory {
             ),
         ];
 
-        for test in tests {
+        for (i, test) in tests.iter().enumerate() {
             let result = panic::catch_unwind(|| {
                 let mut ram = get_test_nested_ram_instance();
                 ram.set_range(
@@ -907,7 +896,7 @@ mod tests_memory {
                 let values = ram.get_range_clone(test.start, test.end, &test.context);
 
                 // Check that the read value is correct.
-                assert_eq!(values, test.expected_values, "{}", test.fail_message(false));
+                assert_eq!(values, test.expected_values, "{}", test.fail_message(i, false, &values));
             });
 
             let did_panic = result.is_err();
@@ -915,7 +904,7 @@ mod tests_memory {
                 did_panic,
                 test.should_panic,
                 "{}",
-                test.fail_message(did_panic)
+                test.fail_message(i, did_panic, &[])
             );
         }
     }
