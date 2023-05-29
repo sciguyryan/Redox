@@ -1,6 +1,3 @@
-// If bit 7 of an opcode is set, then we are working with an extended opcode.
-// This means that we need to read two bytes instead of one byte.
-// This is a size optimization, the most common opcodes will only take 1 byte.
 #[repr(u16)]
 pub enum OpCode {
     /// Subroutine - a pseudo-opcode used to identify a subroutine position.

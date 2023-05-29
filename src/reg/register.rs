@@ -52,10 +52,18 @@ impl RegisterU32 {
         &self.value
     }
 
+    pub fn read_unchecked(&self) -> &u32 {
+        &self.value
+    }
+
     pub fn write(&mut self, value: u32, context: &SecurityContext) {
         // Check whether the register has write permissions.
         self.validate_access(&DataAccessType::Write, context);
 
+        self.value = value;
+    }
+
+    pub fn write_unchecked(&mut self, value: u32) {
         self.value = value;
     }
 
@@ -64,8 +72,6 @@ impl RegisterU32 {
         // Check whether the register has read/write permissions.
         self.validate_access(&DataAccessType::Write, context);
 
-        // TODO: correctly set negative flag in flags register.
-
         self.value += val;
     }
 
@@ -73,8 +79,6 @@ impl RegisterU32 {
     pub fn subtract(&mut self, val: u32, context: &SecurityContext) {
         // Check whether the register has read/write permissions.
         self.validate_access(&DataAccessType::Write, context);
-
-        // TODO: correctly set negative flag in flags register.
 
         self.value -= val;
     }

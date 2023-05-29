@@ -17,7 +17,7 @@ impl VirtualMachine {
         //self.cpu.run(self, 0);
     }
 
-    pub fn run_tester(&mut self, instructions: &[Instruction]) {
-        self.cpu.run_tester(&mut self.ram, instructions);
+    pub fn run_instructions(&mut self, instructions: &[Instruction]) {
+        self.cpu.run_instructions(&mut self.ram, instructions);
     }
 }

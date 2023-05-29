@@ -19,9 +19,10 @@ fn main() {
     //vm.ram.set(0, 0x12, &SecurityContext::System);
     //vm.ram.print_range(0, 10);
 
-    vm.run_tester(&[
-        Instruction::AddU32LitReg(0x10, RegisterId::R1),
-        Instruction::Hlt(),
+    vm.run_instructions(&[
+        Instruction::AddU32LitReg(u32::MAX, RegisterId::R1),
+        Instruction::AddU32LitReg(2, RegisterId::R1),
+        Instruction::Hlt,
     ]);
 
     println!("----------[Registers]----------");
