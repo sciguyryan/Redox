@@ -18,6 +18,12 @@ impl Cpu {
         }
     }
 
+    fn decode_next_instruction(&self) -> Instruction {
+        let instruction = Instruction::Nop;
+
+        instruction
+    }
+
     pub fn run(&mut self, _mem: &mut Memory, _mem_seq_id: usize) {
         // Do something fun here.
     }
@@ -61,12 +67,13 @@ impl Cpu {
                     .get_register_u32_mut(*r)
                     .write(new_value, &SecurityContext::User);
             }
-        }
+        };
 
-        // Increment the program counter (PC) register.
-        self.registers
-            .get_register_u32_mut(RegisterId::PC)
-            .increment(&SecurityContext::System);
+        self.update_program_counter_register();
+
+        // Move the instruction pointer register forward by the number of
+        // bytes used to build the instruction.
+        self.update_instruction_pointer(instruction.get_instruction_len());
     }
 
     fn set_flag_state(&mut self, index: u32, set: bool) {
@@ -82,6 +89,20 @@ impl Cpu {
 
     fn set_overflow_flag_state(&mut self, set: bool) {
         self.set_flag_state(2, set);
+    }
+
+    #[inline(always)]
+    fn update_instruction_pointer(&mut self, bytes: u32) {
+        self.registers
+            .get_register_u32_mut(RegisterId::IP)
+            .add_unchecked(bytes);
+    }
+
+    #[inline(always)]
+    fn update_program_counter_register(&mut self) {
+        self.registers
+            .get_register_u32_mut(RegisterId::PC)
+            .increment_unchecked();
     }
 }
 

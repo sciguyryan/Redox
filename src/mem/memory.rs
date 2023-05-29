@@ -2,7 +2,10 @@ use bitflags::bitflags;
 use prettytable::{row, Table};
 use std::fmt::{self, Display};
 
-use crate::{data_access_type::DataAccessType, security_context::SecurityContext};
+use crate::{
+    data_access_type::DataAccessType, ins::instruction::Instruction,
+    security_context::SecurityContext,
+};
 
 bitflags! {
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -228,25 +231,28 @@ impl Memory {
         self.storage[pos]
     }
 
-    pub fn get_instruction_first_byte_ptr(&self, pos: usize, context: &SecurityContext) -> &u8 {
-        self.assert_point_in_bounds(pos);
+    pub fn get_instruction(&self, pos: usize, context: &SecurityContext) -> Instruction {
+        let range = self.get_range_ptr(pos, 2, true, context);
 
-        // Check whether the memory region has execution permissions.
-        self.validate_access(pos, &DataAccessType::Execute, context, true);
-
-        &self.storage[pos]
+        Instruction::Nop
     }
 
     pub fn get_u32(&self, pos: usize, context: &SecurityContext) -> u32 {
         let bytes: [u8; 4] = self
-            .get_range_ptr(pos, pos + 4, context)
+            .get_range_ptr(pos, pos + 4, false, context)
             .try_into()
             .expect("failed to create a u32 from memory bytes");
 
         u32::from_le_bytes(bytes)
     }
 
-    pub fn get_range_ptr(&self, start: usize, len: usize, context: &SecurityContext) -> &[u8] {
+    pub fn get_range_ptr(
+        &self,
+        start: usize,
+        len: usize,
+        needs_exec: bool,
+        context: &SecurityContext,
+    ) -> &[u8] {
         let end = start + len;
         self.assert_point_in_bounds(start);
         self.assert_point_in_bounds(end);
@@ -254,11 +260,21 @@ impl Memory {
         // Check whether the memory region has read permissions.
         self.validate_access_range(start, end, &DataAccessType::Read, context, false);
 
+        if needs_exec {
+            self.validate_access_range(start, end, &DataAccessType::Execute, context, true);
+        }
+
         &self.storage[start..end]
     }
 
-    pub fn get_range_clone(&self, start: usize, len: usize, context: &SecurityContext) -> Vec<u8> {
-        self.get_range_ptr(start, len, context).to_vec()
+    pub fn get_range_clone(
+        &self,
+        start: usize,
+        len: usize,
+        needs_exec: bool,
+        context: &SecurityContext,
+    ) -> Vec<u8> {
+        self.get_range_ptr(start, len, needs_exec, context).to_vec()
     }
 
     pub fn len(&self) -> usize {
@@ -510,7 +526,7 @@ mod tests_memory {
         );
 
         assert_eq!(
-            ram.get_range_ptr(0, size - 1, &SecurityContext::System),
+            ram.get_range_ptr(0, size - 1, false, &SecurityContext::System),
             vec![0x0; size - 1],
             "failed to correctly initialize RAM"
         );
@@ -545,7 +561,7 @@ mod tests_memory {
         ram.set_range(0, &input, &SecurityContext::System);
         assert_eq!(
             &input,
-            ram.get_range_ptr(0, 50, &SecurityContext::System),
+            ram.get_range_ptr(0, 50, false, &SecurityContext::System),
             "failed to read correct values from memory"
         );
     }
@@ -610,7 +626,7 @@ mod tests_memory {
 
         for (i, test) in tests.iter().enumerate() {
             let result = panic::catch_unwind(|| {
-                let value = vec![*ram.get_instruction_first_byte_ptr(test.start, &test.context)];
+                let value = ram.get_range_clone(test.start, 1, true, &test.context);
 
                 // Check that the read value is correct.
                 assert_eq!(
@@ -682,7 +698,7 @@ mod tests_memory {
 
         for (i, test) in tests.iter().enumerate() {
             let result = panic::catch_unwind(|| {
-                let values = ram.get_range_clone(test.start, test.end, &test.context);
+                let values = ram.get_range_clone(test.start, test.end, false, &test.context);
 
                 // Check that the read value is correct.
                 assert_eq!(
@@ -759,7 +775,7 @@ mod tests_memory {
                     &test.context,
                 );
 
-                let values = ram.get_range_clone(test.start, test.end, &test.context);
+                let values = ram.get_range_clone(test.start, test.end, false, &test.context);
 
                 // Check that the read value is correct.
                 assert_eq!(
@@ -831,7 +847,7 @@ mod tests_memory {
 
         for (i, test) in tests.iter().enumerate() {
             let result = panic::catch_unwind(|| {
-                let values = ram.get_range_clone(test.start, test.end, &test.context);
+                let values = ram.get_range_clone(test.start, test.end, false, &test.context);
 
                 // Check that the read value is correct.
                 assert_eq!(
@@ -908,7 +924,7 @@ mod tests_memory {
                     &test.context,
                 );
 
-                let values = ram.get_range_clone(test.start, test.end, &test.context);
+                let values = ram.get_range_clone(test.start, test.end, false, &test.context);
 
                 // Check that the read value is correct.
                 assert_eq!(

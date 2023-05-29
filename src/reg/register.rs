@@ -68,6 +68,11 @@ impl RegisterU32 {
     }
 
     #[inline(always)]
+    pub fn add_unchecked(&mut self, value: u32) {
+        self.value += value;
+    }
+
+    #[inline(always)]
     pub fn add(&mut self, val: u32, context: &SecurityContext) {
         // Check whether the register has read/write permissions.
         self.validate_access(&DataAccessType::Write, context);
@@ -86,6 +91,11 @@ impl RegisterU32 {
     #[inline(always)]
     pub fn increment(&mut self, context: &SecurityContext) {
         self.add(1, context);
+    }
+
+    #[inline(always)]
+    pub fn increment_unchecked(&mut self) {
+        self.add_unchecked(1);
     }
 
     #[inline(always)]

@@ -19,3 +19,16 @@ impl Display for Instruction {
         write!(f, "{}", asm_format)
     }
 }
+
+impl Instruction {
+    pub fn get_instruction_len(&self) -> u32 {
+        match self {
+            Instruction::Nop => 2,
+            Instruction::Hlt => 2,
+            Instruction::AddU32LitReg(_, _) => {
+                // 2 bytes for the instruction, 4 bytes for the literal, 1 byte for the register.
+                2 + 4 + 1
+            }
+        }
+    }
+}
