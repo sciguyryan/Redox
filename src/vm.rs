@@ -1,4 +1,4 @@
-use crate::{cpu::Cpu, mem::memory::Memory};
+use crate::{cpu::Cpu, ins::instruction::Instruction, mem::memory::Memory};
 
 pub struct VirtualMachine {
     pub ram: Memory,
@@ -6,14 +6,18 @@ pub struct VirtualMachine {
 }
 
 impl VirtualMachine {
-    pub fn new(memory: usize) -> Self {
+    pub fn new(memory_size: usize) -> Self {
         Self {
-            ram: Memory::new(memory),
+            ram: Memory::new(memory_size),
             cpu: Cpu::new(),
         }
     }
 
     pub fn run(&mut self) {
-        self.cpu.run(&mut self.ram, 0);
+        //self.cpu.run(self, 0);
+    }
+
+    pub fn run_tester(&mut self, instructions: &[Instruction]) {
+        self.cpu.run_tester(&mut self.ram, instructions);
     }
 }

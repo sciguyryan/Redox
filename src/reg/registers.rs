@@ -1,8 +1,12 @@
-use std::collections::HashMap;
+use core::fmt;
+use prettytable::{row, Table};
+use std::{collections::BTreeMap, fmt::Display};
+
+use crate::security_context::SecurityContext;
 
 use super::register::{RegisterF32, RegisterPermission, RegisterU32};
 
-#[derive(Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(u8)]
 pub enum RegisterId {
     // Layout
@@ -47,6 +51,9 @@ pub enum RegisterId {
     /// Data register 8.
     R8,
 
+    /// Float data register 1.
+    F1,
+
     // [System Registers] //
     /// Accumulator register.
     AC,
@@ -61,7 +68,31 @@ pub enum RegisterId {
     /// Program counter register.
     PC,
     /// A debug testing register.
-    T0,
+    DG,
+}
+
+impl Display for RegisterId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let printable = match *self {
+            RegisterId::R1 => "R1",
+            RegisterId::R2 => "R2",
+            RegisterId::R3 => "R3",
+            RegisterId::R4 => "R4",
+            RegisterId::R5 => "R5",
+            RegisterId::R6 => "R6",
+            RegisterId::R7 => "R7",
+            RegisterId::R8 => "R8",
+            RegisterId::F1 => "F1",
+            RegisterId::AC => "AC",
+            RegisterId::FL => "FL",
+            RegisterId::IP => "IP",
+            RegisterId::SP => "SP",
+            RegisterId::FP => "FP",
+            RegisterId::PC => "PC",
+            RegisterId::DG => "DG",
+        };
+        write!(f, "{}", printable)
+    }
 }
 
 macro_rules! register_u32 {
@@ -71,11 +102,18 @@ macro_rules! register_u32 {
     }};
 }
 
+macro_rules! register_f32 {
+    ($b:expr, $c:expr, $d:expr) => {{
+        use super::register::RegisterF32;
+        ($b, RegisterF32::new($b, $c.clone(), $d))
+    }};
+}
+
 pub struct Registers {
     /// A hashmap of the u32 registers.
-    pub registers_u32: HashMap<RegisterId, RegisterU32>,
+    pub registers_u32: BTreeMap<RegisterId, RegisterU32>,
     /// A hashmap of the f32 registers.
-    pub registers_f32: HashMap<RegisterId, RegisterF32>,
+    pub registers_f32: BTreeMap<RegisterId, RegisterF32>,
 }
 
 impl Registers {
@@ -85,7 +123,7 @@ impl Registers {
         let prpw = RegisterPermission::PR | RegisterPermission::PW;
 
         Self {
-            registers_u32: HashMap::from([
+            registers_u32: BTreeMap::from([
                 // [ User Registers ] //
                 register_u32!(RegisterId::R1, &rw, 0),
                 register_u32!(RegisterId::R2, &rw, 0),
@@ -104,8 +142,39 @@ impl Registers {
                 //register!(RegisterId::T0, &prpw, 0),
                 register_u32!(RegisterId::PC, &rpw, 0),
             ]),
-            registers_f32: HashMap::new(),
+            registers_f32: BTreeMap::from([
+                // [ User Registers ] //
+                register_f32!(RegisterId::F1, &rw, 0f32),
+            ]),
         }
+    }
+
+    #[inline(always)]
+    pub fn get_register_u32(&self, id: RegisterId) -> &RegisterU32 {
+        self.registers_u32.get(&id).expect("failed to get register")
+    }
+
+    #[inline(always)]
+    pub fn get_register_u32_mut(&mut self, id: RegisterId) -> &mut RegisterU32 {
+        self.registers_u32
+            .get_mut(&id)
+            .expect("failed to get register")
+    }
+
+    pub fn print_registers(&self) {
+        let mut table = Table::new();
+
+        table.add_row(row!["Register", "Value"]);
+
+        for (id, reg) in &self.registers_u32 {
+            table.add_row(row![id, *reg.read(&SecurityContext::System)]);
+        }
+
+        for (id, reg) in &self.registers_f32 {
+            table.add_row(row![id, *reg.read(&SecurityContext::System)]);
+        }
+
+        table.printstd();
     }
 }
 

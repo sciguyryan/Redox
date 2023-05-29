@@ -59,7 +59,32 @@ impl RegisterU32 {
         self.value = value;
     }
 
-    #[inline]
+    #[inline(always)]
+    pub fn add(&mut self, val: u32, context: &SecurityContext) {
+        // Check whether the register has read/write permissions.
+        self.validate_access(&DataAccessType::Write, context);
+
+        // TODO: correctly set negative flag in flags register.
+
+        self.value += val;
+    }
+
+    #[inline(always)]
+    pub fn subtract(&mut self, val: u32, context: &SecurityContext) {
+        // Check whether the register has read/write permissions.
+        self.validate_access(&DataAccessType::Write, context);
+
+        // TODO: correctly set negative flag in flags register.
+
+        self.value -= val;
+    }
+
+    #[inline(always)]
+    pub fn increment(&mut self, context: &SecurityContext) {
+        self.add(1, context);
+    }
+
+    #[inline(always)]
     fn validate_access(&self, access_type: &DataAccessType, context: &SecurityContext) {
         // System-level contexts are permitted to do anything, without limitation.
         // NOTE: This might end up being replaced with a ring-permission type system.
@@ -215,7 +240,7 @@ mod tests_registers {
         pub fn fail_message(&self, id: usize, got_value: Option<T>, panicked: bool) -> String {
             let test_type = match self.test_type {
                 TestType::Read => "Read",
-                TestType::Write => "Write"
+                TestType::Write => "Write",
             };
 
             format!(

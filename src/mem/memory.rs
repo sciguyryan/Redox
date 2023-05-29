@@ -437,7 +437,7 @@ mod tests_memory {
             let test_type = match self.test_type {
                 TestType::Read => "Read",
                 TestType::Write => "Write",
-                TestType::Execute => "Execute"
+                TestType::Execute => "Execute",
             };
 
             format!(
@@ -685,7 +685,12 @@ mod tests_memory {
                 let values = ram.get_range_clone(test.start, test.end, &test.context);
 
                 // Check that the read value is correct.
-                assert_eq!(values, test.expected_values, "{}", test.fail_message(i, false, &values));
+                assert_eq!(
+                    values,
+                    test.expected_values,
+                    "{}",
+                    test.fail_message(i, false, &values)
+                );
             });
 
             // Check whether we panicked, and if we should have.
@@ -757,7 +762,12 @@ mod tests_memory {
                 let values = ram.get_range_clone(test.start, test.end, &test.context);
 
                 // Check that the read value is correct.
-                assert_eq!(values, test.expected_values, "{}", test.fail_message(i, false, &values));
+                assert_eq!(
+                    values,
+                    test.expected_values,
+                    "{}",
+                    test.fail_message(i, false, &values)
+                );
             });
 
             // Check whether we panicked, and if we should have.
@@ -824,7 +834,12 @@ mod tests_memory {
                 let values = ram.get_range_clone(test.start, test.end, &test.context);
 
                 // Check that the read value is correct.
-                assert_eq!(values, test.expected_values, "{}", test.fail_message(i, false, &values));
+                assert_eq!(
+                    values,
+                    test.expected_values,
+                    "{}",
+                    test.fail_message(i, false, &values)
+                );
             });
 
             // Check whether we panicked, and if we should have.
@@ -896,7 +911,12 @@ mod tests_memory {
                 let values = ram.get_range_clone(test.start, test.end, &test.context);
 
                 // Check that the read value is correct.
-                assert_eq!(values, test.expected_values, "{}", test.fail_message(i, false, &values));
+                assert_eq!(
+                    values,
+                    test.expected_values,
+                    "{}",
+                    test.fail_message(i, false, &values)
+                );
             });
 
             let did_panic = result.is_err();
