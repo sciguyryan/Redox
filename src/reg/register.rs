@@ -27,6 +27,7 @@ impl Display for RegisterPermission {
     }
 }
 
+#[derive(Debug)]
 pub struct RegisterU32 {
     /// The ID of this register.
     pub id: RegisterId,
@@ -45,6 +46,29 @@ impl RegisterU32 {
         }
     }
 
+    #[inline(always)]
+    pub fn add(&mut self, val: u32, context: &SecurityContext) {
+        // Check whether the register has read/write permissions.
+        self.validate_access(&DataAccessType::Write, context);
+
+        self.value += val;
+    }
+
+    #[inline(always)]
+    pub fn add_unchecked(&mut self, value: u32) {
+        self.value += value;
+    }
+
+    #[inline(always)]
+    pub fn increment(&mut self, context: &SecurityContext) {
+        self.add(1, context);
+    }
+
+    #[inline(always)]
+    pub fn increment_unchecked(&mut self) {
+        self.add_unchecked(1);
+    }
+
     pub fn read(&self, context: &SecurityContext) -> &u32 {
         // Check whether the register has read permissions.
         self.validate_access(&DataAccessType::Read, context);
@@ -56,6 +80,14 @@ impl RegisterU32 {
         &self.value
     }
 
+    #[inline(always)]
+    pub fn subtract(&mut self, val: u32, context: &SecurityContext) {
+        // Check whether the register has read/write permissions.
+        self.validate_access(&DataAccessType::Write, context);
+
+        self.value -= val;
+    }
+
     pub fn write(&mut self, value: u32, context: &SecurityContext) {
         // Check whether the register has write permissions.
         self.validate_access(&DataAccessType::Write, context);
@@ -65,37 +97,6 @@ impl RegisterU32 {
 
     pub fn write_unchecked(&mut self, value: u32) {
         self.value = value;
-    }
-
-    #[inline(always)]
-    pub fn add_unchecked(&mut self, value: u32) {
-        self.value += value;
-    }
-
-    #[inline(always)]
-    pub fn add(&mut self, val: u32, context: &SecurityContext) {
-        // Check whether the register has read/write permissions.
-        self.validate_access(&DataAccessType::Write, context);
-
-        self.value += val;
-    }
-
-    #[inline(always)]
-    pub fn subtract(&mut self, val: u32, context: &SecurityContext) {
-        // Check whether the register has read/write permissions.
-        self.validate_access(&DataAccessType::Write, context);
-
-        self.value -= val;
-    }
-
-    #[inline(always)]
-    pub fn increment(&mut self, context: &SecurityContext) {
-        self.add(1, context);
-    }
-
-    #[inline(always)]
-    pub fn increment_unchecked(&mut self) {
-        self.add_unchecked(1);
     }
 
     #[inline(always)]
@@ -129,6 +130,7 @@ impl RegisterU32 {
     }
 }
 
+#[derive(Debug)]
 pub struct RegisterF32 {
     /// The ID of this register.
     pub id: RegisterId,
@@ -154,10 +156,18 @@ impl RegisterF32 {
         &self.value
     }
 
+    pub fn read_unchecked(&self) -> &f32 {
+        &self.value
+    }
+
     pub fn write(&mut self, value: f32, context: &SecurityContext) {
         // Check whether the register has write permissions.
         self.validate_access(&DataAccessType::Write, context);
 
+        self.value = value;
+    }
+
+    pub fn write_unchecked(&mut self, value: f32) {
         self.value = value;
     }
 

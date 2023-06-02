@@ -2,7 +2,7 @@ use core::fmt;
 use prettytable::{row, Table};
 use std::{collections::BTreeMap, fmt::Display};
 
-use crate::security_context::SecurityContext;
+use crate::{cpu::CpuFlag, utils};
 
 use super::register::{RegisterF32, RegisterPermission, RegisterU32};
 
@@ -109,12 +109,39 @@ macro_rules! register_f32 {
     }};
 }
 
+#[derive(Debug)]
 pub struct Registers {
     /// A hashmap of the u32 registers.
     pub registers_u32: BTreeMap<RegisterId, RegisterU32>,
     /// A hashmap of the f32 registers.
     pub registers_f32: BTreeMap<RegisterId, RegisterF32>,
 }
+
+impl PartialEq for Registers {
+    fn eq(&self, other: &Self) -> bool {
+        for (self_reg, other_reg) in self
+            .registers_u32
+            .values()
+            .zip(other.registers_u32.values())
+        {
+            if self_reg.read_unchecked() != other_reg.read_unchecked() {
+                return false;
+            }
+        }
+        for (self_reg, other_reg) in self
+            .registers_f32
+            .values()
+            .zip(other.registers_f32.values())
+        {
+            if self_reg.read_unchecked() != other_reg.read_unchecked() {
+                return false;
+            }
+        }
+        true
+    }
+}
+
+impl Eq for Registers {}
 
 impl Registers {
     pub fn new() -> Self {
@@ -149,6 +176,16 @@ impl Registers {
         }
     }
 
+    pub fn reset(&mut self) {
+        for reg in &mut self.registers_u32 {
+            reg.1.write_unchecked(0);
+        }
+
+        for reg in &mut self.registers_f32 {
+            reg.1.write_unchecked(0f32);
+        }
+    }
+
     #[inline(always)]
     pub fn get_register_u32(&self, id: RegisterId) -> &RegisterU32 {
         self.registers_u32.get(&id).expect("failed to get register")
@@ -161,17 +198,61 @@ impl Registers {
             .expect("failed to get register")
     }
 
+    pub fn print_differences(&self, other: &Registers) {
+        println!("--- [u32 Register Differences] ---");
+        for (self_reg, other_reg) in self
+            .registers_u32
+            .values()
+            .zip(other.registers_u32.values())
+        {
+            println!(
+                "{} - Self = {}, Other = {}",
+                self_reg.id,
+                self_reg.read_unchecked(),
+                other_reg.read_unchecked()
+            );
+        }
+
+        println!("--- [f32 Register Differences] ---");
+        for (self_reg, other_reg) in self
+            .registers_f32
+            .values()
+            .zip(other.registers_f32.values())
+        {
+            println!(
+                "{} - Self = {}, Other = {}",
+                self_reg.id,
+                self_reg.read_unchecked(),
+                other_reg.read_unchecked()
+            );
+        }
+    }
+
     pub fn print_registers(&self) {
         let mut table = Table::new();
 
-        table.add_row(row!["Register", "Value"]);
+        table.add_row(row!["Register", "Value", "Type", "Notes"]);
 
         for (id, reg) in &self.registers_u32 {
-            table.add_row(row![id, *reg.read(&SecurityContext::System)]);
+            let reg_value = *reg.read_unchecked();
+            let formatted_value = format!("{reg_value:0>8X}");
+            let mut notes = String::new();
+
+            if *id == RegisterId::FL {
+                let states: Vec<String> = CpuFlag::iterator()
+                    .map(|flag_type| {
+                        let is_set = utils::is_bit_set(reg_value, (*flag_type) as u8);
+                        format!("{flag_type} = {is_set}")
+                    })
+                    .collect();
+                notes = states.join(", ");
+            }
+
+            table.add_row(row![id, formatted_value, "u32", notes]);
         }
 
         for (id, reg) in &self.registers_f32 {
-            table.add_row(row![id, *reg.read(&SecurityContext::System)]);
+            table.add_row(row![id, format!("{}", reg.read_unchecked()), "f32", ""]);
         }
 
         table.printstd();

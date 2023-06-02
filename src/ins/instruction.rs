@@ -21,7 +21,7 @@ impl Display for Instruction {
 }
 
 impl Instruction {
-    pub fn get_instruction_len(&self) -> u32 {
+    pub fn get_instruction_size(&self) -> u32 {
         match self {
             Instruction::Nop => 2,
             Instruction::Hlt => 2,

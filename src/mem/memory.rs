@@ -139,25 +139,6 @@ impl Memory {
         );
     }
 
-    /// Checks whether the allocated memory region has a size greater than 0.
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    /// Checks whether a specific memory position is within the valid memory region bounds.
-    ///
-    /// # Arguments
-    ///
-    /// * `pos` - The point in memory to be checked.
-    ///
-    /// # Returns
-    ///
-    /// True if the memory region is within the valid memory region bounds, false otherwise.
-    #[inline]
-    fn is_in_bounds(&self, pos: usize) -> bool {
-        pos <= self.len()
-    }
-
     /// Get a specific memory region, by its id.
     ///
     /// # Arguments
@@ -277,8 +258,35 @@ impl Memory {
         self.get_range_ptr(start, len, needs_exec, context).to_vec()
     }
 
+    pub fn get_storage(&self) -> &[u8] {
+        &self.storage
+    }
+
+    /// Checks whether the allocated memory region has a size greater than 0.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Checks whether a specific memory position is within the valid memory region bounds.
+    ///
+    /// # Arguments
+    ///
+    /// * `pos` - The point in memory to be checked.
+    ///
+    /// # Returns
+    ///
+    /// True if the memory region is within the valid memory region bounds, false otherwise.
+    #[inline]
+    fn is_in_bounds(&self, pos: usize) -> bool {
+        pos <= self.len()
+    }
+
     pub fn len(&self) -> usize {
         self.storage.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.storage = vec![0; self.storage.len()];
     }
 
     pub fn set(&mut self, pos: usize, value: u8, context: &SecurityContext) {
