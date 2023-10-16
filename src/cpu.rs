@@ -12,6 +12,7 @@ use crate::{
 pub struct Cpu {
     pub registers: Registers,
     pub is_halted: bool,
+    pub is_machine_mode: bool,
 }
 
 impl Cpu {
@@ -19,6 +20,7 @@ impl Cpu {
         Self {
             registers: Registers::default(),
             is_halted: false,
+            is_machine_mode: true,
         }
     }
 
@@ -106,24 +108,29 @@ impl Cpu {
     /// # Arguments
     ///
     /// * `mem` - The [`Memory`] connected to this CPU instance.
-    /// * `instructions` - A slice of [`Instruction`] instances to be executed.
+    /// * `instruction` - An [`Instruction`] instance to be executed.
     fn run_instruction(&mut self, mem: &mut Memory, instruction: &Instruction) {
+        let privilege = match self.is_machine_mode {
+            true => SecurityContext::System,
+            false => SecurityContext::User,
+        };
+
         match instruction {
             Instruction::Nop => {}
-            Instruction::Hlt => {
-                self.is_halted = true;
-            }
             Instruction::AddU32LitReg(v, r) => {
-                let old_value = *self
-                    .registers
-                    .get_register_u32(*r)
-                    .read(&SecurityContext::User);
+                let old_value = *self.registers.get_register_u32(*r).read(&privilege);
 
                 let new_value = self.perform_checked_add_u32(old_value, *v);
 
                 self.registers
                     .get_register_u32_mut(*r)
-                    .write(new_value, &SecurityContext::User);
+                    .write(new_value, &privilege);
+            }
+            Instruction::Mret => {
+                self.is_machine_mode = false;
+            }
+            Instruction::Hlt => {
+                self.is_halted = true;
             }
         };
 
@@ -205,16 +212,15 @@ mod tests_cpu {
     use std::panic;
 
     use crate::{
-        ins::instruction::Instruction,
-        mem::memory::Memory,
-        reg::registers::{RegisterId, Registers},
+        ins::instruction::Instruction, mem::memory::Memory, reg::registers::RegisterId,
+        security_context::SecurityContext,
     };
 
     use super::Cpu;
 
     struct TestEntryRegU32<'a> {
         pub instructions: &'a [Instruction],
-        pub expected_registers: Registers,
+        pub expected_registers: &'a [(RegisterId, u32)],
         pub expected_memory: Vec<u8>,
         pub should_panic: bool,
         pub fail_message: String,
@@ -223,14 +229,14 @@ mod tests_cpu {
     impl<'a> TestEntryRegU32<'a> {
         fn new(
             instructions: &'a [Instruction],
-            changed_register_vals: &[(RegisterId, u32)],
+            expected_registers: &'a [(RegisterId, u32)],
             expected_memory: Vec<u8>,
             should_panic: bool,
             fail_message: &str,
         ) -> Self {
             Self {
                 instructions,
-                expected_registers: build_register_presets_u32(changed_register_vals),
+                expected_registers,
                 expected_memory,
                 should_panic,
                 fail_message: fail_message.to_string(),
@@ -259,12 +265,17 @@ mod tests_cpu {
             );
 
             if let Ok((cpu, mem)) = result {
-                assert_eq!(
-                    cpu.registers,
-                    self.expected_registers,
-                    "{}",
-                    self.fail_message(id, false)
-                );
+                for (reg, val) in self.expected_registers {
+                    assert_eq!(
+                        cpu.registers
+                            .get_register_u32(*reg)
+                            .read(&SecurityContext::System),
+                        val,
+                        "{}",
+                        self.fail_message(id, false)
+                    );
+                }
+
                 assert_eq!(
                     mem.get_storage(),
                     self.expected_memory,
@@ -295,26 +306,6 @@ mod tests_cpu {
     /// A tuple containing a [`Memory`] instance and a [`Cpu`'] instance.
     fn create_instance() -> (Memory, Cpu) {
         (Memory::new(100), Cpu::default())
-    }
-
-    /// Build the set of expected CPU register values from the provided data.
-    /// # Arguments
-    ///
-    /// * `changed_registers` - A slice containing a set of tuples, the first entry of which is the [`RegisterId`]
-    /// the second entry is the value of the register.
-    ///
-    /// # Returns
-    ///
-    /// A [`Registers`] instance with each register set to the specified value, or the default value.
-    fn build_register_presets_u32(changed_registers: &[(RegisterId, u32)]) -> Registers {
-        let mut registers_output = Registers::new();
-        for (id, register) in changed_registers {
-            registers_output
-                .get_register_u32_mut(*id)
-                .write_unchecked(*register);
-        }
-
-        registers_output
     }
 
     /// Test the NOP instruction.
@@ -360,21 +351,21 @@ mod tests_cpu {
         }
     }
 
-    /// Test the AddU32LitReg instruction.
+    /// Test the AddU32LitReg instruction, in machine mode.
     #[test]
-    fn test_add_u32_lit_reg() {
+    fn test_add_u32_lit_reg_machine() {
         let tests = [
             TestEntryRegU32::new(
                 &[Instruction::AddU32LitReg(1, RegisterId::R1)],
-                &[(RegisterId::R1, 1), (RegisterId::IP, 7), (RegisterId::PC, 1)],
+                &[(RegisterId::R1, 1)],
                 vec![0; 100],
                 false,
-                "failed tp correctly execute add_u32_reg instruction"
+                "failed to correctly execute add_u32_reg instruction"
             ),
             // This test should cause the CPU's overflow flag to be set.
             TestEntryRegU32::new(
                 &[Instruction::AddU32LitReg(u32::MAX, RegisterId::R1), Instruction::AddU32LitReg(2, RegisterId::R1)],
-                &[(RegisterId::R1, 1), (RegisterId::IP, 14), (RegisterId::PC, 2), (RegisterId::FL, 0b00000100)],
+                &[(RegisterId::R1, 1), (RegisterId::FL, 0b00000100)],
                 vec![0; 100],
                 false,
                 "failed to correctly execute add_u32_reg instruction: overflow CPU register flag was not correctly set"
@@ -382,12 +373,62 @@ mod tests_cpu {
             // This test should cause the CPU's zero flag to be set.
             TestEntryRegU32::new(
                 &[Instruction::AddU32LitReg(0, RegisterId::R1)],
-                &[(RegisterId::R1, 0), (RegisterId::IP, 7), (RegisterId::PC, 1), (RegisterId::FL, 0b00000010)],
+                &[(RegisterId::R1, 0), (RegisterId::FL, 0b00000010)],
                 vec![0; 100],
                 false,
                 "failed to correctly execute add_u32_reg instruction: zero CPU register flag was not correctly set"
             ),
+            // This test should be permitted, in machine mode. Yes... you should never really do this.
+            TestEntryRegU32::new(
+                &[Instruction::AddU32LitReg(1, RegisterId::PC)],
+                &[(RegisterId::PC, 2)],
+                vec![0; 100],
+                false,
+                "failed to correctly execute add_u32_reg instruction in machine mode"
+            ),
         ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the AddU32LitReg instruction, in user mode.
+    #[test]
+    fn test_add_u32_lit_reg_user() {
+        let tests = [
+                TestEntryRegU32::new(
+                    &[Instruction::Mret, Instruction::AddU32LitReg(1, RegisterId::R1)],
+                    &[(RegisterId::R1, 1)],
+                    vec![0; 100],
+                    false,
+                    "failed to correctly execute add_u32_reg instruction"
+                ),
+                // This test should cause the CPU's overflow flag to be set.
+                TestEntryRegU32::new(
+                    &[Instruction::Mret, Instruction::AddU32LitReg(u32::MAX, RegisterId::R1), Instruction::AddU32LitReg(2, RegisterId::R1)],
+                    &[(RegisterId::R1, 1), (RegisterId::FL, 0b00000100)],
+                    vec![0; 100],
+                    false,
+                    "failed to correctly execute add_u32_reg instruction: overflow CPU register flag was not correctly set"
+                ),
+                // This test should cause the CPU's zero flag to be set.
+                TestEntryRegU32::new(
+                    &[Instruction::Mret, Instruction::AddU32LitReg(0, RegisterId::R1)],
+                    &[(RegisterId::R1, 0), (RegisterId::FL, 0b00000010)],
+                    vec![0; 100],
+                    false,
+                    "failed to correctly execute add_u32_reg instruction: zero CPU register flag was not correctly set"
+                ),
+            // This test should not be permitted, in user mode. Yes... you should never really do this.
+            TestEntryRegU32::new(
+                &[Instruction::Mret, Instruction::AddU32LitReg(1, RegisterId::PC)],
+                &[(RegisterId::PC, 2)],
+                vec![0; 100],
+                true,
+                "succeeded in execute add_u32_reg instruction in user mode"
+            ),
+            ];
 
         for (id, test) in tests.iter().enumerate() {
             test.run_test(id);

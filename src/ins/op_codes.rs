@@ -11,6 +11,9 @@ pub enum OpCode {
     /// Add u32 Literal to Register.
     AddU32LitReg = 1,
 
+    /// Machine return - downgrade the privilege level of the processor.
+    Mret = 65534,
+
     /// Halt - halt the execution of the virtual machine.
     Hlt = 65535,
 }
