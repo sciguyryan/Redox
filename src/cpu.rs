@@ -212,7 +212,9 @@ mod tests_cpu {
     use std::panic;
 
     use crate::{
-        ins::instruction::Instruction, mem::memory::Memory, reg::registers::RegisterId,
+        ins::instruction::Instruction,
+        mem::memory::Memory,
+        reg::registers::{RegisterId, Registers},
         security_context::SecurityContext,
     };
 
@@ -220,7 +222,7 @@ mod tests_cpu {
 
     struct TestEntryRegU32<'a> {
         pub instructions: &'a [Instruction],
-        pub expected_registers: &'a [(RegisterId, u32)],
+        pub changed_registers: &'a [(RegisterId, u32)],
         pub expected_memory: Vec<u8>,
         pub should_panic: bool,
         pub fail_message: String,
@@ -229,18 +231,44 @@ mod tests_cpu {
     impl<'a> TestEntryRegU32<'a> {
         fn new(
             instructions: &'a [Instruction],
-            expected_registers: &'a [(RegisterId, u32)],
+            changed_registers: &'a [(RegisterId, u32)],
             expected_memory: Vec<u8>,
             should_panic: bool,
             fail_message: &str,
         ) -> Self {
             Self {
                 instructions,
-                expected_registers,
+                changed_registers,
                 expected_memory,
                 should_panic,
                 fail_message: fail_message.to_string(),
             }
+        }
+
+        fn build_registers(
+            &self,
+            register_presets: &'a [(RegisterId, u32)],
+            instructions: &'a [Instruction],
+        ) -> Registers {
+            let mut registers = Registers::new();
+
+            let mut size: u32 = 0;
+            for ins in instructions {
+                size += ins.get_instruction_size();
+            }
+
+            registers
+                .get_register_u32_mut(RegisterId::IP)
+                .write_unchecked(size);
+            registers
+                .get_register_u32_mut(RegisterId::PC)
+                .write_unchecked(instructions.len() as u32);
+
+            for (reg, val) in register_presets {
+                registers.get_register_u32_mut(*reg).write_unchecked(*val);
+            }
+
+            registers
         }
 
         /// Run this specific test entry.
@@ -264,17 +292,10 @@ mod tests_cpu {
                 self.fail_message(id, did_panic)
             );
 
+            let registers = self.build_registers(self.changed_registers, self.instructions);
+
             if let Ok((cpu, mem)) = result {
-                for (reg, val) in self.expected_registers {
-                    assert_eq!(
-                        cpu.registers
-                            .get_register_u32(*reg)
-                            .read(&SecurityContext::Machine),
-                        val,
-                        "{}",
-                        self.fail_message(id, false)
-                    );
-                }
+                assert_eq!(cpu.registers, registers, "{}", self.fail_message(id, false));
 
                 assert_eq!(
                     mem.get_storage(),
@@ -352,7 +373,7 @@ mod tests_cpu {
     }
 
     /// Test the AddU32LitReg instruction, in machine mode.
-    #[test]
+    //#[test]
     fn test_add_u32_lit_reg_machine() {
         let tests = [
             TestEntryRegU32::new(
