@@ -103,7 +103,7 @@ impl RegisterU32 {
     fn validate_access(&self, access_type: &DataAccessType, context: &SecurityContext) {
         // System-level contexts are permitted to do anything, without limitation.
         // NOTE: This might end up being replaced with a ring-permission type system.
-        if *context == SecurityContext::System {
+        if *context == SecurityContext::Machine {
             return;
         }
 
@@ -114,12 +114,12 @@ impl RegisterU32 {
             DataAccessType::Read => {
                 permissions.intersects(RegisterPermission::R)
                     || (permissions.intersects(RegisterPermission::PR)
-                        && *context == SecurityContext::System)
+                        && *context == SecurityContext::Machine)
             }
             DataAccessType::Write => {
                 permissions.intersects(RegisterPermission::W)
                     || (permissions.intersects(RegisterPermission::PW)
-                        && *context == SecurityContext::System)
+                        && *context == SecurityContext::Machine)
             }
             DataAccessType::Execute => panic!("Invalid access type specified."),
         };
@@ -175,7 +175,7 @@ impl RegisterF32 {
     fn validate_access(&self, access_type: &DataAccessType, context: &SecurityContext) {
         // System-level contexts are permitted to do anything, without limitation.
         // NOTE: This might end up being replaced with a ring-permission type system.
-        if *context == SecurityContext::System {
+        if *context == SecurityContext::Machine {
             return;
         }
 
@@ -186,12 +186,12 @@ impl RegisterF32 {
             DataAccessType::Read => {
                 permissions.intersects(RegisterPermission::R)
                     || (permissions.intersects(RegisterPermission::PR)
-                        && *context == SecurityContext::System)
+                        && *context == SecurityContext::Machine)
             }
             DataAccessType::Write => {
                 permissions.intersects(RegisterPermission::W)
                     || (permissions.intersects(RegisterPermission::PW)
-                        && *context == SecurityContext::System)
+                        && *context == SecurityContext::Machine)
             }
             DataAccessType::Execute => panic!("Invalid access type specified."),
         };
@@ -297,7 +297,7 @@ mod tests_registers {
                 None,
                 10,
                 &rw,
-                SecurityContext::System,
+                SecurityContext::Machine,
                 false,
                 "failed to read a value from a u32 R|W register, with system context",
             ),
@@ -317,7 +317,7 @@ mod tests_registers {
                 None,
                 10,
                 &prpw,
-                SecurityContext::System,
+                SecurityContext::Machine,
                 false,
                 "failed to read a value from a u32 PR|PW register, with system context",
             ),
@@ -337,7 +337,7 @@ mod tests_registers {
                 Some(10),
                 10,
                 &rw,
-                SecurityContext::System,
+                SecurityContext::Machine,
                 false,
                 "failed to write a value to a u32 R|W register, with system context",
             ),
@@ -357,7 +357,7 @@ mod tests_registers {
                 Some(10),
                 10,
                 &prpw,
-                SecurityContext::System,
+                SecurityContext::Machine,
                 false,
                 "failed to write a value to a u32 R|W register, with system context",
             ),
@@ -417,7 +417,7 @@ mod tests_registers {
                 None,
                 10f32,
                 &rw,
-                SecurityContext::System,
+                SecurityContext::Machine,
                 false,
                 "failed to read a value from a u32 R|W register, with system context",
             ),
@@ -437,7 +437,7 @@ mod tests_registers {
                 None,
                 10f32,
                 &prpw,
-                SecurityContext::System,
+                SecurityContext::Machine,
                 false,
                 "failed to read a value from a u32 PR|PW register, with system context",
             ),
@@ -457,7 +457,7 @@ mod tests_registers {
                 Some(10f32),
                 10f32,
                 &rw,
-                SecurityContext::System,
+                SecurityContext::Machine,
                 false,
                 "failed to write a value to a u32 R|W register, with system context",
             ),
@@ -477,7 +477,7 @@ mod tests_registers {
                 Some(10f32),
                 10f32,
                 &prpw,
-                SecurityContext::System,
+                SecurityContext::Machine,
                 false,
                 "failed to write a value to a u32 R|W register, with system context",
             ),

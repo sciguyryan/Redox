@@ -357,7 +357,7 @@ impl Memory {
     ) {
         // System-level contexts are permitted to do anything, without limitation.
         // NOTE: This might end up being replaced with a ring-permission type system.
-        if *context == SecurityContext::System {
+        if *context == SecurityContext::Machine {
             return;
         }
 
@@ -379,12 +379,12 @@ impl Memory {
             DataAccessType::Read => {
                 permissions.intersects(MemoryPermission::R)
                     || (permissions.intersects(MemoryPermission::PR)
-                        && *context == SecurityContext::System)
+                        && *context == SecurityContext::Machine)
             }
             DataAccessType::Write => {
                 permissions.intersects(MemoryPermission::W)
                     || (permissions.intersects(MemoryPermission::PW)
-                        && *context == SecurityContext::System)
+                        && *context == SecurityContext::Machine)
             }
         };
 
@@ -534,7 +534,7 @@ mod tests_memory {
         );
 
         assert_eq!(
-            ram.get_range_ptr(0, size - 1, false, &SecurityContext::System),
+            ram.get_range_ptr(0, size - 1, false, &SecurityContext::Machine),
             vec![0x0; size - 1],
             "failed to correctly initialize RAM"
         );
@@ -557,19 +557,19 @@ mod tests_memory {
 
         // Read/write a single byte.
         let byte = 0xff;
-        ram.set(0, byte, &SecurityContext::System);
+        ram.set(0, byte, &SecurityContext::Machine);
         assert_eq!(
             byte,
-            *ram.get_byte_ptr(0, &SecurityContext::System),
+            *ram.get_byte_ptr(0, &SecurityContext::Machine),
             "failed to read correct value from memory"
         );
 
         // Read/write a range of bytes.
         let input: Vec<u8> = (0..50).collect();
-        ram.set_range(0, &input, &SecurityContext::System);
+        ram.set_range(0, &input, &SecurityContext::Machine);
         assert_eq!(
             &input,
-            ram.get_range_ptr(0, 50, false, &SecurityContext::System),
+            ram.get_range_ptr(0, 50, false, &SecurityContext::Machine),
             "failed to read correct values from memory"
         );
     }
@@ -616,7 +616,7 @@ mod tests_memory {
                 0,
                 None,
                 vec![0],
-                SecurityContext::System,
+                SecurityContext::Machine,
                 false,
                 "failed to get an executable byte from EX memory, with system context",
             ),
@@ -626,7 +626,7 @@ mod tests_memory {
                 51,
                 None,
                 vec![51],
-                SecurityContext::System,
+                SecurityContext::Machine,
                 false,
                 "failed to get an executable byte from non-EX memory, with system context",
             ),
@@ -688,7 +688,7 @@ mod tests_memory {
                 50,
                 None,
                 (0..50).collect(),
-                SecurityContext::System,
+                SecurityContext::Machine,
                 false,
                 "failed to read from R|W memory with system context",
             ),
@@ -698,7 +698,7 @@ mod tests_memory {
                 51,
                 None,
                 (0..51).collect(),
-                SecurityContext::System,
+                SecurityContext::Machine,
                 false,
                 "failed to read from PR|PW memory with system context",
             ),
@@ -758,7 +758,7 @@ mod tests_memory {
                 50,
                 Some(vec![0; 50]),
                 vec![0; 50],
-                SecurityContext::System,
+                SecurityContext::Machine,
                 false,
                 "failed to write to R|W memory with system context",
             ),
@@ -768,7 +768,7 @@ mod tests_memory {
                 51,
                 Some(vec![0; 51]),
                 vec![0; 51],
-                SecurityContext::System,
+                SecurityContext::Machine,
                 false,
                 "failed to write to PR|PW memory with system context",
             ),
@@ -837,7 +837,7 @@ mod tests_memory {
                 50,
                 None,
                 (0..50).collect(),
-                SecurityContext::System,
+                SecurityContext::Machine,
                 false,
                 "failed to read from R|W memory with system context",
             ),
@@ -847,7 +847,7 @@ mod tests_memory {
                 51,
                 None,
                 (0..51).collect(),
-                SecurityContext::System,
+                SecurityContext::Machine,
                 false,
                 "failed to read from R|W memory with system context",
             ),
@@ -907,7 +907,7 @@ mod tests_memory {
                 50,
                 Some(vec![0; 50]),
                 vec![0; 50],
-                SecurityContext::System,
+                SecurityContext::Machine,
                 false,
                 "failed to write to R|W memory with system context",
             ),
@@ -917,7 +917,7 @@ mod tests_memory {
                 51,
                 Some(vec![0; 51]),
                 vec![0; 51],
-                SecurityContext::System,
+                SecurityContext::Machine,
                 false,
                 "failed to write to R|W memory with system context",
             ),

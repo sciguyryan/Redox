@@ -111,7 +111,7 @@ impl Cpu {
     /// * `instruction` - An [`Instruction`] instance to be executed.
     fn run_instruction(&mut self, mem: &mut Memory, instruction: &Instruction) {
         let privilege = match self.is_machine_mode {
-            true => SecurityContext::System,
+            true => SecurityContext::Machine,
             false => SecurityContext::User,
         };
 
@@ -269,7 +269,7 @@ mod tests_cpu {
                     assert_eq!(
                         cpu.registers
                             .get_register_u32(*reg)
-                            .read(&SecurityContext::System),
+                            .read(&SecurityContext::Machine),
                         val,
                         "{}",
                         self.fail_message(id, false)

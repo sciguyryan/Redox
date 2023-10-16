@@ -22,8 +22,13 @@ fn main() {
     vm.run_instructions(&[
         Instruction::AddU32LitReg(u32::MAX, RegisterId::R1),
         Instruction::AddU32LitReg(2, RegisterId::R1),
+        Instruction::Mret,
         Instruction::Hlt,
     ]);
+
+    println!("----------[CPU]----------");
+    println!("Machine Mode? {}", vm.cpu.is_machine_mode);
+    println!();
 
     println!("----------[Registers]----------");
     vm.cpu.registers.print_registers();
