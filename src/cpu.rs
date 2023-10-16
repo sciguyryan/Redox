@@ -252,6 +252,9 @@ mod tests_cpu {
         ) -> Registers {
             let mut registers = Registers::new();
 
+            // This should be done before the registers are set because there will be instances
+            // there the number of executed instructions will be different than the total
+            // instruction count, such as if we hit a halt or early return.
             let mut size: u32 = 0;
             for ins in instructions {
                 size += ins.get_instruction_size();
