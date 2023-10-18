@@ -618,7 +618,7 @@ mod tests_memory {
                 vec![0],
                 SecurityContext::Machine,
                 false,
-                "failed to get an executable byte from EX memory, with system context",
+                "failed to get an executable byte from EX memory, with machine context",
             ),
             TestEntry::new(
                 TestType::Execute,
@@ -628,7 +628,7 @@ mod tests_memory {
                 vec![51],
                 SecurityContext::Machine,
                 false,
-                "failed to get an executable byte from non-EX memory, with system context",
+                "failed to get an executable byte from non-EX memory, with machine context",
             ),
         ];
 
@@ -690,7 +690,7 @@ mod tests_memory {
                 (0..50).collect(),
                 SecurityContext::Machine,
                 false,
-                "failed to read from R|W memory with system context",
+                "failed to read from R|W memory with machine context",
             ),
             TestEntry::new(
                 TestType::Read,
@@ -700,7 +700,7 @@ mod tests_memory {
                 (0..51).collect(),
                 SecurityContext::Machine,
                 false,
-                "failed to read from PR|PW memory with system context",
+                "failed to read from PR|PW memory with machine context",
             ),
         ];
 
@@ -760,7 +760,7 @@ mod tests_memory {
                 vec![0; 50],
                 SecurityContext::Machine,
                 false,
-                "failed to write to R|W memory with system context",
+                "failed to write to R|W memory with machine context",
             ),
             TestEntry::new(
                 TestType::Write,
@@ -770,7 +770,7 @@ mod tests_memory {
                 vec![0; 51],
                 SecurityContext::Machine,
                 false,
-                "failed to write to PR|PW memory with system context",
+                "failed to write to PR|PW memory with machine context",
             ),
         ];
 
@@ -839,7 +839,7 @@ mod tests_memory {
                 (0..50).collect(),
                 SecurityContext::Machine,
                 false,
-                "failed to read from R|W memory with system context",
+                "failed to read from R|W memory with machine context",
             ),
             TestEntry::new(
                 TestType::Read,
@@ -849,7 +849,7 @@ mod tests_memory {
                 (0..51).collect(),
                 SecurityContext::Machine,
                 false,
-                "failed to read from R|W memory with system context",
+                "failed to read from R|W memory with machine context",
             ),
         ];
 
@@ -909,7 +909,7 @@ mod tests_memory {
                 vec![0; 50],
                 SecurityContext::Machine,
                 false,
-                "failed to write to R|W memory with system context",
+                "failed to write to R|W memory with machine context",
             ),
             TestEntry::new(
                 TestType::Write,
@@ -919,7 +919,7 @@ mod tests_memory {
                 vec![0; 51],
                 SecurityContext::Machine,
                 false,
-                "failed to write to R|W memory with system context",
+                "failed to write to R|W memory with machine context",
             ),
         ];
 

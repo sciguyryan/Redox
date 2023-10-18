@@ -542,7 +542,7 @@ mod tests_cpu {
                 &[(RegisterId::R1, 0x1), (RegisterId::AC, 0x3)],
                 vec![0; 100],
                 false,
-                "failed to correctly execute add_u32_lit_u32_reg instruction"
+                "failed to correctly execute ADD instruction"
             ),
             // This test should cause the CPU's overflow flag to be set.
             TestEntryU32Standard::new(
@@ -556,7 +556,7 @@ mod tests_cpu {
                 ],
                 vec![0; 100],
                 false,
-                "failed to correctly execute add_u32_lit_u32_reg instruction: overflow CPU register flag was not correctly set"
+                "failed to correctly execute ADD instruction: overflow CPU register flag was not correctly set"
             ),
             // This test should cause the CPU's zero flag to be set.
             TestEntryU32Standard::new(
@@ -564,7 +564,7 @@ mod tests_cpu {
                 &[(RegisterId::FL, 0b00000010)],
                 vec![0; 100],
                 false,
-                "failed to correctly execute add_u32_lit_u32_reg instruction: zero CPU register flag was not correctly set"
+                "failed to correctly execute ADD instruction: zero CPU register flag was not correctly set"
             ),
             // This test should succeed in machine mode.
             TestEntryU32Standard::new(
@@ -572,7 +572,7 @@ mod tests_cpu {
                 &[(RegisterId::AC, 0x1)],
                 vec![0; 100],
                 false,
-                "failed to correctly execute add_u32_lit_u32_reg instruction in machine mode"
+                "failed to correctly execute ADD instruction in machine mode"
             ),
             // This test should fail in user mode due to the register permissions.
             TestEntryU32Standard::new(
@@ -583,7 +583,7 @@ mod tests_cpu {
                 &[(RegisterId::AC, 2)],
                 vec![0; 100],
                 true,
-                "succeeded in execute add_u32_lit_u32_reg instruction in user mode"
+                "succeeded in execute ADD instruction in user mode"
             ),
         ];
 
@@ -610,7 +610,7 @@ mod tests_cpu {
                 ],
                 vec![0; 100],
                 false,
-                "failed to correctly execute add_u32_reg_u32_reg instruction"
+                "failed to correctly execute ADD instruction"
             ),
             // This test should cause the CPU's overflow flag to be set.
             TestEntryU32Standard::new(
@@ -627,7 +627,7 @@ mod tests_cpu {
                 ],
                 vec![0; 100],
                 false,
-                "failed to correctly execute add_u32_reg_u32_reg instruction: overflow CPU register flag was not correctly set"
+                "failed to correctly execute ADD instruction: overflow CPU register flag was not correctly set"
             ),
             // This test should cause the CPU's zero flag to be set.
             TestEntryU32Standard::new(
@@ -637,7 +637,7 @@ mod tests_cpu {
                 &[(RegisterId::FL, 0b00000010)],
                 vec![0; 100],
                 false,
-                "failed to correctly execute add_u32_reg_u32_reg instruction: zero CPU register flag was not correctly set"
+                "failed to correctly execute ADD instruction: zero CPU register flag was not correctly set"
             ),
             // This test succeed in machine mode.
             TestEntryU32Standard::new(
@@ -648,7 +648,7 @@ mod tests_cpu {
                 &[(RegisterId::R1, 0x1), (RegisterId::AC, 0x1)],
                 vec![0; 100],
                 false,
-                "failed to correctly execute add_u32_reg_u32_reg instruction in machine mode"
+                "failed to correctly execute ADD instruction in machine mode"
             ),
             // This test should fail in user mode due to the register permissions.
             TestEntryU32Standard::new(
@@ -660,7 +660,7 @@ mod tests_cpu {
                 &[(RegisterId::R1, 0x1), (RegisterId::AC, 0x1)],
                 vec![0; 100],
                 true,
-                "succeeded in execute add_u32_reg_u32_reg instruction in user mode"
+                "succeeded in execute ADD instruction in user mode"
             ),
         ];
 
@@ -680,7 +680,7 @@ mod tests_cpu {
                 &[(RegisterId::R1, 0x1)],
                 vec![0; 100],
                 false,
-                "failed to correctly execute mov_u32_lit_u32_reg instruction"
+                "failed to correctly execute MOV instruction"
             ),
             TestEntryU32Standard::new(
                 &[
@@ -690,7 +690,7 @@ mod tests_cpu {
                 &[(RegisterId::R1, 0x2)],
                 vec![0; 100],
                 false,
-                "failed to correctly execute mov_u32_lit_u32_reg instruction"
+                "failed to correctly execute MOV instruction"
             ),
             // This test should succeed in machine mode.
             TestEntryU32Standard::new(
@@ -700,7 +700,7 @@ mod tests_cpu {
                 &[(RegisterId::TEST0, 0x1)],
                 vec![0; 100],
                 false,
-                "failed to correctly execute mov_u32_lit_u32_reg instruction in machine mode"
+                "failed to correctly execute MOV instruction in machine mode"
             ),
             // This test should fail in user mode due to the register permissions.
             TestEntryU32Standard::new(
@@ -711,7 +711,7 @@ mod tests_cpu {
                 &[(RegisterId::TEST0, 0x1)],
                 vec![0; 100],
                 true,
-                "succeeded in execute mov_u32_lit_u32_reg instruction in user mode"
+                "succeeded in execute MOV instruction in user mode"
             ),
         ];
 
