@@ -550,7 +550,10 @@ mod tests_cpu {
                     Instruction::MovU32LitU32Reg(u32::MAX, RegisterId::R1),
                     Instruction::AddU32LitU32Reg(0x2, RegisterId::R1)
                 ],
-                &[(RegisterId::R1, u32::MAX), (RegisterId::AC, 0x1), (RegisterId::FL, 0b00000100)],
+                &[
+                    (RegisterId::R1, u32::MAX), (RegisterId::AC, 0x1),
+                    (RegisterId::FL, 0b00000100)
+                ],
                 vec![0; 100],
                 false,
                 "failed to correctly execute add_u32_lit_u32_reg instruction: overflow CPU register flag was not correctly set"
@@ -601,7 +604,10 @@ mod tests_cpu {
                     // Add the register values.
                     Instruction::AddU32RegU32Reg(RegisterId::R1, RegisterId::R2)
                 ],
-                &[(RegisterId::R1, 0xf), (RegisterId::R2, 0x1), (RegisterId::AC, 0x10)],
+                &[
+                    (RegisterId::R1, 0xf), (RegisterId::R2, 0x1),
+                    (RegisterId::AC, 0x10)
+                ],
                 vec![0; 100],
                 false,
                 "failed to correctly execute add_u32_reg_u32_reg instruction"
@@ -615,7 +621,10 @@ mod tests_cpu {
                     // Add the register values.
                     Instruction::AddU32RegU32Reg(RegisterId::R1, RegisterId::R2)
                 ],
-                &[(RegisterId::R1, u32::MAX), (RegisterId::R2, 0x2), (RegisterId::AC, 0x1), (RegisterId::FL, 0b00000100)],
+                &[
+                    (RegisterId::R1, u32::MAX), (RegisterId::R2, 0x2),
+                    (RegisterId::AC, 0x1), (RegisterId::FL, 0b00000100)
+                ],
                 vec![0; 100],
                 false,
                 "failed to correctly execute add_u32_reg_u32_reg instruction: overflow CPU register flag was not correctly set"
@@ -652,6 +661,57 @@ mod tests_cpu {
                 vec![0; 100],
                 true,
                 "succeeded in execute add_u32_reg_u32_reg instruction in user mode"
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the MoveU32LitU32Reg instruction.
+    #[test]
+    fn test_move_u32_lit_u32_reg() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32LitU32Reg(0x1, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0x1)],
+                vec![0; 100],
+                false,
+                "failed to correctly execute mov_u32_lit_u32_reg instruction"
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32LitU32Reg(0x1, RegisterId::R1),
+                    Instruction::MovU32LitU32Reg(0x2, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0x2)],
+                vec![0; 100],
+                false,
+                "failed to correctly execute mov_u32_lit_u32_reg instruction"
+            ),
+            // This test should succeed in machine mode.
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32LitU32Reg(0x1, RegisterId::TEST0)
+                ],
+                &[(RegisterId::TEST0, 0x1)],
+                vec![0; 100],
+                false,
+                "failed to correctly execute mov_u32_lit_u32_reg instruction in machine mode"
+            ),
+            // This test should fail in user mode due to the register permissions.
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::Mret,
+                    Instruction::MovU32LitU32Reg(0x1, RegisterId::TEST0)
+                ],
+                &[(RegisterId::TEST0, 0x1)],
+                vec![0; 100],
+                true,
+                "succeeded in execute mov_u32_lit_u32_reg instruction in user mode"
             ),
         ];
 
