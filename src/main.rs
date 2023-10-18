@@ -23,8 +23,8 @@ fn main() {
     //vm.ram.print_range(0, 10);
 
     vm.run_instructions(&[
-        Instruction::AddU32LitU32Reg(u32::MAX, RegisterId::R1),
-        Instruction::AddU32LitU32Reg(2, RegisterId::R1),
+        Instruction::AddU32ImmU32Reg(u32::MAX, RegisterId::R1),
+        Instruction::AddU32ImmU32Reg(2, RegisterId::R1),
         Instruction::Mret,
         Instruction::Hlt,
     ]);

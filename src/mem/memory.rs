@@ -105,7 +105,7 @@ impl Memory {
     /// * `end` - The ending index of the memory region.
     /// * `access` - The [`MemoryAccessPerms`] for the specific memory region.
     /// * `name` - A string giving the name of this memory region.
-    fn add_memory_region(
+    pub fn add_memory_region(
         &mut self,
         start: usize,
         end: usize,

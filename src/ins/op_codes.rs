@@ -8,17 +8,23 @@ pub enum OpCode {
     /// No Operation - a non-operation instruction.
     Nop = 0,
 
-    /// Add u32 Literal to u32 Register. Result is moved into Accumulator register.
-    AddU32LitU32Reg,
+    /// Add u32 Immediate to u32 Register. Result is moved into Accumulator register.
+    AddU32ImmU32Reg,
 
     /// Add u32 Register to u32 Register. Result is moved into Accumulator register.
     AddU32RegU32Reg,
 
-    /// Move a u32 Literal to u32 Register. Result is moved into the register.
-    MovU32LitU32Reg,
+    /// Move a u32 Immediate to u32 Register. Result is copied into the register.
+    MovU32ImmU32Reg,
 
-    /// Move a u32 Register to u32 Register. Result is moved into the register.
+    /// Move a u32 Register to u32 Register. Result is copied into the register.
     MovU32RegU32Reg,
+
+    /// Move a u32 Immediate to Memory. Result is copied into memory.
+    MovU32ImmMem,
+
+    /// Move a u32 Register to Memory. Result is copied into memory.
+    MovU32RegMem,
 
     /// Return - return from a subroutine.
     Ret = 65533,

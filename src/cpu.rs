@@ -117,7 +117,7 @@ impl Cpu {
 
         match instruction {
             Instruction::Nop => {}
-            Instruction::AddU32LitU32Reg(lit, reg) => {
+            Instruction::AddU32ImmU32Reg(lit, reg) => {
                 let old_value = *self.registers.get_register_u32(*reg).read(&privilege);
                 let new_value = self.perform_checked_add_u32(old_value, *lit);
 
@@ -134,7 +134,7 @@ impl Cpu {
                     .get_register_u32_mut(RegisterId::AC)
                     .write(new_value, &privilege);
             }
-            Instruction::MovU32LitU32Reg(literal, reg) => {
+            Instruction::MovU32ImmU32Reg(literal, reg) => {
                 self.registers
                     .get_register_u32_mut(*reg)
                     .write(*literal, &privilege);
@@ -145,7 +145,14 @@ impl Cpu {
                 self.registers
                     .get_register_u32_mut(*reg2)
                     .write(value, &privilege);
-            },
+            }
+            Instruction::MovU32ImmMem(literal, addr) => {
+                mem.set_u32(*addr as usize, *literal, &privilege)
+            }
+            Instruction::MovU32RegMem(reg, addr) => {
+                let value = *self.registers.get_register_u32(*reg).read(&privilege);
+                mem.set_u32(*addr as usize, value, &privilege)
+            }
             Instruction::Ret => {
                 todo!();
             }
@@ -237,7 +244,7 @@ mod tests_cpu {
 
     use crate::{
         ins::instruction::Instruction,
-        mem::memory::Memory,
+        mem::memory::{Memory, MemoryPermission},
         reg::registers::{RegisterId, Registers},
     };
 
@@ -475,7 +482,15 @@ mod tests_cpu {
     ///
     /// A tuple containing a [`Memory`] instance and a [`Cpu`] instance.
     fn create_instance() -> (Memory, Cpu) {
-        (Memory::new(100), Cpu::default())
+        let mut mem = Memory::new(100);
+        mem.add_memory_region(
+            50,
+            100,
+            MemoryPermission::PR | MemoryPermission::PW,
+            "Private",
+        );
+
+        (mem, Cpu::default())
     }
 
     /// Test the NOP instruction.
@@ -537,14 +552,14 @@ mod tests_cpu {
         }
     }
 
-    /// Test the AddU32LitU32Reg instruction.
+    /// Test the add u32 immediate to u32 register instruction.
     #[test]
-    fn test_add_u32_lit_u32_reg() {
+    fn test_add_u32_imm_u32_reg() {
         let tests = [
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32LitU32Reg(0x1, RegisterId::R1),
-                    Instruction::AddU32LitU32Reg(0x2, RegisterId::R1)
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::AddU32ImmU32Reg(0x2, RegisterId::R1)
                 ],
                 &[(RegisterId::R1, 0x1), (RegisterId::AC, 0x3)],
                 vec![0; 100],
@@ -554,8 +569,8 @@ mod tests_cpu {
             // This test should cause the CPU's overflow flag to be set.
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32LitU32Reg(u32::MAX, RegisterId::R1),
-                    Instruction::AddU32LitU32Reg(0x2, RegisterId::R1)
+                    Instruction::MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
+                    Instruction::AddU32ImmU32Reg(0x2, RegisterId::R1)
                 ],
                 &[
                     (RegisterId::R1, u32::MAX), (RegisterId::AC, 0x1),
@@ -567,7 +582,7 @@ mod tests_cpu {
             ),
             // This test should cause the CPU's zero flag to be set.
             TestEntryU32Standard::new(
-                &[Instruction::AddU32LitU32Reg(0, RegisterId::R1)],
+                &[Instruction::AddU32ImmU32Reg(0, RegisterId::R1)],
                 &[(RegisterId::FL, 0b00000010)],
                 vec![0; 100],
                 false,
@@ -575,7 +590,7 @@ mod tests_cpu {
             ),
             // This test should succeed in machine mode.
             TestEntryU32Standard::new(
-                &[Instruction::AddU32LitU32Reg(0x1, RegisterId::TEST0)],
+                &[Instruction::AddU32ImmU32Reg(0x1, RegisterId::TEST0)],
                 &[(RegisterId::AC, 0x1)],
                 vec![0; 100],
                 false,
@@ -585,7 +600,7 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     Instruction::Mret,
-                    Instruction::AddU32LitU32Reg(0x2, RegisterId::TEST0)
+                    Instruction::AddU32ImmU32Reg(0x2, RegisterId::TEST0)
                 ],
                 &[],
                 vec![0; 100],
@@ -599,15 +614,15 @@ mod tests_cpu {
         }
     }
 
-    /// Test the AddU32RegU32Reg instruction.
+    /// Test the add u32 register to u32 register instruction.
     #[test]
     fn test_add_u32_reg_u32_reg() {
         let tests = [
             TestEntryU32Standard::new(
                 &[
                     // Setup register values.
-                    Instruction::MovU32LitU32Reg(0xf, RegisterId::R1),
-                    Instruction::MovU32LitU32Reg(0x1, RegisterId::R2),
+                    Instruction::MovU32ImmU32Reg(0xf, RegisterId::R1),
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
                     // Add the register values.
                     Instruction::AddU32RegU32Reg(RegisterId::R1, RegisterId::R2)
                 ],
@@ -623,8 +638,8 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Setup register values.
-                    Instruction::MovU32LitU32Reg(u32::MAX, RegisterId::R1),
-                    Instruction::MovU32LitU32Reg(0x2, RegisterId::R2),
+                    Instruction::MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
+                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R2),
                     // Add the register values.
                     Instruction::AddU32RegU32Reg(RegisterId::R1, RegisterId::R2)
                 ],
@@ -649,7 +664,7 @@ mod tests_cpu {
             // This test succeed in machine mode.
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32LitU32Reg(0x1, RegisterId::R1),
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
                     Instruction::AddU32RegU32Reg(RegisterId::R1, RegisterId::TEST0),
                 ],
                 &[(RegisterId::R1, 0x1), (RegisterId::AC, 0x1)],
@@ -661,7 +676,7 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     Instruction::Mret,
-                    Instruction::MovU32LitU32Reg(0x1, RegisterId::R1),
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
                     Instruction::AddU32RegU32Reg(RegisterId::R1, RegisterId::TEST0),
                 ],
                 &[],
@@ -676,49 +691,45 @@ mod tests_cpu {
         }
     }
 
-    /// Test the MoveU32LitU32Reg instruction.
+    /// Test the move u32 immediate to u32 register instruction.
     #[test]
-    fn test_move_u32_lit_u32_reg() {
+    fn test_move_u32_imm_u32_reg() {
         let tests = [
             TestEntryU32Standard::new(
-                &[
-                    Instruction::MovU32LitU32Reg(0x1, RegisterId::R1),
-                ],
+                &[Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1)],
                 &[(RegisterId::R1, 0x1)],
                 vec![0; 100],
                 false,
-                "failed to correctly execute MOV instruction"
+                "failed to correctly execute MOV instruction",
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32LitU32Reg(0x1, RegisterId::R1),
-                    Instruction::MovU32LitU32Reg(0x2, RegisterId::R1),
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x2)],
                 vec![0; 100],
                 false,
-                "failed to correctly execute MOV instruction"
+                "failed to correctly execute MOV instruction",
             ),
             // This test should succeed in machine mode.
             TestEntryU32Standard::new(
-                &[
-                    Instruction::MovU32LitU32Reg(0x1, RegisterId::TEST0)
-                ],
+                &[Instruction::MovU32ImmU32Reg(0x1, RegisterId::TEST0)],
                 &[(RegisterId::TEST0, 0x1)],
                 vec![0; 100],
                 false,
-                "failed to correctly execute MOV instruction in machine mode"
+                "failed to correctly execute MOV instruction in machine mode",
             ),
             // This test should fail in user mode due to the register permissions.
             TestEntryU32Standard::new(
                 &[
                     Instruction::Mret,
-                    Instruction::MovU32LitU32Reg(0x1, RegisterId::TEST0)
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::TEST0),
                 ],
                 &[],
                 vec![0; 100],
                 true,
-                "succeeded in execute MOV instruction in user mode"
+                "succeeded in execute MOV instruction in user mode",
             ),
         ];
 
@@ -727,58 +738,152 @@ mod tests_cpu {
         }
     }
 
-   /// Test the MoveU32RegU32Reg instruction.
-   #[test]
-   fn test_move_u32_reg_u32_reg() {
-       let tests = [
-           TestEntryU32Standard::new(
-               &[
-                   Instruction::MovU32LitU32Reg(0x1, RegisterId::R1),
-                   Instruction::MovU32RegU32Reg(RegisterId::R1, RegisterId::R2),
-               ],
-               &[(RegisterId::R1, 0x1), (RegisterId::R2, 0x1)],
-               vec![0; 100],
-               false,
-               "failed to correctly execute MOV instruction"
-           ),
-           TestEntryU32Standard::new(
-               &[
-                   Instruction::MovU32LitU32Reg(0x1, RegisterId::R1),
-                   Instruction::MovU32LitU32Reg(0x2, RegisterId::R2),
-                   Instruction::MovU32RegU32Reg(RegisterId::R1, RegisterId::R2),
-               ],
-               &[(RegisterId::R1, 0x1), (RegisterId::R2, 0x1)],
-               vec![0; 100],
-               false,
-               "failed to correctly execute MOV instruction"
-           ),
-           // This test should succeed in machine mode.
-           TestEntryU32Standard::new(
-               &[
-                   Instruction::MovU32LitU32Reg(0x1, RegisterId::R1),
-                   Instruction::MovU32RegU32Reg(RegisterId::R1, RegisterId::TEST0)
-               ],
-               &[(RegisterId::R1, 0x1), (RegisterId::TEST0, 0x1)],
-               vec![0; 100],
-               false,
-               "failed to correctly execute MOV instruction in machine mode"
-           ),
-           // This test should fail in user mode due to the register permissions.
-           TestEntryU32Standard::new(
-               &[
-                   Instruction::Mret,
-                   Instruction::MovU32LitU32Reg(0x1, RegisterId::R1),
-                   Instruction::MovU32RegU32Reg(RegisterId::R1, RegisterId::TEST0)
-               ],
-               &[],
-               vec![0; 100],
-               true,
-               "succeeded in execute MOV instruction in user mode"
-           ),
-       ];
+    /// Test the move u32 register to u32 register instruction.
+    #[test]
+    fn test_move_u32_reg_u32_reg() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::MovU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                ],
+                &[(RegisterId::R1, 0x1), (RegisterId::R2, 0x1)],
+                vec![0; 100],
+                false,
+                "failed to correctly execute MOV instruction",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R2),
+                    Instruction::MovU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                ],
+                &[(RegisterId::R1, 0x1), (RegisterId::R2, 0x1)],
+                vec![0; 100],
+                false,
+                "failed to correctly execute MOV instruction",
+            ),
+            // This test should succeed in machine mode.
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::MovU32RegU32Reg(RegisterId::R1, RegisterId::TEST0),
+                ],
+                &[(RegisterId::R1, 0x1), (RegisterId::TEST0, 0x1)],
+                vec![0; 100],
+                false,
+                "failed to correctly execute MOV instruction in machine mode",
+            ),
+            // This test should fail in user mode due to the register permissions.
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::Mret,
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::MovU32RegU32Reg(RegisterId::R1, RegisterId::TEST0),
+                ],
+                &[],
+                vec![0; 100],
+                true,
+                "succeeded in execute MOV instruction in user mode",
+            ),
+        ];
 
-       for (id, test) in tests.iter().enumerate() {
-           test.run_test(id);
-       }
-   }
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the move u32 literal to memory instruction.
+    #[test]
+    fn test_move_u32_lit_mem() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[Instruction::MovU32ImmMem(0x123, 0x0)],
+                &[],
+                vec![
+                    35, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                ],
+                false,
+                "failed to correctly execute MOV instruction",
+            ),
+            TestEntryU32Standard::new(
+                &[Instruction::MovU32ImmMem(0x123, 0x50)],
+                &[],
+                vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                ],
+                false,
+                "failed to correctly execute MOV instruction",
+            ),
+            TestEntryU32Standard::new(
+                &[Instruction::Mret, Instruction::MovU32ImmMem(0x123, 0x50)],
+                &[],
+                vec![0; 100],
+                true,
+                "succeeded in execute MOV instruction in user mode",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the move u32 register to memory instruction.
+    #[test]
+    fn test_move_u32_reg_mem() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x123, RegisterId::R1),
+                    Instruction::MovU32RegMem(RegisterId::R1, 0x0),
+                ],
+                &[(RegisterId::R1, 0x123)],
+                vec![
+                    35, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                ],
+                false,
+                "failed to correctly execute MOV instruction",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x123, RegisterId::R1),
+                    Instruction::MovU32RegMem(RegisterId::R1, 0x50),
+                ],
+                &[(RegisterId::R1, 0x123)],
+                vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                ],
+                false,
+                "failed to correctly execute MOV instruction",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::Mret,
+                    Instruction::MovU32ImmU32Reg(0x123, RegisterId::R1),
+                    Instruction::MovU32RegMem(RegisterId::R1, 0x50),
+                ],
+                &[(RegisterId::R1, 0x123)],
+                vec![0; 100],
+                true,
+                "succeeded in execute MOV instruction in user mode",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
 }
