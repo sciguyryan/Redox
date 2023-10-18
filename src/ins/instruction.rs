@@ -14,6 +14,7 @@ pub enum Instruction {
     Nop,
     AddU32LitU32Reg(u32, RegisterId),
     AddU32RegU32Reg(RegisterId, RegisterId),
+    MovU32LitU32Reg(u32, RegisterId),
     Ret,
     Mret,
     Hlt,
@@ -24,9 +25,12 @@ impl Display for Instruction {
         let asm_format = match *self {
             Instruction::Nop => String::from("nop"),
             Instruction::AddU32LitU32Reg(literal, reg) => {
-                format!("add.u32 {:02X}, {}", literal, reg)
+                format!("add.32l_32r {:02X}, {}", literal, reg)
             }
-            Instruction::AddU32RegU32Reg(reg1, reg2) => format!("add.reg {}, {}", reg1, reg2),
+            Instruction::AddU32RegU32Reg(reg1, reg2) => format!("add.32r_32r {}, {}", reg1, reg2),
+            Instruction::MovU32LitU32Reg(literal, reg) => {
+                format!("move.32l_32r {:02X}, {}", literal, reg)
+            }
             Instruction::Ret => String::from("ret"),
             Instruction::Mret => String::from("mret"),
             Instruction::Hlt => String::from("hlt"),
@@ -41,6 +45,7 @@ impl Instruction {
             Instruction::Nop => 0,
             Instruction::AddU32LitU32Reg(_, _) => ARG_U32_LIT_SIZE + ARG_REG_ID_SIZE,
             Instruction::AddU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
+            Instruction::MovU32LitU32Reg(_, _) => ARG_U32_LIT_SIZE + ARG_REG_ID_SIZE,
             Instruction::Ret => 0,
             Instruction::Mret => 0,
             Instruction::Hlt => 0,

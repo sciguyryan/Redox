@@ -69,6 +69,10 @@ pub enum RegisterId {
     PC,
     /// A debug testing register.
     DG,
+
+    // [Test Registers] //
+    #[cfg(test)]
+    TEST0,
 }
 
 impl Display for RegisterId {
@@ -90,6 +94,9 @@ impl Display for RegisterId {
             RegisterId::FP => "FP",
             RegisterId::PC => "PC",
             RegisterId::DG => "DG",
+
+            #[cfg(test)]
+            RegisterId::TEST0 => "TEST0",
         };
         write!(f, "{}", printable)
     }
@@ -165,9 +172,11 @@ impl Registers {
                 register_u32!(RegisterId::IP, &rw, 0),
                 register_u32!(RegisterId::SP, &prpw, 0),
                 register_u32!(RegisterId::FP, &prpw, 0),
-                register_u32!(RegisterId::FL, &prpw, 0),
-                //register!(RegisterId::T0, &prpw, 0),
+                register_u32!(RegisterId::FL, &rpw, 0),
                 register_u32!(RegisterId::PC, &rpw, 0),
+                // [Test Registers] //
+                #[cfg(test)]
+                register_u32!(RegisterId::TEST0, &prpw, 0),
             ]),
             registers_f32: BTreeMap::from([
                 // [ User Registers ] //

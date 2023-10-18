@@ -122,7 +122,7 @@ impl Cpu {
                 let new_value = self.perform_checked_add_u32(old_value, *lit);
 
                 self.registers
-                    .get_register_u32_mut(*reg)
+                    .get_register_u32_mut(RegisterId::AC)
                     .write(new_value, &privilege);
             }
             Instruction::AddU32RegU32Reg(reg1, reg2) => {
@@ -133,6 +133,11 @@ impl Cpu {
                 self.registers
                     .get_register_u32_mut(RegisterId::AC)
                     .write(new_value, &privilege);
+            }
+            Instruction::MovU32LitU32Reg(literal, reg) => {
+                self.registers
+                    .get_register_u32_mut(*reg)
+                    .write(*literal, &privilege);
             }
             Instruction::Ret => {
                 todo!();
@@ -530,8 +535,11 @@ mod tests_cpu {
     fn test_add_u32_lit_u32_reg() {
         let tests = [
             TestEntryU32Standard::new(
-                &[Instruction::AddU32LitU32Reg(1, RegisterId::R1)],
-                &[(RegisterId::R1, 1)],
+                &[
+                    Instruction::MovU32LitU32Reg(0x1, RegisterId::R1),
+                    Instruction::AddU32LitU32Reg(0x2, RegisterId::R1)
+                ],
+                &[(RegisterId::R1, 0x1), (RegisterId::AC, 0x3)],
                 vec![0; 100],
                 false,
                 "failed to correctly execute add_u32_lit_u32_reg instruction"
@@ -539,10 +547,10 @@ mod tests_cpu {
             // This test should cause the CPU's overflow flag to be set.
             TestEntryU32Standard::new(
                 &[
-                    Instruction::AddU32LitU32Reg(u32::MAX, RegisterId::R1),
-                    Instruction::AddU32LitU32Reg(2, RegisterId::R1)
+                    Instruction::MovU32LitU32Reg(u32::MAX, RegisterId::R1),
+                    Instruction::AddU32LitU32Reg(0x2, RegisterId::R1)
                 ],
-                &[(RegisterId::R1, 1), (RegisterId::FL, 0b00000100)],
+                &[(RegisterId::R1, u32::MAX), (RegisterId::AC, 0x1), (RegisterId::FL, 0b00000100)],
                 vec![0; 100],
                 false,
                 "failed to correctly execute add_u32_lit_u32_reg instruction: overflow CPU register flag was not correctly set"
@@ -555,21 +563,21 @@ mod tests_cpu {
                 false,
                 "failed to correctly execute add_u32_lit_u32_reg instruction: zero CPU register flag was not correctly set"
             ),
-            // This test should succeed in machine mode. Yes... you should never really do this.
+            // This test should succeed in machine mode.
             TestEntryU32Standard::new(
-                &[Instruction::AddU32LitU32Reg(1, RegisterId::PC)],
-                &[(RegisterId::PC, 2)],
+                &[Instruction::AddU32LitU32Reg(0x1, RegisterId::TEST0)],
+                &[(RegisterId::AC, 0x1)],
                 vec![0; 100],
                 false,
                 "failed to correctly execute add_u32_lit_u32_reg instruction in machine mode"
             ),
-            // This test fail in user mode.
+            // This test should fail in user mode due to the register permissions.
             TestEntryU32Standard::new(
                 &[
                     Instruction::Mret,
-                    Instruction::AddU32LitU32Reg(1, RegisterId::PC)
+                    Instruction::AddU32LitU32Reg(0x2, RegisterId::TEST0)
                 ],
-                &[(RegisterId::PC, 2)],
+                &[(RegisterId::AC, 2)],
                 vec![0; 100],
                 true,
                 "succeeded in execute add_u32_lit_u32_reg instruction in user mode"
@@ -588,8 +596,8 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Setup register values.
-                    Instruction::AddU32LitU32Reg(0xf, RegisterId::R1),
-                    Instruction::AddU32LitU32Reg(0x1, RegisterId::R2),
+                    Instruction::MovU32LitU32Reg(0xf, RegisterId::R1),
+                    Instruction::MovU32LitU32Reg(0x1, RegisterId::R2),
                     // Add the register values.
                     Instruction::AddU32RegU32Reg(RegisterId::R1, RegisterId::R2)
                 ],
@@ -602,8 +610,8 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Setup register values.
-                    Instruction::AddU32LitU32Reg(u32::MAX, RegisterId::R1),
-                    Instruction::AddU32LitU32Reg(0x2, RegisterId::R2),
+                    Instruction::MovU32LitU32Reg(u32::MAX, RegisterId::R1),
+                    Instruction::MovU32LitU32Reg(0x2, RegisterId::R2),
                     // Add the register values.
                     Instruction::AddU32RegU32Reg(RegisterId::R1, RegisterId::R2)
                 ],
@@ -625,24 +633,24 @@ mod tests_cpu {
             // This test succeed in machine mode.
             TestEntryU32Standard::new(
                 &[
-                    Instruction::AddU32LitU32Reg(0x1, RegisterId::R1),
-                    Instruction::AddU32RegU32Reg(RegisterId::R1, RegisterId::PC),
+                    Instruction::MovU32LitU32Reg(0x1, RegisterId::R1),
+                    Instruction::AddU32RegU32Reg(RegisterId::R1, RegisterId::TEST0),
                 ],
-                &[(RegisterId::R1, 0x1), (RegisterId::AC, 2)],
+                &[(RegisterId::R1, 0x1), (RegisterId::AC, 0x1)],
                 vec![0; 100],
                 false,
                 "failed to correctly execute add_u32_reg_u32_reg instruction in machine mode"
             ),
-            // This test should fail in user mode.
+            // This test should fail in user mode due to the register permissions.
             TestEntryU32Standard::new(
                 &[
                     Instruction::Mret,
-                    Instruction::AddU32LitU32Reg(0x1, RegisterId::R1),
-                    Instruction::AddU32RegU32Reg(RegisterId::R1, RegisterId::PC),
+                    Instruction::MovU32LitU32Reg(0x1, RegisterId::R1),
+                    Instruction::AddU32RegU32Reg(RegisterId::R1, RegisterId::TEST0),
                 ],
-                &[(RegisterId::R1, 0x1), (RegisterId::AC, 3)],
+                &[(RegisterId::R1, 0x1), (RegisterId::AC, 0x1)],
                 vec![0; 100],
-                false,
+                true,
                 "succeeded in execute add_u32_reg_u32_reg instruction in user mode"
             ),
         ];

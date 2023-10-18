@@ -8,11 +8,14 @@ pub enum OpCode {
     /// No Operation - a non-operation instruction.
     Nop = 0,
 
-    /// Add u32 Literal to Register.
-    AddU32LitReg = 1,
+    /// Add u32 Literal to Register. Result is moved into Accumulator register.
+    AddU32LitReg,
 
     /// Add u32 Register to Register. Result is moved into Accumulator register.
-    AddU32RegReg = 2,
+    AddU32RegReg,
+
+    /// Move a u32 Literal to Register. Result is moved into the register.
+    MovU32LitReg,
 
     /// Return - return from a subroutine.
     Ret = 65533,
