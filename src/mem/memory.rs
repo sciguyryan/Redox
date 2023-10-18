@@ -355,7 +355,7 @@ impl Memory {
         context: &SecurityContext,
         exec: bool,
     ) {
-        // System-level contexts are permitted to do anything, without limitation.
+        // Machine-level contexts are permitted to do anything, without limitation.
         // NOTE: This might end up being replaced with a ring-permission type system.
         if *context == SecurityContext::Machine {
             return;

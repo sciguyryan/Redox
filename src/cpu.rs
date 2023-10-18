@@ -139,6 +139,13 @@ impl Cpu {
                     .get_register_u32_mut(*reg)
                     .write(*literal, &privilege);
             }
+            Instruction::MovU32RegU32Reg(reg1, reg2) => {
+                let value = *self.registers.get_register_u32(*reg1).read(&privilege);
+
+                self.registers
+                    .get_register_u32_mut(*reg2)
+                    .write(value, &privilege);
+            },
             Instruction::Ret => {
                 todo!();
             }
@@ -580,7 +587,7 @@ mod tests_cpu {
                     Instruction::Mret,
                     Instruction::AddU32LitU32Reg(0x2, RegisterId::TEST0)
                 ],
-                &[(RegisterId::AC, 2)],
+                &[],
                 vec![0; 100],
                 true,
                 "succeeded in execute ADD instruction in user mode"
@@ -657,7 +664,7 @@ mod tests_cpu {
                     Instruction::MovU32LitU32Reg(0x1, RegisterId::R1),
                     Instruction::AddU32RegU32Reg(RegisterId::R1, RegisterId::TEST0),
                 ],
-                &[(RegisterId::R1, 0x1), (RegisterId::AC, 0x1)],
+                &[],
                 vec![0; 100],
                 true,
                 "succeeded in execute ADD instruction in user mode"
@@ -708,7 +715,7 @@ mod tests_cpu {
                     Instruction::Mret,
                     Instruction::MovU32LitU32Reg(0x1, RegisterId::TEST0)
                 ],
-                &[(RegisterId::TEST0, 0x1)],
+                &[],
                 vec![0; 100],
                 true,
                 "succeeded in execute MOV instruction in user mode"
@@ -719,4 +726,59 @@ mod tests_cpu {
             test.run_test(id);
         }
     }
+
+   /// Test the MoveU32RegU32Reg instruction.
+   #[test]
+   fn test_move_u32_reg_u32_reg() {
+       let tests = [
+           TestEntryU32Standard::new(
+               &[
+                   Instruction::MovU32LitU32Reg(0x1, RegisterId::R1),
+                   Instruction::MovU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+               ],
+               &[(RegisterId::R1, 0x1), (RegisterId::R2, 0x1)],
+               vec![0; 100],
+               false,
+               "failed to correctly execute MOV instruction"
+           ),
+           TestEntryU32Standard::new(
+               &[
+                   Instruction::MovU32LitU32Reg(0x1, RegisterId::R1),
+                   Instruction::MovU32LitU32Reg(0x2, RegisterId::R2),
+                   Instruction::MovU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+               ],
+               &[(RegisterId::R1, 0x1), (RegisterId::R2, 0x1)],
+               vec![0; 100],
+               false,
+               "failed to correctly execute MOV instruction"
+           ),
+           // This test should succeed in machine mode.
+           TestEntryU32Standard::new(
+               &[
+                   Instruction::MovU32LitU32Reg(0x1, RegisterId::R1),
+                   Instruction::MovU32RegU32Reg(RegisterId::R1, RegisterId::TEST0)
+               ],
+               &[(RegisterId::R1, 0x1), (RegisterId::TEST0, 0x1)],
+               vec![0; 100],
+               false,
+               "failed to correctly execute MOV instruction in machine mode"
+           ),
+           // This test should fail in user mode due to the register permissions.
+           TestEntryU32Standard::new(
+               &[
+                   Instruction::Mret,
+                   Instruction::MovU32LitU32Reg(0x1, RegisterId::R1),
+                   Instruction::MovU32RegU32Reg(RegisterId::R1, RegisterId::TEST0)
+               ],
+               &[],
+               vec![0; 100],
+               true,
+               "succeeded in execute MOV instruction in user mode"
+           ),
+       ];
+
+       for (id, test) in tests.iter().enumerate() {
+           test.run_test(id);
+       }
+   }
 }
