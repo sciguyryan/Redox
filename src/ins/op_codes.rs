@@ -11,6 +11,12 @@ pub enum OpCode {
     /// Add u32 Literal to Register.
     AddU32LitReg = 1,
 
+    /// Add u32 Register to Register. Result is moved into Accumulator register.
+    AddU32RegReg = 2,
+
+    /// Return - return from a subroutine.
+    Ret = 65533,
+
     /// Machine return - downgrade the privilege level of the processor.
     Mret = 65534,
 
