@@ -220,7 +220,7 @@ impl Memory {
 
     pub fn get_u32(&self, pos: usize, context: &SecurityContext) -> u32 {
         let bytes: [u8; 4] = self
-            .get_range_ptr(pos, pos + 4, false, context)
+            .get_range_ptr(pos, 4, false, context)
             .try_into()
             .expect("failed to create a u32 from memory bytes");
 
