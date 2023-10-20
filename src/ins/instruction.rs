@@ -2,6 +2,8 @@ use std::fmt::{self, Display, Formatter};
 
 use crate::reg::registers::RegisterId;
 
+use super::op_codes::OpCode;
+
 /// The size of the instruction, in bytes.
 const INSTRUCTION_SIZE: u32 = 2;
 /// The size of an extended instruction, in bytes.
@@ -23,33 +25,59 @@ pub enum Instruction {
     MovU32ImmMem(u32, u32),
     MovU32RegMem(RegisterId, u32),
     MovMemU32Reg(u32, RegisterId),
+    MovU32RegPtrU32Reg(RegisterId, RegisterId),
     Ret,
     Mret,
     Hlt,
 }
 
+impl Into<OpCode> for Instruction {
+    fn into(self) -> OpCode {
+        match self {
+            Instruction::Nop => OpCode::Nop,
+            Instruction::AddU32ImmU32Reg(_, _) => OpCode::AddU32ImmU32Reg,
+            Instruction::AddU32RegU32Reg(_, _) => OpCode::AddU32RegU32Reg,
+            Instruction::MovU32ImmU32Reg(_, _) => OpCode::MovU32ImmU32Reg,
+            Instruction::MovU32RegU32Reg(_, _) => OpCode::MovU32RegU32Reg,
+            Instruction::MovU32ImmMem(_, _) => OpCode::MovU32ImmMem,
+            Instruction::MovU32RegMem(_, _) => OpCode::MovU32RegMem,
+            Instruction::MovMemU32Reg(_, _) => OpCode::MovMemU32Reg,
+            Instruction::MovU32RegPtrU32Reg(_, _) => OpCode::MovMemU32Reg,
+            Instruction::Ret => OpCode::Ret,
+            Instruction::Mret => OpCode::Mret,
+            Instruction::Hlt => OpCode::Hlt,
+        }
+    }
+}
+
 impl Display for Instruction {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        // Note: square brackets are used to indicate an address.
         let asm_format = match *self {
             Instruction::Nop => String::from("nop"),
-            Instruction::AddU32ImmU32Reg(literal, reg) => {
-                format!("add ${:02X}, {}", literal, reg)
+            Instruction::AddU32ImmU32Reg(imm, reg) => {
+                format!("add ${:02X}, {}", imm, reg)
             }
-            Instruction::AddU32RegU32Reg(reg1, reg2) => format!("add {}, {}", reg1, reg2),
-            Instruction::MovU32ImmU32Reg(literal, reg) => {
-                format!("move ${:02X}, {}", literal, reg)
+            Instruction::AddU32RegU32Reg(reg1, reg2) => {
+                format!("add {}, {}", reg1, reg2)
+            }
+            Instruction::MovU32ImmU32Reg(imm, reg) => {
+                format!("move ${:02X}, {}", imm, reg)
             }
             Instruction::MovU32RegU32Reg(reg1, reg2) => {
                 format!("move {}, {}", reg1, reg2)
             }
-            Instruction::MovU32ImmMem(lit, addr) => {
-                format!("move ${:02X}, ${:04X}", lit, addr)
+            Instruction::MovU32ImmMem(imm, addr) => {
+                format!("move ${:02X}, [${:04X}]", imm, addr)
             }
             Instruction::MovU32RegMem(reg, addr) => {
-                format!("move {}, ${:04X}", reg, addr)
+                format!("move {}, [${:04X}]", reg, addr)
             }
             Instruction::MovMemU32Reg(addr, reg) => {
                 format!("move [${:04X}], {}", addr, reg)
+            }
+            Instruction::MovU32RegPtrU32Reg(reg1, reg2) => {
+                format!("move [{}], {}", reg1, reg2)
             }
             Instruction::Ret => String::from("ret"),
             Instruction::Mret => String::from("mret"),
@@ -70,6 +98,7 @@ impl Instruction {
             Instruction::MovU32ImmMem(_, _) => (ARG_U32_IMM_SIZE + ARG_MEM_ADDR_SIZE, false),
             Instruction::MovU32RegMem(_, _) => (ARG_REG_ID_SIZE + ARG_MEM_ADDR_SIZE, false),
             Instruction::MovMemU32Reg(_, _) => (ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE, false),
+            Instruction::MovU32RegPtrU32Reg(_, _) => (ARG_REG_ID_SIZE + ARG_REG_ID_SIZE, false),
             Instruction::Ret => (0, false),
             Instruction::Mret => (0, false),
             Instruction::Hlt => (0, false),
