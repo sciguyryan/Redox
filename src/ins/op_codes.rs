@@ -28,6 +28,8 @@ pub enum OpCode {
     MovMemU32Reg = 7,
     /// Move the value from the memory address specified by a Register. Result is copied into the other register.
     MovU32RegPtrU32Reg = 8,
+    /// Swap the values of the two registers.
+    SwapU32RegU32Reg = 9,
 
     /// Return - return from a subroutine.
     Ret = 32765,

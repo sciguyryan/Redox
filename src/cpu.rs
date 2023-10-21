@@ -166,6 +166,17 @@ impl Cpu {
                     .get_register_u32_mut(*out_reg)
                     .write(value, &privilege);
             }
+            Instruction::SwapU32RegU32Reg(reg1, reg2) => {
+                let reg1_val = *self.registers.get_register_u32(*reg1).read(&privilege);
+                let reg2_val = *self.registers.get_register_u32(*reg2).read(&privilege);
+
+                self.registers
+                    .get_register_u32_mut(*reg1)
+                    .write(reg2_val, &privilege);
+                self.registers
+                    .get_register_u32_mut(*reg2)
+                    .write(reg1_val, &privilege);
+            }
             Instruction::Ret => {
                 todo!();
             }
@@ -1020,6 +1031,53 @@ mod tests_cpu {
                 vec![0; 100],
                 true,
                 "succeeded in execute MOV instruction in user mode",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the swap u32 register to u32 register instruction.
+    #[test]
+    fn test_swap_u32_reg_u32_reg() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R2),
+                    Instruction::SwapU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                ],
+                &[(RegisterId::R1, 0x2), (RegisterId::R2, 0x1)],
+                vec![0; 100],
+                false,
+                "failed to correctly execute SWAP instruction",
+            ),
+            // This test should succeed in machine mode.
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::TEST0),
+                    Instruction::SwapU32RegU32Reg(RegisterId::R1, RegisterId::TEST0),
+                ],
+                &[(RegisterId::R1, 0x2), (RegisterId::TEST0, 0x1)],
+                vec![0; 100],
+                false,
+                "failed to correctly execute SWAP instruction in machine mode",
+            ),
+            // This test should fail in user mode due to the register permissions.
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::TEST0),
+                    Instruction::Mret,
+                    Instruction::SwapU32RegU32Reg(RegisterId::R1, RegisterId::TEST0),
+                ],
+                &[],
+                vec![0; 100],
+                true,
+                "succeeded in execute SWAP instruction in user mode",
             ),
         ];
 

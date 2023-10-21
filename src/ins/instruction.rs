@@ -26,14 +26,15 @@ pub enum Instruction {
     MovU32RegMem(RegisterId, u32),
     MovMemU32Reg(u32, RegisterId),
     MovU32RegPtrU32Reg(RegisterId, RegisterId),
+    SwapU32RegU32Reg(RegisterId, RegisterId),
     Ret,
     Mret,
     Hlt,
 }
 
-impl Into<OpCode> for Instruction {
-    fn into(self) -> OpCode {
-        match self {
+impl From<Instruction> for OpCode {
+    fn from(val: Instruction) -> Self {
+        match val {
             Instruction::Nop => OpCode::Nop,
             Instruction::AddU32ImmU32Reg(_, _) => OpCode::AddU32ImmU32Reg,
             Instruction::AddU32RegU32Reg(_, _) => OpCode::AddU32RegU32Reg,
@@ -42,7 +43,8 @@ impl Into<OpCode> for Instruction {
             Instruction::MovU32ImmMem(_, _) => OpCode::MovU32ImmMem,
             Instruction::MovU32RegMem(_, _) => OpCode::MovU32RegMem,
             Instruction::MovMemU32Reg(_, _) => OpCode::MovMemU32Reg,
-            Instruction::MovU32RegPtrU32Reg(_, _) => OpCode::MovMemU32Reg,
+            Instruction::MovU32RegPtrU32Reg(_, _) => OpCode::MovU32RegPtrU32Reg,
+            Instruction::SwapU32RegU32Reg(_, _) => OpCode::SwapU32RegU32Reg,
             Instruction::Ret => OpCode::Ret,
             Instruction::Mret => OpCode::Mret,
             Instruction::Hlt => OpCode::Hlt,
@@ -52,32 +54,35 @@ impl Into<OpCode> for Instruction {
 
 impl Display for Instruction {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        // Note: square brackets are used to indicate an address.
+        // Note: square brackets are used to indicate we are working with an address.
         let asm_format = match *self {
             Instruction::Nop => String::from("nop"),
             Instruction::AddU32ImmU32Reg(imm, reg) => {
-                format!("add ${:02X}, {}", imm, reg)
+                format!("add ${imm:02X}, {reg}")
             }
-            Instruction::AddU32RegU32Reg(reg1, reg2) => {
-                format!("add {}, {}", reg1, reg2)
+            Instruction::AddU32RegU32Reg(in_reg, out_reg) => {
+                format!("add {in_reg}, {out_reg}")
             }
             Instruction::MovU32ImmU32Reg(imm, reg) => {
-                format!("move ${:02X}, {}", imm, reg)
+                format!("move ${imm:02X}, {reg}")
             }
-            Instruction::MovU32RegU32Reg(reg1, reg2) => {
-                format!("move {}, {}", reg1, reg2)
+            Instruction::MovU32RegU32Reg(in_reg, out_reg) => {
+                format!("move {in_reg}, {out_reg}")
             }
             Instruction::MovU32ImmMem(imm, addr) => {
-                format!("move ${:02X}, [${:04X}]", imm, addr)
+                format!("move ${imm:02X}, [${addr:04X}]")
             }
             Instruction::MovU32RegMem(reg, addr) => {
-                format!("move {}, [${:04X}]", reg, addr)
+                format!("move {reg}, [${addr:04X}]")
             }
             Instruction::MovMemU32Reg(addr, reg) => {
-                format!("move [${:04X}], {}", addr, reg)
+                format!("move [${addr:04X}], {reg}")
             }
-            Instruction::MovU32RegPtrU32Reg(reg1, reg2) => {
-                format!("move [{}], {}", reg1, reg2)
+            Instruction::MovU32RegPtrU32Reg(in_reg, out_reg) => {
+                format!("move [{in_reg}], {out_reg}")
+            }
+            Instruction::SwapU32RegU32Reg(reg1, reg2) => {
+                format!("swap {reg1}, {reg2}")
             }
             Instruction::Ret => String::from("ret"),
             Instruction::Mret => String::from("mret"),
@@ -99,6 +104,7 @@ impl Instruction {
             Instruction::MovU32RegMem(_, _) => (ARG_REG_ID_SIZE + ARG_MEM_ADDR_SIZE, false),
             Instruction::MovMemU32Reg(_, _) => (ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE, false),
             Instruction::MovU32RegPtrU32Reg(_, _) => (ARG_REG_ID_SIZE + ARG_REG_ID_SIZE, false),
+            Instruction::SwapU32RegU32Reg(_, _) => (ARG_REG_ID_SIZE + ARG_REG_ID_SIZE, false),
             Instruction::Ret => (0, false),
             Instruction::Mret => (0, false),
             Instruction::Hlt => (0, false),

@@ -19,12 +19,13 @@ use crate::{ins::instruction::Instruction, reg::registers::RegisterId};
 fn main() {
     let mut vm = VirtualMachine::new(64_000);
 
-    //vm.ram.set(0, 0x12, &SecurityContext::System);
+    //vm.ram.set(0, 0x12, &SecurityContext::Machine);
     //vm.ram.print_range(0, 10);
 
     vm.run_instructions(&[
-        Instruction::AddU32ImmU32Reg(u32::MAX, RegisterId::R1),
-        Instruction::AddU32ImmU32Reg(2, RegisterId::R1),
+        Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+        Instruction::MovU32ImmU32Reg(0x2, RegisterId::R2),
+        Instruction::SwapU32RegU32Reg(RegisterId::R1, RegisterId::R2),
         Instruction::Mret,
         Instruction::Hlt,
     ]);
