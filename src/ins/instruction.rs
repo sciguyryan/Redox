@@ -1,8 +1,6 @@
 use std::fmt::{self, Display, Formatter};
 
-use crate::reg::registers::RegisterId;
-
-use super::op_codes::OpCode;
+use crate::{ins::op_codes::OpCode, reg::registers::RegisterId};
 
 /// The size of the instruction, in bytes.
 const INSTRUCTION_SIZE: u32 = 2;
@@ -15,7 +13,7 @@ const ARG_MEM_ADDR_SIZE: u32 = std::mem::size_of::<u32>() as u32;
 /// The size of a register ID argument, in bytes.
 const ARG_REG_ID_SIZE: u32 = std::mem::size_of::<RegisterId>() as u32;
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum Instruction {
     Nop,
     AddU32ImmU32Reg(u32, RegisterId),
@@ -30,26 +28,6 @@ pub enum Instruction {
     Ret,
     Mret,
     Hlt,
-}
-
-impl From<Instruction> for OpCode {
-    fn from(val: Instruction) -> Self {
-        match val {
-            Instruction::Nop => OpCode::Nop,
-            Instruction::AddU32ImmU32Reg(_, _) => OpCode::AddU32ImmU32Reg,
-            Instruction::AddU32RegU32Reg(_, _) => OpCode::AddU32RegU32Reg,
-            Instruction::MovU32ImmU32Reg(_, _) => OpCode::MovU32ImmU32Reg,
-            Instruction::MovU32RegU32Reg(_, _) => OpCode::MovU32RegU32Reg,
-            Instruction::MovU32ImmMem(_, _) => OpCode::MovU32ImmMem,
-            Instruction::MovU32RegMem(_, _) => OpCode::MovU32RegMem,
-            Instruction::MovMemU32Reg(_, _) => OpCode::MovMemU32Reg,
-            Instruction::MovU32RegPtrU32Reg(_, _) => OpCode::MovU32RegPtrU32Reg,
-            Instruction::SwapU32RegU32Reg(_, _) => OpCode::SwapU32RegU32Reg,
-            Instruction::Ret => OpCode::Ret,
-            Instruction::Mret => OpCode::Mret,
-            Instruction::Hlt => OpCode::Hlt,
-        }
-    }
 }
 
 impl Display for Instruction {
@@ -115,5 +93,66 @@ impl Instruction {
         } else {
             EXT_INSTRUCTION_SIZE + arg_size
         }
+    }
+
+    pub fn get_bytecode(&self) -> Vec<u8> {
+        let mut bytecode: Vec<u8> = Vec::new();
+
+        let opcode = OpCode::from(*self);
+        let opcode_value = opcode as u32;
+        let opcode_bytes = opcode_value.to_le_bytes();
+
+        // First we push the bytes for the opcode.
+        if opcode.is_extended() {
+            bytecode.extend_from_slice(&opcode_bytes);
+        } else {
+            bytecode.extend_from_slice(&opcode_bytes[0..2]);
+        }
+
+        // Next, we need to push the argument bytes. This part is more interesting.
+        match self {
+            Instruction::Nop => {}
+            Instruction::AddU32ImmU32Reg(imm, reg) => {
+                bytecode.extend_from_slice(&imm.to_le_bytes());
+                bytecode.push(*reg as u8);
+            }
+            Instruction::AddU32RegU32Reg(in_reg, out_reg) => {
+                bytecode.push(*in_reg as u8);
+                bytecode.push(*out_reg as u8);
+            }
+            Instruction::MovU32ImmU32Reg(imm, reg) => {
+                bytecode.extend_from_slice(&imm.to_le_bytes());
+                bytecode.push(*reg as u8);
+            }
+            Instruction::MovU32RegU32Reg(in_reg, out_reg) => {
+                bytecode.push(*in_reg as u8);
+                bytecode.push(*out_reg as u8);
+            }
+            Instruction::MovU32ImmMem(imm, addr) => {
+                bytecode.extend_from_slice(&imm.to_le_bytes());
+                bytecode.extend_from_slice(&addr.to_le_bytes());
+            }
+            Instruction::MovU32RegMem(reg, addr) => {
+                bytecode.push(*reg as u8);
+                bytecode.extend_from_slice(&addr.to_le_bytes());
+            }
+            Instruction::MovMemU32Reg(addr, reg) => {
+                bytecode.extend_from_slice(&addr.to_le_bytes());
+                bytecode.push(*reg as u8);
+            }
+            Instruction::MovU32RegPtrU32Reg(in_reg, out_reg) => {
+                bytecode.push(*in_reg as u8);
+                bytecode.push(*out_reg as u8);
+            }
+            Instruction::SwapU32RegU32Reg(reg1, reg2) => {
+                bytecode.push(*reg1 as u8);
+                bytecode.push(*reg2 as u8);
+            }
+            Instruction::Ret => todo!(),
+            Instruction::Mret => {}
+            Instruction::Hlt => {}
+        }
+
+        bytecode
     }
 }

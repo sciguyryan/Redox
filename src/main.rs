@@ -1,5 +1,6 @@
 #![crate_name = "redox"]
 
+mod compiler;
 mod cpu;
 mod data_access_type;
 mod ins;
@@ -11,7 +12,11 @@ pub mod vm;
 
 use vm::VirtualMachine;
 
-use crate::{ins::instruction::Instruction, reg::registers::RegisterId};
+use crate::{
+    compiler::{bytecode_compiler::Compiler, bytecode_decompiler::Decompiler},
+    ins::instruction::Instruction,
+    reg::registers::RegisterId,
+};
 
 // https://onlinedocs.microchip.com/pr/GUID-0E320577-28E6-4365-9BB8-9E1416A0A6E4-en-US-6/index.html?GUID-4983CB0C-7FEB-40F1-99D3-0608805404F3
 // https://www.youtube.com/watch?v=KkenLT8S9Hs&list=WL&index=17
@@ -22,13 +27,26 @@ fn main() {
     //vm.ram.set(0, 0x12, &SecurityContext::Machine);
     //vm.ram.print_range(0, 10);
 
-    vm.run_instructions(&[
+    let instructions = &[
         Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
         Instruction::MovU32ImmU32Reg(0x2, RegisterId::R2),
         Instruction::SwapU32RegU32Reg(RegisterId::R1, RegisterId::R2),
         Instruction::Mret,
         Instruction::Hlt,
-    ]);
+    ];
+
+    let data = Compiler::compile(instructions);
+
+    let mut decompiler = Decompiler::new(&data);
+    let insssss = decompiler.decompile();
+
+    return;
+
+    for ins in instructions {
+        ins.get_instruction_size();
+    }
+
+    vm.run_instructions(&instructions[..]);
 
     println!("----------[CPU]----------");
     println!("Machine Mode? {}", vm.cpu.is_machine_mode);

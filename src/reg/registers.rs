@@ -1,4 +1,5 @@
 use core::fmt;
+use num_derive::FromPrimitive;
 use prettytable::{row, Table};
 use std::{collections::BTreeMap, fmt::Display};
 
@@ -6,7 +7,7 @@ use crate::{cpu::CpuFlag, utils};
 
 use super::register::{RegisterF32, RegisterPermission, RegisterU32};
 
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, FromPrimitive, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(u8)]
 pub enum RegisterId {
     // Layout
