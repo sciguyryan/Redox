@@ -70,8 +70,8 @@ impl MoveExpressionHandler {
         assert!(self.validate());
     }
 
-    pub fn encode(&mut self, args: &[ExpressionArgs]) -> u32 {
-        self.args = args.to_vec();
+    pub fn encode(&mut self, args: Vec<ExpressionArgs>) -> u32 {
+        self.args = args;
         assert!(self.validate());
 
         // Layout:
@@ -80,10 +80,10 @@ impl MoveExpressionHandler {
         let mut encoded_value = 0u32;
 
         // If the first two bits are unset, the values will be assumed to be register IDs.
-        if let ExpressionArgs::Constant(_) = args[0] {
+        if let ExpressionArgs::Constant(_) = self.args[0] {
             utils::set_bit_state_inline(&mut encoded_value, 0, true);
         }
-        if let ExpressionArgs::Constant(_) = args[2] {
+        if let ExpressionArgs::Constant(_) = self.args[2] {
             utils::set_bit_state_inline(&mut encoded_value, 1, true);
         }
 
@@ -91,20 +91,20 @@ impl MoveExpressionHandler {
         // NOTE: noted for posterity.
 
         // Encode the first operand.
-        encoded_value |= match args[0] {
+        encoded_value |= match self.args[0] {
             ExpressionArgs::Register(rid) => rid as u32,
             ExpressionArgs::Constant(val) => val as u32,
             _ => panic!(),
         } << VALUE_1_ENCODE_SHIFT;
 
         // Encode the operator.
-        encoded_value |= match args[1] {
+        encoded_value |= match self.args[1] {
             ExpressionArgs::Operator(oid) => oid as u32,
             _ => panic!(),
         } << OPERATOR_ENCODE_SHIFT;
 
         // Encode the second operand.
-        encoded_value |= match args[2] {
+        encoded_value |= match self.args[2] {
             ExpressionArgs::Register(rid) => rid as u32,
             ExpressionArgs::Constant(val) => val as u32,
             _ => panic!(),
@@ -196,7 +196,7 @@ mod tests_move_expressions {
             let result = panic::catch_unwind(|| {
                 // Perform a roundtrip encode and decode.
                 let mut handler = MoveExpressionHandler::new();
-                let encoded = handler.encode(self.arguments);
+                let encoded = handler.encode(self.arguments.to_vec());
                 handler.decode(encoded);
 
                 // Yield the decoded arguments.
