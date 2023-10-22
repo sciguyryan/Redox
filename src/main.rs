@@ -35,15 +35,14 @@ fn main() {
     ];
     let mut expression_encoder = MoveExpressionHandler::new();
     let expr = expression_encoder.encode(&expr_args);
-
     //println!("{:#018b}", expr);
     //return;
 
     let instructions = &[
-        /*Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+        Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
         Instruction::MovU32ImmU32Reg(0x2, RegisterId::R2),
         Instruction::SwapU32RegU32Reg(RegisterId::R1, RegisterId::R2),
-        Instruction::Mret,*/
+        Instruction::Mret,
         Instruction::MovU32ImmMemRelExpr(0x123, expr),
         Instruction::Hlt,
     ];
@@ -53,6 +52,7 @@ fn main() {
     let mut decompiler = Decompiler::new(&data);
     let insssss = decompiler.decompile();
 
+    println!("----------[Instructions]----------");
     for ins in instructions {
         println!("{ins}");
     }

@@ -72,7 +72,7 @@ impl MoveExpressionHandler {
             self.args.push(ExpressionArgs::Constant(value_2));
         } else {
             let reg_id: RegisterId =
-                FromPrimitive::from_u8(value_1).expect("failed to get valid register id");
+                FromPrimitive::from_u8(value_2).expect("failed to get valid register id");
             self.args.push(ExpressionArgs::Register(reg_id));
         }
 
@@ -258,22 +258,22 @@ impl Display for Instruction {
                 format!("swap {reg1}, {reg2}")
             }
             Instruction::MovU32ImmU32Reg(imm, reg) => {
-                format!("move ${imm:02X}, {reg}")
+                format!("mov ${imm:02X}, {reg}")
             }
             Instruction::MovU32RegU32Reg(in_reg, out_reg) => {
-                format!("move {in_reg}, {out_reg}")
+                format!("mov {in_reg}, {out_reg}")
             }
             Instruction::MovU32ImmMemRelSimple(imm, addr) => {
-                format!("move.rs ${imm:02X}, [${addr:04X}]")
+                format!("mov.rs ${imm:02X}, [${addr:04X}]")
             }
             Instruction::MovU32RegMemRelSimple(reg, addr) => {
-                format!("move.rs {reg}, [${addr:04X}]")
+                format!("mov.rs {reg}, [${addr:04X}]")
             }
             Instruction::MovMemU32RegRelSimple(addr, reg) => {
-                format!("move.rs [${addr:04X}], {reg}")
+                format!("mov.rs [${addr:04X}], {reg}")
             }
             Instruction::MovU32RegPtrU32RegRelSimple(in_reg, out_reg) => {
-                format!("move.rs [{in_reg}], {out_reg}")
+                format!("mov.rs [{in_reg}], {out_reg}")
             }
 
             /******** [Complex Move Instructions - WITH EXPRESSIONS] ********/
@@ -281,7 +281,7 @@ impl Display for Instruction {
                 let mut expression_decoder = MoveExpressionHandler::new();
                 expression_decoder.decode(expr);
 
-                format!("move.rs ${imm:02X}, [{expression_decoder}]")
+                format!("mov.rs ${imm:02X}, [{expression_decoder}]")
             }
 
             /******** [Special Instructions] ********/
