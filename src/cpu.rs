@@ -1,8 +1,5 @@
 use core::fmt;
-use std::{
-    collections::HashMap,
-    slice::Iter,
-};
+use std::{collections::HashMap, slice::Iter};
 
 use crate::{
     ins::instruction::{ExpressionArgs, ExpressionOperator, Instruction, MoveExpressionHandler},
@@ -35,6 +32,47 @@ impl Cpu {
         let instruction = Instruction::Nop;
 
         instruction
+    }
+
+    /// Execute a move instruction expression.
+    ///
+    /// # Arguments
+    ///
+    /// * `operators` - The operators that form the expression.
+    /// * `context` - The [`SecurityContext`] in which this expression should be executed.
+    ///
+    /// # Returns
+    ///
+    /// A u32 that is the calculated result of the expression.
+    fn execute_u32_move_expression(
+        &self,
+        operators: &[ExpressionArgs; 3],
+        context: &SecurityContext,
+    ) -> u32 {
+        // Determine the first operand.
+        let val_1 = match operators[0] {
+            ExpressionArgs::Register(rid) => *self.registers.get_register_u32(rid).read(context),
+            ExpressionArgs::Constant(val) => val as u32,
+            _ => panic!(),
+        };
+
+        // Determine the second operand.
+        let val_2 = match operators[2] {
+            ExpressionArgs::Register(rid) => *self.registers.get_register_u32(rid).read(context),
+            ExpressionArgs::Constant(val) => val as u32,
+            _ => panic!(),
+        };
+
+        // Calculate the destination address by evaluating the expression.
+        if let ExpressionArgs::Operator(op) = operators[1] {
+            match op {
+                ExpressionOperator::Add => val_1 + val_2,
+                ExpressionOperator::Subtract => val_1 - val_2,
+                ExpressionOperator::Multiply => val_1 * val_2,
+            }
+        } else {
+            panic!();
+        }
     }
 
     /// Get the state of a given CPU flag.
@@ -201,35 +239,7 @@ impl Cpu {
                 }
 
                 let operators = self.move_expression_cache.get(expr).unwrap();
-
-                // Determine the first operand.
-                let val_1 = match operators[0] {
-                    ExpressionArgs::Register(rid) => {
-                        *self.registers.get_register_u32(rid).read(&privilege)
-                    }
-                    ExpressionArgs::Constant(val) => val as u32,
-                    _ => panic!(),
-                };
-
-                // Determine the second operand.
-                let val_2 = match operators[2] {
-                    ExpressionArgs::Register(rid) => {
-                        *self.registers.get_register_u32(rid).read(&privilege)
-                    }
-                    ExpressionArgs::Constant(val) => val as u32,
-                    _ => panic!(),
-                };
-
-                // Calculate the destination address by evaluating the expression.
-                let addr = if let ExpressionArgs::Operator(op) = operators[1] {
-                    match op {
-                        ExpressionOperator::Add => val_1 + val_2,
-                        ExpressionOperator::Subtract => val_1 - val_2,
-                        ExpressionOperator::Multiply => val_1 * val_2,
-                    }
-                } else {
-                    panic!();
-                };
+                let addr = self.execute_u32_move_expression(operators, &privilege);
 
                 mem.set_u32(addr as usize, *imm, &privilege);
             }
