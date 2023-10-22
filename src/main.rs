@@ -15,7 +15,10 @@ use vm::VirtualMachine;
 
 use crate::{
     compiler::{bytecode_compiler::Compiler, bytecode_decompiler::Decompiler},
-    ins::instruction::{ExpressionArgs, ExpressionOperator, Instruction, MoveExpressionHandler},
+    ins::{
+        instruction::Instruction,
+        move_expressions::{ExpressionArgs, ExpressionOperator, MoveExpressionHandler},
+    },
     reg::registers::RegisterId,
 };
 

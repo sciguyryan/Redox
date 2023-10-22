@@ -2,7 +2,10 @@ use core::fmt;
 use std::{collections::HashMap, slice::Iter};
 
 use crate::{
-    ins::instruction::{ExpressionArgs, ExpressionOperator, Instruction, MoveExpressionHandler},
+    ins::{
+        instruction::Instruction,
+        move_expressions::{ExpressionArgs, ExpressionOperator, MoveExpressionHandler},
+    },
     mem::memory::Memory,
     reg::registers::{RegisterId, Registers},
     security_context::SecurityContext,
