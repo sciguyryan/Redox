@@ -17,7 +17,7 @@ pub struct Cpu {
     pub is_halted: bool,
     pub is_machine_mode: bool,
 
-    move_expression_cache: HashMap<u16, [ExpressionArgs; 3]>,
+    move_expression_cache: HashMap<u32, [ExpressionArgs; 3]>,
 }
 
 impl Cpu {
@@ -32,9 +32,7 @@ impl Cpu {
     }
 
     fn decode_next_instruction(&self) -> Instruction {
-        let instruction = Instruction::Nop;
-
-        instruction
+        Instruction::Nop
     }
 
     /// Execute a move instruction expression.
@@ -238,7 +236,7 @@ impl Cpu {
                     expression_decoder.decode(*expr);
 
                     self.move_expression_cache
-                        .insert(*expr, expression_decoder.get_as_array());
+                        .insert(*expr, expression_decoder.get_args_as_array());
                 }
 
                 let operators = self.move_expression_cache.get(expr).unwrap();

@@ -230,7 +230,7 @@ impl<'a> Decompiler<'a> {
             /******** [Complex Move Instructions - WITH EXPRESSIONS] ********/
             OpCode::MovU32ImmMemRelExpr => {
                 let imm = self.read_u32();
-                let expr = self.read_u16();
+                let expr = self.read_u32();
 
                 if imm.is_none() {
                     eprintln!("MovU32ImmMemRelExpr - no valid immediate for first argument.");

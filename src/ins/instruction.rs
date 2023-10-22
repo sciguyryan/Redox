@@ -36,7 +36,7 @@ pub enum Instruction {
     MovU32RegPtrU32RegRelSimple(RegisterId, RegisterId),
 
     /******** [Complex Move Instructions - WITH EXPRESSIONS] ********/
-    MovU32ImmMemRelExpr(u32, u16),
+    MovU32ImmMemRelExpr(u32, u32),
 
     /******** [Special Instructions] ********/
     Ret,

@@ -31,21 +31,26 @@ fn main() {
     //vm.ram.set(0, 0x12, &SecurityContext::Machine);
     //vm.ram.print_range(0, 10);
 
-    let expr_args = vec![
+    let expr_args_1 = vec![
         ExpressionArgs::Register(RegisterId::R7),
         ExpressionArgs::Operator(ExpressionOperator::Multiply),
         ExpressionArgs::Register(RegisterId::R8),
     ];
+    let expr_args_2 = vec![
+        ExpressionArgs::Constant(123),
+        ExpressionArgs::Operator(ExpressionOperator::Multiply),
+        ExpressionArgs::Constant(65),
+    ];
     let mut expression_encoder = MoveExpressionHandler::new();
-    let expr = expression_encoder.encode(&expr_args);
+    let expr = expression_encoder.encode(&expr_args_2);
     //println!("{:#018b}", expr);
     //return;
 
     let instructions = &[
-        Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+        /*Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
         Instruction::MovU32ImmU32Reg(0x2, RegisterId::R2),
         Instruction::SwapU32RegU32Reg(RegisterId::R1, RegisterId::R2),
-        Instruction::Mret,
+        Instruction::Mret,*/
         Instruction::MovU32ImmMemRelExpr(0x123, expr),
         Instruction::Hlt,
     ];
