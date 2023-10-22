@@ -1,8 +1,11 @@
 use core::fmt;
-use std::slice::Iter;
+use std::{
+    collections::HashMap,
+    slice::Iter,
+};
 
 use crate::{
-    ins::instruction::Instruction,
+    ins::instruction::{ExpressionArgs, ExpressionOperator, Instruction, MoveExpressionHandler},
     mem::memory::Memory,
     reg::registers::{RegisterId, Registers},
     security_context::SecurityContext,
@@ -13,6 +16,8 @@ pub struct Cpu {
     pub registers: Registers,
     pub is_halted: bool,
     pub is_machine_mode: bool,
+
+    move_expression_cache: HashMap<u16, [ExpressionArgs; 3]>,
 }
 
 impl Cpu {
@@ -21,6 +26,8 @@ impl Cpu {
             registers: Registers::default(),
             is_halted: false,
             is_machine_mode: true,
+
+            move_expression_cache: HashMap::new(),
         }
     }
 
@@ -117,6 +124,8 @@ impl Cpu {
 
         match instruction {
             Instruction::Nop => {}
+
+            /******** [Arithmetic Instructions] ********/
             Instruction::AddU32ImmU32Reg(imm, reg) => {
                 let old_value = *self.registers.get_register_u32(*reg).read(&privilege);
                 let new_value = self.perform_checked_add_u32(old_value, *imm);
@@ -134,6 +143,19 @@ impl Cpu {
                     .get_register_u32_mut(RegisterId::AC)
                     .write(new_value, &privilege);
             }
+
+            /******** [Simple Move Instructions - NO EXPRESSIONS] ********/
+            Instruction::SwapU32RegU32Reg(reg1, reg2) => {
+                let reg1_val = *self.registers.get_register_u32(*reg1).read(&privilege);
+                let reg2_val = *self.registers.get_register_u32(*reg2).read(&privilege);
+
+                self.registers
+                    .get_register_u32_mut(*reg1)
+                    .write(reg2_val, &privilege);
+                self.registers
+                    .get_register_u32_mut(*reg2)
+                    .write(reg1_val, &privilege);
+            }
             Instruction::MovU32ImmU32Reg(imm, reg) => {
                 self.registers
                     .get_register_u32_mut(*reg)
@@ -146,37 +168,73 @@ impl Cpu {
                     .get_register_u32_mut(*out_reg)
                     .write(value, &privilege);
             }
-            Instruction::MovU32ImmMem(imm, addr) => {
+            Instruction::MovU32ImmMemRelSimple(imm, addr) => {
                 mem.set_u32(*addr as usize, *imm, &privilege);
             }
-            Instruction::MovU32RegMem(reg, addr) => {
+            Instruction::MovU32RegMemRelSimple(reg, addr) => {
                 let value = *self.registers.get_register_u32(*reg).read(&privilege);
                 mem.set_u32(*addr as usize, value, &privilege);
             }
-            Instruction::MovMemU32Reg(addr, reg) => {
+            Instruction::MovMemU32RegRelSimple(addr, reg) => {
                 let value = mem.get_u32(*addr as usize, &privilege);
                 self.registers
                     .get_register_u32_mut(*reg)
                     .write(value, &privilege);
             }
-            Instruction::MovU32RegPtrU32Reg(in_reg, out_reg) => {
+            Instruction::MovU32RegPtrU32RegRelSimple(in_reg, out_reg) => {
                 let address = self.registers.get_register_u32(*in_reg).read(&privilege);
                 let value = mem.get_u32(*address as usize, &privilege);
                 self.registers
                     .get_register_u32_mut(*out_reg)
                     .write(value, &privilege);
             }
-            Instruction::SwapU32RegU32Reg(reg1, reg2) => {
-                let reg1_val = *self.registers.get_register_u32(*reg1).read(&privilege);
-                let reg2_val = *self.registers.get_register_u32(*reg2).read(&privilege);
 
-                self.registers
-                    .get_register_u32_mut(*reg1)
-                    .write(reg2_val, &privilege);
-                self.registers
-                    .get_register_u32_mut(*reg2)
-                    .write(reg1_val, &privilege);
+            /******** [Complex Move Instructions - WITH EXPRESSIONS] ********/
+            Instruction::MovU32ImmMemRelExpr(imm, expr) => {
+                // Cache the decoding process to speed up processing slightly.
+                if !self.move_expression_cache.contains_key(expr) {
+                    let mut expression_decoder = MoveExpressionHandler::new();
+                    expression_decoder.decode(*expr);
+
+                    self.move_expression_cache
+                        .insert(*expr, expression_decoder.get_as_array());
+                }
+
+                let operators = self.move_expression_cache.get(expr).unwrap();
+
+                // Determine the first operand.
+                let val_1 = match operators[0] {
+                    ExpressionArgs::Register(rid) => {
+                        *self.registers.get_register_u32(rid).read(&privilege)
+                    }
+                    ExpressionArgs::Constant(val) => val as u32,
+                    _ => panic!(),
+                };
+
+                // Determine the second operand.
+                let val_2 = match operators[2] {
+                    ExpressionArgs::Register(rid) => {
+                        *self.registers.get_register_u32(rid).read(&privilege)
+                    }
+                    ExpressionArgs::Constant(val) => val as u32,
+                    _ => panic!(),
+                };
+
+                // Calculate the destination address by evaluating the expression.
+                let addr = if let ExpressionArgs::Operator(op) = operators[1] {
+                    match op {
+                        ExpressionOperator::Add => val_1 + val_2,
+                        ExpressionOperator::Subtract => val_1 - val_2,
+                        ExpressionOperator::Multiply => val_1 * val_2,
+                    }
+                } else {
+                    panic!();
+                };
+
+                mem.set_u32(addr as usize, *imm, &privilege);
             }
+
+            /******** [Special Instructions] ********/
             Instruction::Ret => {
                 todo!();
             }
@@ -822,7 +880,7 @@ mod tests_cpu {
     fn test_move_u32_lit_mem() {
         let tests = [
             TestEntryU32Standard::new(
-                &[Instruction::MovU32ImmMem(0x123, 0x0)],
+                &[Instruction::MovU32ImmMemRelSimple(0x123, 0x0)],
                 &[],
                 vec![
                     35, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -834,7 +892,7 @@ mod tests_cpu {
                 "failed to correctly execute MOV instruction",
             ),
             TestEntryU32Standard::new(
-                &[Instruction::MovU32ImmMem(0x123, 0x50)],
+                &[Instruction::MovU32ImmMemRelSimple(0x123, 0x50)],
                 &[],
                 vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -846,7 +904,10 @@ mod tests_cpu {
                 "failed to correctly execute MOV instruction",
             ),
             TestEntryU32Standard::new(
-                &[Instruction::Mret, Instruction::MovU32ImmMem(0x123, 0x50)],
+                &[
+                    Instruction::Mret,
+                    Instruction::MovU32ImmMemRelSimple(0x123, 0x50),
+                ],
                 &[],
                 vec![0; 100],
                 true,
@@ -866,7 +927,7 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     Instruction::MovU32ImmU32Reg(0x123, RegisterId::R1),
-                    Instruction::MovU32RegMem(RegisterId::R1, 0x0),
+                    Instruction::MovU32RegMemRelSimple(RegisterId::R1, 0x0),
                 ],
                 &[(RegisterId::R1, 0x123)],
                 vec![
@@ -881,7 +942,7 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     Instruction::MovU32ImmU32Reg(0x123, RegisterId::R1),
-                    Instruction::MovU32RegMem(RegisterId::R1, 0x50),
+                    Instruction::MovU32RegMemRelSimple(RegisterId::R1, 0x50),
                 ],
                 &[(RegisterId::R1, 0x123)],
                 vec![
@@ -897,7 +958,7 @@ mod tests_cpu {
                 &[
                     Instruction::Mret,
                     Instruction::MovU32ImmU32Reg(0x123, RegisterId::R1),
-                    Instruction::MovU32RegMem(RegisterId::R1, 0x50),
+                    Instruction::MovU32RegMemRelSimple(RegisterId::R1, 0x50),
                 ],
                 &[],
                 vec![0; 100],
@@ -918,9 +979,9 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     Instruction::MovU32ImmU32Reg(0x123, RegisterId::R1),
-                    Instruction::MovU32RegMem(RegisterId::R1, 0x0),
+                    Instruction::MovU32RegMemRelSimple(RegisterId::R1, 0x0),
                     Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
-                    Instruction::MovMemU32Reg(0x0, RegisterId::R2),
+                    Instruction::MovMemU32RegRelSimple(0x0, RegisterId::R2),
                 ],
                 &[(RegisterId::R2, 0x123)],
                 vec![
@@ -935,9 +996,9 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     Instruction::MovU32ImmU32Reg(0x123, RegisterId::R1),
-                    Instruction::MovU32RegMem(RegisterId::R1, 0x50),
+                    Instruction::MovU32RegMemRelSimple(RegisterId::R1, 0x50),
                     Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
-                    Instruction::MovMemU32Reg(0x50, RegisterId::R2),
+                    Instruction::MovMemU32RegRelSimple(0x50, RegisterId::R2),
                 ],
                 &[(RegisterId::R2, 0x123)],
                 vec![
@@ -953,9 +1014,9 @@ mod tests_cpu {
                 &[
                     Instruction::Mret,
                     Instruction::MovU32ImmU32Reg(0x123, RegisterId::R1),
-                    Instruction::MovU32RegMem(RegisterId::R1, 0x50),
+                    Instruction::MovU32RegMemRelSimple(RegisterId::R1, 0x50),
                     Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
-                    Instruction::MovMemU32Reg(0x50, RegisterId::R2),
+                    Instruction::MovMemU32RegRelSimple(0x50, RegisterId::R2),
                 ],
                 &[],
                 vec![0; 100],
@@ -977,12 +1038,12 @@ mod tests_cpu {
                 &[
                     // Store value in memory.
                     Instruction::MovU32ImmU32Reg(0x123, RegisterId::R1),
-                    Instruction::MovU32RegMem(RegisterId::R1, 0x0),
+                    Instruction::MovU32RegMemRelSimple(RegisterId::R1, 0x0),
                     Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
                     // Set the address pointer in R2.
                     Instruction::MovU32ImmU32Reg(0x0, RegisterId::R2),
                     // Read the value from the address of R2 into R1.
-                    Instruction::MovU32RegPtrU32Reg(RegisterId::R2, RegisterId::R1),
+                    Instruction::MovU32RegPtrU32RegRelSimple(RegisterId::R2, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x123)],
                 vec![
@@ -998,12 +1059,12 @@ mod tests_cpu {
                 &[
                     // Store value in memory.
                     Instruction::MovU32ImmU32Reg(0x123, RegisterId::R1),
-                    Instruction::MovU32RegMem(RegisterId::R1, 0x50),
+                    Instruction::MovU32RegMemRelSimple(RegisterId::R1, 0x50),
                     Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
                     // Set the address pointer in R2.
                     Instruction::MovU32ImmU32Reg(0x50, RegisterId::R2),
                     // Read the value from the address of R2 into R1.
-                    Instruction::MovU32RegPtrU32Reg(RegisterId::R2, RegisterId::R1),
+                    Instruction::MovU32RegPtrU32RegRelSimple(RegisterId::R2, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x123), (RegisterId::R2, 0x50)],
                 vec![
@@ -1020,12 +1081,12 @@ mod tests_cpu {
                     Instruction::Mret,
                     // Store value in memory.
                     Instruction::MovU32ImmU32Reg(0x123, RegisterId::R1),
-                    Instruction::MovU32RegMem(RegisterId::R1, 0x50),
+                    Instruction::MovU32RegMemRelSimple(RegisterId::R1, 0x50),
                     Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
                     // Set the address pointer in R2.
                     Instruction::MovU32ImmU32Reg(0x50, RegisterId::R2),
                     // Read the value from the address of R2 into R1.
-                    Instruction::MovU32RegPtrU32Reg(RegisterId::R2, RegisterId::R1),
+                    Instruction::MovU32RegPtrU32RegRelSimple(RegisterId::R2, RegisterId::R1),
                 ],
                 &[],
                 vec![0; 100],

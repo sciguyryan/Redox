@@ -74,17 +74,19 @@ impl<'a> Decompiler<'a> {
 
         let ins = match opcode {
             OpCode::Nop => Instruction::Nop,
+
+            /******** [Arithmetic Instructions] ********/
             OpCode::AddU32ImmU32Reg => {
                 let imm = self.read_u32();
                 let reg = self.read_register_id();
 
                 if imm.is_none() {
-                    eprintln!("AddU32ImmU32Reg no immediate value for first argument.");
+                    eprintln!("AddU32ImmU32Reg - no immediate value for first argument.");
                     return None;
                 }
 
                 if reg.is_none() {
-                    eprintln!("AddU32ImmU32Reg no valid register ID for second argument.");
+                    eprintln!("AddU32ImmU32Reg - no valid register ID for second argument.");
                     return None;
                 }
 
@@ -95,28 +97,46 @@ impl<'a> Decompiler<'a> {
                 let reg_2 = self.read_register_id();
 
                 if reg_1.is_none() {
-                    eprintln!("AddU32RegU32Reg no valid register ID for first argument.");
+                    eprintln!("AddU32RegU32Reg - no valid register ID for first argument.");
                     return None;
                 }
 
                 if reg_2.is_none() {
-                    eprintln!("AddU32RegU32Reg no valid register ID for second argument.");
+                    eprintln!("AddU32RegU32Reg - no valid register ID for second argument.");
                     return None;
                 }
 
                 Instruction::AddU32RegU32Reg(reg_1.unwrap(), reg_2.unwrap())
+            }
+
+            /******** [Simple Move Instructions - NO EXPRESSIONS] ********/
+            OpCode::SwapU32RegU32Reg => {
+                let reg1 = self.read_register_id();
+                let reg2 = self.read_register_id();
+
+                if reg1.is_none() {
+                    eprintln!("SwapU32RegU32Reg - no valid register ID for first argument.");
+                    return None;
+                }
+
+                if reg2.is_none() {
+                    eprintln!("SwapU32RegU32Reg - no valid register ID for second argument.");
+                    return None;
+                }
+
+                Instruction::SwapU32RegU32Reg(reg1.unwrap(), reg2.unwrap())
             }
             OpCode::MovU32ImmU32Reg => {
                 let imm = self.read_u32();
                 let reg = self.read_register_id();
 
                 if imm.is_none() {
-                    eprintln!("MovU32ImmU32Reg no immediate value for first argument.");
+                    eprintln!("MovU32ImmU32Reg - no immediate value for first argument.");
                     return None;
                 }
 
                 if reg.is_none() {
-                    eprintln!("MovU32ImmU32Reg no valid register ID for second argument.");
+                    eprintln!("MovU32ImmU32Reg - no valid register ID for second argument.");
                     return None;
                 }
 
@@ -127,97 +147,105 @@ impl<'a> Decompiler<'a> {
                 let out_reg = self.read_register_id();
 
                 if in_reg.is_none() {
-                    eprintln!("MovU32RegU32Reg no valid register ID for first argument.");
+                    eprintln!("MovU32RegU32Reg - no valid register ID for first argument.");
                     return None;
                 }
 
                 if out_reg.is_none() {
-                    eprintln!("MovU32RegU32Reg no valid register ID for second argument.");
+                    eprintln!("MovU32RegU32Reg - no valid register ID for second argument.");
                     return None;
                 }
 
                 Instruction::MovU32RegU32Reg(in_reg.unwrap(), out_reg.unwrap())
             }
-            OpCode::MovU32ImmMem => {
+            OpCode::MovU32ImmMemRelSimple => {
                 let imm = self.read_u32();
                 let addr = self.read_u32();
 
                 if imm.is_none() {
-                    eprintln!("MovU32ImmMem no valid immediate for first argument.");
+                    eprintln!("MovU32ImmMemRelSimple - no valid immediate for first argument.");
                     return None;
                 }
 
                 if addr.is_none() {
-                    eprintln!("MovU32ImmMem no valid address for second argument.");
+                    eprintln!("MovU32ImmMemRelSimple - no valid address for second argument.");
                     return None;
                 }
 
-                Instruction::MovU32ImmMem(imm.unwrap(), addr.unwrap())
+                Instruction::MovU32ImmMemRelSimple(imm.unwrap(), addr.unwrap())
             }
-            OpCode::MovU32RegMem => {
+            OpCode::MovU32RegMemRelSimple => {
                 let reg = self.read_register_id();
                 let addr = self.read_u32();
 
                 if reg.is_none() {
-                    eprintln!("MovU32RegMem no valid register ID for first argument.");
+                    eprintln!("MovU32RegMemRelSimple - no valid register ID for first argument.");
                     return None;
                 }
 
                 if addr.is_none() {
-                    eprintln!("MovU32RegMem no valid address for second argument.");
+                    eprintln!("MovU32RegMemRelSimple - no valid address for second argument.");
                     return None;
                 }
 
-                Instruction::MovU32RegMem(reg.unwrap(), addr.unwrap())
+                Instruction::MovU32RegMemRelSimple(reg.unwrap(), addr.unwrap())
             }
-            OpCode::MovMemU32Reg => {
+            OpCode::MovMemU32RegRelSimple => {
                 let addr = self.read_u32();
                 let reg = self.read_register_id();
 
                 if addr.is_none() {
-                    eprintln!("MovMemU32Reg no valid address for first argument.");
+                    eprintln!("MovMemU32RegRelSimple - no valid address for first argument.");
                     return None;
                 }
 
                 if reg.is_none() {
-                    eprintln!("MovMemU32Reg no valid register ID for second argument.");
+                    eprintln!("MovMemU32RegRelSimple - no valid register ID for second argument.");
                     return None;
                 }
 
-                Instruction::MovMemU32Reg(addr.unwrap(), reg.unwrap())
+                Instruction::MovMemU32RegRelSimple(addr.unwrap(), reg.unwrap())
             }
-            OpCode::MovU32RegPtrU32Reg => {
+            OpCode::MovU32RegPtrU32RegRelSimple => {
                 let in_reg = self.read_register_id();
                 let out_reg = self.read_register_id();
 
                 if in_reg.is_none() {
-                    eprintln!("MovU32RegPtrU32Reg no valid register ID for first argument.");
+                    eprintln!(
+                        "MovU32RegPtrU32RegRelSimple - no valid register ID for first argument."
+                    );
                     return None;
                 }
 
                 if out_reg.is_none() {
-                    eprintln!("MovU32RegPtrU32Reg no valid register ID for second argument.");
+                    eprintln!(
+                        "MovU32RegPtrU32RegRelSimple - no valid register ID for second argument."
+                    );
                     return None;
                 }
 
-                Instruction::MovU32RegPtrU32Reg(in_reg.unwrap(), out_reg.unwrap())
+                Instruction::MovU32RegPtrU32RegRelSimple(in_reg.unwrap(), out_reg.unwrap())
             }
-            OpCode::SwapU32RegU32Reg => {
-                let reg1 = self.read_register_id();
-                let reg2 = self.read_register_id();
 
-                if reg1.is_none() {
-                    eprintln!("SwapU32RegU32Reg no valid register ID for first argument.");
+            /******** [Complex Move Instructions - WITH EXPRESSIONS] ********/
+            OpCode::MovU32ImmMemRelExpr => {
+                let imm = self.read_u32();
+                let expr = self.read_u16();
+
+                if imm.is_none() {
+                    eprintln!("MovU32ImmMemRelExpr - no valid immediate for first argument.");
                     return None;
                 }
 
-                if reg2.is_none() {
-                    eprintln!("SwapU32RegU32Reg no valid register ID for second argument.");
+                if expr.is_none() {
+                    eprintln!("MovU32ImmMemRelExpr - no valid expression for second argument.");
                     return None;
                 }
 
-                Instruction::SwapU32RegU32Reg(reg1.unwrap(), reg2.unwrap())
+                Instruction::MovU32ImmMemRelExpr(imm.unwrap(), expr.unwrap())
             }
+
+            /******** [Special Instructions] ********/
             OpCode::Ret => Instruction::Ret,
             OpCode::Mret => Instruction::Mret,
             OpCode::Hlt => Instruction::Hlt,
@@ -278,6 +306,8 @@ impl<'a> Decompiler<'a> {
 
     pub fn decompile(&mut self) -> Vec<Instruction> {
         let mut instructions = Vec::new();
+
+        println!("compiled: {:?}", self.bytes);
 
         while let Some(ins) = self.read_next_instruction() {
             instructions.push(ins);

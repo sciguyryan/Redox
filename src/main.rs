@@ -5,6 +5,7 @@ mod cpu;
 mod data_access_type;
 mod ins;
 mod mem;
+mod parsing;
 mod reg;
 mod security_context;
 mod utils;
@@ -14,7 +15,7 @@ use vm::VirtualMachine;
 
 use crate::{
     compiler::{bytecode_compiler::Compiler, bytecode_decompiler::Decompiler},
-    ins::instruction::Instruction,
+    ins::instruction::{ExpressionArgs, ExpressionOperator, Instruction, MoveExpressionHandler},
     reg::registers::RegisterId,
 };
 
@@ -27,11 +28,23 @@ fn main() {
     //vm.ram.set(0, 0x12, &SecurityContext::Machine);
     //vm.ram.print_range(0, 10);
 
+    let expr_args = vec![
+        ExpressionArgs::Register(RegisterId::R7),
+        ExpressionArgs::Operator(ExpressionOperator::Multiply),
+        ExpressionArgs::Register(RegisterId::R8),
+    ];
+    let mut expression_encoder = MoveExpressionHandler::new();
+    let expr = expression_encoder.encode(&expr_args);
+
+    //println!("{:#018b}", expr);
+    //return;
+
     let instructions = &[
-        Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+        /*Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
         Instruction::MovU32ImmU32Reg(0x2, RegisterId::R2),
         Instruction::SwapU32RegU32Reg(RegisterId::R1, RegisterId::R2),
-        Instruction::Mret,
+        Instruction::Mret,*/
+        Instruction::MovU32ImmMemRelExpr(0x123, expr),
         Instruction::Hlt,
     ];
 
@@ -39,6 +52,10 @@ fn main() {
 
     let mut decompiler = Decompiler::new(&data);
     let insssss = decompiler.decompile();
+
+    for ins in instructions {
+        println!("{ins}");
+    }
 
     return;
 
