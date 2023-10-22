@@ -31,18 +31,18 @@ fn main() {
     //vm.ram.set(0, 0x12, &SecurityContext::Machine);
     //vm.ram.print_range(0, 10);
 
-    /*let expr_args_1 = vec![
+    let expr_args_1 = vec![
         ExpressionArgs::Register(RegisterId::R7),
-        ExpressionArgs::Operator(ExpressionOperator::Multiply),
+        ExpressionArgs::Operator(ExpressionOperator::Subtract),
         ExpressionArgs::Register(RegisterId::R8),
     ];
     let expr_args_2 = vec![
         ExpressionArgs::Constant(123),
-        ExpressionArgs::Operator(ExpressionOperator::Multiply),
+        ExpressionArgs::Operator(ExpressionOperator::Subtract),
         ExpressionArgs::Constant(65),
     ];
     let mut expression_encoder = MoveExpressionHandler::new();
-    let expr = expression_encoder.encode(expr_args_2);
+    let expr = expression_encoder.encode(expr_args_1);
     //println!("{:#018b}", expr);
     //return;
 
@@ -53,23 +53,9 @@ fn main() {
         Instruction::Mret,*/
         Instruction::MovU32ImmMemRelExpr(0x123, expr),
         Instruction::Hlt,
-    ];*/
-
-    let mut handler = MoveExpressionHandler::new();
-    let instructions = &[
-        Instruction::MovU32ImmU32Reg(0x25, RegisterId::R1),
-        Instruction::MovU32ImmU32Reg(0xF, RegisterId::R2),
-        Instruction::MovU32ImmMemRelExpr(
-            0x123,
-            handler.encode(vec![
-                ExpressionArgs::Register(RegisterId::R1),
-                ExpressionArgs::Operator(ExpressionOperator::Subtract),
-                ExpressionArgs::Register(RegisterId::R2),
-            ]),
-        ),
     ];
 
-    /*let data = Compiler::compile(instructions);
+    let data = Compiler::compile(instructions);
 
     let mut decompiler = Decompiler::new(&data);
     let insssss = decompiler.decompile();
@@ -80,10 +66,6 @@ fn main() {
     }
 
     return;
-
-    for ins in instructions {
-        ins.get_instruction_size();
-    }*/
 
     vm.run_instructions(&instructions[..]);
 

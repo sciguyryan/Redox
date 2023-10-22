@@ -47,9 +47,6 @@ pub enum Instruction {
 impl Display for Instruction {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         // NOTE: square brackets are used to indicate we are working with an address.
-        // NOTE: once expressions are added any that reference addresses could be modified
-        //       to use the encoded expression system instead.
-        //       https://www.cs.virginia.edu/~evans/cs216/guides/x86.html (Addressing Memory)
         let asm_format = match *self {
             Instruction::Nop => String::from("nop"),
 
@@ -86,10 +83,10 @@ impl Display for Instruction {
 
             /******** [Complex Move Instructions - WITH EXPRESSIONS] ********/
             Instruction::MovU32ImmMemRelExpr(imm, expr) => {
-                let mut expression_decoder = MoveExpressionHandler::new();
-                expression_decoder.decode(expr);
+                let mut decoder = MoveExpressionHandler::new();
+                decoder.decode(expr);
 
-                format!("mov.rs ${imm:02X}, [{expression_decoder}]")
+                format!("mov.rc ${imm:02X}, [{decoder}]")
             }
 
             /******** [Special Instructions] ********/
@@ -128,7 +125,7 @@ impl Instruction {
             }
 
             /******** [Complex Move Instructions - WITH EXPRESSIONS] ********/
-            Instruction::MovU32ImmMemRelExpr(_, _) => (ARG_U32_IMM_SIZE + ARG_U16_IMM_SIZE, false),
+            Instruction::MovU32ImmMemRelExpr(_, _) => (ARG_U32_IMM_SIZE + ARG_U32_IMM_SIZE, false),
 
             /******** [Special Instructions] ********/
             Instruction::Ret => (0, false),
