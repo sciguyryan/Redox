@@ -1,8 +1,4 @@
-use crate::{
-    cpu::Cpu,
-    ins::instruction::Instruction,
-    mem::memory::Memory
-};
+use crate::{cpu::Cpu, ins::instruction::Instruction, mem::memory::Memory};
 
 pub struct VirtualMachine {
     pub ram: Memory,

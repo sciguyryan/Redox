@@ -1,7 +1,7 @@
 use bitflags::bitflags;
 use std::fmt::{self, Display};
 
-use crate::{data_access_type::DataAccessType, security_context::SecurityContext};
+use crate::{data_access_type::DataAccessType, privilege_level::PrivilegeLevel};
 
 use super::registers::RegisterId;
 
@@ -47,9 +47,9 @@ impl RegisterU32 {
     }
 
     #[inline(always)]
-    pub fn add(&mut self, val: u32, context: &SecurityContext) {
+    pub fn add(&mut self, val: u32, privilege: &PrivilegeLevel) {
         // Check whether the register has read/write permissions.
-        self.validate_access(&DataAccessType::Write, context);
+        self.validate_access(&DataAccessType::Write, privilege);
 
         self.value += val;
     }
@@ -60,8 +60,8 @@ impl RegisterU32 {
     }
 
     #[inline(always)]
-    pub fn increment(&mut self, context: &SecurityContext) {
-        self.add(1, context);
+    pub fn increment(&mut self, privilege: &PrivilegeLevel) {
+        self.add(1, privilege);
     }
 
     #[inline(always)]
@@ -69,9 +69,9 @@ impl RegisterU32 {
         self.add_unchecked(1);
     }
 
-    pub fn read(&self, context: &SecurityContext) -> &u32 {
+    pub fn read(&self, privilege: &PrivilegeLevel) -> &u32 {
         // Check whether the register has read permissions.
-        self.validate_access(&DataAccessType::Read, context);
+        self.validate_access(&DataAccessType::Read, privilege);
 
         &self.value
     }
@@ -81,16 +81,16 @@ impl RegisterU32 {
     }
 
     #[inline(always)]
-    pub fn subtract(&mut self, val: u32, context: &SecurityContext) {
+    pub fn subtract(&mut self, val: u32, privilege: &PrivilegeLevel) {
         // Check whether the register has read/write permissions.
-        self.validate_access(&DataAccessType::Write, context);
+        self.validate_access(&DataAccessType::Write, privilege);
 
         self.value -= val;
     }
 
-    pub fn write(&mut self, value: u32, context: &SecurityContext) {
+    pub fn write(&mut self, value: u32, privilege: &PrivilegeLevel) {
         // Check whether the register has write permissions.
-        self.validate_access(&DataAccessType::Write, context);
+        self.validate_access(&DataAccessType::Write, privilege);
 
         self.value = value;
     }
@@ -100,10 +100,10 @@ impl RegisterU32 {
     }
 
     #[inline(always)]
-    fn validate_access(&self, access_type: &DataAccessType, context: &SecurityContext) {
+    fn validate_access(&self, access_type: &DataAccessType, context: &PrivilegeLevel) {
         // System-level contexts are permitted to do anything, without limitation.
         // NOTE: This might end up being replaced with a ring-permission type system.
-        if *context == SecurityContext::Machine {
+        if *context == PrivilegeLevel::Machine {
             return;
         }
 
@@ -114,12 +114,12 @@ impl RegisterU32 {
             DataAccessType::Read => {
                 permissions.intersects(RegisterPermission::R)
                     || (permissions.intersects(RegisterPermission::PR)
-                        && *context == SecurityContext::Machine)
+                        && *context == PrivilegeLevel::Machine)
             }
             DataAccessType::Write => {
                 permissions.intersects(RegisterPermission::W)
                     || (permissions.intersects(RegisterPermission::PW)
-                        && *context == SecurityContext::Machine)
+                        && *context == PrivilegeLevel::Machine)
             }
         };
 
@@ -148,9 +148,9 @@ impl RegisterF32 {
         }
     }
 
-    pub fn read(&self, context: &SecurityContext) -> &f32 {
+    pub fn read(&self, privilege: &PrivilegeLevel) -> &f32 {
         // Check whether the register has read permissions.
-        self.validate_access(&DataAccessType::Read, context);
+        self.validate_access(&DataAccessType::Read, privilege);
 
         &self.value
     }
@@ -159,9 +159,9 @@ impl RegisterF32 {
         &self.value
     }
 
-    pub fn write(&mut self, value: f32, context: &SecurityContext) {
+    pub fn write(&mut self, value: f32, privilege: &PrivilegeLevel) {
         // Check whether the register has write permissions.
-        self.validate_access(&DataAccessType::Write, context);
+        self.validate_access(&DataAccessType::Write, privilege);
 
         self.value = value;
     }
@@ -171,10 +171,10 @@ impl RegisterF32 {
     }
 
     #[inline]
-    fn validate_access(&self, access_type: &DataAccessType, context: &SecurityContext) {
+    fn validate_access(&self, access_type: &DataAccessType, context: &PrivilegeLevel) {
         // System-level contexts are permitted to do anything, without limitation.
         // NOTE: This might end up being replaced with a ring-permission type system.
-        if *context == SecurityContext::Machine {
+        if *context == PrivilegeLevel::Machine {
             return;
         }
 
@@ -185,12 +185,12 @@ impl RegisterF32 {
             DataAccessType::Read => {
                 permissions.intersects(RegisterPermission::R)
                     || (permissions.intersects(RegisterPermission::PR)
-                        && *context == SecurityContext::Machine)
+                        && *context == PrivilegeLevel::Machine)
             }
             DataAccessType::Write => {
                 permissions.intersects(RegisterPermission::W)
                     || (permissions.intersects(RegisterPermission::PW)
-                        && *context == SecurityContext::Machine)
+                        && *context == PrivilegeLevel::Machine)
             }
         };
 
@@ -211,7 +211,7 @@ mod tests_registers {
         panic,
     };
 
-    use crate::{reg::registers::RegisterId, security_context::SecurityContext};
+    use crate::{privilege_level::PrivilegeLevel, reg::registers::RegisterId};
 
     use super::{RegisterF32, RegisterPermission, RegisterU32};
 
@@ -230,7 +230,7 @@ mod tests_registers {
         pub write_value: Option<T>,
         pub expected_value: T,
         pub permissions: RegisterPermission,
-        pub context: SecurityContext,
+        pub context: PrivilegeLevel,
         pub should_panic: bool,
         pub fail_message: String,
     }
@@ -243,7 +243,7 @@ mod tests_registers {
             write_value: Option<T>,
             expected_value: T,
             permissions: &RegisterPermission,
-            context: SecurityContext,
+            context: PrivilegeLevel,
             should_panic: bool,
             fail_message: &str,
         ) -> Self {
@@ -285,7 +285,7 @@ mod tests_registers {
                 None,
                 10,
                 &rw,
-                SecurityContext::User,
+                PrivilegeLevel::User,
                 false,
                 "failed to read a value from a u32 R|W register, with user context",
             ),
@@ -295,7 +295,7 @@ mod tests_registers {
                 None,
                 10,
                 &rw,
-                SecurityContext::Machine,
+                PrivilegeLevel::Machine,
                 false,
                 "failed to read a value from a u32 R|W register, with system context",
             ),
@@ -305,7 +305,7 @@ mod tests_registers {
                 None,
                 10,
                 &prpw,
-                SecurityContext::User,
+                PrivilegeLevel::User,
                 true,
                 "succeeded in reading a value from a u32 PR|PW register, with user context",
             ),
@@ -315,7 +315,7 @@ mod tests_registers {
                 None,
                 10,
                 &prpw,
-                SecurityContext::Machine,
+                PrivilegeLevel::Machine,
                 false,
                 "failed to read a value from a u32 PR|PW register, with system context",
             ),
@@ -325,7 +325,7 @@ mod tests_registers {
                 Some(10),
                 10,
                 &rw,
-                SecurityContext::User,
+                PrivilegeLevel::User,
                 false,
                 "failed to write a value to a u32 R|W register, with user context",
             ),
@@ -335,7 +335,7 @@ mod tests_registers {
                 Some(10),
                 10,
                 &rw,
-                SecurityContext::Machine,
+                PrivilegeLevel::Machine,
                 false,
                 "failed to write a value to a u32 R|W register, with system context",
             ),
@@ -345,7 +345,7 @@ mod tests_registers {
                 Some(10),
                 10,
                 &prpw,
-                SecurityContext::User,
+                PrivilegeLevel::User,
                 true,
                 "succeeded in writing a value to a u32 PR|PW register, with user context",
             ),
@@ -355,7 +355,7 @@ mod tests_registers {
                 Some(10),
                 10,
                 &prpw,
-                SecurityContext::Machine,
+                PrivilegeLevel::Machine,
                 false,
                 "failed to write a value to a u32 R|W register, with system context",
             ),
@@ -405,7 +405,7 @@ mod tests_registers {
                 None,
                 10f32,
                 &rw,
-                SecurityContext::User,
+                PrivilegeLevel::User,
                 false,
                 "failed to read a value from a u32 R|W register, with user context",
             ),
@@ -415,7 +415,7 @@ mod tests_registers {
                 None,
                 10f32,
                 &rw,
-                SecurityContext::Machine,
+                PrivilegeLevel::Machine,
                 false,
                 "failed to read a value from a u32 R|W register, with system context",
             ),
@@ -425,7 +425,7 @@ mod tests_registers {
                 None,
                 10f32,
                 &prpw,
-                SecurityContext::User,
+                PrivilegeLevel::User,
                 true,
                 "succeeded in reading a value from a u32 PR|PW register, with user context",
             ),
@@ -435,7 +435,7 @@ mod tests_registers {
                 None,
                 10f32,
                 &prpw,
-                SecurityContext::Machine,
+                PrivilegeLevel::Machine,
                 false,
                 "failed to read a value from a u32 PR|PW register, with system context",
             ),
@@ -445,7 +445,7 @@ mod tests_registers {
                 Some(10f32),
                 10f32,
                 &rw,
-                SecurityContext::User,
+                PrivilegeLevel::User,
                 false,
                 "failed to write a value to a u32 R|W register, with user context",
             ),
@@ -455,7 +455,7 @@ mod tests_registers {
                 Some(10f32),
                 10f32,
                 &rw,
-                SecurityContext::Machine,
+                PrivilegeLevel::Machine,
                 false,
                 "failed to write a value to a u32 R|W register, with system context",
             ),
@@ -465,7 +465,7 @@ mod tests_registers {
                 Some(10f32),
                 10f32,
                 &prpw,
-                SecurityContext::User,
+                PrivilegeLevel::User,
                 true,
                 "succeeded in writing a value to a u32 PR|PW register, with user context",
             ),
@@ -475,7 +475,7 @@ mod tests_registers {
                 Some(10f32),
                 10f32,
                 &prpw,
-                SecurityContext::Machine,
+                PrivilegeLevel::Machine,
                 false,
                 "failed to write a value to a u32 R|W register, with system context",
             ),

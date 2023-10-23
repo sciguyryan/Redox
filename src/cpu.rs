@@ -8,8 +8,8 @@ use crate::{
         op_codes::OpCode,
     },
     mem::memory::Memory,
+    privilege_level::PrivilegeLevel,
     reg::registers::{RegisterId, Registers},
-    security_context::SecurityContext,
     utils,
 };
 
@@ -17,7 +17,6 @@ pub struct Cpu {
     pub registers: Registers,
     pub is_halted: bool,
     pub is_machine_mode: bool,
-    pub security_context: SecurityContext,
 
     move_expression_cache: HashMap<u32, [ExpressionArgs; 3]>,
 }
@@ -28,24 +27,9 @@ impl Cpu {
             registers: Registers::default(),
             is_halted: false,
             is_machine_mode: true,
-            security_context: SecurityContext::Machine,
 
             move_expression_cache: HashMap::new(),
         }
-    }
-
-    fn fetch_decode_next_instruction(
-        &mut self,
-        mem: &Memory,
-    ) -> Option<Instruction> {
-        // Get the current instruction pointer.
-        let ip = *self
-            .registers
-            .get_register_u32(RegisterId::IP)
-            .read(&SecurityContext::Machine);
-
-        // Update the program counter register.
-        Some(mem.get_instruction(ip as usize))
     }
 
     /// Execute a move instruction expression.
@@ -53,7 +37,7 @@ impl Cpu {
     /// # Arguments
     ///
     /// * `operators` - The operators that form the expression.
-    /// * `context` - The [`SecurityContext`] in which this expression should be executed.
+    /// * `privilege` - The [`PrivilegeLevel`] in which this expression should be executed.
     ///
     /// # Returns
     ///
@@ -61,18 +45,18 @@ impl Cpu {
     fn execute_u32_move_expression(
         &self,
         operators: &[ExpressionArgs; 3],
-        context: &SecurityContext,
+        privilege: &PrivilegeLevel,
     ) -> u32 {
         // Determine the first operand.
         let val_1 = match operators[0] {
-            ExpressionArgs::Register(rid) => *self.registers.get_register_u32(rid).read(context),
+            ExpressionArgs::Register(rid) => *self.registers.get_register_u32(rid).read(privilege),
             ExpressionArgs::Constant(val) => val as u32,
             _ => panic!(),
         };
 
         // Determine the second operand.
         let val_2 = match operators[2] {
-            ExpressionArgs::Register(rid) => *self.registers.get_register_u32(rid).read(context),
+            ExpressionArgs::Register(rid) => *self.registers.get_register_u32(rid).read(privilege),
             ExpressionArgs::Constant(val) => val as u32,
             _ => panic!(),
         };
@@ -87,6 +71,40 @@ impl Cpu {
         } else {
             panic!();
         }
+    }
+
+    /// Get the current privilege level of the processor.
+    ///
+    /// # Returns
+    ///
+    /// A [`PrivilegeLevel`] giving the current privilege level of the processor.
+    #[inline(always)]
+    fn get_privilege(&self) -> PrivilegeLevel {
+        if self.is_machine_mode {
+            PrivilegeLevel::Machine
+        } else {
+            PrivilegeLevel::User
+        }
+    }
+
+    /// Execute a move instruction expression.
+    ///
+    /// # Arguments
+    ///
+    /// * `mem` - A reference to the virtual machine [`Memory`] instance.
+    ///
+    /// # Returns
+    ///
+    /// The next [`Instruction`] to be executed.
+    fn fetch_decode_next_instruction(&mut self, mem: &Memory) -> Instruction {
+        // Get the current instruction pointer.
+        let ip = *self
+            .registers
+            .get_register_u32(RegisterId::IP)
+            .read(&PrivilegeLevel::Machine);
+
+        // Update the program counter register.
+        mem.get_instruction(ip as usize)
     }
 
     /// Get the state of a given CPU flag.
@@ -140,13 +158,15 @@ impl Cpu {
         self.is_halted = false;
     }
 
+    /// Run the CPU from a specified starting point in memory.
+    ///
+    /// # Arguments
+    ///
+    /// * `mem` - A reference to the virtual machine [`Memory`] instance.
     pub fn run(&mut self, mem: &mut Memory) {
         loop {
-            if let Some(ins) = self.fetch_decode_next_instruction(mem) {
-                self.run_instruction(mem, &ins);
-            } else {
-                self.is_halted = true;
-            }
+            let ins = self.fetch_decode_next_instruction(mem);
+            self.run_instruction(mem, &ins);
 
             if self.is_halted {
                 break;
@@ -179,100 +199,78 @@ impl Cpu {
     /// * `mem` - The [`Memory`] connected to this CPU instance.
     /// * `instruction` - An [`Instruction`] instance to be executed.
     fn run_instruction(&mut self, mem: &mut Memory, instruction: &Instruction) {
+        let privilege = &self.get_privilege();
+
         match instruction {
             Instruction::Nop => {}
 
             /******** [Arithmetic Instructions] ********/
             Instruction::AddU32ImmU32Reg(imm, reg) => {
-                let old_value = *self
-                    .registers
-                    .get_register_u32(*reg)
-                    .read(&self.security_context);
+                let old_value = *self.registers.get_register_u32(*reg).read(privilege);
                 let new_value = self.perform_checked_add_u32(old_value, *imm);
 
                 self.registers
                     .get_register_u32_mut(RegisterId::AC)
-                    .write(new_value, &self.security_context);
+                    .write(new_value, privilege);
             }
             Instruction::AddU32RegU32Reg(in_reg, out_reg) => {
-                let value1 = *self
-                    .registers
-                    .get_register_u32(*in_reg)
-                    .read(&self.security_context);
-                let value2 = *self
-                    .registers
-                    .get_register_u32(*out_reg)
-                    .read(&self.security_context);
+                let value1 = *self.registers.get_register_u32(*in_reg).read(privilege);
+                let value2 = *self.registers.get_register_u32(*out_reg).read(privilege);
                 let new_value = self.perform_checked_add_u32(value1, value2);
 
                 self.registers
                     .get_register_u32_mut(RegisterId::AC)
-                    .write(new_value, &self.security_context);
+                    .write(new_value, privilege);
             }
 
             /******** [Simple Move Instructions - NO EXPRESSIONS] ********/
             Instruction::SwapU32RegU32Reg(reg1, reg2) => {
-                let reg1_val = *self
-                    .registers
-                    .get_register_u32(*reg1)
-                    .read(&self.security_context);
-                let reg2_val = *self
-                    .registers
-                    .get_register_u32(*reg2)
-                    .read(&self.security_context);
+                let reg1_val = *self.registers.get_register_u32(*reg1).read(privilege);
+                let reg2_val = *self.registers.get_register_u32(*reg2).read(privilege);
 
                 self.registers
                     .get_register_u32_mut(*reg1)
-                    .write(reg2_val, &self.security_context);
+                    .write(reg2_val, privilege);
                 self.registers
                     .get_register_u32_mut(*reg2)
-                    .write(reg1_val, &self.security_context);
+                    .write(reg1_val, privilege);
             }
             Instruction::MovU32ImmU32Reg(imm, reg) => {
                 self.registers
                     .get_register_u32_mut(*reg)
-                    .write(*imm, &self.security_context);
+                    .write(*imm, privilege);
             }
             Instruction::MovU32RegU32Reg(in_reg, out_reg) => {
-                let value = *self
-                    .registers
-                    .get_register_u32(*in_reg)
-                    .read(&self.security_context);
+                let value = *self.registers.get_register_u32(*in_reg).read(privilege);
 
                 self.registers
                     .get_register_u32_mut(*out_reg)
-                    .write(value, &self.security_context);
+                    .write(value, privilege);
             }
             Instruction::MovU32ImmMemRelSimple(imm, addr) => {
                 mem.set_u32(*addr as usize, *imm);
             }
             Instruction::MovU32RegMemRelSimple(reg, addr) => {
-                let value = *self
-                    .registers
-                    .get_register_u32(*reg)
-                    .read(&self.security_context);
+                let value = *self.registers.get_register_u32(*reg).read(privilege);
                 mem.set_u32(*addr as usize, value);
             }
             Instruction::MovMemU32RegRelSimple(addr, reg) => {
                 let value = mem.get_u32(*addr as usize);
                 self.registers
                     .get_register_u32_mut(*reg)
-                    .write(value, &self.security_context);
+                    .write(value, privilege);
             }
             Instruction::MovU32RegPtrU32RegRelSimple(in_reg, out_reg) => {
-                let address = self
-                    .registers
-                    .get_register_u32(*in_reg)
-                    .read(&self.security_context);
+                let address = self.registers.get_register_u32(*in_reg).read(privilege);
                 let value = mem.get_u32(*address as usize);
                 self.registers
                     .get_register_u32_mut(*out_reg)
-                    .write(value, &self.security_context);
+                    .write(value, privilege);
             }
 
             /******** [Complex Move Instructions - WITH EXPRESSIONS] ********/
             Instruction::MovU32ImmMemRelExpr(imm, expr) => {
-                // Cache the decoding process to speed up processing slightly.
+                // Cache the decoding result to speed up processing slightly.
                 if !self.move_expression_cache.contains_key(expr) {
                     let mut expression_decoder = MoveExpressionHandler::new();
                     expression_decoder.decode(*expr);
@@ -282,7 +280,7 @@ impl Cpu {
                 }
 
                 let operators = self.move_expression_cache.get(expr).unwrap();
-                let addr = self.execute_u32_move_expression(operators, &self.security_context);
+                let addr = self.execute_u32_move_expression(operators, privilege);
 
                 mem.set_u32(addr as usize, *imm);
             }
@@ -322,12 +320,6 @@ impl Cpu {
     #[inline(always)]
     fn set_machine_mode(&mut self, state: bool) {
         self.is_machine_mode = state;
-
-        if state {
-            self.security_context = SecurityContext::Machine;
-        } else {
-            self.security_context = SecurityContext::User;
-        }
     }
 
     /// Update the instruction pointer (IP) register.
@@ -938,20 +930,18 @@ mod tests_cpu {
     /// Test the move u32 literal to memory instruction.
     #[test]
     fn test_move_u32_lit_mem() {
-        let tests = [
-            TestEntryU32Standard::new(
-                &[Instruction::MovU32ImmMemRelSimple(0x123, 0x0)],
-                &[],
-                vec![
-                    35, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ],
-                false,
-                "failed to correctly execute MOV instruction",
-            ),
-        ];
+        let tests = [TestEntryU32Standard::new(
+            &[Instruction::MovU32ImmMemRelSimple(0x123, 0x0)],
+            &[],
+            vec![
+                35, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            ],
+            false,
+            "failed to correctly execute MOV instruction",
+        )];
 
         for (id, test) in tests.iter().enumerate() {
             test.run_test(id);
@@ -961,23 +951,21 @@ mod tests_cpu {
     /// Test the move u32 register to memory instruction.
     #[test]
     fn test_move_u32_reg_mem() {
-        let tests = [
-            TestEntryU32Standard::new(
-                &[
-                    Instruction::MovU32ImmU32Reg(0x123, RegisterId::R1),
-                    Instruction::MovU32RegMemRelSimple(RegisterId::R1, 0x0),
-                ],
-                &[(RegisterId::R1, 0x123)],
-                vec![
-                    35, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ],
-                false,
-                "failed to correctly execute MOV instruction",
-            ),
-        ];
+        let tests = [TestEntryU32Standard::new(
+            &[
+                Instruction::MovU32ImmU32Reg(0x123, RegisterId::R1),
+                Instruction::MovU32RegMemRelSimple(RegisterId::R1, 0x0),
+            ],
+            &[(RegisterId::R1, 0x123)],
+            vec![
+                35, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            ],
+            false,
+            "failed to correctly execute MOV instruction",
+        )];
 
         for (id, test) in tests.iter().enumerate() {
             test.run_test(id);
@@ -987,25 +975,23 @@ mod tests_cpu {
     /// Test the move u32 register to memory instruction.
     #[test]
     fn test_move_mem_u32_reg() {
-        let tests = [
-            TestEntryU32Standard::new(
-                &[
-                    Instruction::MovU32ImmU32Reg(0x123, RegisterId::R1),
-                    Instruction::MovU32RegMemRelSimple(RegisterId::R1, 0x0),
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
-                    Instruction::MovMemU32RegRelSimple(0x0, RegisterId::R2),
-                ],
-                &[(RegisterId::R2, 0x123)],
-                vec![
-                    35, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ],
-                false,
-                "failed to correctly execute MOV instruction",
-            ),
-        ];
+        let tests = [TestEntryU32Standard::new(
+            &[
+                Instruction::MovU32ImmU32Reg(0x123, RegisterId::R1),
+                Instruction::MovU32RegMemRelSimple(RegisterId::R1, 0x0),
+                Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
+                Instruction::MovMemU32RegRelSimple(0x0, RegisterId::R2),
+            ],
+            &[(RegisterId::R2, 0x123)],
+            vec![
+                35, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            ],
+            false,
+            "failed to correctly execute MOV instruction",
+        )];
 
         for (id, test) in tests.iter().enumerate() {
             test.run_test(id);
@@ -1015,29 +1001,27 @@ mod tests_cpu {
     /// Test the move u32 to register from address provided by a different register.
     #[test]
     fn test_move_u32_reg_ptr_u32_reg() {
-        let tests = [
-            TestEntryU32Standard::new(
-                &[
-                    // Store value in memory.
-                    Instruction::MovU32ImmU32Reg(0x123, RegisterId::R1),
-                    Instruction::MovU32RegMemRelSimple(RegisterId::R1, 0x0),
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
-                    // Set the address pointer in R2.
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R2),
-                    // Read the value from the address of R2 into R1.
-                    Instruction::MovU32RegPtrU32RegRelSimple(RegisterId::R2, RegisterId::R1),
-                ],
-                &[(RegisterId::R1, 0x123)],
-                vec![
-                    35, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ],
-                false,
-                "failed to correctly execute MOV instruction",
-            ),
-        ];
+        let tests = [TestEntryU32Standard::new(
+            &[
+                // Store value in memory.
+                Instruction::MovU32ImmU32Reg(0x123, RegisterId::R1),
+                Instruction::MovU32RegMemRelSimple(RegisterId::R1, 0x0),
+                Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
+                // Set the address pointer in R2.
+                Instruction::MovU32ImmU32Reg(0x0, RegisterId::R2),
+                // Read the value from the address of R2 into R1.
+                Instruction::MovU32RegPtrU32RegRelSimple(RegisterId::R2, RegisterId::R1),
+            ],
+            &[(RegisterId::R1, 0x123)],
+            vec![
+                35, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            ],
+            false,
+            "failed to correctly execute MOV instruction",
+        )];
 
         for (id, test) in tests.iter().enumerate() {
             test.run_test(id);

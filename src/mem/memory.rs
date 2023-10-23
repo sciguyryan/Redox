@@ -52,8 +52,6 @@ impl Memory {
         // be smaller than two bytes in length.
         let opcode_range = self.get_range_ptr(pos, 2);
 
-        //println!("opcode_range = {opcode_range:?}");
-
         let mut opcode_bytes: [u8; 4] = [0; 4];
         opcode_bytes[0] = opcode_range[0];
         opcode_bytes[1] = opcode_range[1];
@@ -169,11 +167,7 @@ impl Memory {
         u32::from_le_bytes(bytes)
     }
 
-    pub fn get_range_ptr(
-        &self,
-        start: usize,
-        len: usize,
-    ) -> &[u8] {
+    pub fn get_range_ptr(&self, start: usize, len: usize) -> &[u8] {
         let end = start + len;
         self.assert_point_in_bounds(start);
         self.assert_point_in_bounds(end);
@@ -181,11 +175,7 @@ impl Memory {
         &self.storage[start..end]
     }
 
-    pub fn get_range_clone(
-        &self,
-        start: usize,
-        len: usize,
-    ) -> Vec<u8> {
+    pub fn get_range_clone(&self, start: usize, len: usize) -> Vec<u8> {
         self.get_range_ptr(start, len).to_vec()
     }
 

@@ -6,8 +6,8 @@ mod data_access_type;
 mod ins;
 mod mem;
 mod parsing;
+mod privilege_level;
 mod reg;
-mod security_context;
 mod utils;
 pub mod vm;
 
@@ -62,12 +62,15 @@ fn run_test() {
     }
 
     let elapsed = now.elapsed().as_micros() as f32;
-    println!("Elapsed: {:.2?} microseconds per iteration", elapsed / iterations as f32);
+    println!(
+        "Elapsed: {:.2?} microseconds per iteration",
+        elapsed / iterations as f32
+    );
 }
 
 fn main() {
-    run_test();
-    return;
+    //run_test();
+    //return;
 
     let mut vm = VirtualMachine::new(64_000);
 
@@ -79,9 +82,11 @@ fn main() {
         ExpressionArgs::Operator(ExpressionOperator::Add),
         ExpressionArgs::Register(RegisterId::R8),
     ];
-    let expr_args_2 = [ExpressionArgs::Constant(123),
+    let expr_args_2 = [
+        ExpressionArgs::Constant(123),
         ExpressionArgs::Operator(ExpressionOperator::Subtract),
-        ExpressionArgs::Constant(65)];
+        ExpressionArgs::Constant(65),
+    ];
     let mut expression_encoder = MoveExpressionHandler::new();
     let expr = expression_encoder.encode(&expr_args_1);
     //println!("{:#018b}", expr);
