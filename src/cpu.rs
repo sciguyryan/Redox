@@ -632,7 +632,7 @@ mod tests_cpu {
     fn test_nop() {
         let tests = [TestEntrySimple::new(
             &[Instruction::Nop],
-            &[(RegisterId::IP, 2), (RegisterId::PC, 1)],
+            &[(RegisterId::IP, 4), (RegisterId::PC, 1)],
             false,
             "failed to execute NOP instruction",
         )];
@@ -648,7 +648,7 @@ mod tests_cpu {
         let tests = [
             TestEntrySimple::new(
                 &[Instruction::Hlt],
-                &[(RegisterId::IP, 2), (RegisterId::PC, 1)],
+                &[(RegisterId::IP, 4), (RegisterId::PC, 1)],
                 false,
                 "failed to execute HLT instruction",
             ),
@@ -656,7 +656,7 @@ mod tests_cpu {
             // means that the program counter should also not increase.
             TestEntrySimple::new(
                 &[Instruction::Hlt, Instruction::Nop],
-                &[(RegisterId::IP, 2), (RegisterId::PC, 1)],
+                &[(RegisterId::IP, 4), (RegisterId::PC, 1)],
                 false,
                 "failed to correctly stop execution after a HLT instruction",
             ),

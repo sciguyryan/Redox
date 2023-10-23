@@ -44,39 +44,15 @@ impl Memory {
     }
 
     pub fn get_instruction(&self, pos: usize) -> Instruction {
-        //let range = self.get_range_ptr(pos, 2, true, context);
-
-        let mut instruction_size = 2;
-
-        // Read the first two bytes of the instruction as an instruction will never
-        // be smaller than two bytes in length.
-        let opcode_range = self.get_range_ptr(pos, 2);
-
-        let mut opcode_bytes: [u8; 4] = [0; 4];
-        opcode_bytes[0] = opcode_range[0];
-        opcode_bytes[1] = opcode_range[1];
-
-        // Are we handling an extended instruction or a basic one?
-        let mut opcode_id = u32::from_le_bytes(opcode_bytes);
-        if opcode_id > 32767 {
-            // Extended instructions are 4 bytes in length.
-            instruction_size = 4;
-
-            let opcode_range_ex = self.get_range_ptr(pos + 2, 2);
-
-            opcode_bytes[2] = opcode_range_ex[0];
-            opcode_bytes[3] = opcode_range_ex[1];
-
-            opcode_id = u32::from_le_bytes(opcode_bytes);
-        }
+        let opcode_id = self.get_u32(pos);
 
         // Validate the opcode is one of the ones we know about.
         let opcode: OpCode =
             FromPrimitive::from_u32(opcode_id).expect("failed to read valid instruction opcode");
 
         // calculate the length of the arguments, in bytes.
-        let arg_len = opcode.get_total_instruction_size() as usize - instruction_size;
-        let arg_bytes = self.get_range_ptr(pos + instruction_size, arg_len);
+        let arg_len = opcode.get_total_instruction_size() as usize - 4;
+        let arg_bytes = self.get_range_ptr(pos + 4, arg_len);
 
         // Create a memory block reader.
         let mut block = MemoryBlockReader::new(arg_bytes);

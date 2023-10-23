@@ -91,18 +91,13 @@ impl Instruction {
     }
 
     pub fn get_bytecode(&self) -> Vec<u8> {
-        let mut bytecode = Vec::new();
-
-        let opcode = OpCode::from(*self);
-        let opcode_value = opcode as u32;
+        let opcode_value = OpCode::from(*self) as u32;
         let opcode_bytes = opcode_value.to_le_bytes();
 
+        let mut bytecode = Vec::new();
+
         // First we push the bytes for the opcode.
-        if opcode.is_extended() {
-            bytecode.extend_from_slice(&opcode_bytes);
-        } else {
-            bytecode.extend_from_slice(&opcode_bytes[0..2]);
-        }
+        bytecode.extend_from_slice(&opcode_bytes);
 
         // Next, we need to push the argument bytes. This part is more interesting.
         match self {

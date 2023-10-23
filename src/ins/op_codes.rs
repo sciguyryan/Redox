@@ -5,9 +5,7 @@ use super::instruction::Instruction;
 use num_derive::FromPrimitive;
 
 /// The size of the instruction, in bytes.
-const INSTRUCTION_SIZE: u32 = 2;
-/// The size of an extended instruction, in bytes.
-const EXT_INSTRUCTION_SIZE: u32 = 4;
+const INSTRUCTION_SIZE: u32 = 4;
 /// The size of a u32 argument, in bytes.
 const ARG_U32_IMM_SIZE: u32 = std::mem::size_of::<u32>() as u32;
 /// The size of a memory address argument, in bytes.
@@ -67,42 +65,33 @@ pub enum OpCode {
 }
 
 impl OpCode {
-    pub fn is_extended(&self) -> bool {
-        let val = *self as u32;
-        val > 32767
-    }
-
     pub fn get_total_instruction_size(&self) -> u32 {
-        let (arg_size, extended) = match self {
-            OpCode::Nop => (0, false),
+        let size = match self {
+            OpCode::Nop => 0,
 
             /******** [Arithmetic Instructions] ********/
-            OpCode::AddU32ImmU32Reg => (ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE, false),
-            OpCode::AddU32RegU32Reg => (ARG_REG_ID_SIZE + ARG_REG_ID_SIZE, false),
+            OpCode::AddU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
+            OpCode::AddU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Simple Move Instructions - NO EXPRESSIONS] ********/
-            OpCode::SwapU32RegU32Reg => (ARG_REG_ID_SIZE + ARG_REG_ID_SIZE, false),
-            OpCode::MovU32ImmU32Reg => (ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE, false),
-            OpCode::MovU32RegU32Reg => (ARG_REG_ID_SIZE + ARG_REG_ID_SIZE, false),
-            OpCode::MovU32ImmMemRelSimple => (ARG_U32_IMM_SIZE + ARG_MEM_ADDR_SIZE, false),
-            OpCode::MovU32RegMemRelSimple => (ARG_REG_ID_SIZE + ARG_MEM_ADDR_SIZE, false),
-            OpCode::MovMemU32RegRelSimple => (ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE, false),
-            OpCode::MovU32RegPtrU32RegRelSimple => (ARG_REG_ID_SIZE + ARG_REG_ID_SIZE, false),
+            OpCode::SwapU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
+            OpCode::MovU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
+            OpCode::MovU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
+            OpCode::MovU32ImmMemRelSimple => ARG_U32_IMM_SIZE + ARG_MEM_ADDR_SIZE,
+            OpCode::MovU32RegMemRelSimple => ARG_REG_ID_SIZE + ARG_MEM_ADDR_SIZE,
+            OpCode::MovMemU32RegRelSimple => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
+            OpCode::MovU32RegPtrU32RegRelSimple => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Complex Move Instructions - WITH EXPRESSIONS] ********/
-            OpCode::MovU32ImmMemRelExpr => (ARG_U32_IMM_SIZE + ARG_U32_IMM_SIZE, false),
+            OpCode::MovU32ImmMemRelExpr => ARG_U32_IMM_SIZE + ARG_U32_IMM_SIZE,
 
             /******** [Special Instructions] ********/
-            OpCode::Ret => (0, false),
-            OpCode::Mret => (0, false),
-            OpCode::Hlt => (0, false),
+            OpCode::Ret => 0,
+            OpCode::Mret => 0,
+            OpCode::Hlt => 0,
         };
 
-        if !extended {
-            INSTRUCTION_SIZE + arg_size
-        } else {
-            EXT_INSTRUCTION_SIZE + arg_size
-        }
+        size + INSTRUCTION_SIZE
     }
 }
 

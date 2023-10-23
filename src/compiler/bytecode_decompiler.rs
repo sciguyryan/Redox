@@ -32,38 +32,18 @@ impl<'a> Decompiler<'a> {
     }
 
     pub fn read_next_instruction(&mut self) -> Option<Instruction> {
-        // Ensure we have enough data to read two bytes.
+        // Ensure we have enough data to read four bytes.
         let start = self.cursor;
-        let end = start + 1;
-        if end >= self.len() {
+        let end = start + 4;
+        if end > self.len() {
             return None;
         }
 
-        let mut opcode_bytes: [u8; 4] = [0; 4];
-        opcode_bytes[0] = self.bytes[self.cursor];
-        opcode_bytes[1] = self.bytes[self.cursor + 1];
-        self.cursor += 2;
-
-        //println!("opcode_bytes = {:?}", opcode_bytes);
+        let opcode_bytes: [u8; 4] = self.bytes[start..end].try_into().expect("");
+        self.cursor += 4;
 
         // Are we handling an extended instruction or a basic one?
-        let mut opcode_id = u32::from_le_bytes(opcode_bytes);
-        if opcode_id > 32767 {
-            // Ensure we have enough data to read two bytes.
-            let start = self.cursor;
-            let end = start + 2;
-            if end < self.len() {
-                return None;
-            }
-
-            opcode_bytes[2] = self.bytes[self.cursor];
-            opcode_bytes[3] = self.bytes[self.cursor + 1];
-            self.cursor += 2;
-
-            opcode_id = u32::from_le_bytes(opcode_bytes);
-        }
-
-        //println!("opcode_id = {opcode_id}");
+        let opcode_id = u32::from_le_bytes(opcode_bytes);
 
         // Validate the opcode is one of the ones we know about.
         let opcode_validate: Option<OpCode> = FromPrimitive::from_u32(opcode_id);

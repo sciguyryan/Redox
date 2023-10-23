@@ -69,9 +69,6 @@ fn run_test() {
 }
 
 fn main() {
-    //run_test();
-    //return;
-
     let mut vm = VirtualMachine::new(64_000);
 
     //vm.ram.set(0, 0x12, &SecurityContext::Machine);
@@ -104,8 +101,9 @@ fn main() {
     ];
 
     let data = Compiler::compile(instructions);
-    let mut decompiler = Decompiler::new(&data);
-    //let insssss = decompiler.decompile();
+    //let mut decompiler = Decompiler::new(&data);
+    //let iiii = decompiler.decompile();
+    //println!("iiii = {iiii:?}");
 
     println!("compiled data = {data:?}");
     println!("compiled data len = {}", data.len());
