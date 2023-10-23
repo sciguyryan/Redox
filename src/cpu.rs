@@ -1,10 +1,11 @@
 use core::fmt;
-use std::{collections::HashMap, slice::Iter};
+use std::{collections::HashMap, panic, slice::Iter};
 
 use crate::{
     ins::{
         instruction::Instruction,
         move_expressions::{ExpressionArgs, ExpressionOperator, MoveExpressionHandler},
+        op_codes::OpCode,
     },
     mem::memory::Memory,
     reg::registers::{RegisterId, Registers},
@@ -16,6 +17,7 @@ pub struct Cpu {
     pub registers: Registers,
     pub is_halted: bool,
     pub is_machine_mode: bool,
+    pub security_context: SecurityContext,
 
     move_expression_cache: HashMap<u32, [ExpressionArgs; 3]>,
 }
@@ -26,13 +28,31 @@ impl Cpu {
             registers: Registers::default(),
             is_halted: false,
             is_machine_mode: true,
+            security_context: SecurityContext::Machine,
 
             move_expression_cache: HashMap::new(),
         }
     }
 
-    fn decode_next_instruction(&self) -> Instruction {
-        Instruction::Nop
+    fn fetch_decode_next_instruction(
+        &mut self,
+        mem: &Memory,
+        mem_seq_id: usize,
+    ) -> Option<Instruction> {
+        // Get the current instruction pointer.
+        let ip = *self
+            .registers
+            .get_register_u32(RegisterId::IP)
+            .read(&SecurityContext::Machine);
+
+        // Have we gone outside the data memory region?
+        let region = mem.get_region(mem_seq_id).expect("");
+        if !region.contains(ip as usize) {
+            return None;
+        }
+
+        // Update the program counter register.
+        Some(mem.get_instruction(ip as usize, &self.security_context))
     }
 
     /// Execute a move instruction expression.
@@ -127,8 +147,18 @@ impl Cpu {
         self.is_halted = false;
     }
 
-    pub fn run(&mut self, _mem: &mut Memory, _mem_seq_id: usize) {
-        // Do something fun here.
+    pub fn run(&mut self, mem: &mut Memory, mem_seq_id: usize) {
+        loop {
+            if let Some(ins) = self.fetch_decode_next_instruction(mem, mem_seq_id) {
+                self.run_instruction(mem, &ins);
+            } else {
+                self.is_halted = true;
+            }
+
+            if self.is_halted {
+                break;
+            }
+        }
     }
 
     /// Execute a set of instructions on the CPU.
@@ -156,76 +186,95 @@ impl Cpu {
     /// * `mem` - The [`Memory`] connected to this CPU instance.
     /// * `instruction` - An [`Instruction`] instance to be executed.
     fn run_instruction(&mut self, mem: &mut Memory, instruction: &Instruction) {
-        let privilege = match self.is_machine_mode {
-            true => SecurityContext::Machine,
-            false => SecurityContext::User,
-        };
-
         match instruction {
             Instruction::Nop => {}
 
             /******** [Arithmetic Instructions] ********/
             Instruction::AddU32ImmU32Reg(imm, reg) => {
-                let old_value = *self.registers.get_register_u32(*reg).read(&privilege);
+                let old_value = *self
+                    .registers
+                    .get_register_u32(*reg)
+                    .read(&self.security_context);
                 let new_value = self.perform_checked_add_u32(old_value, *imm);
 
                 self.registers
                     .get_register_u32_mut(RegisterId::AC)
-                    .write(new_value, &privilege);
+                    .write(new_value, &self.security_context);
             }
             Instruction::AddU32RegU32Reg(in_reg, out_reg) => {
-                let value1 = *self.registers.get_register_u32(*in_reg).read(&privilege);
-                let value2 = *self.registers.get_register_u32(*out_reg).read(&privilege);
+                let value1 = *self
+                    .registers
+                    .get_register_u32(*in_reg)
+                    .read(&self.security_context);
+                let value2 = *self
+                    .registers
+                    .get_register_u32(*out_reg)
+                    .read(&self.security_context);
                 let new_value = self.perform_checked_add_u32(value1, value2);
 
                 self.registers
                     .get_register_u32_mut(RegisterId::AC)
-                    .write(new_value, &privilege);
+                    .write(new_value, &self.security_context);
             }
 
             /******** [Simple Move Instructions - NO EXPRESSIONS] ********/
             Instruction::SwapU32RegU32Reg(reg1, reg2) => {
-                let reg1_val = *self.registers.get_register_u32(*reg1).read(&privilege);
-                let reg2_val = *self.registers.get_register_u32(*reg2).read(&privilege);
+                let reg1_val = *self
+                    .registers
+                    .get_register_u32(*reg1)
+                    .read(&self.security_context);
+                let reg2_val = *self
+                    .registers
+                    .get_register_u32(*reg2)
+                    .read(&self.security_context);
 
                 self.registers
                     .get_register_u32_mut(*reg1)
-                    .write(reg2_val, &privilege);
+                    .write(reg2_val, &self.security_context);
                 self.registers
                     .get_register_u32_mut(*reg2)
-                    .write(reg1_val, &privilege);
+                    .write(reg1_val, &self.security_context);
             }
             Instruction::MovU32ImmU32Reg(imm, reg) => {
                 self.registers
                     .get_register_u32_mut(*reg)
-                    .write(*imm, &privilege);
+                    .write(*imm, &self.security_context);
             }
             Instruction::MovU32RegU32Reg(in_reg, out_reg) => {
-                let value = *self.registers.get_register_u32(*in_reg).read(&privilege);
+                let value = *self
+                    .registers
+                    .get_register_u32(*in_reg)
+                    .read(&self.security_context);
 
                 self.registers
                     .get_register_u32_mut(*out_reg)
-                    .write(value, &privilege);
+                    .write(value, &self.security_context);
             }
             Instruction::MovU32ImmMemRelSimple(imm, addr) => {
-                mem.set_u32(*addr as usize, *imm, &privilege);
+                mem.set_u32(*addr as usize, *imm, &self.security_context);
             }
             Instruction::MovU32RegMemRelSimple(reg, addr) => {
-                let value = *self.registers.get_register_u32(*reg).read(&privilege);
-                mem.set_u32(*addr as usize, value, &privilege);
+                let value = *self
+                    .registers
+                    .get_register_u32(*reg)
+                    .read(&self.security_context);
+                mem.set_u32(*addr as usize, value, &self.security_context);
             }
             Instruction::MovMemU32RegRelSimple(addr, reg) => {
-                let value = mem.get_u32(*addr as usize, &privilege);
+                let value = mem.get_u32(*addr as usize, false, &self.security_context);
                 self.registers
                     .get_register_u32_mut(*reg)
-                    .write(value, &privilege);
+                    .write(value, &self.security_context);
             }
             Instruction::MovU32RegPtrU32RegRelSimple(in_reg, out_reg) => {
-                let address = self.registers.get_register_u32(*in_reg).read(&privilege);
-                let value = mem.get_u32(*address as usize, &privilege);
+                let address = self
+                    .registers
+                    .get_register_u32(*in_reg)
+                    .read(&self.security_context);
+                let value = mem.get_u32(*address as usize, false, &self.security_context);
                 self.registers
                     .get_register_u32_mut(*out_reg)
-                    .write(value, &privilege);
+                    .write(value, &self.security_context);
             }
 
             /******** [Complex Move Instructions - WITH EXPRESSIONS] ********/
@@ -240,9 +289,9 @@ impl Cpu {
                 }
 
                 let operators = self.move_expression_cache.get(expr).unwrap();
-                let addr = self.execute_u32_move_expression(operators, &privilege);
+                let addr = self.execute_u32_move_expression(operators, &self.security_context);
 
-                mem.set_u32(addr as usize, *imm, &privilege);
+                mem.set_u32(addr as usize, *imm, &self.security_context);
             }
 
             /******** [Special Instructions] ********/
@@ -250,7 +299,7 @@ impl Cpu {
                 todo!();
             }
             Instruction::Mret => {
-                self.is_machine_mode = false;
+                self.set_machine_mode(false);
             }
             Instruction::Hlt => {
                 self.is_halted = true;
@@ -261,7 +310,7 @@ impl Cpu {
 
         // Move the instruction pointer register forward by the number of
         // bytes used to build the instruction.
-        self.update_instruction_pointer(instruction.get_instruction_size());
+        self.update_instruction_pointer(OpCode::from(*instruction).get_total_instruction_size());
     }
 
     /// Set the state of the specified CPU flag.
@@ -275,6 +324,17 @@ impl Cpu {
         let register = self.registers.get_register_u32_mut(RegisterId::FL);
         let flags = utils::set_bit_state(*register.read_unchecked(), flag as u8, state);
         register.write_unchecked(flags);
+    }
+
+    #[inline(always)]
+    fn set_machine_mode(&mut self, state: bool) {
+        self.is_machine_mode = state;
+
+        if state {
+            self.security_context = SecurityContext::Machine;
+        } else {
+            self.security_context = SecurityContext::User;
+        }
     }
 
     /// Update the instruction pointer (IP) register.
@@ -339,6 +399,7 @@ mod tests_cpu {
         ins::{
             instruction::Instruction,
             move_expressions::{ExpressionArgs, ExpressionOperator, MoveExpressionHandler},
+            op_codes::OpCode,
         },
         mem::memory::{Memory, MemoryPermission},
         reg::registers::{RegisterId, Registers},
@@ -380,7 +441,7 @@ mod tests_cpu {
             // instruction count, such as if we hit a halt or early return.
             let mut size = 0;
             for ins in instructions {
-                size += ins.get_instruction_size();
+                size += OpCode::from(*ins).get_total_instruction_size();
             }
 
             registers
@@ -507,7 +568,7 @@ mod tests_cpu {
             // instruction count, such as if we hit a halt or early return.
             let mut size = 0;
             for ins in instructions {
-                size += ins.get_instruction_size();
+                size += OpCode::from(*ins).get_total_instruction_size();
             }
 
             registers

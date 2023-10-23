@@ -313,7 +313,7 @@ impl<'a> Decompiler<'a> {
             instructions.push(ins);
         }
 
-        println!("instructions: {:?}", instructions);
+        println!("instructions: {instructions:?}");
 
         instructions
     }

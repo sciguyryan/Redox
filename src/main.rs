@@ -11,6 +11,8 @@ mod security_context;
 mod utils;
 pub mod vm;
 
+use std::io::Read;
+
 use vm::VirtualMachine;
 
 use crate::{
@@ -33,7 +35,7 @@ fn main() {
 
     let expr_args_1 = vec![
         ExpressionArgs::Register(RegisterId::R7),
-        ExpressionArgs::Operator(ExpressionOperator::Subtract),
+        ExpressionArgs::Operator(ExpressionOperator::Add),
         ExpressionArgs::Register(RegisterId::R8),
     ];
     let expr_args_2 = vec![
@@ -47,27 +49,33 @@ fn main() {
     //return;
 
     let instructions = &[
-        /*Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+        Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
         Instruction::MovU32ImmU32Reg(0x2, RegisterId::R2),
         Instruction::SwapU32RegU32Reg(RegisterId::R1, RegisterId::R2),
-        Instruction::Mret,*/
+        Instruction::Mret,
+        Instruction::MovU32ImmU32Reg(50, RegisterId::R7),
+        Instruction::MovU32ImmU32Reg(50, RegisterId::R8),
         Instruction::MovU32ImmMemRelExpr(0x123, expr),
         Instruction::Hlt,
     ];
 
     let data = Compiler::compile(instructions);
-
     let mut decompiler = Decompiler::new(&data);
-    let insssss = decompiler.decompile();
+    //let insssss = decompiler.decompile();
+
+    println!("compiled data = {data:?}");
+    println!("compiled data len = {}", data.len());
 
     println!("----------[Instructions]----------");
     for ins in instructions {
         println!("{ins}");
     }
+    println!();
 
-    return;
+    let mem_seq_id = vm.load_code_block(&data);
+    vm.run(mem_seq_id);
 
-    vm.run_instructions(&instructions[..]);
+    //vm.run_instructions(&instructions[..]);
 
     println!("----------[CPU]----------");
     println!("Machine Mode? {}", vm.cpu.is_machine_mode);
@@ -81,5 +89,7 @@ fn main() {
     vm.ram.print_memory_regions();
     println!();
 
-    //println!("{:?}", vm.ram.get_storage());
+    println!("----------[RAM]----------");
+    let segment = &vm.ram.get_storage()[..150];
+    println!("{segment:?}");
 }

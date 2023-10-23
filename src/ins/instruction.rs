@@ -5,19 +5,6 @@ use crate::{
     reg::registers::RegisterId,
 };
 
-/// The size of the instruction, in bytes.
-const INSTRUCTION_SIZE: u32 = 2;
-/// The size of an extended instruction, in bytes.
-const EXT_INSTRUCTION_SIZE: u32 = 4;
-/// The size of a u16 argument, in bytes.
-const ARG_U16_IMM_SIZE: u32 = std::mem::size_of::<u16>() as u32;
-/// The size of a u32 argument, in bytes.
-const ARG_U32_IMM_SIZE: u32 = std::mem::size_of::<u32>() as u32;
-/// The size of a memory address argument, in bytes.
-const ARG_MEM_ADDR_SIZE: u32 = std::mem::size_of::<u32>() as u32;
-/// The size of a register ID argument, in bytes.
-const ARG_REG_ID_SIZE: u32 = std::mem::size_of::<RegisterId>() as u32;
-
 #[derive(Clone, Copy, Debug)]
 pub enum Instruction {
     Nop,
@@ -99,45 +86,8 @@ impl Display for Instruction {
 }
 
 impl Instruction {
-    pub fn get_instruction_size(&self) -> u32 {
-        let (arg_size, extended) = match self {
-            Instruction::Nop => (0, false),
-
-            /******** [Arithmetic Instructions] ********/
-            Instruction::AddU32ImmU32Reg(_, _) => (ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE, false),
-            Instruction::AddU32RegU32Reg(_, _) => (ARG_REG_ID_SIZE + ARG_REG_ID_SIZE, false),
-
-            /******** [Simple Move Instructions - NO EXPRESSIONS] ********/
-            Instruction::SwapU32RegU32Reg(_, _) => (ARG_REG_ID_SIZE + ARG_REG_ID_SIZE, false),
-            Instruction::MovU32ImmU32Reg(_, _) => (ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE, false),
-            Instruction::MovU32RegU32Reg(_, _) => (ARG_REG_ID_SIZE + ARG_REG_ID_SIZE, false),
-            Instruction::MovU32ImmMemRelSimple(_, _) => {
-                (ARG_U32_IMM_SIZE + ARG_MEM_ADDR_SIZE, false)
-            }
-            Instruction::MovU32RegMemRelSimple(_, _) => {
-                (ARG_REG_ID_SIZE + ARG_MEM_ADDR_SIZE, false)
-            }
-            Instruction::MovMemU32RegRelSimple(_, _) => {
-                (ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE, false)
-            }
-            Instruction::MovU32RegPtrU32RegRelSimple(_, _) => {
-                (ARG_REG_ID_SIZE + ARG_REG_ID_SIZE, false)
-            }
-
-            /******** [Complex Move Instructions - WITH EXPRESSIONS] ********/
-            Instruction::MovU32ImmMemRelExpr(_, _) => (ARG_U32_IMM_SIZE + ARG_U32_IMM_SIZE, false),
-
-            /******** [Special Instructions] ********/
-            Instruction::Ret => (0, false),
-            Instruction::Mret => (0, false),
-            Instruction::Hlt => (0, false),
-        };
-
-        if !extended {
-            INSTRUCTION_SIZE + arg_size
-        } else {
-            EXT_INSTRUCTION_SIZE + arg_size
-        }
+    pub fn read_instruction() -> Instruction {
+        Instruction::Nop
     }
 
     pub fn get_bytecode(&self) -> Vec<u8> {

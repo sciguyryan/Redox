@@ -1,11 +1,16 @@
 use bitflags::bitflags;
+use num_derive::FromPrimitive;
+use num_traits::FromPrimitive;
 use prettytable::{row, Table};
 use std::fmt::{self, Display};
 
 use crate::{
-    data_access_type::DataAccessType, ins::instruction::Instruction,
+    data_access_type::DataAccessType,
+    ins::{instruction::Instruction, op_codes::OpCode},
     security_context::SecurityContext,
 };
+
+use super::memory_block_reader::MemoryBlockReader;
 
 bitflags! {
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -64,6 +69,10 @@ impl MemoryRegion {
             seq_id,
             name,
         }
+    }
+
+    pub fn contains(&self, pos: usize) -> bool {
+        pos >= self.start && pos < self.end
     }
 }
 
@@ -194,33 +203,146 @@ impl Memory {
             .find(|r| pos >= r.start && pos <= r.end)
     }
 
-    pub fn get_byte_ptr(&self, pos: usize, context: &SecurityContext) -> &u8 {
+    pub fn get_byte_ptr(&self, pos: usize, needs_exec: bool, context: &SecurityContext) -> &u8 {
         self.assert_point_in_bounds(pos);
 
         // Check whether the memory region has read permissions.
-        self.validate_access(pos, &DataAccessType::Read, context, false);
+        self.validate_access(pos, &DataAccessType::Read, context, needs_exec);
 
         &self.storage[pos]
     }
 
-    pub fn get_byte_clone(&self, pos: usize, context: &SecurityContext) -> u8 {
+    pub fn get_byte_clone(&self, pos: usize, needs_exec: bool, context: &SecurityContext) -> u8 {
         assert!(self.is_in_bounds(pos));
 
         // Check whether the memory region has read permissions.
-        self.validate_access(pos, &DataAccessType::Read, context, false);
+        self.validate_access(pos, &DataAccessType::Read, context, needs_exec);
 
         self.storage[pos]
     }
 
     pub fn get_instruction(&self, pos: usize, context: &SecurityContext) -> Instruction {
-        let range = self.get_range_ptr(pos, 2, true, context);
+        //let range = self.get_range_ptr(pos, 2, true, context);
 
-        Instruction::Nop
+        let mut instruction_size = 2;
+
+        // Read the first two bytes of the instruction as an instruction will never
+        // be smaller than two bytes in length.
+        let opcode_range = self.get_range_ptr(pos, 2, true, context);
+
+        //println!("opcode_range = {opcode_range:?}");
+
+        let mut opcode_bytes: [u8; 4] = [0; 4];
+        opcode_bytes[0] = opcode_range[0];
+        opcode_bytes[1] = opcode_range[1];
+
+        // Are we handling an extended instruction or a basic one?
+        let mut opcode_id = u32::from_le_bytes(opcode_bytes);
+        if opcode_id > 32767 {
+            // Extended instructions are 4 bytes in length.
+            instruction_size = 4;
+
+            let opcode_range_ex = self.get_range_ptr(pos + 2, 2, true, context);
+
+            opcode_bytes[2] = opcode_range_ex[0];
+            opcode_bytes[3] = opcode_range_ex[1];
+
+            opcode_id = u32::from_le_bytes(opcode_bytes);
+        }
+
+        // Validate the opcode is one of the ones we know about.
+        let opcode: OpCode =
+            FromPrimitive::from_u32(opcode_id).expect("failed to read valid instruction opcode");
+
+        // calculate the length of the arguments, in bytes.
+        let arg_len = opcode.get_total_instruction_size() as usize - instruction_size;
+        let arg_bytes = self.get_range_ptr(pos + instruction_size, arg_len, true, context);
+
+        // Create a memory block reader.
+        let mut block = MemoryBlockReader::new(arg_bytes);
+
+        // Create our instruction instance.
+        let ins = match opcode {
+            OpCode::Nop => Instruction::Nop,
+
+            /******** [Arithmetic Instructions] ********/
+            OpCode::AddU32ImmU32Reg => {
+                let imm = block.read_u32();
+                let reg = block.read_register_id();
+
+                Instruction::AddU32ImmU32Reg(imm, reg)
+            }
+            OpCode::AddU32RegU32Reg => {
+                let reg_1 = block.read_register_id();
+                let reg_2 = block.read_register_id();
+
+                Instruction::AddU32RegU32Reg(reg_1, reg_2)
+            }
+
+            /******** [Simple Move Instructions - NO EXPRESSIONS] ********/
+            OpCode::SwapU32RegU32Reg => {
+                let reg1 = block.read_register_id();
+                let reg2 = block.read_register_id();
+
+                Instruction::SwapU32RegU32Reg(reg1, reg2)
+            }
+            OpCode::MovU32ImmU32Reg => {
+                let imm = block.read_u32();
+                let reg = block.read_register_id();
+
+                Instruction::MovU32ImmU32Reg(imm, reg)
+            }
+            OpCode::MovU32RegU32Reg => {
+                let in_reg = block.read_register_id();
+                let out_reg = block.read_register_id();
+
+                Instruction::MovU32RegU32Reg(in_reg, out_reg)
+            }
+            OpCode::MovU32ImmMemRelSimple => {
+                let imm = block.read_u32();
+                let addr = block.read_u32();
+
+                Instruction::MovU32ImmMemRelSimple(imm, addr)
+            }
+            OpCode::MovU32RegMemRelSimple => {
+                let reg = block.read_register_id();
+                let addr = block.read_u32();
+
+                Instruction::MovU32RegMemRelSimple(reg, addr)
+            }
+            OpCode::MovMemU32RegRelSimple => {
+                let addr = block.read_u32();
+                let reg = block.read_register_id();
+
+                Instruction::MovMemU32RegRelSimple(addr, reg)
+            }
+            OpCode::MovU32RegPtrU32RegRelSimple => {
+                let in_reg = block.read_register_id();
+                let out_reg = block.read_register_id();
+
+                Instruction::MovU32RegPtrU32RegRelSimple(in_reg, out_reg)
+            }
+
+            /******** [Complex Move Instructions - WITH EXPRESSIONS] ********/
+            OpCode::MovU32ImmMemRelExpr => {
+                let imm = block.read_u32();
+                let expr = block.read_u32();
+
+                Instruction::MovU32ImmMemRelExpr(imm, expr)
+            }
+
+            /******** [Special Instructions] ********/
+            OpCode::Ret => Instruction::Ret,
+            OpCode::Mret => Instruction::Mret,
+            OpCode::Hlt => Instruction::Hlt,
+        };
+
+        ins
     }
 
-    pub fn get_u32(&self, pos: usize, context: &SecurityContext) -> u32 {
+    pub fn get_u32(&self, pos: usize, needs_exec: bool, context: &SecurityContext) -> u32 {
         let bytes: [u8; 4] = self
-            .get_range_ptr(pos, 4, false, context)
+            .get_range_ptr(pos, 4, needs_exec, context)
             .try_into()
             .expect("failed to create a u32 from memory bytes");
 
@@ -397,12 +519,12 @@ impl Memory {
     fn validate_access_range(
         &self,
         start: usize,
-        len: usize,
+        end: usize,
         access_type: &DataAccessType,
         context: &SecurityContext,
         exec: bool,
     ) {
-        for i in start..(start + len) {
+        for i in start..end {
             self.validate_access(i, access_type, context, exec);
         }
     }
@@ -560,7 +682,7 @@ mod tests_memory {
         ram.set(0, byte, &SecurityContext::Machine);
         assert_eq!(
             byte,
-            *ram.get_byte_ptr(0, &SecurityContext::Machine),
+            *ram.get_byte_ptr(0, false, &SecurityContext::Machine),
             "failed to read correct value from memory"
         );
 
@@ -961,6 +1083,6 @@ mod tests_memory {
         let input = 0xDEADBEEF;
         ram.set_u32(0, input, &SecurityContext::User);
 
-        assert_eq!(input, ram.get_u32(0, &SecurityContext::User));
+        assert_eq!(input, ram.get_u32(0, false, &SecurityContext::User));
     }
 }

@@ -1,6 +1,19 @@
+use crate::reg::registers::RegisterId;
+
 use super::instruction::Instruction;
 
 use num_derive::FromPrimitive;
+
+/// The size of the instruction, in bytes.
+const INSTRUCTION_SIZE: u32 = 2;
+/// The size of an extended instruction, in bytes.
+const EXT_INSTRUCTION_SIZE: u32 = 4;
+/// The size of a u32 argument, in bytes.
+const ARG_U32_IMM_SIZE: u32 = std::mem::size_of::<u32>() as u32;
+/// The size of a memory address argument, in bytes.
+const ARG_MEM_ADDR_SIZE: u32 = std::mem::size_of::<u32>() as u32;
+/// The size of a register ID argument, in bytes.
+const ARG_REG_ID_SIZE: u32 = std::mem::size_of::<RegisterId>() as u32;
 
 #[repr(u32)]
 /// The opcode for an instruction.
@@ -57,6 +70,39 @@ impl OpCode {
     pub fn is_extended(&self) -> bool {
         let val = *self as u32;
         val > 32767
+    }
+
+    pub fn get_total_instruction_size(&self) -> u32 {
+        let (arg_size, extended) = match self {
+            OpCode::Nop => (0, false),
+
+            /******** [Arithmetic Instructions] ********/
+            OpCode::AddU32ImmU32Reg => (ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE, false),
+            OpCode::AddU32RegU32Reg => (ARG_REG_ID_SIZE + ARG_REG_ID_SIZE, false),
+
+            /******** [Simple Move Instructions - NO EXPRESSIONS] ********/
+            OpCode::SwapU32RegU32Reg => (ARG_REG_ID_SIZE + ARG_REG_ID_SIZE, false),
+            OpCode::MovU32ImmU32Reg => (ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE, false),
+            OpCode::MovU32RegU32Reg => (ARG_REG_ID_SIZE + ARG_REG_ID_SIZE, false),
+            OpCode::MovU32ImmMemRelSimple => (ARG_U32_IMM_SIZE + ARG_MEM_ADDR_SIZE, false),
+            OpCode::MovU32RegMemRelSimple => (ARG_REG_ID_SIZE + ARG_MEM_ADDR_SIZE, false),
+            OpCode::MovMemU32RegRelSimple => (ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE, false),
+            OpCode::MovU32RegPtrU32RegRelSimple => (ARG_REG_ID_SIZE + ARG_REG_ID_SIZE, false),
+
+            /******** [Complex Move Instructions - WITH EXPRESSIONS] ********/
+            OpCode::MovU32ImmMemRelExpr => (ARG_U32_IMM_SIZE + ARG_U32_IMM_SIZE, false),
+
+            /******** [Special Instructions] ********/
+            OpCode::Ret => (0, false),
+            OpCode::Mret => (0, false),
+            OpCode::Hlt => (0, false),
+        };
+
+        if !extended {
+            INSTRUCTION_SIZE + arg_size
+        } else {
+            EXT_INSTRUCTION_SIZE + arg_size
+        }
     }
 }
 
