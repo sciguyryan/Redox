@@ -70,8 +70,8 @@ impl MoveExpressionHandler {
         assert!(self.validate());
     }
 
-    pub fn encode(&mut self, args: &[ExpressionArgs]) -> u32 {
-        self.args = args.to_vec();
+    pub fn encode(&mut self, args: Vec<ExpressionArgs>) -> u32 {
+        self.args = args;
         assert!(self.validate());
 
         // Layout:
@@ -196,7 +196,7 @@ mod tests_move_expressions {
             let result = panic::catch_unwind(|| {
                 // Perform a roundtrip encode and decode.
                 let mut handler = MoveExpressionHandler::new();
-                let encoded = handler.encode(self.arguments);
+                let encoded = handler.encode(self.arguments.to_vec());
                 handler.decode(encoded);
 
                 // Yield the decoded arguments.

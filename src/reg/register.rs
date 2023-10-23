@@ -121,6 +121,7 @@ impl RegisterU32 {
                     || (permissions.intersects(RegisterPermission::PW)
                         && *context == SecurityContext::Machine)
             }
+            DataAccessType::Execute => panic!("Invalid access type specified."),
         };
 
         if !has_required_perms {
@@ -192,6 +193,7 @@ impl RegisterF32 {
                     || (permissions.intersects(RegisterPermission::PW)
                         && *context == SecurityContext::Machine)
             }
+            DataAccessType::Execute => panic!("Invalid access type specified."),
         };
 
         if !has_required_perms {
