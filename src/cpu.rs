@@ -392,182 +392,64 @@ mod tests_cpu {
 
     use super::Cpu;
 
-    struct TestEntrySimple<'a> {
-        pub instructions: &'a [Instruction],
-        pub changed_registers: &'a [(RegisterId, u32)],
-        pub should_panic: bool,
-        pub fail_message: String,
-    }
-
-    impl<'a> TestEntrySimple<'a> {
-        fn new(
-            instructions: &'a [Instruction],
-            changed_registers: &'a [(RegisterId, u32)],
-            should_panic: bool,
-            fail_message: &str,
-        ) -> Self {
-            Self {
-                instructions,
-                changed_registers,
-                should_panic,
-                fail_message: fail_message.to_string(),
-            }
-        }
-
-        fn build_registers(
-            &self,
-            register_presets: &'a [(RegisterId, u32)],
-            instructions: &'a [Instruction],
-        ) -> Registers {
-            let mut registers = Registers::new();
-
-            // This should be done before the registers are set because there will be instances
-            // there the number of executed instructions will be different than the total
-            // instruction count, such as if we hit a halt or early return.
-            let mut size = 0;
-            for ins in instructions {
-                size += OpCode::from(*ins).get_total_instruction_size();
-            }
-
-            registers
-                .get_register_u32_mut(RegisterId::IP)
-                .write_unchecked(size);
-            registers
-                .get_register_u32_mut(RegisterId::PC)
-                .write_unchecked(instructions.len() as u32);
-
-            for (reg, val) in register_presets {
-                registers.get_register_u32_mut(*reg).write_unchecked(*val);
-            }
-
-            registers
-        }
-
-        /// Run this specific test entry.
-        ///
-        /// # Arguments
-        ///
-        /// * `id` - The ID of this test.
-        pub fn run_test(&self, id: usize) {
-            let result = panic::catch_unwind(|| {
-                let (mut mem, mut cpu) = create_instance();
-                cpu.run_instructions(&mut mem, self.instructions);
-
-                (mem, cpu)
-            });
-
-            let did_panic = result.is_err();
-            assert_eq!(
-                did_panic,
-                self.should_panic,
-                "{}",
-                self.fail_message(id, did_panic)
-            );
-
-            if let Ok((_, cpu)) = result {
-                let registers = self.build_registers(self.changed_registers, self.instructions);
-                assert_eq!(cpu.registers, registers, "{}", self.fail_message(id, false));
-            }
-        }
-
-        /// Run a special test entry, returning a copy of the CPU instance for interrogation.
-        ///
-        /// # Arguments
-        ///
-        /// * `id` - The ID of this test.
-        pub fn run_test_special(&self, id: usize) -> (Memory, Cpu) {
-            let result = panic::catch_unwind(|| {
-                let (mut mem, mut cpu) = create_instance();
-                cpu.run_instructions(&mut mem, self.instructions);
-
-                (mem, cpu)
-            });
-
-            let did_panic = result.is_err();
-            assert_eq!(
-                did_panic,
-                self.should_panic,
-                "{}",
-                self.fail_message(id, true)
-            );
-
-            match result {
-                Ok((mem, cpu)) => {
-                    let registers = self.build_registers(self.changed_registers, self.instructions);
-                    assert_eq!(cpu.registers, registers, "{}", self.fail_message(id, false));
-
-                    (mem, cpu)
-                }
-                Err(_) => create_instance(),
-            }
-        }
-
-        /// Run this specific test entry.
-        ///
-        /// # Arguments
-        ///
-        /// * `id` - The ID of this test.
-        /// * `did_panic` - Did the test panic?
-        pub fn fail_message(&self, id: usize, did_panic: bool) -> String {
-            format!(
-                "Test {id} Failed - Should Panic? {}, Panicked? {did_panic}. Message = {}",
-                self.should_panic, self.fail_message
-            )
-        }
-    }
-
-    struct TestEntryU32Standard<'a> {
-        pub instructions: &'a [Instruction],
-        pub changed_registers: &'a [(RegisterId, u32)],
+    struct TestEntryU32Standard {
+        pub instructions: Vec<Instruction>,
+        pub registers: Registers,
         pub expected_memory: Vec<u8>,
         pub should_panic: bool,
         pub fail_message: String,
     }
 
-    impl<'a> TestEntryU32Standard<'a> {
+    impl TestEntryU32Standard {
         fn new(
-            instructions: &'a [Instruction],
-            changed_registers: &'a [(RegisterId, u32)],
+            instructions: &[Instruction],
+            changed_registers: &[(RegisterId, u32)],
             expected_memory: Vec<u8>,
             should_panic: bool,
             fail_message: &str,
         ) -> Self {
-            Self {
-                instructions,
-                changed_registers,
+            // Ensure we always end with a halt instruction.
+            let mut instructions_vec = instructions.to_vec();
+            if let Some(ins) = instructions_vec.last() {
+                if !matches!(ins, Instruction::Hlt) {
+                    instructions_vec.push(Instruction::Hlt);
+                }
+            }
+
+            let mut s = Self {
+                instructions: instructions_vec,
+                registers: Registers::default(),
                 expected_memory,
                 should_panic,
                 fail_message: fail_message.to_string(),
-            }
+            };
+
+            s.build_registers(changed_registers);
+
+            s
         }
 
-        fn build_registers(
-            &self,
-            register_presets: &'a [(RegisterId, u32)],
-            instructions: &'a [Instruction],
-        ) -> Registers {
-            let mut registers = Registers::new();
-
+        fn build_registers(&mut self, register_presets: &[(RegisterId, u32)]) {
             // This should be done before the registers are set because there will be instances
             // there the number of executed instructions will be different than the total
             // instruction count, such as if we hit a halt or early return.
             let mut size = 0;
-            for ins in instructions {
+            for ins in &self.instructions {
                 size += OpCode::from(*ins).get_total_instruction_size();
             }
 
-            registers
+            self.registers
                 .get_register_u32_mut(RegisterId::IP)
                 .write_unchecked(size);
-            registers
+            self.registers
                 .get_register_u32_mut(RegisterId::PC)
-                .write_unchecked(instructions.len() as u32);
+                .write_unchecked(self.instructions.len() as u32);
 
             for (reg, val) in register_presets {
-                registers.get_register_u32_mut(*reg).write_unchecked(*val);
+                self.registers
+                    .get_register_u32_mut(*reg)
+                    .write_unchecked(*val);
             }
-
-            registers
         }
 
         /// Run this specific test entry.
@@ -575,10 +457,10 @@ mod tests_cpu {
         /// # Arguments
         ///
         /// * `id` - The ID of this test.
-        pub fn run_test(&self, id: usize) {
+        pub fn run_test(&self, id: usize) -> (Memory, Cpu) {
             let result = panic::catch_unwind(|| {
                 let (mut mem, mut cpu) = create_instance();
-                cpu.run_instructions(&mut mem, self.instructions);
+                cpu.run_instructions(&mut mem, &self.instructions);
 
                 (mem, cpu)
             });
@@ -591,17 +473,26 @@ mod tests_cpu {
                 self.fail_message(id, did_panic)
             );
 
-            if let Ok((mem, cpu)) = result {
-                let registers = self.build_registers(self.changed_registers, self.instructions);
-                assert_eq!(cpu.registers, registers, "{}", self.fail_message(id, false));
-
-                assert_eq!(
-                    mem.get_storage(),
-                    self.expected_memory,
-                    "{}",
-                    self.fail_message(id, false)
-                );
+            if did_panic {
+                return create_instance();
             }
+
+            let (mem, cpu) = result.unwrap();
+            assert_eq!(
+                cpu.registers,
+                self.registers,
+                "{}",
+                self.fail_message(id, false)
+            );
+
+            assert_eq!(
+                mem.get_storage(),
+                self.expected_memory,
+                "{}",
+                self.fail_message(id, false)
+            );
+
+            (mem, cpu)
         }
 
         /// Run this specific test entry.
@@ -630,9 +521,10 @@ mod tests_cpu {
     /// Test the NOP instruction.
     #[test]
     fn test_nop() {
-        let tests = [TestEntrySimple::new(
+        let tests = [TestEntryU32Standard::new(
             &[Instruction::Nop],
-            &[(RegisterId::IP, 4), (RegisterId::PC, 1)],
+            &[],
+            vec![0; 100],
             false,
             "failed to execute NOP instruction",
         )];
@@ -646,17 +538,19 @@ mod tests_cpu {
     #[test]
     fn test_hlt() {
         let tests = [
-            TestEntrySimple::new(
+            TestEntryU32Standard::new(
                 &[Instruction::Hlt],
-                &[(RegisterId::IP, 4), (RegisterId::PC, 1)],
+                &[],
+                vec![0; 100],
                 false,
                 "failed to execute HLT instruction",
             ),
             // The halt instruction should prevent any following instructions from executing, which
             // means that the program counter should also not increase.
-            TestEntrySimple::new(
+            TestEntryU32Standard::new(
                 &[Instruction::Hlt, Instruction::Nop],
                 &[(RegisterId::IP, 4), (RegisterId::PC, 1)],
+                vec![0; 100],
                 false,
                 "failed to correctly stop execution after a HLT instruction",
             ),
@@ -670,15 +564,16 @@ mod tests_cpu {
     /// Test the MRET instruction.
     #[test]
     fn test_mret() {
-        let tests = [TestEntrySimple::new(
+        let tests = [TestEntryU32Standard::new(
             &[Instruction::Mret],
             &[],
+            vec![0; 100],
             false,
             "failed to execute MRET instruction",
         )];
 
         for (id, test) in tests.iter().enumerate() {
-            let (_, cpu) = test.run_test_special(id);
+            let (_, cpu) = test.run_test(id);
             assert!(
                 !cpu.is_machine_mode,
                 "Test {id} Failed - machine is still in machine mode after executing mret instruction!"
@@ -1080,14 +975,17 @@ mod tests_cpu {
     fn test_move_u32_imm_expr() {
         let mut handler = MoveExpressionHandler::new();
 
-        let test_1_args = [Instruction::MovU32ImmMemRelExpr(
-            0x123,
-            handler.encode(&[
-                ExpressionArgs::Constant(0x8),
-                ExpressionArgs::Operator(ExpressionOperator::Add),
-                ExpressionArgs::Constant(0x8),
-            ]),
-        )];
+        let test_1_args = [
+            Instruction::MovU32ImmMemRelExpr(
+                0x123,
+                handler.encode(&[
+                    ExpressionArgs::Constant(0x8),
+                    ExpressionArgs::Operator(ExpressionOperator::Add),
+                    ExpressionArgs::Constant(0x8),
+                ]),
+            ),
+            Instruction::Hlt,
+        ];
 
         let test_2_args = [
             Instruction::MovU32ImmU32Reg(0x8, RegisterId::R1),
@@ -1100,6 +998,7 @@ mod tests_cpu {
                     ExpressionArgs::Register(RegisterId::R2),
                 ]),
             ),
+            Instruction::Hlt,
         ];
 
         let test_3_args = [
@@ -1112,6 +1011,7 @@ mod tests_cpu {
                     ExpressionArgs::Constant(0x8),
                 ]),
             ),
+            Instruction::Hlt,
         ];
 
         let test_4_args = [
@@ -1124,6 +1024,7 @@ mod tests_cpu {
                     ExpressionArgs::Constant(0x8),
                 ]),
             ),
+            Instruction::Hlt,
         ];
 
         let test_5_args = [
@@ -1137,6 +1038,7 @@ mod tests_cpu {
                     ExpressionArgs::Constant(0x8),
                 ]),
             ),
+            Instruction::Hlt,
         ];
 
         let test_6_args = [
@@ -1150,6 +1052,7 @@ mod tests_cpu {
                     ExpressionArgs::Register(RegisterId::R2),
                 ]),
             ),
+            Instruction::Hlt,
         ];
 
         let test_7_args = [
@@ -1163,6 +1066,7 @@ mod tests_cpu {
                     ExpressionArgs::Register(RegisterId::R2),
                 ]),
             ),
+            Instruction::Hlt,
         ];
 
         let tests = [

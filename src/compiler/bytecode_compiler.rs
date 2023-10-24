@@ -7,7 +7,7 @@ impl Compiler {
         let mut compiled_bytes = Vec::new();
 
         for ins in instructions {
-            let bytecode = ins.get_bytecode();
+            let bytecode = ins.into_bytecode();
             compiled_bytes.extend_from_slice(&bytecode);
         }
 
