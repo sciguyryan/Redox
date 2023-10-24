@@ -52,9 +52,11 @@ pub enum OpCode {
 
     /******** [Complex Move Instructions - WITH EXPRESSIONS] ********/
     /// Move a u32 Immediate to Memory (relative to the base address of the code block). Result is copied into Memory.
-    MovU32ImmMemRelExpr = 10,
+    MovU32ImmMemExprRel = 10,
     /// Move the address as given by an expression (from Memory, relative to the base address of the code block). Result is copied into the Register.
-    MovU32MemU32RegRelExpr = 11,
+    MovMemExprU32RegRel = 11,
+    /// Move the value of a register to the address given by an expression (relative to the base address of the code block). Result is copied into Memory.
+    MovU32RegMemExprRel = 12,
 
     /******** [Special Instructions] ********/
     /// Return - return from a subroutine.
@@ -85,8 +87,9 @@ impl OpCode {
             OpCode::MovU32RegPtrU32RegRelSimple => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Complex Move Instructions - WITH EXPRESSIONS] ********/
-            OpCode::MovU32ImmMemRelExpr => ARG_U32_IMM_SIZE + ARG_U32_IMM_SIZE,
-            OpCode::MovU32MemU32RegRelExpr => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
+            OpCode::MovU32ImmMemExprRel => ARG_U32_IMM_SIZE + ARG_U32_IMM_SIZE,
+            OpCode::MovMemExprU32RegRel => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
+            OpCode::MovU32RegMemExprRel => ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE,
 
             /******** [Special Instructions] ********/
             OpCode::Ret => 0,
@@ -119,8 +122,9 @@ impl From<Instruction> for OpCode {
             Instruction::MovU32RegPtrU32RegRelSimple(_, _) => OpCode::MovU32RegPtrU32RegRelSimple,
 
             /******** [Complex Move Instructions - WITH EXPRESSIONS] ********/
-            Instruction::MovU32ImmMemRelExpr(_, _) => OpCode::MovU32ImmMemRelExpr,
-            Instruction::MovU32MemU32RegRelExpr(_, _) => OpCode::MovU32MemU32RegRelExpr,
+            Instruction::MovU32ImmMemExprRel(_, _) => OpCode::MovU32ImmMemExprRel,
+            Instruction::MovMemExprU32RegRel(_, _) => OpCode::MovMemExprU32RegRel,
+            Instruction::MovU32RegMemExprRel(_, _) => OpCode::MovU32RegMemExprRel,
 
             /******** [Special Instructions] ********/
             Instruction::Ret => OpCode::Ret,

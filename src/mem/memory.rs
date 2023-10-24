@@ -120,17 +120,23 @@ impl Memory {
             }
 
             /******** [Complex Move Instructions - WITH EXPRESSIONS] ********/
-            OpCode::MovU32ImmMemRelExpr => {
+            OpCode::MovU32ImmMemExprRel => {
                 let imm = block.read_u32();
                 let expr = block.read_u32();
 
-                Instruction::MovU32ImmMemRelExpr(imm, expr)
+                Instruction::MovU32ImmMemExprRel(imm, expr)
             }
-            OpCode::MovU32MemU32RegRelExpr => {
+            OpCode::MovMemExprU32RegRel => {
                 let expr = block.read_u32();
                 let reg = block.read_register_id();
 
-                Instruction::MovU32MemU32RegRelExpr(expr, reg)
+                Instruction::MovMemExprU32RegRel(expr, reg)
+            }
+            OpCode::MovU32RegMemExprRel => {
+                let reg = block.read_register_id();
+                let expr = block.read_u32();
+
+                Instruction::MovU32RegMemExprRel(reg, expr)
             }
 
             /******** [Special Instructions] ********/

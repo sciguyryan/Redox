@@ -45,7 +45,7 @@ fn run_test() {
         Instruction::Mret,
         Instruction::MovU32ImmU32Reg(50, RegisterId::R7),
         Instruction::MovU32ImmU32Reg(50, RegisterId::R8),
-        Instruction::MovU32ImmMemRelExpr(0x123, expr),
+        Instruction::MovU32ImmMemExprRel(0x123, expr),
         Instruction::Hlt,
     ];
 
@@ -96,7 +96,16 @@ fn main() {
         Instruction::Mret,
         Instruction::MovU32ImmU32Reg(50, RegisterId::R7),
         Instruction::MovU32ImmU32Reg(50, RegisterId::R8),
-        Instruction::MovU32ImmMemRelExpr(0x123, expr),
+        Instruction::MovU32ImmMemExprRel(0x123, expr),
+        /*Instruction::MovU32ImmMemRelSimple(0x123, 50),
+        Instruction::MovU32MemU32RegRelExpr(
+            expression_encoder.encode(&[
+                ExpressionArgs::Constant(25),
+                ExpressionArgs::Operator(ExpressionOperator::Add),
+                ExpressionArgs::Constant(25),
+            ]),
+            RegisterId::R1,
+        ),*/
         Instruction::Hlt,
     ];
 

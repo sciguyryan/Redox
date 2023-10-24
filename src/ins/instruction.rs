@@ -23,8 +23,9 @@ pub enum Instruction {
     MovU32RegPtrU32RegRelSimple(RegisterId, RegisterId),
 
     /******** [Complex Move Instructions - WITH EXPRESSIONS] ********/
-    MovU32ImmMemRelExpr(u32, u32),
-    MovU32MemU32RegRelExpr(u32, RegisterId),
+    MovU32ImmMemExprRel(u32, u32),
+    MovMemExprU32RegRel(u32, RegisterId),
+    MovU32RegMemExprRel(RegisterId, u32),
 
     /******** [Special Instructions] ********/
     Ret,
@@ -70,17 +71,23 @@ impl Display for Instruction {
             }
 
             /******** [Complex Move Instructions - WITH EXPRESSIONS] ********/
-            Instruction::MovU32ImmMemRelExpr(imm, expr) => {
+            Instruction::MovU32ImmMemExprRel(imm, expr) => {
                 let mut decoder = MoveExpressionHandler::new();
                 decoder.decode(expr);
 
                 format!("mov.rc ${imm:02X}, [{decoder}]")
             }
-            Instruction::MovU32MemU32RegRelExpr(expr, reg) => {
+            Instruction::MovMemExprU32RegRel(expr, reg) => {
                 let mut decoder = MoveExpressionHandler::new();
                 decoder.decode(expr);
 
                 format!("mov.rc [{decoder}], {reg}")
+            }
+            Instruction::MovU32RegMemExprRel(reg, expr) => {
+                let mut decoder = MoveExpressionHandler::new();
+                decoder.decode(expr);
+
+                format!("mov.rc {reg}, [{decoder}]")
             }
 
             /******** [Special Instructions] ********/
@@ -147,13 +154,17 @@ impl Instruction {
             }
 
             /******** [Complex Move Instructions - WITH EXPRESSIONS] ********/
-            Instruction::MovU32ImmMemRelExpr(imm, expr) => {
+            Instruction::MovU32ImmMemExprRel(imm, expr) => {
                 bytecode.extend_from_slice(&imm.to_le_bytes());
                 bytecode.extend_from_slice(&expr.to_le_bytes());
             }
-            Instruction::MovU32MemU32RegRelExpr(expr, reg) => {
+            Instruction::MovMemExprU32RegRel(expr, reg) => {
                 bytecode.extend_from_slice(&expr.to_le_bytes());
                 bytecode.push(reg as u8);
+            }
+            Instruction::MovU32RegMemExprRel(reg, expr) => {
+                bytecode.push(reg as u8);
+                bytecode.extend_from_slice(&expr.to_le_bytes());
             }
 
             /******** [Special Instructions] ********/

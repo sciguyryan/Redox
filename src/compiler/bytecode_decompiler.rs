@@ -208,7 +208,7 @@ impl<'a> Decompiler<'a> {
             }
 
             /******** [Complex Move Instructions - WITH EXPRESSIONS] ********/
-            OpCode::MovU32ImmMemRelExpr => {
+            OpCode::MovU32ImmMemExprRel => {
                 let imm = self.read_u32();
                 let expr = self.read_u32();
 
@@ -222,23 +222,39 @@ impl<'a> Decompiler<'a> {
                     return None;
                 }
 
-                Instruction::MovU32ImmMemRelExpr(imm.unwrap(), expr.unwrap())
+                Instruction::MovU32ImmMemExprRel(imm.unwrap(), expr.unwrap())
             }
-            OpCode::MovU32MemU32RegRelExpr => {
+            OpCode::MovMemExprU32RegRel => {
                 let expr = self.read_u32();
                 let reg = self.read_register_id();
 
                 if expr.is_none() {
-                    eprintln!("MovMemU32RegRelExpr - no valid expression for second argument.");
+                    eprintln!("MovMemU32RegRelExpr - no valid expression for first argument.");
                     return None;
                 }
 
                 if reg.is_none() {
-                    eprintln!("MovMemU32RegRelExpr - no valid immediate for first argument.");
+                    eprintln!("MovMemU32RegRelExpr - no valid immediate for second argument.");
                     return None;
                 }
 
-                Instruction::MovU32MemU32RegRelExpr(expr.unwrap(), reg.unwrap())
+                Instruction::MovMemExprU32RegRel(expr.unwrap(), reg.unwrap())
+            }
+            OpCode::MovU32RegMemExprRel => {
+                let reg = self.read_register_id();
+                let expr = self.read_u32();
+
+                if reg.is_none() {
+                    eprintln!("MovU32RegMemExprRel - no valid immediate for first argument.");
+                    return None;
+                }
+
+                if expr.is_none() {
+                    eprintln!("MovU32RegMemExprRel - no valid expression for second argument.");
+                    return None;
+                }
+
+                Instruction::MovU32RegMemExprRel(reg.unwrap(), expr.unwrap())
             }
 
             /******** [Special Instructions] ********/
