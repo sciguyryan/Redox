@@ -3,15 +3,16 @@ use crate::reg::registers::RegisterId;
 use super::instruction::Instruction;
 
 use num_derive::FromPrimitive;
+use std::mem;
 
 /// The size of the instruction, in bytes.
 const INSTRUCTION_SIZE: u32 = 4;
 /// The size of a u32 argument, in bytes.
-const ARG_U32_IMM_SIZE: u32 = std::mem::size_of::<u32>() as u32;
+const ARG_U32_IMM_SIZE: u32 = mem::size_of::<u32>() as u32;
 /// The size of a memory address argument, in bytes.
-const ARG_MEM_ADDR_SIZE: u32 = std::mem::size_of::<u32>() as u32;
+const ARG_MEM_ADDR_SIZE: u32 = mem::size_of::<u32>() as u32;
 /// The size of a register ID argument, in bytes.
-const ARG_REG_ID_SIZE: u32 = std::mem::size_of::<RegisterId>() as u32;
+const ARG_REG_ID_SIZE: u32 = mem::size_of::<RegisterId>() as u32;
 
 #[repr(u32)]
 /// The opcode for an instruction.
@@ -65,8 +66,8 @@ pub enum OpCode {
 }
 
 impl OpCode {
-    pub fn get_total_instruction_size(&self) -> u32 {
-        let size = match self {
+    pub fn get_instruction_arg_size(&self) -> u32 {
+        match self {
             OpCode::Nop => 0,
 
             /******** [Arithmetic Instructions] ********/
@@ -89,9 +90,11 @@ impl OpCode {
             OpCode::Ret => 0,
             OpCode::Mret => 0,
             OpCode::Hlt => 0,
-        };
+        }
+    }
 
-        size + INSTRUCTION_SIZE
+    pub fn get_total_instruction_size(&self) -> u32 {
+        self.get_instruction_arg_size() + INSTRUCTION_SIZE
     }
 }
 

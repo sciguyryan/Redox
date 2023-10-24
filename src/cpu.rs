@@ -429,14 +429,20 @@ mod tests_cpu {
             s
         }
 
+        /// Build the expected [`Registers`] instance for our test.
+        ///
+        /// # Arguments
+        ///
+        /// * `register_presets` - A slice of tuples, the first entry being the [`RegisterId`] and the second being the expected value.
         fn build_registers(&mut self, register_presets: &[(RegisterId, u32)]) {
             // This should be done before the registers are set because there will be instances
             // there the number of executed instructions will be different than the total
             // instruction count, such as if we hit a halt or early return.
-            let mut size = 0;
-            for ins in &self.instructions {
-                size += OpCode::from(*ins).get_total_instruction_size();
-            }
+            let size: u32 = self
+                .instructions
+                .iter()
+                .map(|i| OpCode::from(*i).get_total_instruction_size())
+                .sum();
 
             self.registers
                 .get_register_u32_mut(RegisterId::IP)
