@@ -24,7 +24,7 @@ impl VirtualMachine {
     pub fn load_code_block(&mut self, start: usize, bytes: &[u8]) {
         assert!(bytes.len() < self.ram.len());
 
-        // Next, load the data into RAM.
+        // Load the bytecode data into RAM.
         self.ram.set_range(start, bytes);
     }
 }

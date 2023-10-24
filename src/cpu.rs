@@ -1,5 +1,5 @@
 use core::fmt;
-use std::{collections::HashMap, panic, slice::Iter};
+use std::{collections::BTreeMap, panic, slice::Iter};
 
 use crate::{
     ins::{
@@ -18,7 +18,7 @@ pub struct Cpu {
     pub is_halted: bool,
     pub is_machine_mode: bool,
 
-    move_expression_cache: HashMap<u32, [ExpressionArgs; 3]>,
+    move_expression_cache: BTreeMap<u32, [ExpressionArgs; 3]>,
 }
 
 impl Cpu {
@@ -28,7 +28,7 @@ impl Cpu {
             is_halted: false,
             is_machine_mode: true,
 
-            move_expression_cache: HashMap::new(),
+            move_expression_cache: BTreeMap::new(),
         }
     }
 
@@ -169,10 +169,36 @@ impl Cpu {
     #[inline(always)]
     fn perform_checked_add_u32(&mut self, value_1: u32, value_2: u32) -> u32 {
         let final_value = value_1 as u64 + value_2 as u64;
-        self.set_flag_state(CpuFlag::V, final_value > Cpu::U32_MAX);
+        self.set_flag_state(CpuFlag::OF, final_value > Cpu::U32_MAX);
 
         let final_value = final_value as u32;
-        self.set_flag_state(CpuFlag::Z, final_value == 0);
+        self.set_flag_state(CpuFlag::ZF, final_value == 0);
+
+        final_value
+    }
+
+    /// Perform a checked left-shift of two u32 values.
+    ///
+    /// # Arguments
+    ///
+    /// * `in_value` - The first u32 value.
+    /// * `shift_by` - The second u32 value.
+    ///
+    /// # Returns
+    ///
+    /// The result of the operation, truncated in the case of an overflow.
+    ///
+    /// # Note
+    ///
+    /// This method sets and unsets the zero, overflow and carry flags as required.
+    #[inline(always)]
+    fn perform_checked_left_shift_u32(&mut self, in_value: u32, shift_by: u32) -> u32 {
+        let final_value = (in_value as u64) << shift_by;
+        self.set_flag_state(CpuFlag::OF, final_value > Cpu::U32_MAX);
+        self.set_flag_state(CpuFlag::CF, utils::is_bit_set_64(final_value, 32));
+
+        let final_value = final_value as u32;
+        self.set_flag_state(CpuFlag::ZF, final_value == 0);
 
         final_value
     }
@@ -248,7 +274,17 @@ impl Cpu {
                     .write(new_value, privilege);
             }
 
-            /******** [Simple Move Instructions - NO EXPRESSIONS] ********/
+            /******** [Bit Operation Instructions] ********/
+            Instruction::LeftShiftU32ImmU32Reg(imm, reg) => {
+                let old_value = *self.registers.get_register_u32(*reg).read(privilege);
+                let shifted = self.perform_checked_left_shift_u32(old_value, *imm);
+
+                self.registers
+                    .get_register_u32_mut(*reg)
+                    .write(shifted, privilege);
+            }
+
+            /******** [Move Instructions - NO EXPRESSIONS] ********/
             Instruction::SwapU32RegU32Reg(reg1, reg2) => {
                 let reg1_val = *self.registers.get_register_u32(*reg1).read(privilege);
                 let reg2_val = *self.registers.get_register_u32(*reg2).read(privilege);
@@ -293,15 +329,15 @@ impl Cpu {
                     .write(value, privilege);
             }
 
-            /******** [Complex Move Instructions - WITH EXPRESSIONS] ********/
+            /******** [Move Instructions - WITH EXPRESSIONS] ********/
             Instruction::MovU32ImmMemExprRel(imm, expr) => {
-                // move imm, [addr] - move immediate to address.
+                // mov imm, [addr] - move immediate to address.
                 let args = self.get_cache_move_expression_decode(expr);
                 let addr = self.execute_u32_move_expression(&args, privilege);
                 mem.set_u32(addr as usize, *imm);
             }
             Instruction::MovMemExprU32RegRel(expr, reg) => {
-                // move [addr], register - move value at address to register.
+                // mov [addr], register - move value at address to register.
                 let args = self.get_cache_move_expression_decode(expr);
                 let addr = self.execute_u32_move_expression(&args, privilege);
                 let value = mem.get_u32(addr as usize);
@@ -310,7 +346,7 @@ impl Cpu {
                     .write(value, privilege);
             }
             Instruction::MovU32RegMemExprRel(reg, expr) => {
-                // move reg, [addr] - move value of a register to an address.
+                // mov reg, [addr] - move value of a register to an address.
                 let args = self.get_cache_move_expression_decode(expr);
                 let addr = self.execute_u32_move_expression(&args, privilege);
                 let value = self.registers.get_register_u32(*reg).read(privilege);
@@ -386,29 +422,29 @@ impl Default for Cpu {
 #[repr(u8)]
 pub enum CpuFlag {
     /// The negative flag - set to true if the result of an operation is negative.
-    N,
+    SF,
     /// The zero flag - set to true if the result of an operation is zero.
-    Z,
+    ZF,
     /// The overflow flag - set to true if the result of an operation overflowed.
-    V,
-    ///  The carry flag - set to true if the carry bit has been set by an operation.
-    C,
+    OF,
+    /// The carry flag - set to true if the carry bit has been set by an operation.
+    CF,
 }
 
 impl fmt::Display for CpuFlag {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CpuFlag::N => write!(f, "N"),
-            CpuFlag::Z => write!(f, "Z"),
-            CpuFlag::V => write!(f, "V"),
-            CpuFlag::C => write!(f, "C"),
+            CpuFlag::SF => write!(f, "SF"),
+            CpuFlag::ZF => write!(f, "ZF"),
+            CpuFlag::OF => write!(f, "OF"),
+            CpuFlag::CF => write!(f, "CF"),
         }
     }
 }
 
 impl CpuFlag {
     pub fn iterator() -> Iter<'static, CpuFlag> {
-        static FLAGS: [CpuFlag; 4] = [CpuFlag::N, CpuFlag::Z, CpuFlag::V, CpuFlag::C];
+        static FLAGS: [CpuFlag; 4] = [CpuFlag::SF, CpuFlag::ZF, CpuFlag::OF, CpuFlag::CF];
         FLAGS.iter()
     }
 }
@@ -621,6 +657,103 @@ mod tests_cpu {
                 !cpu.is_machine_mode,
                 "Test {id} Failed - machine is still in machine mode after executing mret instruction!"
             );
+        }
+    }
+
+    /// Test the left-shift u32 register by u32 immediate value.
+    #[test]
+    fn test_left_shift_u32_imm_u32_reg() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0x2)],
+                vec![0; 100],
+                false,
+                "failed to correctly execute LSH instruction",
+            ),
+            // When shifted left by two places, this value will set the overflow flag but not the
+            // carry flag.
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(
+                        0b1011_1111_1111_1111_1111_1111_1111_1111,
+                        RegisterId::R1,
+                    ),
+                    Instruction::LeftShiftU32ImmU32Reg(0x2, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1100),
+                    (RegisterId::FL, 0b0100),
+                ],
+                vec![0; 100],
+                false,
+                "failed to correctly execute LSH instruction",
+            ),
+            // When shifted left by two places, this value will set the overflow and carry flags.
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
+                    Instruction::LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
+                    (RegisterId::FL, 0b1100),
+                ],
+                vec![0; 100],
+                false,
+                "failed to correctly execute LSH instruction",
+            ),
+            // When left-shifted by 32 places, the result will be zero and so the zero flag should be set
+            // in addition to the overflow flag.
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
+                    Instruction::LeftShiftU32ImmU32Reg(0x32, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0x0), (RegisterId::FL, 0b0110)],
+                vec![0; 100],
+                false,
+                "failed to correctly execute LSH instruction",
+            ),
+            // Just zero flag should be set here since zero left-shifted by anything will be zero.
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
+                    Instruction::LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0x0), (RegisterId::FL, 0b0010)],
+                vec![0; 100],
+                false,
+                "failed to correctly execute LSH instruction",
+            ),
+            // Just zero flag should be set here since zero left-shifted by anything will be zero.
+            TestEntryU32Standard::new(
+                &[
+                    // This value will set the overflow flag.
+                    Instruction::MovU32ImmU32Reg(
+                        0b1011_1111_1111_1111_1111_1111_1111_1111,
+                        RegisterId::R1,
+                    ),
+                    Instruction::LeftShiftU32ImmU32Reg(0x2, RegisterId::R1),
+                    // This will unset the overflow flag and set the zero flag instead.
+                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R2),
+                    Instruction::LeftShiftU32ImmU32Reg(0x1, RegisterId::R2),
+                ],
+                &[
+                    (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1100),
+                    (RegisterId::FL, 0b0010),
+                ],
+                vec![0; 100],
+                false,
+                "failed to correctly execute LSH instruction",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
         }
     }
 

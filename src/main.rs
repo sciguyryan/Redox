@@ -14,7 +14,7 @@ pub mod vm;
 use vm::VirtualMachine;
 
 use crate::{
-    compiler::{bytecode_compiler::Compiler, bytecode_decompiler::Decompiler},
+    compiler::bytecode_compiler::Compiler,
     ins::{
         instruction::Instruction,
         move_expressions::{ExpressionArgs, ExpressionOperator, MoveExpressionHandler},
@@ -86,8 +86,6 @@ fn main() {
     ];
     let mut expression_encoder = MoveExpressionHandler::new();
     let expr = expression_encoder.encode(&expr_args_1);
-    //println!("{:#018b}", expr);
-    //return;
 
     let instructions = &[
         Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
@@ -98,7 +96,7 @@ fn main() {
         Instruction::MovU32ImmU32Reg(50, RegisterId::R8),
         Instruction::MovU32ImmMemExprRel(0x123, expr),
         /*Instruction::MovU32ImmMemRelSimple(0x123, 50),
-        Instruction::MovU32MemU32RegRelExpr(
+        Instruction::MovMemExprU32RegRel(
             expression_encoder.encode(&[
                 ExpressionArgs::Constant(25),
                 ExpressionArgs::Operator(ExpressionOperator::Add),
@@ -106,16 +104,21 @@ fn main() {
             ]),
             RegisterId::R1,
         ),*/
+        /*Instruction::MovU32ImmMemRelSimple(0x123, 50),
+        Instruction::MovU32RegMemExprRel(
+            RegisterId::R1,
+            expression_encoder.encode(&[
+                ExpressionArgs::Constant(25),
+                ExpressionArgs::Operator(ExpressionOperator::Add),
+                ExpressionArgs::Constant(25),
+            ]),
+        ),*/
         Instruction::Hlt,
     ];
 
     let data = Compiler::compile(instructions);
-    //let mut decompiler = Decompiler::new(&data);
-    //let iiii = decompiler.decompile();
-    //println!("iiii = {iiii:?}");
-
-    println!("compiled data = {data:?}");
-    println!("compiled data len = {}", data.len());
+    //println!("compiled data = {data:?}");
+    //println!("compiled data len = {}", data.len());
 
     println!("----------[Instructions]----------");
     for ins in instructions {
@@ -123,7 +126,7 @@ fn main() {
     }
     println!();
 
-    let mem_seq_id = vm.load_code_block(0, &data);
+    vm.load_code_block(0, &data);
     vm.run();
 
     //vm.run_instructions(&instructions[..]);

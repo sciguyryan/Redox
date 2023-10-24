@@ -31,6 +31,20 @@ impl Memory {
         );
     }
 
+    pub fn decompile_instructions(&self, start: usize, end: usize) -> Vec<Instruction> {
+        let mut instructions = vec![];
+
+        let mut cursor = start;
+        while cursor < end {
+            let ins = self.get_instruction(cursor);
+            instructions.push(ins);
+
+            cursor += OpCode::from(ins).get_total_instruction_size() as usize;
+        }
+
+        instructions
+    }
+
     pub fn get_byte_ptr(&self, pos: usize) -> &u8 {
         self.assert_point_in_bounds(pos);
 
@@ -60,6 +74,14 @@ impl Memory {
         // Create our instruction instance.
         match opcode {
             OpCode::Nop => Instruction::Nop,
+
+            /******** [Bit Operation Instructions] ********/
+            OpCode::LeftShiftU32ImmU32Reg => {
+                let imm = block.read_u32();
+                let reg = block.read_register_id();
+
+                Instruction::LeftShiftU32ImmU32Reg(imm, reg)
+            }
 
             /******** [Arithmetic Instructions] ********/
             OpCode::AddU32ImmU32Reg => {

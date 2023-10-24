@@ -9,11 +9,14 @@ use crate::{
 pub enum Instruction {
     Nop,
 
+    /******** [Bit Operation Instructions] ********/
+    LeftShiftU32ImmU32Reg(u32, RegisterId),
+
     /******** [Arithmetic Instructions] ********/
     AddU32ImmU32Reg(u32, RegisterId),
     AddU32RegU32Reg(RegisterId, RegisterId),
 
-    /******** [Simple Move Instructions - NO EXPRESSIONS] ********/
+    /******** [Move Instructions - NO EXPRESSIONS] ********/
     SwapU32RegU32Reg(RegisterId, RegisterId),
     MovU32ImmU32Reg(u32, RegisterId),
     MovU32RegU32Reg(RegisterId, RegisterId),
@@ -22,7 +25,7 @@ pub enum Instruction {
     MovMemU32RegRelSimple(u32, RegisterId),
     MovU32RegPtrU32RegRelSimple(RegisterId, RegisterId),
 
-    /******** [Complex Move Instructions - WITH EXPRESSIONS] ********/
+    /******** [Move Instructions - WITH EXPRESSIONS] ********/
     MovU32ImmMemExprRel(u32, u32),
     MovMemExprU32RegRel(u32, RegisterId),
     MovU32RegMemExprRel(RegisterId, u32),
@@ -47,7 +50,12 @@ impl Display for Instruction {
                 format!("add {in_reg}, {out_reg}")
             }
 
-            /******** [Simple Move Instructions - NO EXPRESSIONS] ********/
+            /******** [Bit Operation Instructions] ********/
+            Instruction::LeftShiftU32ImmU32Reg(imm, reg) => {
+                format!("lsf ${imm:02X}, {reg}")
+            }
+
+            /******** [Move Instructions - NO EXPRESSIONS] ********/
             Instruction::SwapU32RegU32Reg(reg1, reg2) => {
                 format!("swap {reg1}, {reg2}")
             }
@@ -70,7 +78,7 @@ impl Display for Instruction {
                 format!("mov.rs [{in_reg}], {out_reg}")
             }
 
-            /******** [Complex Move Instructions - WITH EXPRESSIONS] ********/
+            /******** [Move Instructions - WITH EXPRESSIONS] ********/
             Instruction::MovU32ImmMemExprRel(imm, expr) => {
                 let mut decoder = MoveExpressionHandler::new();
                 decoder.decode(expr);
@@ -123,7 +131,13 @@ impl Instruction {
                 bytecode.push(out_reg as u8);
             }
 
-            /******** [Simple Move Instructions - NO EXPRESSIONS] ********/
+            /******** [Bit Operation Instructions] ********/
+            Instruction::LeftShiftU32ImmU32Reg(imm, reg) => {
+                bytecode.extend_from_slice(&imm.to_le_bytes());
+                bytecode.push(reg as u8);
+            }
+
+            /******** [Move Instructions - NO EXPRESSIONS] ********/
             Instruction::SwapU32RegU32Reg(reg1, reg2) => {
                 bytecode.push(reg1 as u8);
                 bytecode.push(reg2 as u8);
@@ -153,7 +167,7 @@ impl Instruction {
                 bytecode.push(out_reg as u8);
             }
 
-            /******** [Complex Move Instructions - WITH EXPRESSIONS] ********/
+            /******** [Move Instructions - WITH EXPRESSIONS] ********/
             Instruction::MovU32ImmMemExprRel(imm, expr) => {
                 bytecode.extend_from_slice(&imm.to_le_bytes());
                 bytecode.extend_from_slice(&expr.to_le_bytes());
