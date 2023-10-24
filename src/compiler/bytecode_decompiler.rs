@@ -224,6 +224,22 @@ impl<'a> Decompiler<'a> {
 
                 Instruction::MovU32ImmMemRelExpr(imm.unwrap(), expr.unwrap())
             }
+            OpCode::MovU32MemU32RegRelExpr => {
+                let expr = self.read_u32();
+                let reg = self.read_register_id();
+
+                if expr.is_none() {
+                    eprintln!("MovMemU32RegRelExpr - no valid expression for second argument.");
+                    return None;
+                }
+
+                if reg.is_none() {
+                    eprintln!("MovMemU32RegRelExpr - no valid immediate for first argument.");
+                    return None;
+                }
+
+                Instruction::MovU32MemU32RegRelExpr(expr.unwrap(), reg.unwrap())
+            }
 
             /******** [Special Instructions] ********/
             OpCode::Ret => Instruction::Ret,

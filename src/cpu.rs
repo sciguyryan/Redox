@@ -107,6 +107,31 @@ impl Cpu {
         mem.get_instruction(ip as usize)
     }
 
+    /// Get a cached move expression decode result, or compute and cache it if not present.
+    ///
+    /// # Arguments
+    ///
+    /// * `expr` - The encoded expression to be decoded.
+    ///
+    /// # Returns
+    ///
+    /// An array containing the three decoded [`ExpressionArgs`] objects.
+    #[inline(always)]
+    fn get_cache_move_expression_decode(&mut self, expr: &u32) -> [ExpressionArgs; 3] {
+        if !self.move_expression_cache.contains_key(expr) {
+            // Cache the decoding result to speed up processing slightly.
+            let mut expression_decoder = MoveExpressionHandler::new();
+            expression_decoder.decode(*expr);
+
+            let result = expression_decoder.into_array();
+            self.move_expression_cache.insert(*expr, result);
+
+            result
+        } else {
+            *self.move_expression_cache.get(expr).unwrap()
+        }
+    }
+
     /// Get the state of a given CPU flag.
     ///
     /// # Arguments
@@ -155,7 +180,7 @@ impl Cpu {
     /// Perform a hard reset on the CPU.
     pub fn reset(&mut self) {
         self.registers.reset();
-        self.is_halted = false;
+        self.set_halted(false);
     }
 
     /// Run the CPU from a specified starting point in memory.
@@ -189,7 +214,7 @@ impl Cpu {
             }
         }
 
-        self.is_halted = true;
+        self.set_halted(true);
     }
 
     /// Execute a single instruction on the CPU.
@@ -270,19 +295,17 @@ impl Cpu {
 
             /******** [Complex Move Instructions - WITH EXPRESSIONS] ********/
             Instruction::MovU32ImmMemRelExpr(imm, expr) => {
-                // Cache the decoding result to speed up processing slightly.
-                if !self.move_expression_cache.contains_key(expr) {
-                    let mut expression_decoder = MoveExpressionHandler::new();
-                    expression_decoder.decode(*expr);
-
-                    self.move_expression_cache
-                        .insert(*expr, expression_decoder.get_args_as_array());
-                }
-
-                let operators = self.move_expression_cache.get(expr).unwrap();
-                let addr = self.execute_u32_move_expression(operators, privilege);
-
+                let args = self.get_cache_move_expression_decode(expr);
+                let addr = self.execute_u32_move_expression(&args, privilege);
                 mem.set_u32(addr as usize, *imm);
+            }
+            Instruction::MovU32MemU32RegRelExpr(expr, reg) => {
+                let args = self.get_cache_move_expression_decode(expr);
+                let addr = self.execute_u32_move_expression(&args, privilege);
+                let value = mem.get_u32(addr as usize);
+                self.registers
+                    .get_register_u32_mut(*reg)
+                    .write(value, privilege);
             }
 
             /******** [Special Instructions] ********/
@@ -293,7 +316,7 @@ impl Cpu {
                 self.set_machine_mode(false);
             }
             Instruction::Hlt => {
-                self.is_halted = true;
+                self.set_halted(true);
             }
         };
 
@@ -320,6 +343,11 @@ impl Cpu {
     #[inline(always)]
     fn set_machine_mode(&mut self, state: bool) {
         self.is_machine_mode = state;
+    }
+
+    #[inline(always)]
+    fn set_halted(&mut self, state: bool) {
+        self.is_halted = state;
     }
 
     /// Update the instruction pointer (IP) register.
@@ -981,17 +1009,14 @@ mod tests_cpu {
     fn test_move_u32_imm_expr() {
         let mut handler = MoveExpressionHandler::new();
 
-        let test_1_args = [
-            Instruction::MovU32ImmMemRelExpr(
-                0x123,
-                handler.encode(&[
-                    ExpressionArgs::Constant(0x8),
-                    ExpressionArgs::Operator(ExpressionOperator::Add),
-                    ExpressionArgs::Constant(0x8),
-                ]),
-            ),
-            Instruction::Hlt,
-        ];
+        let test_1_args = [Instruction::MovU32ImmMemRelExpr(
+            0x123,
+            handler.encode(&[
+                ExpressionArgs::Constant(0x8),
+                ExpressionArgs::Operator(ExpressionOperator::Add),
+                ExpressionArgs::Constant(0x8),
+            ]),
+        )];
 
         let test_2_args = [
             Instruction::MovU32ImmU32Reg(0x8, RegisterId::R1),
@@ -1004,7 +1029,6 @@ mod tests_cpu {
                     ExpressionArgs::Register(RegisterId::R2),
                 ]),
             ),
-            Instruction::Hlt,
         ];
 
         let test_3_args = [
@@ -1017,7 +1041,6 @@ mod tests_cpu {
                     ExpressionArgs::Constant(0x8),
                 ]),
             ),
-            Instruction::Hlt,
         ];
 
         let test_4_args = [
@@ -1030,7 +1053,6 @@ mod tests_cpu {
                     ExpressionArgs::Constant(0x8),
                 ]),
             ),
-            Instruction::Hlt,
         ];
 
         let test_5_args = [
@@ -1044,7 +1066,6 @@ mod tests_cpu {
                     ExpressionArgs::Constant(0x8),
                 ]),
             ),
-            Instruction::Hlt,
         ];
 
         let test_6_args = [
@@ -1058,7 +1079,6 @@ mod tests_cpu {
                     ExpressionArgs::Register(RegisterId::R2),
                 ]),
             ),
-            Instruction::Hlt,
         ];
 
         let test_7_args = [
@@ -1072,7 +1092,6 @@ mod tests_cpu {
                     ExpressionArgs::Register(RegisterId::R2),
                 ]),
             ),
-            Instruction::Hlt,
         ];
 
         let tests = [
@@ -1153,6 +1172,211 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &test_7_args,
                 &[(RegisterId::R1, 0x1A), (RegisterId::R2, 0x4)],
+                vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                ],
+                false,
+                "failed to correctly execute MOV instruction",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the complex move from an expression-derived memory address to a register.
+    #[test]
+    fn test_move_mem_expr_u32_reg() {
+        let mut handler = MoveExpressionHandler::new();
+
+        let test_1_args = [
+            Instruction::MovU32ImmMemRelSimple(0x123, 0x10),
+            Instruction::MovU32MemU32RegRelExpr(
+                handler.encode(&[
+                    ExpressionArgs::Constant(0x8),
+                    ExpressionArgs::Operator(ExpressionOperator::Add),
+                    ExpressionArgs::Constant(0x8),
+                ]),
+                RegisterId::R8,
+            ),
+        ];
+
+        let test_2_args = [
+            Instruction::MovU32ImmMemRelSimple(0x123, 0x10),
+            Instruction::MovU32ImmU32Reg(0x8, RegisterId::R1),
+            Instruction::MovU32ImmU32Reg(0x8, RegisterId::R2),
+            Instruction::MovU32MemU32RegRelExpr(
+                handler.encode(&[
+                    ExpressionArgs::Register(RegisterId::R1),
+                    ExpressionArgs::Operator(ExpressionOperator::Add),
+                    ExpressionArgs::Register(RegisterId::R2),
+                ]),
+                RegisterId::R8,
+            ),
+        ];
+
+        let test_3_args = [
+            Instruction::MovU32ImmMemRelSimple(0x123, 0x10),
+            Instruction::MovU32ImmU32Reg(0x8, RegisterId::R1),
+            Instruction::MovU32MemU32RegRelExpr(
+                handler.encode(&[
+                    ExpressionArgs::Register(RegisterId::R1),
+                    ExpressionArgs::Operator(ExpressionOperator::Add),
+                    ExpressionArgs::Constant(0x8),
+                ]),
+                RegisterId::R8,
+            ),
+        ];
+
+        let test_4_args = [
+            Instruction::MovU32ImmMemRelSimple(0x123, 0x10),
+            Instruction::MovU32ImmU32Reg(0x8, RegisterId::TEST0),
+            Instruction::MovU32MemU32RegRelExpr(
+                handler.encode(&[
+                    ExpressionArgs::Register(RegisterId::TEST0),
+                    ExpressionArgs::Operator(ExpressionOperator::Add),
+                    ExpressionArgs::Constant(0x8),
+                ]),
+                RegisterId::R8,
+            ),
+        ];
+
+        let test_5_args = [
+            Instruction::MovU32ImmMemRelSimple(0x123, 0x10),
+            Instruction::MovU32ImmU32Reg(0x8, RegisterId::TEST0),
+            Instruction::Mret,
+            Instruction::MovU32MemU32RegRelExpr(
+                handler.encode(&[
+                    ExpressionArgs::Register(RegisterId::TEST0),
+                    ExpressionArgs::Operator(ExpressionOperator::Add),
+                    ExpressionArgs::Constant(0x8),
+                ]),
+                RegisterId::R8,
+            ),
+        ];
+
+        let test_6_args = [
+            Instruction::MovU32ImmMemRelSimple(0x123, 0x10),
+            Instruction::MovU32ImmU32Reg(0x2, RegisterId::R1),
+            Instruction::MovU32ImmU32Reg(0x8, RegisterId::R2),
+            Instruction::MovU32MemU32RegRelExpr(
+                handler.encode(&[
+                    ExpressionArgs::Register(RegisterId::R1),
+                    ExpressionArgs::Operator(ExpressionOperator::Multiply),
+                    ExpressionArgs::Register(RegisterId::R2),
+                ]),
+                RegisterId::R8,
+            ),
+        ];
+
+        let test_7_args = [
+            Instruction::MovU32ImmMemRelSimple(0x123, 0x16),
+            Instruction::MovU32ImmU32Reg(0x1A, RegisterId::R1),
+            Instruction::MovU32ImmU32Reg(0x4, RegisterId::R2),
+            Instruction::MovU32MemU32RegRelExpr(
+                handler.encode(&[
+                    ExpressionArgs::Register(RegisterId::R1),
+                    ExpressionArgs::Operator(ExpressionOperator::Subtract),
+                    ExpressionArgs::Register(RegisterId::R2),
+                ]),
+                RegisterId::R8,
+            ),
+        ];
+
+        let tests = [
+            // Test with two constant values.
+            TestEntryU32Standard::new(
+                &test_1_args,
+                &[(RegisterId::R8, 0x123)],
+                vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                ],
+                false,
+                "failed to correctly execute MOV instruction",
+            ),
+            // Test with two register values.
+            TestEntryU32Standard::new(
+                &test_2_args,
+                &[
+                    (RegisterId::R1, 0x8),
+                    (RegisterId::R2, 0x8),
+                    (RegisterId::R8, 0x123),
+                ],
+                vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                ],
+                false,
+                "failed to correctly execute MOV instruction",
+            ),
+            // Test with a constant and a register.
+            TestEntryU32Standard::new(
+                &test_3_args,
+                &[(RegisterId::R1, 0x8), (RegisterId::R8, 0x123)],
+                vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                ],
+                false,
+                "failed to correctly execute MOV instruction",
+            ),
+            // This test should succeed in machine mode.
+            TestEntryU32Standard::new(
+                &test_4_args,
+                &[(RegisterId::R8, 0x123), (RegisterId::TEST0, 0x8)],
+                vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                ],
+                false,
+                "failed to correctly execute MOV instruction in machine mode",
+            ),
+            // This test should fail in user mode due to the register permissions.
+            TestEntryU32Standard::new(
+                &test_5_args,
+                &[],
+                vec![],
+                true,
+                "succeeded in execute MOV instruction in user mode",
+            ),
+            // Test with multiplication.
+            TestEntryU32Standard::new(
+                &test_6_args,
+                &[
+                    (RegisterId::R1, 0x2),
+                    (RegisterId::R2, 0x8),
+                    (RegisterId::R8, 0x123),
+                ],
+                vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                ],
+                false,
+                "failed to correctly execute MOV instruction",
+            ),
+            // Test with subtraction.
+            TestEntryU32Standard::new(
+                &test_7_args,
+                &[
+                    (RegisterId::R1, 0x1A),
+                    (RegisterId::R2, 0x4),
+                    (RegisterId::R8, 0x123),
+                ],
                 vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,

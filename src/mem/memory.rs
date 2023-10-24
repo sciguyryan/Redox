@@ -126,6 +126,12 @@ impl Memory {
 
                 Instruction::MovU32ImmMemRelExpr(imm, expr)
             }
+            OpCode::MovU32MemU32RegRelExpr => {
+                let expr = block.read_u32();
+                let reg = block.read_register_id();
+
+                Instruction::MovU32MemU32RegRelExpr(expr, reg)
+            }
 
             /******** [Special Instructions] ********/
             OpCode::Ret => Instruction::Ret,

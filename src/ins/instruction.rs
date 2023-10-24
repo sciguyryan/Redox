@@ -24,6 +24,7 @@ pub enum Instruction {
 
     /******** [Complex Move Instructions - WITH EXPRESSIONS] ********/
     MovU32ImmMemRelExpr(u32, u32),
+    MovU32MemU32RegRelExpr(u32, RegisterId),
 
     /******** [Special Instructions] ********/
     Ret,
@@ -74,6 +75,12 @@ impl Display for Instruction {
                 decoder.decode(expr);
 
                 format!("mov.rc ${imm:02X}, [{decoder}]")
+            }
+            Instruction::MovU32MemU32RegRelExpr(expr, reg) => {
+                let mut decoder = MoveExpressionHandler::new();
+                decoder.decode(expr);
+
+                format!("mov.rc [{decoder}], {reg}")
             }
 
             /******** [Special Instructions] ********/
@@ -143,6 +150,10 @@ impl Instruction {
             Instruction::MovU32ImmMemRelExpr(imm, expr) => {
                 bytecode.extend_from_slice(&imm.to_le_bytes());
                 bytecode.extend_from_slice(&expr.to_le_bytes());
+            }
+            Instruction::MovU32MemU32RegRelExpr(expr, reg) => {
+                bytecode.extend_from_slice(&expr.to_le_bytes());
+                bytecode.push(reg as u8);
             }
 
             /******** [Special Instructions] ********/

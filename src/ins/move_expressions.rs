@@ -113,10 +113,11 @@ impl MoveExpressionHandler {
         encoded_value
     }
 
-    pub fn get_args_as_array(&self) -> [ExpressionArgs; 3] {
+    pub fn into_array(self) -> [ExpressionArgs; 3] {
         [self.args[0], self.args[1], self.args[2]]
     }
 
+    #[inline(always)]
     pub fn validate(&self) -> bool {
         self.args.len() == 3 && matches!(self.args[1], ExpressionArgs::Operator(_))
     }
