@@ -30,6 +30,8 @@ pub enum Instruction {
     /******** [Bit Operation Instructions] ********/
     /// Left shift a u32 register by a u32 immediate. The result remains in the specified register.
     LeftShiftU32ImmU32Reg(u32, RegisterId),
+    /// Left shift a u32 register by a u32 register. The result remains in the specified register.
+    LeftShiftU32RegU32Reg(RegisterId, RegisterId),
 
     /******** [Move Instructions - NO EXPRESSIONS] ********/
     /// Swap the values of the two registers.
@@ -81,6 +83,9 @@ impl Display for Instruction {
             /******** [Bit Operation Instructions] ********/
             Instruction::LeftShiftU32ImmU32Reg(imm, reg) => {
                 format!("lsf ${imm:02X}, {reg}")
+            }
+            Instruction::LeftShiftU32RegU32Reg(shift_reg, reg) => {
+                format!("lsf {shift_reg}, {reg}")
             }
 
             /******** [Move Instructions - NO EXPRESSIONS] ********/
@@ -146,6 +151,7 @@ impl Instruction {
 
             /******** [Bit Operation Instructions] ********/
             Instruction::LeftShiftU32ImmU32Reg(_, _) => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
+            Instruction::LeftShiftU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Move Instructions - NO EXPRESSIONS] ********/
             Instruction::SwapU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
@@ -180,6 +186,7 @@ impl Instruction {
 
             /******** [Bit Operation Instructions] ********/
             OpCode::LeftShiftU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
+            OpCode::LeftShiftU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Move Instructions - NO EXPRESSIONS] ********/
             OpCode::SwapU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,

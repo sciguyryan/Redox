@@ -18,7 +18,8 @@ pub enum OpCode {
     /******** [Bit Operation Instructions] ********/
     /// Left shift a u32 register by a u32 immediate. The result remains in the specified register.
     LeftShiftU32ImmU32Reg,
-    //LeftShiftU32RegU32Reg,
+    /// Left shift a u32 register by a u32 register. The result remains in the specified register.
+    LeftShiftU32RegU32Reg,
 
     /******** [Simple Move Instructions - NO EXPRESSIONS] ********/
     /// Swap the values of the two registers.
@@ -66,6 +67,7 @@ impl From<Instruction> for OpCode {
 
             /******** [Bit Operation Instructions] ********/
             Instruction::LeftShiftU32ImmU32Reg(_, _) => OpCode::LeftShiftU32ImmU32Reg,
+            Instruction::LeftShiftU32RegU32Reg(_, _) => OpCode::LeftShiftU32RegU32Reg,
 
             /******** [Move Instructions - NO EXPRESSIONS] ********/
             Instruction::SwapU32RegU32Reg(_, _) => OpCode::SwapU32RegU32Reg,

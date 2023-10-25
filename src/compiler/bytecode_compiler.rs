@@ -59,6 +59,10 @@ impl Compiler {
                 bytecode.extend_from_slice(&imm.to_le_bytes());
                 bytecode.push(reg as u8);
             }
+            Instruction::LeftShiftU32RegU32Reg(shift_reg, reg) => {
+                bytecode.push(shift_reg as u8);
+                bytecode.push(reg as u8);
+            }
 
             /******** [Move Instructions - NO EXPRESSIONS] ********/
             Instruction::SwapU32RegU32Reg(reg1, reg2) => {
