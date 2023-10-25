@@ -75,6 +75,20 @@ impl Memory {
         match opcode {
             OpCode::Nop => Instruction::Nop,
 
+            /******** [Arithmetic Instructions] ********/
+            OpCode::AddU32ImmU32Reg => {
+                let imm = block.read_u32();
+                let reg = block.read_register_id();
+
+                Instruction::AddU32ImmU32Reg(imm, reg)
+            }
+            OpCode::AddU32RegU32Reg => {
+                let reg_1 = block.read_register_id();
+                let reg_2 = block.read_register_id();
+
+                Instruction::AddU32RegU32Reg(reg_1, reg_2)
+            }
+
             /******** [Bit Operation Instructions] ********/
             OpCode::LeftShiftU32ImmU32Reg => {
                 let imm = block.read_u32();
@@ -88,19 +102,11 @@ impl Memory {
 
                 Instruction::LeftShiftU32RegU32Reg(shift_reg, reg)
             }
-
-            /******** [Arithmetic Instructions] ********/
-            OpCode::AddU32ImmU32Reg => {
+            OpCode::ArithLeftShiftU32ImmU32Reg => {
                 let imm = block.read_u32();
                 let reg = block.read_register_id();
 
-                Instruction::AddU32ImmU32Reg(imm, reg)
-            }
-            OpCode::AddU32RegU32Reg => {
-                let reg_1 = block.read_register_id();
-                let reg_2 = block.read_register_id();
-
-                Instruction::AddU32RegU32Reg(reg_1, reg_2)
+                Instruction::ArithLeftShiftU32ImmU32Reg(imm, reg)
             }
 
             /******** [Simple Move Instructions - NO EXPRESSIONS] ********/

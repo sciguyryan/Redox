@@ -16,17 +16,19 @@ pub enum OpCode {
     AddU32RegU32Reg,
 
     /******** [Bit Operation Instructions] ********/
-    /// Left shift a u32 register by a u32 immediate. The result remains in the specified register.
+    /// Left-shift a u32 register by a u32 immediate. The result remains in the origin register.
     LeftShiftU32ImmU32Reg,
-    /// Left shift a u32 register by a u32 register. The result remains in the specified register.
+    /// Left-shift a u32 register (B) by a u32 register (A). The result remains in register A.
     LeftShiftU32RegU32Reg,
+    /// Arithmetic left-shift a u32 register by a u32 immediate. The result remains in the origin register.
+    ArithLeftShiftU32ImmU32Reg,
 
     /******** [Simple Move Instructions - NO EXPRESSIONS] ********/
     /// Swap the values of the two registers.
     SwapU32RegU32Reg,
-    /// Move a u32 immediate to u32 register. The result is copied into the specified register.
+    /// Move a u32 immediate to u32 register (A). The result is copied into register A.
     MovU32ImmU32Reg,
-    /// Move a u32 register to u32 register. The result is copied into the specified register.
+    /// Move a u32 register (B) to u32 register (A). The result is copied into register A.
     MovU32RegU32Reg,
     /// Move a u32 iImmediate to memory (relative to the base address of the code block). The result is copied into the specified memory address.
     MovU32ImmMemRelSimple,
@@ -68,6 +70,7 @@ impl From<Instruction> for OpCode {
             /******** [Bit Operation Instructions] ********/
             Instruction::LeftShiftU32ImmU32Reg(_, _) => OpCode::LeftShiftU32ImmU32Reg,
             Instruction::LeftShiftU32RegU32Reg(_, _) => OpCode::LeftShiftU32RegU32Reg,
+            Instruction::ArithLeftShiftU32ImmU32Reg(_, _) => OpCode::ArithLeftShiftU32ImmU32Reg,
 
             /******** [Move Instructions - NO EXPRESSIONS] ********/
             Instruction::SwapU32RegU32Reg(_, _) => OpCode::SwapU32RegU32Reg,

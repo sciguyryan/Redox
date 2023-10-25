@@ -28,17 +28,19 @@ pub enum Instruction {
     AddU32RegU32Reg(RegisterId, RegisterId),
 
     /******** [Bit Operation Instructions] ********/
-    /// Left shift a u32 register by a u32 immediate. The result remains in the specified register.
+    /// Left-shift a u32 register by a u32 immediate. The result remains in the origin register.
     LeftShiftU32ImmU32Reg(u32, RegisterId),
-    /// Left shift a u32 register by a u32 register. The result remains in the specified register.
+    /// Left-shift a u32 register (B) by a u32 register (A). The result remains in register A.
     LeftShiftU32RegU32Reg(RegisterId, RegisterId),
+    /// Arithmetic left-shift a u32 register by a u32 immediate. The result remains in the origin register.
+    ArithLeftShiftU32ImmU32Reg(u32, RegisterId),
 
     /******** [Move Instructions - NO EXPRESSIONS] ********/
     /// Swap the values of the two registers.
     SwapU32RegU32Reg(RegisterId, RegisterId),
-    /// Move a u32 immediate to u32 register. The result is copied into the specified register.
+    /// Move a u32 immediate to u32 register (A). The result is copied into register A.
     MovU32ImmU32Reg(u32, RegisterId),
-    /// Move a u32 register to u32 register. The result is copied into the specified register.
+    /// Move a u32 register (B) to u32 register (A). The result is copied into register A.
     MovU32RegU32Reg(RegisterId, RegisterId),
     /// Move a u32 iImmediate to memory (relative to the base address of the code block). The result is copied into the specified memory address.
     MovU32ImmMemRelSimple(u32, u32),
@@ -82,10 +84,13 @@ impl Display for Instruction {
 
             /******** [Bit Operation Instructions] ********/
             Instruction::LeftShiftU32ImmU32Reg(imm, reg) => {
-                format!("lsf ${imm:02X}, {reg}")
+                format!("shl ${imm:02X}, {reg}")
             }
             Instruction::LeftShiftU32RegU32Reg(shift_reg, reg) => {
-                format!("lsf {shift_reg}, {reg}")
+                format!("shl {shift_reg}, {reg}")
+            }
+            Instruction::ArithLeftShiftU32ImmU32Reg(imm, reg) => {
+                format!("shl ${imm:02X}, {reg}")
             }
 
             /******** [Move Instructions - NO EXPRESSIONS] ********/
@@ -152,6 +157,7 @@ impl Instruction {
             /******** [Bit Operation Instructions] ********/
             Instruction::LeftShiftU32ImmU32Reg(_, _) => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
             Instruction::LeftShiftU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
+            Instruction::ArithLeftShiftU32ImmU32Reg(_, _) => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Move Instructions - NO EXPRESSIONS] ********/
             Instruction::SwapU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
@@ -187,6 +193,7 @@ impl Instruction {
             /******** [Bit Operation Instructions] ********/
             OpCode::LeftShiftU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
             OpCode::LeftShiftU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
+            OpCode::ArithLeftShiftU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Move Instructions - NO EXPRESSIONS] ********/
             OpCode::SwapU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,

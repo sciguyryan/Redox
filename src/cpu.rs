@@ -136,6 +136,7 @@ impl Cpu {
     /// # Arguments
     ///
     /// * `flag` - The [`CpuFlag`] to be checked.
+    #[inline(always)]
     fn get_flag_state(&self, flag: CpuFlag) -> bool {
         let register = self.registers.get_register_u32(RegisterId::FL);
         utils::is_bit_set(*register.read_unchecked(), flag as u8)
@@ -170,10 +171,10 @@ impl Cpu {
         let final_value = value_1 as u64 + value_2 as u64;
         self.set_flag_state(CpuFlag::OF, final_value > Cpu::U32_MAX);
 
-        let final_value = final_value as u32;
-        self.set_flag_state(CpuFlag::ZF, final_value == 0);
+        let final_u32_value = final_value as u32;
+        self.set_flag_state(CpuFlag::ZF, final_u32_value == 0);
 
-        final_value
+        final_u32_value
     }
 
     /// Perform a checked left-shift of two u32 values.
@@ -190,16 +191,19 @@ impl Cpu {
     /// # Note
     ///
     /// This method sets and unsets the zero, overflow and carry flags as required.
+    /// The overflow (OF) flag will only be affected by 1-bit shifts.
     #[inline(always)]
     fn perform_checked_left_shift_u32(&mut self, value: u32, shift_by: u32) -> u32 {
         let final_value = (value as u64) << shift_by;
-        self.set_flag_state(CpuFlag::OF, final_value > Cpu::U32_MAX);
+        if shift_by == 1 {
+            self.set_flag_state(CpuFlag::OF, final_value > Cpu::U32_MAX);
+        }
         self.set_flag_state(CpuFlag::CF, utils::is_bit_set_64(final_value, 32));
 
-        let final_value = final_value as u32;
-        self.set_flag_state(CpuFlag::ZF, final_value == 0);
+        let final_u32_value = final_value as u32;
+        self.set_flag_state(CpuFlag::ZF, final_u32_value == 0);
 
-        final_value
+        final_u32_value
     }
 
     /// Perform a hard reset on the CPU.
@@ -290,6 +294,16 @@ impl Cpu {
                 self.registers
                     .get_register_u32_mut(*reg)
                     .write(shifted, privilege)
+            }
+            Instruction::ArithLeftShiftU32ImmU32Reg(imm, reg) => {
+                let old_value = *self.registers.get_register_u32(*reg).read(privilege);
+
+                // The overflow flag must be cleared.
+                self.set_flag_state(CpuFlag::OF, false);
+
+                self.registers
+                    .get_register_u32_mut(*reg)
+                    .write(old_value.rotate_left(*imm), privilege)
             }
 
             /******** [Move Instructions - NO EXPRESSIONS] ********/
@@ -818,25 +832,43 @@ mod tests_cpu {
                 &[(RegisterId::R1, 0x2)],
                 vec![0; 100],
                 false,
-                "failed to correctly execute LSH instruction",
+                "failed to correctly execute SHL instruction",
             ),
-            // When shifted left by two places, this value will set the overflow flag but not the
-            // carry flag.
+            // When shifted left by three places, this value will set the carry flag but not the
+            // overflow flag. The overflow flag is only set when working with 1-bit shifts.
             TestEntryU32Standard::new(
                 &[
                     Instruction::MovU32ImmU32Reg(
                         0b1011_1111_1111_1111_1111_1111_1111_1111,
                         RegisterId::R1,
                     ),
-                    Instruction::LeftShiftU32ImmU32Reg(0x2, RegisterId::R1),
+                    Instruction::LeftShiftU32ImmU32Reg(0x3, RegisterId::R1),
                 ],
                 &[
-                    (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1100),
-                    (RegisterId::FL, 0b0100),
+                    (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1000),
+                    (RegisterId::FL, 0b1000),
                 ],
                 vec![0; 100],
                 false,
-                "failed to correctly execute LSH instruction",
+                "failed to correctly execute SHL instruction",
+            ),
+            // When shifted left by one place. This will set the carry and overflow flags.
+            // The overflow flag is only set when working with 1-bit shifts.
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(
+                        0b1111_1111_1111_1111_1111_1111_1111_1111,
+                        RegisterId::R1,
+                    ),
+                    Instruction::LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
+                    (RegisterId::FL, 0b1100),
+                ],
+                vec![0; 100],
+                false,
+                "failed to correctly execute SHL instruction",
             ),
             // When shifted left by two places, this value will set the overflow and carry flags.
             TestEntryU32Standard::new(
@@ -850,19 +882,18 @@ mod tests_cpu {
                 ],
                 vec![0; 100],
                 false,
-                "failed to correctly execute LSH instruction",
+                "failed to correctly execute SHL instruction",
             ),
-            // When left-shifted by 32 places, the result will be zero and so the zero flag should be set
-            // in addition to the overflow flag.
+            // When left-shifted by 32 places, the result will be zero and so the zero flag should.
             TestEntryU32Standard::new(
                 &[
                     Instruction::MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
                     Instruction::LeftShiftU32ImmU32Reg(0x21, RegisterId::R1),
                 ],
-                &[(RegisterId::R1, 0x0), (RegisterId::FL, 0b0110)],
+                &[(RegisterId::R1, 0x0), (RegisterId::FL, 0b0010)],
                 vec![0; 100],
                 false,
-                "failed to correctly execute LSH instruction",
+                "failed to correctly execute SHL instruction",
             ),
             // Just zero flag should be set here since zero left-shifted by anything will be zero.
             TestEntryU32Standard::new(
@@ -873,7 +904,7 @@ mod tests_cpu {
                 &[(RegisterId::R1, 0x0), (RegisterId::FL, 0b0010)],
                 vec![0; 100],
                 false,
-                "failed to correctly execute LSH instruction",
+                "failed to correctly execute SHL instruction",
             ),
             // Just zero flag should be set here since zero left-shifted by anything will be zero.
             TestEntryU32Standard::new(
@@ -916,27 +947,47 @@ mod tests_cpu {
                 &[(RegisterId::R1, 0x2), (RegisterId::R2, 0x1)],
                 vec![0; 100],
                 false,
-                "failed to correctly execute LSH instruction",
+                "failed to correctly execute SHL instruction",
             ),
-            // When shifted left by two places, this value will set the overflow flag but not the
-            // carry flag.
+            // When shifted left by three places, this value will set the carry flag but not the
+            // overflow flag. The overflow flag is only set when working with 1-bit shifts.
             TestEntryU32Standard::new(
                 &[
                     Instruction::MovU32ImmU32Reg(
                         0b1011_1111_1111_1111_1111_1111_1111_1111,
                         RegisterId::R1,
                     ),
-                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R2),
+                    Instruction::MovU32ImmU32Reg(0x3, RegisterId::R2),
                     Instruction::LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[
-                    (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1100),
-                    (RegisterId::R2, 0x2),
-                    (RegisterId::FL, 0b0100),
+                    (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1000),
+                    (RegisterId::R2, 0x3),
+                    (RegisterId::FL, 0b1000),
                 ],
                 vec![0; 100],
                 false,
-                "failed to correctly execute LSH instruction",
+                "failed to correctly execute SHL instruction",
+            ),
+            // When shifted left by one place. This will set the carry and overflow flags.
+            // The overflow flag is only set when working with 1-bit shifts.
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(
+                        0b1111_1111_1111_1111_1111_1111_1111_1111,
+                        RegisterId::R1,
+                    ),
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    Instruction::LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
+                    (RegisterId::R2, 0x1),
+                    (RegisterId::FL, 0b1100),
+                ],
+                vec![0; 100],
+                false,
+                "failed to correctly execute SHL instruction",
             ),
             // When shifted left by two places, this value will set the overflow and carry flags.
             TestEntryU32Standard::new(
@@ -952,10 +1003,9 @@ mod tests_cpu {
                 ],
                 vec![0; 100],
                 false,
-                "failed to correctly execute LSH instruction",
+                "failed to correctly execute SHL instruction",
             ),
-            // When left-shifted by 32 places, the result will be zero and so the zero flag should be set
-            // in addition to the overflow flag.
+            // When left-shifted by 32 places, the result will be zero and so the zero flag should.
             TestEntryU32Standard::new(
                 &[
                     Instruction::MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
@@ -965,11 +1015,11 @@ mod tests_cpu {
                 &[
                     (RegisterId::R1, 0x0),
                     (RegisterId::R2, 0x21),
-                    (RegisterId::FL, 0b0110),
+                    (RegisterId::FL, 0b0010),
                 ],
                 vec![0; 100],
                 false,
-                "failed to correctly execute LSH instruction",
+                "failed to correctly execute SHL instruction",
             ),
             // Just zero flag should be set here since zero left-shifted by anything will be zero.
             TestEntryU32Standard::new(
@@ -985,7 +1035,7 @@ mod tests_cpu {
                 ],
                 vec![0; 100],
                 false,
-                "failed to correctly execute LSH instruction",
+                "failed to correctly execute SHL instruction",
             ),
             // Just zero flag should be set here since zero left-shifted by anything will be zero.
             TestEntryU32Standard::new(
