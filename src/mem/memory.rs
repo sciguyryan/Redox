@@ -39,7 +39,7 @@ impl Memory {
             let ins = self.get_instruction(cursor);
             instructions.push(ins);
 
-            cursor += OpCode::from(ins).get_total_instruction_size() as usize;
+            cursor += ins.get_total_instruction_size() as usize;
         }
 
         instructions
@@ -65,7 +65,7 @@ impl Memory {
             FromPrimitive::from_u32(opcode_id).expect("failed to read valid instruction opcode");
 
         // calculate the length of the arguments, in bytes.
-        let arg_len = opcode.get_instruction_arg_size() as usize;
+        let arg_len = Instruction::get_instruction_arg_size_from_op(opcode) as usize;
         let arg_bytes = self.get_range_ptr(pos + 4, arg_len);
 
         // Create a memory block reader.

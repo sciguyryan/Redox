@@ -1,111 +1,56 @@
-use crate::reg::registers::RegisterId;
-
 use super::instruction::Instruction;
 
 use num_derive::FromPrimitive;
-use std::mem;
-
-/// The size of the instruction, in bytes.
-const INSTRUCTION_SIZE: u32 = 4;
-/// The size of a u32 argument, in bytes.
-const ARG_U32_IMM_SIZE: u32 = mem::size_of::<u32>() as u32;
-/// The size of a memory address argument, in bytes.
-const ARG_MEM_ADDR_SIZE: u32 = mem::size_of::<u32>() as u32;
-/// The size of a register ID argument, in bytes.
-const ARG_REG_ID_SIZE: u32 = mem::size_of::<RegisterId>() as u32;
 
 #[repr(u32)]
 /// The opcode for an instruction.
 #[derive(Clone, Copy, Debug, FromPrimitive)]
 pub enum OpCode {
-    /// Subroutine - a pseudo-opcode used to identify a subroutine position.
-    //Subroutine = -2,
-    /// Label - a pseudo-opcode used to identify a labels position.
-    //Label = -1,
-
-    /// No Operation - a non-operation instruction.
+    /// No Operation - an empty instruction.
     Nop,
 
     /******** [Arithmetic Instructions] ********/
-    /// Add u32 Immediate to u32 Register. Result is moved into Accumulator register.
+    /// Add u32 immediate to u32 register. The result is stored in the accumulator register.
     AddU32ImmU32Reg,
-    /// Add u32 Register to u32 Register. Result is moved into Accumulator register.
+    /// Add u32 register to u32 register. The result is stored in the accumulator register.
     AddU32RegU32Reg,
 
     /******** [Bit Operation Instructions] ********/
+    /// Left shift a u32 register by a u32 immediate. The result remains in the specified register.
     LeftShiftU32ImmU32Reg,
     //LeftShiftU32RegU32Reg,
 
     /******** [Simple Move Instructions - NO EXPRESSIONS] ********/
     /// Swap the values of the two registers.
     SwapU32RegU32Reg,
-    /// Move a u32 Immediate to u32 Register. Result is copied into the register.
+    /// Move a u32 immediate to u32 register. The result is copied into the specified register.
     MovU32ImmU32Reg,
-    /// Move a u32 Register to u32 Register. Result is copied into the register.
+    /// Move a u32 register to u32 register. The result is copied into the specified register.
     MovU32RegU32Reg,
-    /// Move a u32 Immediate to Memory (relative to the base address of the code block). Result is copied into Memory.
+    /// Move a u32 iImmediate to memory (relative to the base address of the code block). The result is copied into the specified memory address.
     MovU32ImmMemRelSimple,
-    /// Move a u32 Register to Memory (relative to the base address of the code block). Result is copied into Memory.
+    /// Move a u32 register to memory (relative to the base address of the code block). The result is copied into the specified memory address.
     MovU32RegMemRelSimple,
-    /// Move a u32 value from Memory (relative to the base address of the code block) u32 Register. Result is copied into the Register.
+    /// Move a u32 value from memory (relative to the base address of the code block) to a u32 register. The result is copied into the specified register.
     MovMemU32RegRelSimple,
-    /// Move the value from the memory address specified by a Register (relative to the base address of the code block). Result is copied into the other register.
+    /// Move the value from the memory address specified by a register (relative to the base address of the code block). The result is copied into the specified register.
     MovU32RegPtrU32RegRelSimple,
 
     /******** [Complex Move Instructions - WITH EXPRESSIONS] ********/
-    /// Move a u32 Immediate to Memory (relative to the base address of the code block). Result is copied into Memory.
+    /// Move a u32 immediate to memory (relative to the base address of the code block). The result is copied into the specified memory address.
     MovU32ImmMemExprRel,
-    /// Move the address as given by an expression (from Memory, relative to the base address of the code block). Result is copied into the Register.
+    /// Move the address as given by an expression (from memory, relative to the base address of the code block). The result is copied into the specified register.
     MovMemExprU32RegRel,
-    /// Move the value of a register to the address given by an expression (relative to the base address of the code block). Result is copied into Memory.
+    /// Move the value of a register to the address given by an expression (relative to the base address of the code block). The result is copied into the specified memory address.
     MovU32RegMemExprRel,
 
     /******** [Special Instructions] ********/
-    /// Return - return from a subroutine.
+    /// Return from a subroutine.
     Ret = 32765,
     /// Machine return - downgrade the privilege level of the processor.
     Mret = 32766,
-    /// Halt - halt the execution of the virtual machine.
+    /// Halt the execution of the virtual machine.
     Hlt = 32767,
-    // Values higher than 32767 (0x7FFF) are extended instructions and require four bytes to represent.
-}
-
-impl OpCode {
-    pub fn get_instruction_arg_size(&self) -> u32 {
-        match self {
-            OpCode::Nop => 0,
-
-            /******** [Arithmetic Instructions] ********/
-            OpCode::AddU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
-            OpCode::AddU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-
-            /******** [Bit Operation Instructions] ********/
-            OpCode::LeftShiftU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
-
-            /******** [Move Instructions - NO EXPRESSIONS] ********/
-            OpCode::SwapU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-            OpCode::MovU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
-            OpCode::MovU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-            OpCode::MovU32ImmMemRelSimple => ARG_U32_IMM_SIZE + ARG_MEM_ADDR_SIZE,
-            OpCode::MovU32RegMemRelSimple => ARG_REG_ID_SIZE + ARG_MEM_ADDR_SIZE,
-            OpCode::MovMemU32RegRelSimple => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
-            OpCode::MovU32RegPtrU32RegRelSimple => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-
-            /******** [Move Instructions - WITH EXPRESSIONS] ********/
-            OpCode::MovU32ImmMemExprRel => ARG_U32_IMM_SIZE + ARG_U32_IMM_SIZE,
-            OpCode::MovMemExprU32RegRel => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
-            OpCode::MovU32RegMemExprRel => ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE,
-
-            /******** [Special Instructions] ********/
-            OpCode::Ret => 0,
-            OpCode::Mret => 0,
-            OpCode::Hlt => 0,
-        }
-    }
-
-    pub fn get_total_instruction_size(&self) -> u32 {
-        self.get_instruction_arg_size() + INSTRUCTION_SIZE
-    }
 }
 
 impl From<Instruction> for OpCode {

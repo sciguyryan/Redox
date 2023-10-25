@@ -369,7 +369,7 @@ impl Cpu {
 
         // Move the instruction pointer register forward by the number of
         // bytes used to build the instruction.
-        self.update_instruction_pointer(OpCode::from(*instruction).get_total_instruction_size());
+        self.update_instruction_pointer(instruction.get_total_instruction_size());
     }
 
     /// Set the state of the specified CPU flag.
@@ -514,7 +514,7 @@ mod tests_cpu {
             let size: u32 = self
                 .instructions
                 .iter()
-                .map(|i| OpCode::from(*i).get_total_instruction_size())
+                .map(|i| i.get_total_instruction_size())
                 .sum();
 
             self.registers
