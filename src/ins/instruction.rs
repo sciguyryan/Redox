@@ -169,6 +169,8 @@ impl Instruction {
     }
 
     pub fn get_instruction_arg_size_from_op(opcode: OpCode) -> u32 {
+        // Note: Yes, yes... code duplication since this is the same code as
+        //       get_instruction_arg_size above, but I don't care here.
         match opcode {
             OpCode::Nop => 0,
 

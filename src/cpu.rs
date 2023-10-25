@@ -5,7 +5,6 @@ use crate::{
     ins::{
         instruction::Instruction,
         move_expressions::{ExpressionArgs, ExpressionOperator, MoveExpressionHandler},
-        op_codes::OpCode,
     },
     mem::memory::Memory,
     privilege_level::PrivilegeLevel,
@@ -181,7 +180,7 @@ impl Cpu {
     ///
     /// # Arguments
     ///
-    /// * `in_value` - The first u32 value.
+    /// * `value` - The first u32 value.
     /// * `shift_by` - The second u32 value.
     ///
     /// # Returns
@@ -192,8 +191,8 @@ impl Cpu {
     ///
     /// This method sets and unsets the zero, overflow and carry flags as required.
     #[inline(always)]
-    fn perform_checked_left_shift_u32(&mut self, in_value: u32, shift_by: u32) -> u32 {
-        let final_value = (in_value as u64) << shift_by;
+    fn perform_checked_left_shift_u32(&mut self, value: u32, shift_by: u32) -> u32 {
+        let final_value = (value as u64) << shift_by;
         self.set_flag_state(CpuFlag::OF, final_value > Cpu::U32_MAX);
         self.set_flag_state(CpuFlag::CF, utils::is_bit_set_64(final_value, 32));
 
