@@ -90,7 +90,7 @@ impl Display for Instruction {
                 format!("shl {shift_reg}, {reg}")
             }
             Instruction::ArithLeftShiftU32ImmU32Reg(imm, reg) => {
-                format!("shl ${imm:02X}, {reg}")
+                format!("sal ${imm:02X}, {reg}")
             }
 
             /******** [Move Instructions - NO EXPRESSIONS] ********/

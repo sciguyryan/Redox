@@ -206,6 +206,32 @@ impl Cpu {
         final_u32_value
     }
 
+    /// Perform an arithmetic left-shift of two u32 values.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The first u32 value.
+    /// * `shift_by` - The second u32 value.
+    ///
+    /// # Returns
+    ///
+    /// The result of the operation.
+    ///
+    /// # Note
+    ///
+    /// This method sets and unsets the zero flag as required and always clears the overflow
+    /// and carry flags.
+    #[inline(always)]
+    fn perform_arithmetic_left_shift_u32(&mut self, value: u32, shift_by: u32) -> u32 {
+        self.set_flag_state(CpuFlag::OF, false);
+        self.set_flag_state(CpuFlag::CF, false);
+
+        let final_value = value.rotate_left(shift_by);
+        self.set_flag_state(CpuFlag::ZF, final_value == 0);
+
+        final_value
+    }
+
     /// Perform a hard reset on the CPU.
     pub fn reset(&mut self) {
         self.registers.reset();
@@ -297,13 +323,11 @@ impl Cpu {
             }
             Instruction::ArithLeftShiftU32ImmU32Reg(imm, reg) => {
                 let old_value = *self.registers.get_register_u32(*reg).read(privilege);
-
-                // The overflow flag must be cleared.
-                self.set_flag_state(CpuFlag::OF, false);
+                let shifted = self.perform_arithmetic_left_shift_u32(old_value, *imm);
 
                 self.registers
                     .get_register_u32_mut(*reg)
-                    .write(old_value.rotate_left(*imm), privilege)
+                    .write(shifted, privilege)
             }
 
             /******** [Move Instructions - NO EXPRESSIONS] ********/
@@ -1061,6 +1085,54 @@ mod tests_cpu {
                 vec![0; 100],
                 false,
                 "failed to correctly execute LSH instruction",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the arithmetic left-shift u32 register by u32 immediate value.
+    #[test]
+    fn test_arith_left_shift_u32_imm_u32_reg() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::ArithLeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0x2)],
+                vec![0; 100],
+                false,
+                "failed to correctly execute SAL instruction",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(
+                        0b1011_1111_1111_1111_1111_1111_1111_1111,
+                        RegisterId::R1,
+                    ),
+                    Instruction::ArithLeftShiftU32ImmU32Reg(0x3, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1101),
+                    (RegisterId::FL, 0b0000),
+                ],
+                vec![0; 100],
+                false,
+                "failed to correctly execute SAL instruction",
+            ),
+            // Just zero flag should be set here since zero left-shifted by anything will be zero.
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
+                    Instruction::LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0x0), (RegisterId::FL, 0b0010)],
+                vec![0; 100],
+                false,
+                "failed to correctly execute SHL instruction",
             ),
         ];
 
