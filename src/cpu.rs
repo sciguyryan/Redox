@@ -9,8 +9,11 @@ use crate::{
     mem::memory::Memory,
     privilege_level::PrivilegeLevel,
     reg::registers::{RegisterId, Registers},
-    utils,
+    utils, cpu,
 };
+
+/// The u32 maximum value, as u64 constant.
+const U32_MAX: u64 = u32::MAX as u64;
 
 pub struct Cpu {
     pub registers: Registers,
@@ -150,8 +153,6 @@ impl Cpu {
             .read_unchecked();
     }
 
-    const U32_MAX: u64 = u32::MAX as u64;
-
     /// Perform a checked add of two u32 values.
     ///
     /// # Arguments
@@ -169,7 +170,7 @@ impl Cpu {
     #[inline(always)]
     fn perform_checked_add_u32(&mut self, value_1: u32, value_2: u32) -> u32 {
         let final_value = value_1 as u64 + value_2 as u64;
-        self.set_flag_state(CpuFlag::OF, final_value > Cpu::U32_MAX);
+        self.set_flag_state(CpuFlag::OF, final_value > cpu::U32_MAX);
 
         let final_u32_value = final_value as u32;
         self.set_flag_state(CpuFlag::ZF, final_u32_value == 0);
@@ -198,7 +199,7 @@ impl Cpu {
 
         let final_value = (value as u64) << shift_by;
         if shift_by == 1 {
-            self.set_flag_state(CpuFlag::OF, final_value > Cpu::U32_MAX);
+            self.set_flag_state(CpuFlag::OF, final_value > cpu::U32_MAX);
         }
         self.set_flag_state(CpuFlag::CF, utils::is_bit_set_64(final_value, 32));
 
