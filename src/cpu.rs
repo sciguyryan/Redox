@@ -479,22 +479,36 @@ impl Cpu {
         register.write_unchecked(flags);
     }
 
+    /// Set the machine mode privilege level of the processor.
+    ///
+    /// # Arguments
+    ///
+    /// * `state` - Whether the CPU should be running in machine mode or not.
     #[inline(always)]
     fn set_machine_mode(&mut self, state: bool) {
         self.is_machine_mode = state;
     }
 
+    /// Set the halted state of the processor.
+    ///
+    /// # Arguments
+    ///
+    /// * `state` - Whether the CPU should be halted or not.
     #[inline(always)]
     fn set_halted(&mut self, state: bool) {
         self.is_halted = state;
     }
 
     /// Update the instruction pointer (IP) register.
+    ///
+    /// # Arguments
+    ///
+    /// * `bytes` - The size of the instruction, in bytes.
     #[inline(always)]
-    fn update_instruction_pointer(&mut self, bytes: u32) {
+    fn update_instruction_pointer(&mut self, size: u32) {
         self.registers
             .get_register_u32_mut(RegisterId::IP)
-            .add_unchecked(bytes);
+            .add_unchecked(size);
     }
 
     /// Update the program counter (PC) register.
