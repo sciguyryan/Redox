@@ -22,6 +22,8 @@ pub enum OpCode {
     LeftShiftU32RegU32Reg,
     /// Arithmetic left-shift a u32 register by a u32 immediate. The result remains in the origin register.
     ArithLeftShiftU32ImmU32Reg,
+    /// Arithmetic left-shift a u32 register (B) by a u32 register (A). The result remains in register A.
+    ArithLeftShiftU32RegU32Reg,
 
     /******** [Simple Move Instructions - NO EXPRESSIONS] ********/
     /// Swap the values of the two registers.
@@ -71,6 +73,7 @@ impl From<Instruction> for OpCode {
             Instruction::LeftShiftU32ImmU32Reg(_, _) => OpCode::LeftShiftU32ImmU32Reg,
             Instruction::LeftShiftU32RegU32Reg(_, _) => OpCode::LeftShiftU32RegU32Reg,
             Instruction::ArithLeftShiftU32ImmU32Reg(_, _) => OpCode::ArithLeftShiftU32ImmU32Reg,
+            Instruction::ArithLeftShiftU32RegU32Reg(_, _) => OpCode::ArithLeftShiftU32RegU32Reg,
 
             /******** [Move Instructions - NO EXPRESSIONS] ********/
             Instruction::SwapU32RegU32Reg(_, _) => OpCode::SwapU32RegU32Reg,

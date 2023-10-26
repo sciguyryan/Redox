@@ -108,6 +108,12 @@ impl Memory {
 
                 Instruction::ArithLeftShiftU32ImmU32Reg(imm, reg)
             }
+            OpCode::ArithLeftShiftU32RegU32Reg => {
+                let shift_reg = block.read_register_id();
+                let reg = block.read_register_id();
+
+                Instruction::LeftShiftU32RegU32Reg(shift_reg, reg)
+            }
 
             /******** [Simple Move Instructions - NO EXPRESSIONS] ********/
             OpCode::SwapU32RegU32Reg => {
