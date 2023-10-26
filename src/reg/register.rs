@@ -111,20 +111,12 @@ impl RegisterU32 {
 
         // We need to check the read-write permissions on the specific register.
         let has_required_perms = match access_type {
-            DataAccessType::Read => {
-                permissions.intersects(RegisterPermission::R)
-                    || (permissions.intersects(RegisterPermission::PR)
-                        && *context == PrivilegeLevel::Machine)
-            }
-            DataAccessType::Write => {
-                permissions.intersects(RegisterPermission::W)
-                    || (permissions.intersects(RegisterPermission::PW)
-                        && *context == PrivilegeLevel::Machine)
-            }
+            DataAccessType::Read => permissions.intersects(RegisterPermission::R),
+            DataAccessType::Write => permissions.intersects(RegisterPermission::W),
         };
 
         if !has_required_perms {
-            panic!("attempted to access memory without the correct security context or access flags. Register = {:?}, Access Type = {access_type:?}, permissions = {permissions}.", self.id);
+            panic!("attempted to access register without the correct security context and access flags. Register = {:?}, Access Type = {access_type:?}, permissions = {permissions}.", self.id);
         }
     }
 }
@@ -182,20 +174,12 @@ impl RegisterF32 {
 
         // We need to check the read-write permissions on the specific register.
         let has_required_perms = match access_type {
-            DataAccessType::Read => {
-                permissions.intersects(RegisterPermission::R)
-                    || (permissions.intersects(RegisterPermission::PR)
-                        && *context == PrivilegeLevel::Machine)
-            }
-            DataAccessType::Write => {
-                permissions.intersects(RegisterPermission::W)
-                    || (permissions.intersects(RegisterPermission::PW)
-                        && *context == PrivilegeLevel::Machine)
-            }
+            DataAccessType::Read => permissions.intersects(RegisterPermission::R),
+            DataAccessType::Write => permissions.intersects(RegisterPermission::W),
         };
 
         if !has_required_perms {
-            panic!("attempted to access memory without the correct security context or access flags. Register = {:?}, Access Type = {access_type:?}, permissions = {permissions}.", self.id);
+            panic!("attempted to access register without the correct security context or access flags. Register = {:?}, Access Type = {access_type:?}, permissions = {permissions}.", self.id);
         }
     }
 }

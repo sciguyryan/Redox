@@ -139,7 +139,7 @@ impl Cpu {
     #[inline(always)]
     fn get_flag_state(&self, flag: CpuFlag) -> bool {
         let register = self.registers.get_register_u32(RegisterId::FL);
-        utils::is_bit_set(*register.read_unchecked(), flag as u8)
+        utils::is_bit_set(*register.read_unchecked(), flag.into())
     }
 
     /// Get the current value of the program counter (PC) register.
