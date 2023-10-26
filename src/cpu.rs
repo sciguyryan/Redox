@@ -436,7 +436,7 @@ impl Cpu {
     #[inline(always)]
     fn set_flag_state(&mut self, flag: CpuFlag, state: bool) {
         let register = self.registers.get_register_u32_mut(RegisterId::FL);
-        let flags = utils::set_bit_state(*register.read_unchecked(), flag as u8, state);
+        let flags = utils::set_bit_state(*register.read_unchecked(), flag.into(), state);
         register.write_unchecked(flags);
     }
 
@@ -501,6 +501,12 @@ impl CpuFlag {
     pub fn iterator() -> Iter<'static, CpuFlag> {
         static FLAGS: [CpuFlag; 4] = [CpuFlag::SF, CpuFlag::ZF, CpuFlag::OF, CpuFlag::CF];
         FLAGS.iter()
+    }
+}
+
+impl From<CpuFlag> for u8 {
+    fn from(m: CpuFlag) -> u8 {
+        m as u8
     }
 }
 

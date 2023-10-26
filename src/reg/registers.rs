@@ -103,6 +103,12 @@ impl Display for RegisterId {
     }
 }
 
+impl From<RegisterId> for u8 {
+    fn from(m: RegisterId) -> u8 {
+        m as u8
+    }
+}
+
 macro_rules! register_u32 {
     ($b:expr, $c:expr, $d:expr) => {{
         use super::register::RegisterU32;

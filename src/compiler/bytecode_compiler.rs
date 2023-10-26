@@ -47,59 +47,59 @@ impl Compiler {
             /******** [Arithmetic Instructions] ********/
             Instruction::AddU32ImmU32Reg(imm, reg) => {
                 bytecode.extend_from_slice(&imm.to_le_bytes());
-                bytecode.push(reg as u8);
+                bytecode.push(reg.into());
             }
             Instruction::AddU32RegU32Reg(in_reg, out_reg) => {
-                bytecode.push(in_reg as u8);
-                bytecode.push(out_reg as u8);
+                bytecode.push(in_reg.into());
+                bytecode.push(out_reg.into());
             }
 
             /******** [Bit Operation Instructions] ********/
             Instruction::LeftShiftU32ImmU32Reg(imm, reg) => {
                 bytecode.extend_from_slice(&imm.to_le_bytes());
-                bytecode.push(reg as u8);
+                bytecode.push(reg.into());
             }
             Instruction::LeftShiftU32RegU32Reg(shift_reg, reg) => {
-                bytecode.push(shift_reg as u8);
-                bytecode.push(reg as u8);
+                bytecode.push(shift_reg.into());
+                bytecode.push(reg.into());
             }
             Instruction::ArithLeftShiftU32ImmU32Reg(imm, reg) => {
                 bytecode.extend_from_slice(&imm.to_le_bytes());
-                bytecode.push(reg as u8);
+                bytecode.push(reg.into());
             }
             Instruction::ArithLeftShiftU32RegU32Reg(shift_reg, reg) => {
-                bytecode.push(shift_reg as u8);
-                bytecode.push(reg as u8);
+                bytecode.push(shift_reg.into());
+                bytecode.push(reg.into());
             }
 
             /******** [Move Instructions - NO EXPRESSIONS] ********/
             Instruction::SwapU32RegU32Reg(reg1, reg2) => {
-                bytecode.push(reg1 as u8);
-                bytecode.push(reg2 as u8);
+                bytecode.push(reg1.into());
+                bytecode.push(reg2.into());
             }
             Instruction::MovU32ImmU32Reg(imm, reg) => {
                 bytecode.extend_from_slice(&imm.to_le_bytes());
-                bytecode.push(reg as u8);
+                bytecode.push(reg.into());
             }
             Instruction::MovU32RegU32Reg(in_reg, out_reg) => {
-                bytecode.push(in_reg as u8);
-                bytecode.push(out_reg as u8);
+                bytecode.push(in_reg.into());
+                bytecode.push(out_reg.into());
             }
             Instruction::MovU32ImmMemRelSimple(imm, addr) => {
                 bytecode.extend_from_slice(&imm.to_le_bytes());
                 bytecode.extend_from_slice(&addr.to_le_bytes());
             }
             Instruction::MovU32RegMemRelSimple(reg, addr) => {
-                bytecode.push(reg as u8);
+                bytecode.push(reg.into());
                 bytecode.extend_from_slice(&addr.to_le_bytes());
             }
             Instruction::MovMemU32RegRelSimple(addr, reg) => {
                 bytecode.extend_from_slice(&addr.to_le_bytes());
-                bytecode.push(reg as u8);
+                bytecode.push(reg.into());
             }
             Instruction::MovU32RegPtrU32RegRelSimple(in_reg, out_reg) => {
-                bytecode.push(in_reg as u8);
-                bytecode.push(out_reg as u8);
+                bytecode.push(in_reg.into());
+                bytecode.push(out_reg.into());
             }
 
             /******** [Move Instructions - WITH EXPRESSIONS] ********/
@@ -109,10 +109,10 @@ impl Compiler {
             }
             Instruction::MovMemExprU32RegRel(expr, reg) => {
                 bytecode.extend_from_slice(&expr.to_le_bytes());
-                bytecode.push(reg as u8);
+                bytecode.push(reg.into());
             }
             Instruction::MovU32RegMemExprRel(reg, expr) => {
-                bytecode.push(reg as u8);
+                bytecode.push(reg.into());
                 bytecode.extend_from_slice(&expr.to_le_bytes());
             }
 
