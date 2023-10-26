@@ -102,7 +102,6 @@ impl RegisterU32 {
     #[inline(always)]
     fn validate_access(&self, access_type: &DataAccessType, context: &PrivilegeLevel) {
         // System-level contexts are permitted to do anything, without limitation.
-        // NOTE: This might end up being replaced with a ring-permission type system.
         if *context == PrivilegeLevel::Machine {
             return;
         }
@@ -165,7 +164,6 @@ impl RegisterF32 {
     #[inline]
     fn validate_access(&self, access_type: &DataAccessType, context: &PrivilegeLevel) {
         // System-level contexts are permitted to do anything, without limitation.
-        // NOTE: This might end up being replaced with a ring-permission type system.
         if *context == PrivilegeLevel::Machine {
             return;
         }
@@ -214,7 +212,7 @@ mod tests_registers {
         pub write_value: Option<T>,
         pub expected_value: T,
         pub permissions: RegisterPermission,
-        pub context: PrivilegeLevel,
+        pub privilege: PrivilegeLevel,
         pub should_panic: bool,
         pub fail_message: String,
     }
@@ -237,7 +235,7 @@ mod tests_registers {
                 write_value,
                 expected_value,
                 permissions: *permissions,
-                context,
+                privilege: context,
                 should_panic,
                 fail_message: fail_message.to_string(),
             }
@@ -271,7 +269,7 @@ mod tests_registers {
                 &rw,
                 PrivilegeLevel::User,
                 false,
-                "failed to read a value from a u32 R|W register, with user context",
+                "failed to read a value from a u32 R|W register, with user privilege",
             ),
             TestEntry::new(
                 TestType::Read,
@@ -281,7 +279,7 @@ mod tests_registers {
                 &rw,
                 PrivilegeLevel::Machine,
                 false,
-                "failed to read a value from a u32 R|W register, with system context",
+                "failed to read a value from a u32 R|W register, with machine privilege",
             ),
             TestEntry::new(
                 TestType::Read,
@@ -291,7 +289,7 @@ mod tests_registers {
                 &prpw,
                 PrivilegeLevel::User,
                 true,
-                "succeeded in reading a value from a u32 PR|PW register, with user context",
+                "succeeded in reading a value from a u32 PR|PW register, with user privilege",
             ),
             TestEntry::new(
                 TestType::Read,
@@ -301,7 +299,7 @@ mod tests_registers {
                 &prpw,
                 PrivilegeLevel::Machine,
                 false,
-                "failed to read a value from a u32 PR|PW register, with system context",
+                "failed to read a value from a u32 PR|PW register, with machine privilege",
             ),
             TestEntry::new(
                 TestType::Write,
@@ -311,7 +309,7 @@ mod tests_registers {
                 &rw,
                 PrivilegeLevel::User,
                 false,
-                "failed to write a value to a u32 R|W register, with user context",
+                "failed to write a value to a u32 R|W register, with user privilege",
             ),
             TestEntry::new(
                 TestType::Write,
@@ -321,7 +319,7 @@ mod tests_registers {
                 &rw,
                 PrivilegeLevel::Machine,
                 false,
-                "failed to write a value to a u32 R|W register, with system context",
+                "failed to write a value to a u32 R|W register, with machine privilege",
             ),
             TestEntry::new(
                 TestType::Write,
@@ -331,7 +329,7 @@ mod tests_registers {
                 &prpw,
                 PrivilegeLevel::User,
                 true,
-                "succeeded in writing a value to a u32 PR|PW register, with user context",
+                "succeeded in writing a value to a u32 PR|PW register, with user privilege",
             ),
             TestEntry::new(
                 TestType::Write,
@@ -341,7 +339,7 @@ mod tests_registers {
                 &prpw,
                 PrivilegeLevel::Machine,
                 false,
-                "failed to write a value to a u32 R|W register, with system context",
+                "failed to write a value to a u32 R|W register, with machine privilege",
             ),
         ];
 
@@ -351,10 +349,10 @@ mod tests_registers {
                     RegisterU32::new(RegisterId::R1, test.permissions, test.initial_value);
 
                 if matches!(test.test_type, TestType::Write) {
-                    register.write(test.write_value.unwrap(), &test.context);
+                    register.write(test.write_value.unwrap(), &test.privilege);
                 }
 
-                let value = *register.read(&test.context);
+                let value = *register.read(&test.privilege);
 
                 // Check that the read value is correct.
                 assert_eq!(
@@ -391,7 +389,7 @@ mod tests_registers {
                 &rw,
                 PrivilegeLevel::User,
                 false,
-                "failed to read a value from a u32 R|W register, with user context",
+                "failed to read a value from a u32 R|W register, with user privilege",
             ),
             TestEntry::new(
                 TestType::Read,
@@ -401,7 +399,7 @@ mod tests_registers {
                 &rw,
                 PrivilegeLevel::Machine,
                 false,
-                "failed to read a value from a u32 R|W register, with system context",
+                "failed to read a value from a u32 R|W register, with machine privilege",
             ),
             TestEntry::new(
                 TestType::Read,
@@ -411,7 +409,7 @@ mod tests_registers {
                 &prpw,
                 PrivilegeLevel::User,
                 true,
-                "succeeded in reading a value from a u32 PR|PW register, with user context",
+                "succeeded in reading a value from a u32 PR|PW register, with user privilege",
             ),
             TestEntry::new(
                 TestType::Read,
@@ -421,7 +419,7 @@ mod tests_registers {
                 &prpw,
                 PrivilegeLevel::Machine,
                 false,
-                "failed to read a value from a u32 PR|PW register, with system context",
+                "failed to read a value from a u32 PR|PW register, with machine privilege",
             ),
             TestEntry::new(
                 TestType::Write,
@@ -431,7 +429,7 @@ mod tests_registers {
                 &rw,
                 PrivilegeLevel::User,
                 false,
-                "failed to write a value to a u32 R|W register, with user context",
+                "failed to write a value to a u32 R|W register, with user privilege",
             ),
             TestEntry::new(
                 TestType::Write,
@@ -441,7 +439,7 @@ mod tests_registers {
                 &rw,
                 PrivilegeLevel::Machine,
                 false,
-                "failed to write a value to a u32 R|W register, with system context",
+                "failed to write a value to a u32 R|W register, with machine privilege",
             ),
             TestEntry::new(
                 TestType::Write,
@@ -451,7 +449,7 @@ mod tests_registers {
                 &prpw,
                 PrivilegeLevel::User,
                 true,
-                "succeeded in writing a value to a u32 PR|PW register, with user context",
+                "succeeded in writing a value to a u32 PR|PW register, with user privilege",
             ),
             TestEntry::new(
                 TestType::Write,
@@ -461,7 +459,7 @@ mod tests_registers {
                 &prpw,
                 PrivilegeLevel::Machine,
                 false,
-                "failed to write a value to a u32 R|W register, with system context",
+                "failed to write a value to a u32 R|W register, with machine privilege",
             ),
         ];
 
@@ -471,10 +469,10 @@ mod tests_registers {
                     RegisterF32::new(RegisterId::R1, test.permissions, test.initial_value);
 
                 if matches!(test.test_type, TestType::Write) {
-                    register.write(test.write_value.unwrap(), &test.context);
+                    register.write(test.write_value.unwrap(), &test.privilege);
                 }
 
-                let value = *register.read(&test.context);
+                let value = *register.read(&test.privilege);
 
                 // Check that the read value is correct.
                 assert_eq!(

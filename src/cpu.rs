@@ -194,6 +194,8 @@ impl Cpu {
     /// The overflow (OF) flag will only be affected by 1-bit shifts.
     #[inline(always)]
     fn perform_checked_left_shift_u32(&mut self, value: u32, shift_by: u32) -> u32 {
+        assert!(shift_by <= 31);
+
         let final_value = (value as u64) << shift_by;
         if shift_by == 1 {
             self.set_flag_state(CpuFlag::OF, final_value > Cpu::U32_MAX);
@@ -227,6 +229,34 @@ impl Cpu {
         self.set_flag_state(CpuFlag::CF, false);
 
         let final_value = value.rotate_left(shift_by);
+        self.set_flag_state(CpuFlag::ZF, final_value == 0);
+
+        final_value
+    }
+
+    /// Perform a right-shift of two u32 values.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The first u32 value.
+    /// * `shift_by` - The second u32 value.
+    ///
+    /// # Returns
+    ///
+    /// The result of the operation.
+    ///
+    /// # Note
+    ///
+    /// This method sets and unsets the zero flag and overflow flags as required and always
+    /// clears the carry flag.
+    #[inline(always)]
+    fn perform_checked_right_shift_u32(&mut self, value: u32, shift_by: u32) -> u32 {
+        assert!(shift_by <= 31);
+
+        self.set_flag_state(CpuFlag::OF, false);
+        self.set_flag_state(CpuFlag::CF, false);
+
+        let final_value = (value as u64 >> shift_by) as u32;
         self.set_flag_state(CpuFlag::ZF, final_value == 0);
 
         final_value
@@ -337,6 +367,14 @@ impl Cpu {
                 self.registers
                     .get_register_u32_mut(*reg)
                     .write(shifted, privilege)
+            }
+            Instruction::RightShiftU32ImmU32Reg(imm, reg) => {
+                let old_value = *self.registers.get_register_u32(*reg).read(privilege);
+                let shifted = self.perform_checked_right_shift_u32(old_value, *imm);
+
+                self.registers
+                    .get_register_u32_mut(*reg)
+                    .write(shifted, privilege);
             }
 
             /******** [Move Instructions - NO EXPRESSIONS] ********/
@@ -727,53 +765,33 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::AddU32ImmU32Reg(0x2, RegisterId::R1)
+                    Instruction::AddU32ImmU32Reg(0x2, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1), (RegisterId::AC, 0x3)],
                 vec![0; 100],
                 false,
-                "failed to correctly execute ADD instruction"
+                "ADD - incorrect result value produced",
             ),
-            // This test should cause the CPU's overflow flag to be set.
             TestEntryU32Standard::new(
                 &[
                     Instruction::MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
-                    Instruction::AddU32ImmU32Reg(0x2, RegisterId::R1)
+                    Instruction::AddU32ImmU32Reg(0x2, RegisterId::R1),
                 ],
                 &[
-                    (RegisterId::R1, u32::MAX), (RegisterId::AC, 0x1),
-                    (RegisterId::FL, 0b00000100)
+                    (RegisterId::R1, u32::MAX),
+                    (RegisterId::AC, 0x1),
+                    (RegisterId::FL, 0b0000_0100),
                 ],
                 vec![0; 100],
                 false,
-                "failed to correctly execute ADD instruction: overflow CPU register flag was not correctly set"
+                "ADD - CPU flags not correctly set",
             ),
-            // This test should cause the CPU's zero flag to be set.
             TestEntryU32Standard::new(
                 &[Instruction::AddU32ImmU32Reg(0, RegisterId::R1)],
-                &[(RegisterId::FL, 0b00000010)],
+                &[(RegisterId::FL, 0b0000_0010)],
                 vec![0; 100],
                 false,
-                "failed to correctly execute ADD instruction: zero CPU register flag was not correctly set"
-            ),
-            // This test should succeed in machine mode.
-            TestEntryU32Standard::new(
-                &[Instruction::AddU32ImmU32Reg(0x1, RegisterId::TEST0)],
-                &[(RegisterId::AC, 0x1)],
-                vec![0; 100],
-                false,
-                "failed to correctly execute ADD instruction in machine mode"
-            ),
-            // This test should fail in user mode due to the register permissions.
-            TestEntryU32Standard::new(
-                &[
-                    Instruction::Mret,
-                    Instruction::AddU32ImmU32Reg(0x2, RegisterId::TEST0)
-                ],
-                &[],
-                vec![0; 100],
-                true,
-                "succeeded in execute ADD instruction in user mode"
+                "ADD - CPU flags not correctly set",
             ),
         ];
 
@@ -792,65 +810,41 @@ mod tests_cpu {
                     Instruction::MovU32ImmU32Reg(0xf, RegisterId::R1),
                     Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
                     // Add the register values.
-                    Instruction::AddU32RegU32Reg(RegisterId::R1, RegisterId::R2)
+                    Instruction::AddU32RegU32Reg(RegisterId::R1, RegisterId::R2),
                 ],
                 &[
-                    (RegisterId::R1, 0xf), (RegisterId::R2, 0x1),
-                    (RegisterId::AC, 0x10)
+                    (RegisterId::R1, 0xf),
+                    (RegisterId::R2, 0x1),
+                    (RegisterId::AC, 0x10),
                 ],
                 vec![0; 100],
                 false,
-                "failed to correctly execute ADD instruction"
+                "ADD - incorrect result value produced",
             ),
-            // This test should cause the CPU's overflow flag to be set.
             TestEntryU32Standard::new(
                 &[
                     // Setup register values.
                     Instruction::MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
                     Instruction::MovU32ImmU32Reg(0x2, RegisterId::R2),
                     // Add the register values.
-                    Instruction::AddU32RegU32Reg(RegisterId::R1, RegisterId::R2)
+                    Instruction::AddU32RegU32Reg(RegisterId::R1, RegisterId::R2),
                 ],
                 &[
-                    (RegisterId::R1, u32::MAX), (RegisterId::R2, 0x2),
-                    (RegisterId::AC, 0x1), (RegisterId::FL, 0b00000100)
+                    (RegisterId::R1, u32::MAX),
+                    (RegisterId::R2, 0x2),
+                    (RegisterId::AC, 0x1),
+                    (RegisterId::FL, 0b0000_0100),
                 ],
                 vec![0; 100],
                 false,
-                "failed to correctly execute ADD instruction: overflow CPU register flag was not correctly set"
+                "ADD - CPU flags not correctly set",
             ),
-            // This test should cause the CPU's zero flag to be set.
             TestEntryU32Standard::new(
-                &[
-                    Instruction::AddU32RegU32Reg(RegisterId::R1, RegisterId::R2)
-                ],
-                &[(RegisterId::FL, 0b00000010)],
+                &[Instruction::AddU32RegU32Reg(RegisterId::R1, RegisterId::R2)],
+                &[(RegisterId::FL, 0b0000_0010)],
                 vec![0; 100],
                 false,
-                "failed to correctly execute ADD instruction: zero CPU register flag was not correctly set"
-            ),
-            // This test succeed in machine mode.
-            TestEntryU32Standard::new(
-                &[
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::AddU32RegU32Reg(RegisterId::R1, RegisterId::TEST0),
-                ],
-                &[(RegisterId::R1, 0x1), (RegisterId::AC, 0x1)],
-                vec![0; 100],
-                false,
-                "failed to correctly execute ADD instruction in machine mode"
-            ),
-            // This test should fail in user mode due to the register permissions.
-            TestEntryU32Standard::new(
-                &[
-                    Instruction::Mret,
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::AddU32RegU32Reg(RegisterId::R1, RegisterId::TEST0),
-                ],
-                &[],
-                vec![0; 100],
-                true,
-                "succeeded in execute ADD instruction in user mode"
+                "ADD - CPU flags not correctly set",
             ),
         ];
 
@@ -871,10 +865,10 @@ mod tests_cpu {
                 &[(RegisterId::R1, 0x2)],
                 vec![0; 100],
                 false,
-                "failed to correctly execute SHL instruction",
+                "SHL - incorrect result value produced",
             ),
             // When shifted left by three places, this value will set the carry flag but not the
-            // overflow flag. The overflow flag is only set when working with 1-bit shifts.
+            // overflow flag. The overflow flag is only set when computing 1-bit shifts.
             TestEntryU32Standard::new(
                 &[
                     Instruction::MovU32ImmU32Reg(
@@ -885,14 +879,14 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1000),
-                    (RegisterId::FL, 0b1000),
+                    (RegisterId::FL, 0b0000_1000),
                 ],
                 vec![0; 100],
                 false,
-                "failed to correctly execute SHL instruction",
+                "SHL - CPU flags not correctly set",
             ),
             // When shifted left by one place. This will set the carry and overflow flags.
-            // The overflow flag is only set when working with 1-bit shifts.
+            // The overflow flag is only set when computing 1-bit shifts.
             TestEntryU32Standard::new(
                 &[
                     Instruction::MovU32ImmU32Reg(
@@ -903,36 +897,11 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
-                    (RegisterId::FL, 0b1100),
+                    (RegisterId::FL, 0b0000_1100),
                 ],
                 vec![0; 100],
                 false,
-                "failed to correctly execute SHL instruction",
-            ),
-            // When shifted left by two places, this value will set the overflow and carry flags.
-            TestEntryU32Standard::new(
-                &[
-                    Instruction::MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
-                    Instruction::LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
-                ],
-                &[
-                    (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
-                    (RegisterId::FL, 0b1100),
-                ],
-                vec![0; 100],
-                false,
-                "failed to correctly execute SHL instruction",
-            ),
-            // When left-shifted by 32 places, the result will be zero and so the zero flag should.
-            TestEntryU32Standard::new(
-                &[
-                    Instruction::MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
-                    Instruction::LeftShiftU32ImmU32Reg(0x21, RegisterId::R1),
-                ],
-                &[(RegisterId::R1, 0x0), (RegisterId::FL, 0b0010)],
-                vec![0; 100],
-                false,
-                "failed to correctly execute SHL instruction",
+                "SHL - CPU flags not correctly set",
             ),
             // Just zero flag should be set here since zero left-shifted by anything will be zero.
             TestEntryU32Standard::new(
@@ -940,31 +909,32 @@ mod tests_cpu {
                     Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
                     Instruction::LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
-                &[(RegisterId::R1, 0x0), (RegisterId::FL, 0b0010)],
+                &[(RegisterId::FL, 0b0000_0010)],
                 vec![0; 100],
                 false,
-                "failed to correctly execute SHL instruction",
+                "SHL - CPU flags not correctly set",
             ),
             // Just zero flag should be set here since zero left-shifted by anything will be zero.
             TestEntryU32Standard::new(
                 &[
-                    // This value will set the overflow flag.
-                    Instruction::MovU32ImmU32Reg(
-                        0b1011_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::LeftShiftU32ImmU32Reg(0x2, RegisterId::R1),
+                    // Manually set the overflow flag.
+                    Instruction::MovU32ImmU32Reg(0b0000_0100, RegisterId::FL),
                     // This will unset the overflow flag and set the zero flag instead.
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R2),
-                    Instruction::LeftShiftU32ImmU32Reg(0x1, RegisterId::R2),
+                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
+                    Instruction::LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
-                &[
-                    (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1100),
-                    (RegisterId::FL, 0b0010),
-                ],
+                &[(RegisterId::FL, 0b0000_0010)],
                 vec![0; 100],
                 false,
-                "failed to correctly execute LSH instruction",
+                "SHL - correct flags not set",
+            ),
+            // This should assert as a shift of value higher than 31 is unsupported.
+            TestEntryU32Standard::new(
+                &[Instruction::LeftShiftU32ImmU32Reg(0x20, RegisterId::R1)],
+                &[],
+                vec![0; 100],
+                true,
+                "SHL - successfully executed instruction with invalid shift value",
             ),
         ];
 
@@ -986,10 +956,10 @@ mod tests_cpu {
                 &[(RegisterId::R1, 0x2), (RegisterId::R2, 0x1)],
                 vec![0; 100],
                 false,
-                "failed to correctly execute SHL instruction",
+                "SHL - incorrect result value produced",
             ),
             // When shifted left by three places, this value will set the carry flag but not the
-            // overflow flag. The overflow flag is only set when working with 1-bit shifts.
+            // overflow flag. The overflow flag is only set when computing 1-bit shifts.
             TestEntryU32Standard::new(
                 &[
                     Instruction::MovU32ImmU32Reg(
@@ -1002,14 +972,14 @@ mod tests_cpu {
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1000),
                     (RegisterId::R2, 0x3),
-                    (RegisterId::FL, 0b1000),
+                    (RegisterId::FL, 0b0000_1000),
                 ],
                 vec![0; 100],
                 false,
-                "failed to correctly execute SHL instruction",
+                "SHL - invalid CPU flag state",
             ),
             // When shifted left by one place. This will set the carry and overflow flags.
-            // The overflow flag is only set when working with 1-bit shifts.
+            // The overflow flag is only set when computing 1-bit shifts.
             TestEntryU32Standard::new(
                 &[
                     Instruction::MovU32ImmU32Reg(
@@ -1022,11 +992,11 @@ mod tests_cpu {
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
                     (RegisterId::R2, 0x1),
-                    (RegisterId::FL, 0b1100),
+                    (RegisterId::FL, 0b0000_1100),
                 ],
                 vec![0; 100],
                 false,
-                "failed to correctly execute SHL instruction",
+                "SHL - CPU flags not correctly set",
             ),
             // When shifted left by two places, this value will set the overflow and carry flags.
             TestEntryU32Standard::new(
@@ -1038,27 +1008,11 @@ mod tests_cpu {
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
                     (RegisterId::R2, 0x1),
-                    (RegisterId::FL, 0b1100),
+                    (RegisterId::FL, 0b0000_1100),
                 ],
                 vec![0; 100],
                 false,
-                "failed to correctly execute SHL instruction",
-            ),
-            // When left-shifted by 32 places, the result will be zero and so the zero flag should.
-            TestEntryU32Standard::new(
-                &[
-                    Instruction::MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
-                    Instruction::MovU32ImmU32Reg(0x21, RegisterId::R2),
-                    Instruction::LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
-                ],
-                &[
-                    (RegisterId::R1, 0x0),
-                    (RegisterId::R2, 0x21),
-                    (RegisterId::FL, 0b0010),
-                ],
-                vec![0; 100],
-                false,
-                "failed to correctly execute SHL instruction",
+                "SHL - CPU flags not correctly set",
             ),
             // Just zero flag should be set here since zero left-shifted by anything will be zero.
             TestEntryU32Standard::new(
@@ -1067,39 +1021,36 @@ mod tests_cpu {
                     Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
                     Instruction::LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
-                &[
-                    (RegisterId::R1, 0x0),
-                    (RegisterId::R2, 0x1),
-                    (RegisterId::FL, 0b0010),
-                ],
+                &[(RegisterId::R2, 0x1), (RegisterId::FL, 0b0000_0010)],
                 vec![0; 100],
                 false,
-                "failed to correctly execute SHL instruction",
+                "SHL - CPU flags not correctly set",
             ),
             // Just zero flag should be set here since zero left-shifted by anything will be zero.
             TestEntryU32Standard::new(
                 &[
-                    // This value will set the overflow flag.
-                    Instruction::MovU32ImmU32Reg(
-                        0b1011_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R2),
-                    Instruction::LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                    // Manually set the overflow flag.
+                    Instruction::MovU32ImmU32Reg(0b0000_0100, RegisterId::FL),
                     // This will unset the overflow flag and set the zero flag instead.
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R3),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R4),
-                    Instruction::LeftShiftU32RegU32Reg(RegisterId::R4, RegisterId::R3),
+                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    Instruction::LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
-                &[
-                    (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1100),
-                    (RegisterId::R2, 0x2),
-                    (RegisterId::R4, 0x1),
-                    (RegisterId::FL, 0b0010),
-                ],
+                &[(RegisterId::R2, 0x1), (RegisterId::FL, 0b0000_0010)],
                 vec![0; 100],
                 false,
-                "failed to correctly execute LSH instruction",
+                "SHL - CPU flags not correctly set",
+            ),
+            // This should assert as a shift of value higher than 31 is unsupported.
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x20, RegisterId::R2),
+                    Instruction::LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                ],
+                &[],
+                vec![0; 100],
+                true,
+                "SHL - successfully executed instruction with invalid shift value",
             ),
         ];
 
@@ -1120,23 +1071,7 @@ mod tests_cpu {
                 &[(RegisterId::R1, 0x2)],
                 vec![0; 100],
                 false,
-                "failed to correctly execute SAL instruction",
-            ),
-            TestEntryU32Standard::new(
-                &[
-                    Instruction::MovU32ImmU32Reg(
-                        0b1011_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::ArithLeftShiftU32ImmU32Reg(0x3, RegisterId::R1),
-                ],
-                &[
-                    (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1101),
-                    (RegisterId::FL, 0b0000),
-                ],
-                vec![0; 100],
-                false,
-                "failed to correctly execute SAL instruction",
+                "SAL - incorrect result value produced",
             ),
             // Just zero flag should be set here since zero left-shifted by anything will be zero.
             TestEntryU32Standard::new(
@@ -1144,10 +1079,10 @@ mod tests_cpu {
                     Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
                     Instruction::LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
-                &[(RegisterId::R1, 0x0), (RegisterId::FL, 0b0010)],
+                &[(RegisterId::FL, 0b0000_0010)],
                 vec![0; 100],
                 false,
-                "failed to correctly execute SHL instruction",
+                "SAL - CPU flags not correctly set",
             ),
         ];
 
@@ -1169,25 +1104,7 @@ mod tests_cpu {
                 &[(RegisterId::R1, 0x2), (RegisterId::R2, 0x1)],
                 vec![0; 100],
                 false,
-                "failed to correctly execute SAL instruction",
-            ),
-            TestEntryU32Standard::new(
-                &[
-                    Instruction::MovU32ImmU32Reg(
-                        0b1011_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x3, RegisterId::R2),
-                    Instruction::ArithLeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
-                ],
-                &[
-                    (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1101),
-                    (RegisterId::R2, 0x3),
-                    (RegisterId::FL, 0b0000),
-                ],
-                vec![0; 100],
-                false,
-                "failed to correctly execute SAL instruction",
+                "SAL - incorrect result value produced",
             ),
             // Just zero flag should be set here since zero left-shifted by anything will be zero.
             TestEntryU32Standard::new(
@@ -1196,14 +1113,67 @@ mod tests_cpu {
                     Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
                     Instruction::ArithLeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
-                &[
-                    (RegisterId::R1, 0x0),
-                    (RegisterId::R2, 0x1),
-                    (RegisterId::FL, 0b0010),
-                ],
+                &[(RegisterId::R2, 0x1), (RegisterId::FL, 0b0000_0010)],
                 vec![0; 100],
                 false,
-                "failed to correctly execute SHL instruction",
+                "SAL - CPU flags not correctly set",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the right-shift u32 register by u32 immediate value.
+    #[test]
+    fn test_right_shift_u32_imm_u32_reg() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    Instruction::RightShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0x1)],
+                vec![0; 100],
+                false,
+                "SHR - incorrect result value produced",
+            ),
+            // The SHR command should clear the overflow and carry flags.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the overflow and carry flags.
+                    Instruction::MovU32ImmU32Reg(0b0110, RegisterId::FL),
+                    // Execute the test instruction.
+                    Instruction::MovU32ImmU32Reg(
+                        0b1011_1111_1111_1111_1111_1111_1111_1111,
+                        RegisterId::R1,
+                    ),
+                    Instruction::RightShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0b0101_1111_1111_1111_1111_1111_1111_1111)],
+                vec![0; 100],
+                false,
+                "SHR - CPU flags not correctly set",
+            ),
+            // Just zero flag should be set here since zero left-shifted by anything will be zero.
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
+                    Instruction::RightShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[(RegisterId::FL, 0b0010)],
+                vec![0; 100],
+                false,
+                "SHR - CPU flags not correctly set",
+            ),
+            // This should assert as a shift of value higher than 31 is unsupported.
+            TestEntryU32Standard::new(
+                &[Instruction::RightShiftU32ImmU32Reg(0x20, RegisterId::R1)],
+                &[],
+                vec![0; 100],
+                true,
+                "SHR - successfully executed instruction with invalid shift value",
             ),
         ];
 
@@ -1221,7 +1191,7 @@ mod tests_cpu {
                 &[(RegisterId::R1, 0x1)],
                 vec![0; 100],
                 false,
-                "failed to correctly execute MOV instruction",
+                "MOV - invalid value moved to register",
             ),
             TestEntryU32Standard::new(
                 &[
@@ -1231,26 +1201,7 @@ mod tests_cpu {
                 &[(RegisterId::R1, 0x2)],
                 vec![0; 100],
                 false,
-                "failed to correctly execute MOV instruction",
-            ),
-            // This test should succeed in machine mode.
-            TestEntryU32Standard::new(
-                &[Instruction::MovU32ImmU32Reg(0x1, RegisterId::TEST0)],
-                &[(RegisterId::TEST0, 0x1)],
-                vec![0; 100],
-                false,
-                "failed to correctly execute MOV instruction in machine mode",
-            ),
-            // This test should fail in user mode due to the register permissions.
-            TestEntryU32Standard::new(
-                &[
-                    Instruction::Mret,
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::TEST0),
-                ],
-                &[],
-                vec![0; 100],
-                true,
-                "succeeded in execute MOV instruction in user mode",
+                "MOV - invalid value moved to register",
             ),
         ];
 
@@ -1271,7 +1222,7 @@ mod tests_cpu {
                 &[(RegisterId::R1, 0x1), (RegisterId::R2, 0x1)],
                 vec![0; 100],
                 false,
-                "failed to correctly execute MOV instruction",
+                "MOV - immediate value not moved to register",
             ),
             TestEntryU32Standard::new(
                 &[
@@ -1282,30 +1233,7 @@ mod tests_cpu {
                 &[(RegisterId::R1, 0x1), (RegisterId::R2, 0x1)],
                 vec![0; 100],
                 false,
-                "failed to correctly execute MOV instruction",
-            ),
-            // This test should succeed in machine mode.
-            TestEntryU32Standard::new(
-                &[
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::MovU32RegU32Reg(RegisterId::R1, RegisterId::TEST0),
-                ],
-                &[(RegisterId::R1, 0x1), (RegisterId::TEST0, 0x1)],
-                vec![0; 100],
-                false,
-                "failed to correctly execute MOV instruction in machine mode",
-            ),
-            // This test should fail in user mode due to the register permissions.
-            TestEntryU32Standard::new(
-                &[
-                    Instruction::Mret,
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::MovU32RegU32Reg(RegisterId::R1, RegisterId::TEST0),
-                ],
-                &[],
-                vec![0; 100],
-                true,
-                "succeeded in execute MOV instruction in user mode",
+                "MOV - immediate value not moved to register",
             ),
         ];
 
@@ -1327,7 +1255,7 @@ mod tests_cpu {
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             ],
             false,
-            "failed to correctly execute MOV instruction",
+            "MOV - immediate value not moved to memory",
         )];
 
         for (id, test) in tests.iter().enumerate() {
@@ -1351,7 +1279,7 @@ mod tests_cpu {
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             ],
             false,
-            "failed to correctly execute MOV instruction",
+            "MOV - u32 register value not moved to memory",
         )];
 
         for (id, test) in tests.iter().enumerate() {
@@ -1364,12 +1292,13 @@ mod tests_cpu {
     fn test_move_mem_u32_reg() {
         let tests = [TestEntryU32Standard::new(
             &[
+                // Move the value to memory.
                 Instruction::MovU32ImmU32Reg(0x123, RegisterId::R1),
                 Instruction::MovU32RegMemRelSimple(RegisterId::R1, 0x0),
-                Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
+                // Move the value from memory to a register.
                 Instruction::MovMemU32RegRelSimple(0x0, RegisterId::R2),
             ],
-            &[(RegisterId::R2, 0x123)],
+            &[(RegisterId::R1, 0x123), (RegisterId::R2, 0x123)],
             vec![
                 35, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -1377,7 +1306,7 @@ mod tests_cpu {
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             ],
             false,
-            "failed to correctly execute MOV instruction",
+            "MOV - value not correctly moved from memory to register",
         )];
 
         for (id, test) in tests.iter().enumerate() {
@@ -1393,13 +1322,12 @@ mod tests_cpu {
                 // Store value in memory.
                 Instruction::MovU32ImmU32Reg(0x123, RegisterId::R1),
                 Instruction::MovU32RegMemRelSimple(RegisterId::R1, 0x0),
-                Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
                 // Set the address pointer in R2.
                 Instruction::MovU32ImmU32Reg(0x0, RegisterId::R2),
                 // Read the value from the address of R2 into R1.
-                Instruction::MovU32RegPtrU32RegRelSimple(RegisterId::R2, RegisterId::R1),
+                Instruction::MovU32RegPtrU32RegRelSimple(RegisterId::R2, RegisterId::R3),
             ],
-            &[(RegisterId::R1, 0x123)],
+            &[(RegisterId::R1, 0x123), (RegisterId::R3, 0x123)],
             vec![
                 35, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -1407,7 +1335,7 @@ mod tests_cpu {
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             ],
             false,
-            "failed to correctly execute MOV instruction",
+            "MOV - value not correctly moved from memory to register via register pointer",
         )];
 
         for (id, test) in tests.iter().enumerate() {
@@ -1418,44 +1346,17 @@ mod tests_cpu {
     /// Test the swap u32 register to u32 register instruction.
     #[test]
     fn test_swap_u32_reg_u32_reg() {
-        let tests = [
-            TestEntryU32Standard::new(
-                &[
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R2),
-                    Instruction::SwapU32RegU32Reg(RegisterId::R1, RegisterId::R2),
-                ],
-                &[(RegisterId::R1, 0x2), (RegisterId::R2, 0x1)],
-                vec![0; 100],
-                false,
-                "failed to correctly execute SWAP instruction",
-            ),
-            // This test should succeed in machine mode.
-            TestEntryU32Standard::new(
-                &[
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::TEST0),
-                    Instruction::SwapU32RegU32Reg(RegisterId::R1, RegisterId::TEST0),
-                ],
-                &[(RegisterId::R1, 0x2), (RegisterId::TEST0, 0x1)],
-                vec![0; 100],
-                false,
-                "failed to correctly execute SWAP instruction in machine mode",
-            ),
-            // This test should fail in user mode due to the register permissions.
-            TestEntryU32Standard::new(
-                &[
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::TEST0),
-                    Instruction::Mret,
-                    Instruction::SwapU32RegU32Reg(RegisterId::R1, RegisterId::TEST0),
-                ],
-                &[],
-                vec![0; 100],
-                true,
-                "succeeded in execute SWAP instruction in user mode",
-            ),
-        ];
+        let tests = [TestEntryU32Standard::new(
+            &[
+                Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                Instruction::MovU32ImmU32Reg(0x2, RegisterId::R2),
+                Instruction::SwapU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+            ],
+            &[(RegisterId::R1, 0x2), (RegisterId::R2, 0x1)],
+            vec![0; 100],
+            false,
+            "SWAP - values of the two registers were not correctly swapped",
+        )];
 
         for (id, test) in tests.iter().enumerate() {
             test.run_test(id);
@@ -1502,31 +1403,6 @@ mod tests_cpu {
         ];
 
         let test_4_args = [
-            Instruction::MovU32ImmU32Reg(0x8, RegisterId::TEST0),
-            Instruction::MovU32ImmMemExprRel(
-                0x123,
-                handler.encode(&[
-                    ExpressionArgs::Register(RegisterId::TEST0),
-                    ExpressionArgs::Operator(ExpressionOperator::Add),
-                    ExpressionArgs::Constant(0x8),
-                ]),
-            ),
-        ];
-
-        let test_5_args = [
-            Instruction::MovU32ImmU32Reg(0x8, RegisterId::TEST0),
-            Instruction::Mret,
-            Instruction::MovU32ImmMemExprRel(
-                0x123,
-                handler.encode(&[
-                    ExpressionArgs::Register(RegisterId::TEST0),
-                    ExpressionArgs::Operator(ExpressionOperator::Add),
-                    ExpressionArgs::Constant(0x8),
-                ]),
-            ),
-        ];
-
-        let test_6_args = [
             Instruction::MovU32ImmU32Reg(0x2, RegisterId::R1),
             Instruction::MovU32ImmU32Reg(0x8, RegisterId::R2),
             Instruction::MovU32ImmMemExprRel(
@@ -1539,8 +1415,8 @@ mod tests_cpu {
             ),
         ];
 
-        let test_7_args = [
-            Instruction::MovU32ImmU32Reg(0x1A, RegisterId::R1),
+        let test_5_args = [
+            Instruction::MovU32ImmU32Reg(0x1a, RegisterId::R1),
             Instruction::MovU32ImmU32Reg(0x4, RegisterId::R2),
             Instruction::MovU32ImmMemExprRel(
                 0x123,
@@ -1553,7 +1429,6 @@ mod tests_cpu {
         ];
 
         let tests = [
-            // Test with two constant values.
             TestEntryU32Standard::new(
                 &test_1_args,
                 &[],
@@ -1564,9 +1439,8 @@ mod tests_cpu {
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 ],
                 false,
-                "failed to correctly execute MOV instruction",
+                "MOV - value not correctly moved from memory to register with expression - two constants",
             ),
-            // Test with two register values.
             TestEntryU32Standard::new(
                 &test_2_args,
                 &[(RegisterId::R1, 0x8), (RegisterId::R2, 0x8)],
@@ -1577,9 +1451,8 @@ mod tests_cpu {
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 ],
                 false,
-                "failed to correctly execute MOV instruction",
+                "MOV - value not correctly moved from memory to register with expression - two registers",
             ),
-            // Test with a constant and a register.
             TestEntryU32Standard::new(
                 &test_3_args,
                 &[(RegisterId::R1, 0x8)],
@@ -1590,32 +1463,10 @@ mod tests_cpu {
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 ],
                 false,
-                "failed to correctly execute MOV instruction",
+                "MOV - value not correctly moved from memory to register with expression - one constant and one register",
             ),
-            // This test should succeed in machine mode.
             TestEntryU32Standard::new(
                 &test_4_args,
-                &[(RegisterId::TEST0, 0x8)],
-                vec![
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ],
-                false,
-                "failed to correctly execute MOV instruction in machine mode",
-            ),
-            // This test should fail in user mode due to the register permissions.
-            TestEntryU32Standard::new(
-                &test_5_args,
-                &[],
-                vec![],
-                true,
-                "succeeded in execute MOV instruction in user mode",
-            ),
-            // Test with multiplication.
-            TestEntryU32Standard::new(
-                &test_6_args,
                 &[(RegisterId::R1, 0x2), (RegisterId::R2, 0x8)],
                 vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -1624,11 +1475,10 @@ mod tests_cpu {
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 ],
                 false,
-                "failed to correctly execute MOV instruction",
+                "MOV - value not correctly moved from memory to register - using multiplication",
             ),
-            // Test with subtraction.
             TestEntryU32Standard::new(
-                &test_7_args,
+                &test_5_args,
                 &[(RegisterId::R1, 0x1A), (RegisterId::R2, 0x4)],
                 vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0,
@@ -1637,7 +1487,7 @@ mod tests_cpu {
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 ],
                 false,
-                "failed to correctly execute MOV instruction",
+                "MOV - value not correctly moved from memory to register - using subtraction",
             ),
         ];
 
@@ -1692,33 +1542,6 @@ mod tests_cpu {
 
         let test_4_args = [
             Instruction::MovU32ImmMemRelSimple(0x123, 0x10),
-            Instruction::MovU32ImmU32Reg(0x8, RegisterId::TEST0),
-            Instruction::MovMemExprU32RegRel(
-                handler.encode(&[
-                    ExpressionArgs::Register(RegisterId::TEST0),
-                    ExpressionArgs::Operator(ExpressionOperator::Add),
-                    ExpressionArgs::Constant(0x8),
-                ]),
-                RegisterId::R8,
-            ),
-        ];
-
-        let test_5_args = [
-            Instruction::MovU32ImmMemRelSimple(0x123, 0x10),
-            Instruction::MovU32ImmU32Reg(0x8, RegisterId::TEST0),
-            Instruction::Mret,
-            Instruction::MovMemExprU32RegRel(
-                handler.encode(&[
-                    ExpressionArgs::Register(RegisterId::TEST0),
-                    ExpressionArgs::Operator(ExpressionOperator::Add),
-                    ExpressionArgs::Constant(0x8),
-                ]),
-                RegisterId::R8,
-            ),
-        ];
-
-        let test_6_args = [
-            Instruction::MovU32ImmMemRelSimple(0x123, 0x10),
             Instruction::MovU32ImmU32Reg(0x2, RegisterId::R1),
             Instruction::MovU32ImmU32Reg(0x8, RegisterId::R2),
             Instruction::MovMemExprU32RegRel(
@@ -1731,7 +1554,7 @@ mod tests_cpu {
             ),
         ];
 
-        let test_7_args = [
+        let test_5_args = [
             Instruction::MovU32ImmMemRelSimple(0x123, 0x16),
             Instruction::MovU32ImmU32Reg(0x1A, RegisterId::R1),
             Instruction::MovU32ImmU32Reg(0x4, RegisterId::R2),
@@ -1746,7 +1569,6 @@ mod tests_cpu {
         ];
 
         let tests = [
-            // Test with two constant values.
             TestEntryU32Standard::new(
                 &test_1_args,
                 &[(RegisterId::R8, 0x123)],
@@ -1757,9 +1579,8 @@ mod tests_cpu {
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 ],
                 false,
-                "failed to correctly execute MOV instruction",
+                "MOV - value not correctly moved from memory to register with expression - two constants",
             ),
-            // Test with two register values.
             TestEntryU32Standard::new(
                 &test_2_args,
                 &[
@@ -1774,9 +1595,8 @@ mod tests_cpu {
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 ],
                 false,
-                "failed to correctly execute MOV instruction",
+                "MOV - value not correctly moved from memory to register with expression - two registers",
             ),
-            // Test with a constant and a register.
             TestEntryU32Standard::new(
                 &test_3_args,
                 &[(RegisterId::R1, 0x8), (RegisterId::R8, 0x123)],
@@ -1787,32 +1607,10 @@ mod tests_cpu {
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 ],
                 false,
-                "failed to correctly execute MOV instruction",
+                "MOV - value not correctly moved from memory to register with expression - one constant and one register",
             ),
-            // This test should succeed in machine mode.
             TestEntryU32Standard::new(
                 &test_4_args,
-                &[(RegisterId::R8, 0x123), (RegisterId::TEST0, 0x8)],
-                vec![
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ],
-                false,
-                "failed to correctly execute MOV instruction in machine mode",
-            ),
-            // This test should fail in user mode due to the register permissions.
-            TestEntryU32Standard::new(
-                &test_5_args,
-                &[],
-                vec![],
-                true,
-                "succeeded in execute MOV instruction in user mode",
-            ),
-            // Test with multiplication.
-            TestEntryU32Standard::new(
-                &test_6_args,
                 &[
                     (RegisterId::R1, 0x2),
                     (RegisterId::R2, 0x8),
@@ -1825,13 +1623,12 @@ mod tests_cpu {
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 ],
                 false,
-                "failed to correctly execute MOV instruction",
+                "MOV - value not correctly moved from memory to register - using multiplication",
             ),
-            // Test with subtraction.
             TestEntryU32Standard::new(
-                &test_7_args,
+                &test_5_args,
                 &[
-                    (RegisterId::R1, 0x1A),
+                    (RegisterId::R1, 0x1a),
                     (RegisterId::R2, 0x4),
                     (RegisterId::R8, 0x123),
                 ],
@@ -1842,7 +1639,7 @@ mod tests_cpu {
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 ],
                 false,
-                "failed to correctly execute MOV instruction",
+                "MOV - value not correctly moved from memory to register - using subtraction",
             ),
         ];
 
@@ -1896,33 +1693,6 @@ mod tests_cpu {
         ];
 
         let test_4_args = [
-            Instruction::MovU32ImmU32Reg(0x123, RegisterId::R8),
-            Instruction::MovU32ImmU32Reg(0x8, RegisterId::TEST0),
-            Instruction::MovU32RegMemExprRel(
-                RegisterId::R8,
-                handler.encode(&[
-                    ExpressionArgs::Register(RegisterId::TEST0),
-                    ExpressionArgs::Operator(ExpressionOperator::Add),
-                    ExpressionArgs::Constant(0x8),
-                ]),
-            ),
-        ];
-
-        let test_5_args = [
-            Instruction::MovU32ImmU32Reg(0x123, RegisterId::R8),
-            Instruction::MovU32ImmU32Reg(0x8, RegisterId::TEST0),
-            Instruction::Mret,
-            Instruction::MovU32RegMemExprRel(
-                RegisterId::R8,
-                handler.encode(&[
-                    ExpressionArgs::Register(RegisterId::TEST0),
-                    ExpressionArgs::Operator(ExpressionOperator::Add),
-                    ExpressionArgs::Constant(0x8),
-                ]),
-            ),
-        ];
-
-        let test_6_args = [
             Instruction::MovU32ImmU32Reg(0x2, RegisterId::R1),
             Instruction::MovU32ImmU32Reg(0x8, RegisterId::R2),
             Instruction::MovU32ImmU32Reg(0x123, RegisterId::R8),
@@ -1936,7 +1706,7 @@ mod tests_cpu {
             ),
         ];
 
-        let test_7_args = [
+        let test_5_args = [
             Instruction::MovU32ImmU32Reg(0x1A, RegisterId::R1),
             Instruction::MovU32ImmU32Reg(0x4, RegisterId::R2),
             Instruction::MovU32ImmU32Reg(0x123, RegisterId::R8),
@@ -1951,7 +1721,6 @@ mod tests_cpu {
         ];
 
         let tests = [
-            // Test with two constant values.
             TestEntryU32Standard::new(
                 &test_1_args,
                 &[(RegisterId::R8, 0x123)],
@@ -1962,7 +1731,7 @@ mod tests_cpu {
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 ],
                 false,
-                "failed to correctly execute MOV instruction",
+                "MOV - value not correctly moved from memory to register with expression - two constants",
             ),
             // Test with two register values.
             TestEntryU32Standard::new(
@@ -1979,7 +1748,7 @@ mod tests_cpu {
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 ],
                 false,
-                "failed to correctly execute MOV instruction",
+                "MOV - value not correctly moved from memory to register with expression - two registers",
             ),
             // Test with a constant and a register.
             TestEntryU32Standard::new(
@@ -1992,32 +1761,11 @@ mod tests_cpu {
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 ],
                 false,
-                "failed to correctly execute MOV instruction",
-            ),
-            // This test should succeed in machine mode.
-            TestEntryU32Standard::new(
-                &test_4_args,
-                &[(RegisterId::R8, 0x123), (RegisterId::TEST0, 0x8)],
-                vec![
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ],
-                false,
-                "failed to correctly execute MOV instruction in machine mode",
-            ),
-            // This test should fail in user mode due to the register permissions.
-            TestEntryU32Standard::new(
-                &test_5_args,
-                &[],
-                vec![],
-                true,
-                "succeeded in execute MOV instruction in user mode",
+                "MOV - value not correctly moved from memory to register with expression - one constant and one register",
             ),
             // Test with multiplication.
             TestEntryU32Standard::new(
-                &test_6_args,
+                &test_4_args,
                 &[
                     (RegisterId::R1, 0x2),
                     (RegisterId::R2, 0x8),
@@ -2030,13 +1778,13 @@ mod tests_cpu {
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 ],
                 false,
-                "failed to correctly execute MOV instruction",
+                "MOV - value not correctly moved from memory to register - using multiplication",
             ),
             // Test with subtraction.
             TestEntryU32Standard::new(
-                &test_7_args,
+                &test_5_args,
                 &[
-                    (RegisterId::R1, 0x1A),
+                    (RegisterId::R1, 0x1a),
                     (RegisterId::R2, 0x4),
                     (RegisterId::R8, 0x123),
                 ],
@@ -2047,7 +1795,7 @@ mod tests_cpu {
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 ],
                 false,
-                "failed to correctly execute MOV instruction",
+                "MOV - value not correctly moved from memory to register - using subtraction",
             ),
         ];
 
