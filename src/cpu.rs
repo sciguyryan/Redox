@@ -100,7 +100,7 @@ impl Cpu {
         let ip = *self
             .registers
             .get_register_u32(RegisterId::IP)
-            .read(&PrivilegeLevel::Machine);
+            .read_unchecked();
 
         // Update the program counter register.
         mem.get_instruction(ip as usize)
