@@ -70,6 +70,7 @@ impl Cpu {
                 ExpressionOperator::Add => val_1 + val_2,
                 ExpressionOperator::Subtract => val_1 - val_2,
                 ExpressionOperator::Multiply => val_1 * val_2,
+                ExpressionOperator::Divide => panic!("operation not supported in this instance")
             }
         } else {
             panic!();
