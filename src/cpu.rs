@@ -561,7 +561,7 @@ impl Cpu {
     ///
     /// # Arguments
     ///
-    /// * `bytes` - The size of the instruction, in bytes.
+    /// * `size` - The size of the instruction, in bytes.
     #[inline(always)]
     fn update_instruction_pointer(&mut self, size: u32) {
         self.registers
@@ -613,6 +613,20 @@ impl CpuFlag {
         static FLAGS: [CpuFlag; 4] = [CpuFlag::SF, CpuFlag::ZF, CpuFlag::OF, CpuFlag::CF];
         FLAGS.iter()
     }
+
+    /// Build a flag value from the enabled CPU flags.
+    ///
+    /// # Arguments
+    ///
+    /// * `flags` - A slice of [`CpuFlag`]s to be enabled.
+    #[inline(always)]
+    pub fn compute_for(flags: &[CpuFlag]) -> u32 {
+        let mut value = 0;
+        for flag in flags {
+            utils::set_bit_state_inline(&mut value, *flag as u8, true);
+        }
+        value
+    }
 }
 
 impl From<CpuFlag> for u8 {
@@ -634,7 +648,7 @@ mod tests_cpu {
         reg::registers::{RegisterId, Registers},
     };
 
-    use super::Cpu;
+    use super::{Cpu, CpuFlag};
 
     struct TestEntryU32Standard {
         pub instructions: Vec<Instruction>,
@@ -853,7 +867,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::R1, u32::MAX),
                     (RegisterId::AC, 0x1),
-                    (RegisterId::FL, 0b0000_0100),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::OF])),
                 ],
                 vec![0; 100],
                 false,
@@ -861,7 +875,7 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[Instruction::AddU32ImmU32Reg(0, RegisterId::R1)],
-                &[(RegisterId::FL, 0b0000_0010)],
+                &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF]))],
                 vec![0; 100],
                 false,
                 "ADD - CPU flags not correctly set",
@@ -906,7 +920,7 @@ mod tests_cpu {
                     (RegisterId::R1, u32::MAX),
                     (RegisterId::R2, 0x2),
                     (RegisterId::AC, 0x1),
-                    (RegisterId::FL, 0b0000_0100),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::OF])),
                 ],
                 vec![0; 100],
                 false,
@@ -952,7 +966,7 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1000),
-                    (RegisterId::FL, 0b0000_1000),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::CF])),
                 ],
                 vec![0; 100],
                 false,
@@ -970,7 +984,10 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
-                    (RegisterId::FL, 0b0000_1100),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_for(&[CpuFlag::CF, CpuFlag::OF]),
+                    ),
                 ],
                 vec![0; 100],
                 false,
@@ -982,7 +999,7 @@ mod tests_cpu {
                     Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
                     Instruction::LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
-                &[(RegisterId::FL, 0b0000_0010)],
+                &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF]))],
                 vec![0; 100],
                 false,
                 "SHL - CPU flags not correctly set",
@@ -991,12 +1008,15 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the overflow flag.
-                    Instruction::MovU32ImmU32Reg(0b0000_0100, RegisterId::FL),
+                    Instruction::MovU32ImmU32Reg(
+                        CpuFlag::compute_for(&[CpuFlag::OF]),
+                        RegisterId::FL,
+                    ),
                     // This will unset the overflow flag and set the zero flag instead.
                     Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
                     Instruction::LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
-                &[(RegisterId::FL, 0b0000_0010)],
+                &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF]))],
                 vec![0; 100],
                 false,
                 "SHL - correct flags not set",
@@ -1045,7 +1065,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1000),
                     (RegisterId::R2, 0x3),
-                    (RegisterId::FL, 0b0000_1000),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::CF])),
                 ],
                 vec![0; 100],
                 false,
@@ -1065,7 +1085,10 @@ mod tests_cpu {
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
                     (RegisterId::R2, 0x1),
-                    (RegisterId::FL, 0b0000_1100),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_for(&[CpuFlag::OF, CpuFlag::CF]),
+                    ),
                 ],
                 vec![0; 100],
                 false,
@@ -1081,7 +1104,10 @@ mod tests_cpu {
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
                     (RegisterId::R2, 0x1),
-                    (RegisterId::FL, 0b0000_1100),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_for(&[CpuFlag::OF, CpuFlag::CF]),
+                    ),
                 ],
                 vec![0; 100],
                 false,
@@ -1094,7 +1120,10 @@ mod tests_cpu {
                     Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
                     Instruction::LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
-                &[(RegisterId::R2, 0x1), (RegisterId::FL, 0b0000_0010)],
+                &[
+                    (RegisterId::R2, 0x1),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF])),
+                ],
                 vec![0; 100],
                 false,
                 "SHL - CPU flags not correctly set",
@@ -1103,13 +1132,19 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the overflow flag.
-                    Instruction::MovU32ImmU32Reg(0b0000_0100, RegisterId::FL),
+                    Instruction::MovU32ImmU32Reg(
+                        CpuFlag::compute_for(&[CpuFlag::OF]),
+                        RegisterId::FL,
+                    ),
                     // This will unset the overflow flag and set the zero flag instead.
                     Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
                     Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
                     Instruction::LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
-                &[(RegisterId::R2, 0x1), (RegisterId::FL, 0b0000_0010)],
+                &[
+                    (RegisterId::R2, 0x1),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF])),
+                ],
                 vec![0; 100],
                 false,
                 "SHL - CPU flags not correctly set",
@@ -1165,7 +1200,7 @@ mod tests_cpu {
                     Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
                     Instruction::LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
-                &[(RegisterId::FL, 0b0000_0010)],
+                &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF]))],
                 vec![0; 100],
                 false,
                 "SAL - CPU flags not correctly set",
@@ -1216,7 +1251,10 @@ mod tests_cpu {
                     Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
                     Instruction::ArithLeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
-                &[(RegisterId::R2, 0x1), (RegisterId::FL, 0b0000_0010)],
+                &[
+                    (RegisterId::R2, 0x1),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF])),
+                ],
                 vec![0; 100],
                 false,
                 "SAL - CPU flags not correctly set",
@@ -1247,7 +1285,10 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the overflow flag.
-                    Instruction::MovU32ImmU32Reg(0b0100, RegisterId::FL),
+                    Instruction::MovU32ImmU32Reg(
+                        CpuFlag::compute_for(&[CpuFlag::OF]),
+                        RegisterId::FL,
+                    ),
                     // Execute the test instruction.
                     Instruction::MovU32ImmU32Reg(
                         0b0111_1111_1111_1111_1111_1111_1111_1111,
@@ -1257,7 +1298,7 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::R1, 0b0011_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::FL, 0b1000),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::CF])),
                 ],
                 vec![0; 100],
                 false,
@@ -1268,7 +1309,10 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the overflow flag.
-                    Instruction::MovU32ImmU32Reg(0b0100, RegisterId::FL),
+                    Instruction::MovU32ImmU32Reg(
+                        CpuFlag::compute_for(&[CpuFlag::OF]),
+                        RegisterId::FL,
+                    ),
                     // Execute the test instruction.
                     Instruction::MovU32ImmU32Reg(
                         0b0111_1111_1111_1111_1111_1111_1111_1110,
@@ -1276,10 +1320,7 @@ mod tests_cpu {
                     ),
                     Instruction::RightShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
-                &[
-                    (RegisterId::R1, 0b0011_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::FL, 0b0000),
-                ],
+                &[(RegisterId::R1, 0b0011_1111_1111_1111_1111_1111_1111_1111)],
                 vec![0; 100],
                 false,
                 "SHR - CPU flags not correctly set",
@@ -1290,7 +1331,7 @@ mod tests_cpu {
                     Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
                     Instruction::RightShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
-                &[(RegisterId::FL, 0b0010)],
+                &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF]))],
                 vec![0; 100],
                 false,
                 "SHR - CPU flags not correctly set",
@@ -1330,7 +1371,10 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the overflow flag.
-                    Instruction::MovU32ImmU32Reg(0b0100, RegisterId::FL),
+                    Instruction::MovU32ImmU32Reg(
+                        CpuFlag::compute_for(&[CpuFlag::OF]),
+                        RegisterId::FL,
+                    ),
                     Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
                     // Execute the test instruction.
                     Instruction::MovU32ImmU32Reg(
@@ -1342,7 +1386,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::R1, 0b0011_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::R2, 0x1),
-                    (RegisterId::FL, 0b1000),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::CF])),
                 ],
                 vec![0; 100],
                 false,
@@ -1353,7 +1397,10 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the overflow flag.
-                    Instruction::MovU32ImmU32Reg(0b0100, RegisterId::FL),
+                    Instruction::MovU32ImmU32Reg(
+                        CpuFlag::compute_for(&[CpuFlag::OF]),
+                        RegisterId::FL,
+                    ),
                     Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
                     // Execute the test instruction.
                     Instruction::MovU32ImmU32Reg(
@@ -1365,7 +1412,6 @@ mod tests_cpu {
                 &[
                     (RegisterId::R1, 0b0011_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::R2, 0x1),
-                    (RegisterId::FL, 0b0000),
                 ],
                 vec![0; 100],
                 false,
@@ -1378,7 +1424,10 @@ mod tests_cpu {
                     Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
                     Instruction::RightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
-                &[(RegisterId::R2, 0x1), (RegisterId::FL, 0b0010)],
+                &[
+                    (RegisterId::R2, 0x1),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF])),
+                ],
                 vec![0; 100],
                 false,
                 "SHR - CPU flags not correctly set",
@@ -1434,7 +1483,7 @@ mod tests_cpu {
                     Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
                     Instruction::ArithRightShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
-                &[(RegisterId::FL, 0b0000_0010)],
+                &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF]))],
                 vec![0; 100],
                 false,
                 "SAR - CPU flags not correctly set",
@@ -1485,7 +1534,10 @@ mod tests_cpu {
                     Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
                     Instruction::ArithRightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
-                &[(RegisterId::R2, 0x1), (RegisterId::FL, 0b0000_0010)],
+                &[
+                    (RegisterId::R2, 0x1),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF])),
+                ],
                 vec![0; 100],
                 false,
                 "SAR - CPU flags not correctly set",

@@ -116,11 +116,8 @@ fn main() {
                 ExpressionArgs::Constant(25),
             ]),
         ),*/
-        // Manually set the overflow flag.
-        Instruction::MovU32ImmU32Reg(0b0100, RegisterId::FL),
-        // Execute the test instruction.
-        Instruction::MovU32ImmU32Reg(0b0011_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
-        Instruction::RightShiftU32ImmU32Reg(0x1, RegisterId::R1),
+        Instruction::MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
+        Instruction::AddU32ImmU32Reg(0x2, RegisterId::R1),
         Instruction::Hlt,
     ];
 
