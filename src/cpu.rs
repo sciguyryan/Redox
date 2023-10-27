@@ -70,7 +70,7 @@ impl Cpu {
                 ExpressionOperator::Add => val_1 + val_2,
                 ExpressionOperator::Subtract => val_1 - val_2,
                 ExpressionOperator::Multiply => val_1 * val_2,
-                ExpressionOperator::Divide => panic!("operation not supported in this instance")
+                ExpressionOperator::Divide => panic!("operation not supported in this instance"),
             }
         } else {
             panic!();
@@ -417,6 +417,15 @@ impl Cpu {
             Instruction::ArithRightShiftU32ImmU32Reg(imm, reg) => {
                 let old_value = *self.registers.get_register_u32(*reg).read(privilege);
                 let shifted = self.perform_arithmetic_right_shift_u32(old_value, *imm);
+
+                self.registers
+                    .get_register_u32_mut(*reg)
+                    .write(shifted, privilege)
+            }
+            Instruction::ArithRightShiftU32RegU32Reg(shift_reg, reg) => {
+                let shift_by = *self.registers.get_register_u32(*shift_reg).read(privilege);
+                let old_value = *self.registers.get_register_u32(*reg).read(privilege);
+                let shifted = self.perform_arithmetic_right_shift_u32(old_value, shift_by);
 
                 self.registers
                     .get_register_u32_mut(*reg)
@@ -1135,7 +1144,10 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1110, RegisterId::R1),
+                    Instruction::MovU32ImmU32Reg(
+                        0b1111_1111_1111_1111_1111_1111_1111_1110,
+                        RegisterId::R1,
+                    ),
                     Instruction::ArithLeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1101)],
@@ -1178,11 +1190,17 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1110, RegisterId::R1),
+                    Instruction::MovU32ImmU32Reg(
+                        0b1111_1111_1111_1111_1111_1111_1111_1110,
+                        RegisterId::R1,
+                    ),
                     Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
                     Instruction::ArithLeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
-                &[(RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1101), (RegisterId::R2, 0x1)],
+                &[
+                    (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1101),
+                    (RegisterId::R2, 0x1),
+                ],
                 vec![0; 100],
                 false,
                 "SAL - incorrect result value produced",
@@ -1345,7 +1363,10 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    Instruction::MovU32ImmU32Reg(
+                        0b0111_1111_1111_1111_1111_1111_1111_1111,
+                        RegisterId::R1,
+                    ),
                     Instruction::ArithRightShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0b1011_1111_1111_1111_1111_1111_1111_1111)],
@@ -1360,6 +1381,57 @@ mod tests_cpu {
                     Instruction::ArithRightShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[(RegisterId::FL, 0b0000_0010)],
+                vec![0; 100],
+                false,
+                "SAR - CPU flags not correctly set",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the arithmetic right-shift u32 register by u32 register.
+    #[test]
+    fn test_arith_right_shift_u32_reg_u32_reg() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    Instruction::ArithRightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0x1), (RegisterId::R2, 0x1)],
+                vec![0; 100],
+                false,
+                "SAR - incorrect result value produced",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(
+                        0b0111_1111_1111_1111_1111_1111_1111_1111,
+                        RegisterId::R1,
+                    ),
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    Instruction::ArithRightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0b1011_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::R2, 0x1),
+                ],
+                vec![0; 100],
+                false,
+                "SAR - incorrect result value produced",
+            ),
+            // Just zero flag should be set here since zero left-shifted by anything will be zero.
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    Instruction::ArithRightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                ],
+                &[(RegisterId::R2, 0x1), (RegisterId::FL, 0b0000_0010)],
                 vec![0; 100],
                 false,
                 "SAR - CPU flags not correctly set",

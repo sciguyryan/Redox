@@ -86,6 +86,10 @@ impl Compiler {
                 self.write_u32(imm);
                 self.write_register_id(&reg);
             }
+            Instruction::ArithRightShiftU32RegU32Reg(shift_reg, reg) => {
+                self.write_register_id(&shift_reg);
+                self.write_register_id(&reg);
+            }
 
             /******** [Move Instructions - NO EXPRESSIONS] ********/
             Instruction::SwapU32RegU32Reg(reg1, reg2) => {
