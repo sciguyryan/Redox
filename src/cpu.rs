@@ -2,6 +2,7 @@ use core::fmt;
 use std::{collections::BTreeMap, panic, slice::Iter};
 
 use crate::{
+    cpu,
     ins::{
         instruction::Instruction,
         move_expressions::{ExpressionArgs, ExpressionOperator, MoveExpressionHandler},
@@ -9,7 +10,7 @@ use crate::{
     mem::memory::Memory,
     privilege_level::PrivilegeLevel,
     reg::registers::{RegisterId, Registers},
-    utils, cpu,
+    utils,
 };
 
 /// The u32 maximum value, as u64 constant.
@@ -248,16 +249,16 @@ impl Cpu {
     ///
     /// # Note
     ///
-    /// This method sets and unsets the zero flag and overflow flags as required and always
-    /// clears the carry flag.
+    /// This method sets and unsets the zero flag and always clears the overflow flag
+    /// and carry flags.
     #[inline(always)]
-    fn perform_checked_right_shift_u32(&mut self, value: u32, shift_by: u32) -> u32 {
+    fn perform_right_shift_u32(&mut self, value: u32, shift_by: u32) -> u32 {
         assert!(shift_by <= 31);
 
         self.set_flag_state(CpuFlag::OF, false);
         self.set_flag_state(CpuFlag::CF, false);
 
-        let final_value = (value as u64 >> shift_by) as u32;
+        let final_value = value >> shift_by;
         self.set_flag_state(CpuFlag::ZF, final_value == 0);
 
         final_value
@@ -371,11 +372,20 @@ impl Cpu {
             }
             Instruction::RightShiftU32ImmU32Reg(imm, reg) => {
                 let old_value = *self.registers.get_register_u32(*reg).read(privilege);
-                let shifted = self.perform_checked_right_shift_u32(old_value, *imm);
+                let shifted = self.perform_right_shift_u32(old_value, *imm);
 
                 self.registers
                     .get_register_u32_mut(*reg)
                     .write(shifted, privilege);
+            }
+            Instruction::RightShiftU32RegU32Reg(shift_reg, reg) => {
+                let shift_by = *self.registers.get_register_u32(*shift_reg).read(privilege);
+                let old_value = *self.registers.get_register_u32(*reg).read(privilege);
+                let shifted = self.perform_right_shift_u32(old_value, shift_by);
+
+                self.registers
+                    .get_register_u32_mut(*reg)
+                    .write(shifted, privilege)
             }
 
             /******** [Move Instructions - NO EXPRESSIONS] ********/
@@ -580,7 +590,7 @@ mod tests_cpu {
 
     struct TestEntryU32Standard {
         pub instructions: Vec<Instruction>,
-        pub registers: Registers,
+        pub expected_registers: Registers,
         pub expected_memory: Vec<u8>,
         pub should_panic: bool,
         pub fail_message: String,
@@ -589,7 +599,7 @@ mod tests_cpu {
     impl TestEntryU32Standard {
         fn new(
             instructions: &[Instruction],
-            changed_registers: &[(RegisterId, u32)],
+            expected_registers: &[(RegisterId, u32)],
             expected_memory: Vec<u8>,
             should_panic: bool,
             fail_message: &str,
@@ -604,13 +614,13 @@ mod tests_cpu {
 
             let mut s = Self {
                 instructions: instructions_vec,
-                registers: Registers::default(),
+                expected_registers: Registers::default(),
                 expected_memory,
                 should_panic,
                 fail_message: fail_message.to_string(),
             };
 
-            s.build_registers(changed_registers);
+            s.build_registers(expected_registers);
 
             s
         }
@@ -619,8 +629,8 @@ mod tests_cpu {
         ///
         /// # Arguments
         ///
-        /// * `register_presets` - A slice of tuples, the first entry being the [`RegisterId`] and the second being the expected value.
-        fn build_registers(&mut self, register_presets: &[(RegisterId, u32)]) {
+        /// * `expected_registers` - A slice of tuples, the first entry being the [`RegisterId`] and the second being the expected value.
+        fn build_registers(&mut self, expected_registers: &[(RegisterId, u32)]) {
             // This should be done before the registers are set because there will be instances
             // there the number of executed instructions will be different than the total
             // instruction count, such as if we hit a halt or early return.
@@ -630,15 +640,15 @@ mod tests_cpu {
                 .map(|i| i.get_total_instruction_size())
                 .sum();
 
-            self.registers
+            self.expected_registers
                 .get_register_u32_mut(RegisterId::IP)
                 .write_unchecked(size);
-            self.registers
+            self.expected_registers
                 .get_register_u32_mut(RegisterId::PC)
                 .write_unchecked(self.instructions.len() as u32);
 
-            for (reg, val) in register_presets {
-                self.registers
+            for (reg, val) in expected_registers {
+                self.expected_registers
                     .get_register_u32_mut(*reg)
                     .write_unchecked(*val);
             }
@@ -672,7 +682,7 @@ mod tests_cpu {
             let (mem, cpu) = result.unwrap();
             assert_eq!(
                 cpu.registers,
-                self.registers,
+                self.expected_registers,
                 "{}",
                 self.fail_message(id, false)
             );
@@ -1185,6 +1195,72 @@ mod tests_cpu {
             // This should assert as a shift of value higher than 31 is unsupported.
             TestEntryU32Standard::new(
                 &[Instruction::RightShiftU32ImmU32Reg(0x20, RegisterId::R1)],
+                &[],
+                vec![0; 100],
+                true,
+                "SHR - successfully executed instruction with invalid shift value",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the right-shift u32 register by u32 register.
+    #[test]
+    fn test_right_shift_u32_reg_u32_reg() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    Instruction::RightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0x1), (RegisterId::R2, 0x1)],
+                vec![0; 100],
+                false,
+                "SHR - incorrect result value produced",
+            ),
+            // The SHR command should clear the overflow and carry flags.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the overflow and carry flags.
+                    Instruction::MovU32ImmU32Reg(0b0110, RegisterId::FL),
+                    // Execute the test instruction.
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    Instruction::MovU32ImmU32Reg(
+                        0b1011_1111_1111_1111_1111_1111_1111_1111,
+                        RegisterId::R1,
+                    ),
+                    Instruction::RightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0b0101_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::R2, 0x1),
+                ],
+                vec![0; 100],
+                false,
+                "SHR - CPU flags not correctly set",
+            ),
+            // Just zero flag should be set here since zero left-shifted by anything will be zero.
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    Instruction::RightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                ],
+                &[(RegisterId::R2, 0x1), (RegisterId::FL, 0b0010)],
+                vec![0; 100],
+                false,
+                "SHR - CPU flags not correctly set",
+            ),
+            // This should assert as a shift of value higher than 31 is unsupported.
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x20, RegisterId::R2),
+                    Instruction::RightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                ],
                 &[],
                 vec![0; 100],
                 true,

@@ -27,7 +27,6 @@ use crate::{
 
 fn run_test() {
     use std::time::Instant;
-    let now = Instant::now();
 
     let expr_args = [
         ExpressionArgs::Register(RegisterId::R7),
@@ -52,7 +51,8 @@ fn run_test() {
     let data = Compiler::compile(instructions);
 
     let iterations = 100_000;
-    // Code block to measure.
+
+    let now = Instant::now();
     {
         for _ in 0..iterations {
             let mut vm = VirtualMachine::new(500);
