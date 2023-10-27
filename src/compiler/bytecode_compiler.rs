@@ -43,102 +43,51 @@ impl Compiler {
         // First, we push the bytes for the opcode.
         self.write_opcode(OpCode::from(*instruction));
 
-        // Next, we need to push the argument bytes.
+        // Now we need to encode the instruction argument bytes.
+        // This is done based on the type and order of the arguments.
         match *instruction {
-            Instruction::Nop => {}
-
-            /******** [Arithmetic Instructions] ********/
-            Instruction::AddU32ImmU32Reg(imm, reg) => {
+            /******** [u32 immediate and u32 register] ********/
+            Instruction::AddU32ImmU32Reg(imm, reg)
+            | Instruction::LeftShiftU32ImmU32Reg(imm, reg)
+            | Instruction::ArithLeftShiftU32ImmU32Reg(imm, reg)
+            | Instruction::RightShiftU32ImmU32Reg(imm, reg)
+            | Instruction::ArithRightShiftU32ImmU32Reg(imm, reg)
+            | Instruction::MovU32ImmU32Reg(imm, reg)
+            | Instruction::MovMemU32RegRelSimple(imm, reg)
+            | Instruction::MovMemExprU32RegRel(imm, reg) => {
                 self.write_u32(imm);
-                self.write_register_id(&reg);
-            }
-            Instruction::AddU32RegU32Reg(in_reg, out_reg) => {
-                self.write_register_id(&in_reg);
-                self.write_register_id(&out_reg);
-            }
-
-            /******** [Bit Operation Instructions] ********/
-            Instruction::LeftShiftU32ImmU32Reg(imm, reg) => {
-                self.write_u32(imm);
-                self.write_register_id(&reg);
-            }
-            Instruction::LeftShiftU32RegU32Reg(shift_reg, reg) => {
-                self.write_register_id(&shift_reg);
-                self.write_register_id(&reg);
-            }
-            Instruction::ArithLeftShiftU32ImmU32Reg(imm, reg) => {
-                self.write_u32(imm);
-                self.write_register_id(&reg);
-            }
-            Instruction::ArithLeftShiftU32RegU32Reg(shift_reg, reg) => {
-                self.write_register_id(&shift_reg);
-                self.write_register_id(&reg);
-            }
-            Instruction::RightShiftU32ImmU32Reg(imm, reg) => {
-                self.write_u32(imm);
-                self.write_register_id(&reg);
-            }
-            Instruction::RightShiftU32RegU32Reg(shift_reg, reg) => {
-                self.write_register_id(&shift_reg);
-                self.write_register_id(&reg);
-            }
-            Instruction::ArithRightShiftU32ImmU32Reg(imm, reg) => {
-                self.write_u32(imm);
-                self.write_register_id(&reg);
-            }
-            Instruction::ArithRightShiftU32RegU32Reg(shift_reg, reg) => {
-                self.write_register_id(&shift_reg);
                 self.write_register_id(&reg);
             }
 
-            /******** [Move Instructions - NO EXPRESSIONS] ********/
-            Instruction::SwapU32RegU32Reg(reg1, reg2) => {
+            /******** [u32 register and u32 register] ********/
+            Instruction::AddU32RegU32Reg(reg1, reg2)
+            | Instruction::LeftShiftU32RegU32Reg(reg1, reg2)
+            | Instruction::ArithLeftShiftU32RegU32Reg(reg1, reg2)
+            | Instruction::RightShiftU32RegU32Reg(reg1, reg2)
+            | Instruction::ArithRightShiftU32RegU32Reg(reg1, reg2)
+            | Instruction::SwapU32RegU32Reg(reg1, reg2)
+            | Instruction::MovU32RegU32Reg(reg1, reg2)
+            | Instruction::MovU32RegPtrU32RegRelSimple(reg1, reg2) => {
                 self.write_register_id(&reg1);
                 self.write_register_id(&reg2);
             }
-            Instruction::MovU32ImmU32Reg(imm, reg) => {
-                self.write_u32(imm);
-                self.write_register_id(&reg);
-            }
-            Instruction::MovU32RegU32Reg(in_reg, out_reg) => {
-                self.write_register_id(&in_reg);
-                self.write_register_id(&out_reg);
-            }
-            Instruction::MovU32ImmMemRelSimple(imm, addr) => {
-                self.write_u32(imm);
-                self.write_u32(addr);
-            }
-            Instruction::MovU32RegMemRelSimple(reg, addr) => {
-                self.write_register_id(&reg);
-                self.write_u32(addr);
-            }
-            Instruction::MovMemU32RegRelSimple(addr, reg) => {
-                self.write_u32(addr);
-                self.write_register_id(&reg);
-            }
-            Instruction::MovU32RegPtrU32RegRelSimple(in_reg, out_reg) => {
-                self.write_register_id(&in_reg);
-                self.write_register_id(&out_reg);
+
+            /******** [u32 immediate and u32 immediate] ********/
+            Instruction::MovU32ImmMemRelSimple(imm1, imm2)
+            | Instruction::MovU32ImmMemExprRel(imm1, imm2) => {
+                self.write_u32(imm1);
+                self.write_u32(imm2);
             }
 
-            /******** [Move Instructions - WITH EXPRESSIONS] ********/
-            Instruction::MovU32ImmMemExprRel(imm, expr) => {
+            /******** [u32 register and u32 immediate] ********/
+            Instruction::MovU32RegMemRelSimple(reg, imm)
+            | Instruction::MovU32RegMemExprRel(reg, imm) => {
+                self.write_register_id(&reg);
                 self.write_u32(imm);
-                self.write_u32(expr);
-            }
-            Instruction::MovMemExprU32RegRel(expr, reg) => {
-                self.write_u32(expr);
-                self.write_register_id(&reg);
-            }
-            Instruction::MovU32RegMemExprRel(reg, expr) => {
-                self.write_register_id(&reg);
-                self.write_u32(expr);
             }
 
             /******** [Special Instructions] ********/
-            Instruction::Ret => todo!(),
-            Instruction::Mret => {}
-            Instruction::Hlt => {}
+            Instruction::Nop | Instruction::Ret | Instruction::Mret | Instruction::Hlt => {}
         }
     }
 
