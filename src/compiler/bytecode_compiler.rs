@@ -86,7 +86,7 @@ impl Compiler {
                 self.write_u32(imm);
             }
 
-            /******** [Special Instructions] ********/
+            /******** [No Arguments] ********/
             Instruction::Nop | Instruction::Ret | Instruction::Mret | Instruction::Hlt => {}
         }
     }
