@@ -1,26 +1,29 @@
-use crate::ins::{instruction::Instruction, op_codes::OpCode};
+use crate::{
+    ins::{instruction::Instruction, op_codes::OpCode},
+    reg::registers::RegisterId,
+};
 
-pub struct Compiler {}
+pub struct Compiler {
+    /// A vector containing all of the compiled bytecode.
+    bytes: Vec<u8>,
+}
 
 impl Compiler {
+    pub fn new() -> Self {
+        Self { bytes: Vec::new() }
+    }
+
     /// Compile a sequence of instructions into bytecode.
     ///
     /// # Arguments
     ///
     /// * `instructions` - A slice of [`Instruction`] objects to be compiled.
-    ///
-    /// # Returns
-    ///
-    /// A vector of u8 bytes containing the compiled data.
-    pub fn compile(instructions: &[Instruction]) -> Vec<u8> {
-        let mut compiled_bytes = Vec::new();
-
+    pub fn compile(&mut self, instructions: &[Instruction]) -> &[u8] {
         for ins in instructions {
-            let bytecode = Compiler::compile_instruction(ins);
-            compiled_bytes.extend_from_slice(&bytecode);
+            self.compile_instruction(ins);
         }
 
-        compiled_bytes
+        &self.bytes
     }
 
     /// Compile a single instruction into bytecode.
@@ -32,13 +35,9 @@ impl Compiler {
     /// # Returns
     ///
     /// A vector of u8 bytes containing the compiled data in byte form.
-    fn compile_instruction(instruction: &Instruction) -> Vec<u8> {
-        let mut bytecode = Vec::new();
-
+    fn compile_instruction(&mut self, instruction: &Instruction) {
         // First, we push the bytes for the opcode.
-        let opcode_value = OpCode::from(*instruction) as u32;
-        let opcode_bytes = opcode_value.to_le_bytes();
-        bytecode.extend_from_slice(&opcode_bytes);
+        self.write_opcode(&OpCode::from(*instruction));
 
         // Next, we need to push the argument bytes.
         match *instruction {
@@ -46,82 +45,82 @@ impl Compiler {
 
             /******** [Arithmetic Instructions] ********/
             Instruction::AddU32ImmU32Reg(imm, reg) => {
-                bytecode.extend_from_slice(&imm.to_le_bytes());
-                bytecode.push(reg.into());
+                self.write_u32(imm);
+                self.write_register_id(&reg);
             }
             Instruction::AddU32RegU32Reg(in_reg, out_reg) => {
-                bytecode.push(in_reg.into());
-                bytecode.push(out_reg.into());
+                self.write_register_id(&in_reg);
+                self.write_register_id(&out_reg);
             }
 
             /******** [Bit Operation Instructions] ********/
             Instruction::LeftShiftU32ImmU32Reg(imm, reg) => {
-                bytecode.extend_from_slice(&imm.to_le_bytes());
-                bytecode.push(reg.into());
+                self.write_u32(imm);
+                self.write_register_id(&reg);
             }
             Instruction::LeftShiftU32RegU32Reg(shift_reg, reg) => {
-                bytecode.push(shift_reg.into());
-                bytecode.push(reg.into());
+                self.write_register_id(&shift_reg);
+                self.write_register_id(&reg);
             }
             Instruction::ArithLeftShiftU32ImmU32Reg(imm, reg) => {
-                bytecode.extend_from_slice(&imm.to_le_bytes());
-                bytecode.push(reg.into());
+                self.write_u32(imm);
+                self.write_register_id(&reg);
             }
             Instruction::ArithLeftShiftU32RegU32Reg(shift_reg, reg) => {
-                bytecode.push(shift_reg.into());
-                bytecode.push(reg.into());
+                self.write_register_id(&shift_reg);
+                self.write_register_id(&reg);
             }
             Instruction::RightShiftU32ImmU32Reg(imm, reg) => {
-                bytecode.extend_from_slice(&imm.to_le_bytes());
-                bytecode.push(reg.into());
+                self.write_u32(imm);
+                self.write_register_id(&reg);
             }
             Instruction::RightShiftU32RegU32Reg(shift_reg, reg) => {
-                bytecode.push(shift_reg.into());
-                bytecode.push(reg.into());
+                self.write_register_id(&shift_reg);
+                self.write_register_id(&reg);
             }
 
             /******** [Move Instructions - NO EXPRESSIONS] ********/
             Instruction::SwapU32RegU32Reg(reg1, reg2) => {
-                bytecode.push(reg1.into());
-                bytecode.push(reg2.into());
+                self.write_register_id(&reg1);
+                self.write_register_id(&reg2);
             }
             Instruction::MovU32ImmU32Reg(imm, reg) => {
-                bytecode.extend_from_slice(&imm.to_le_bytes());
-                bytecode.push(reg.into());
+                self.write_u32(imm);
+                self.write_register_id(&reg);
             }
             Instruction::MovU32RegU32Reg(in_reg, out_reg) => {
-                bytecode.push(in_reg.into());
-                bytecode.push(out_reg.into());
+                self.write_register_id(&in_reg);
+                self.write_register_id(&out_reg);
             }
             Instruction::MovU32ImmMemRelSimple(imm, addr) => {
-                bytecode.extend_from_slice(&imm.to_le_bytes());
-                bytecode.extend_from_slice(&addr.to_le_bytes());
+                self.write_u32(imm);
+                self.write_u32(addr);
             }
             Instruction::MovU32RegMemRelSimple(reg, addr) => {
-                bytecode.push(reg.into());
-                bytecode.extend_from_slice(&addr.to_le_bytes());
+                self.write_register_id(&reg);
+                self.write_u32(addr);
             }
             Instruction::MovMemU32RegRelSimple(addr, reg) => {
-                bytecode.extend_from_slice(&addr.to_le_bytes());
-                bytecode.push(reg.into());
+                self.write_u32(addr);
+                self.write_register_id(&reg);
             }
             Instruction::MovU32RegPtrU32RegRelSimple(in_reg, out_reg) => {
-                bytecode.push(in_reg.into());
-                bytecode.push(out_reg.into());
+                self.write_register_id(&in_reg);
+                self.write_register_id(&out_reg);
             }
 
             /******** [Move Instructions - WITH EXPRESSIONS] ********/
             Instruction::MovU32ImmMemExprRel(imm, expr) => {
-                bytecode.extend_from_slice(&imm.to_le_bytes());
-                bytecode.extend_from_slice(&expr.to_le_bytes());
+                self.write_u32(imm);
+                self.write_u32(expr);
             }
             Instruction::MovMemExprU32RegRel(expr, reg) => {
-                bytecode.extend_from_slice(&expr.to_le_bytes());
-                bytecode.push(reg.into());
+                self.write_u32(expr);
+                self.write_register_id(&reg);
             }
             Instruction::MovU32RegMemExprRel(reg, expr) => {
-                bytecode.push(reg.into());
-                bytecode.extend_from_slice(&expr.to_le_bytes());
+                self.write_register_id(&reg);
+                self.write_u32(expr);
             }
 
             /******** [Special Instructions] ********/
@@ -129,7 +128,32 @@ impl Compiler {
             Instruction::Mret => {}
             Instruction::Hlt => {}
         }
+    }
 
-        bytecode
+    /// Write an opcode into the byte sequence.
+    ///
+    /// # Arguments
+    ///
+    /// * `opcode` - The [`OpCode`] to be written.
+    fn write_opcode(&mut self, opcode: &OpCode) {
+        self.write_u32(*opcode as u32);
+    }
+
+    /// Write a register ID into the byte sequence.
+    ///
+    /// # Arguments
+    ///
+    /// * `reg_id` - The [`RegisterId`] to be written.
+    fn write_register_id(&mut self, reg_id: &RegisterId) {
+        self.bytes.push((*reg_id).into());
+    }
+
+    /// Write a u32 into the byte sequence.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The value to be written.
+    fn write_u32(&mut self, value: u32) {
+        self.bytes.extend_from_slice(&value.to_le_bytes());
     }
 }

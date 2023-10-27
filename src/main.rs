@@ -48,7 +48,8 @@ fn run_test() {
         Instruction::Hlt,
     ];
 
-    let data = Compiler::compile(instructions);
+    let mut compiler = Compiler::new();
+    let data = compiler.compile(instructions);
 
     let iterations = 100_000;
 
@@ -56,7 +57,7 @@ fn run_test() {
     {
         for _ in 0..iterations {
             let mut vm = VirtualMachine::new(500);
-            vm.load_code_block(0, &data);
+            vm.load_code_block(0, data);
             vm.run();
         }
     }
@@ -116,7 +117,8 @@ fn main() {
         Instruction::Hlt,
     ];
 
-    let data = Compiler::compile(instructions);
+    let mut compiler = Compiler::new();
+    let data = compiler.compile(instructions);
     //println!("compiled data = {data:?}");
     //println!("compiled data len = {}", data.len());
 
@@ -126,7 +128,7 @@ fn main() {
     }
     println!();
 
-    vm.load_code_block(0, &data);
+    vm.load_code_block(0, data);
     vm.run();
 
     //vm.run_instructions(&instructions[..]);
