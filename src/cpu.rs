@@ -250,14 +250,18 @@ impl Cpu {
     ///
     /// # Note
     ///
-    /// This method sets and unsets the zero flag and always clears the overflow flag
-    /// and carry flags.
+    /// This method sets and unsets the zero and carry flags as required,
+    /// and always clears the overflow flag.
     #[inline(always)]
     fn perform_right_shift_u32(&mut self, value: u32, shift_by: u32) -> u32 {
         assert!(shift_by <= 31);
 
         self.set_flag_state(CpuFlag::OF, false);
-        self.set_flag_state(CpuFlag::CF, false);
+
+        // The carried forward flag should be the value of the least significant bit being
+        // shifted out of the value and so MUST be calculated prior to the shifted value.
+        // Since we are working in little-Endian the lowest bit has the lowest index.
+        self.set_flag_state(CpuFlag::CF, utils::is_bit_set(value, 0));
 
         let final_value = value >> shift_by;
         self.set_flag_state(CpuFlag::ZF, final_value == 0);
@@ -1238,19 +1242,44 @@ mod tests_cpu {
                 false,
                 "SHR - incorrect result value produced",
             ),
-            // The SHR command should clear the overflow and carry flags.
+            // The SHR command should clear the overflow flag but set the
+            // carry flag since the bit being shifted out is one.
             TestEntryU32Standard::new(
                 &[
-                    // Manually set the overflow and carry flags.
-                    Instruction::MovU32ImmU32Reg(0b0110, RegisterId::FL),
+                    // Manually set the overflow flag.
+                    Instruction::MovU32ImmU32Reg(0b0100, RegisterId::FL),
                     // Execute the test instruction.
                     Instruction::MovU32ImmU32Reg(
-                        0b1011_1111_1111_1111_1111_1111_1111_1111,
+                        0b0111_1111_1111_1111_1111_1111_1111_1111,
                         RegisterId::R1,
                     ),
                     Instruction::RightShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
-                &[(RegisterId::R1, 0b0101_1111_1111_1111_1111_1111_1111_1111)],
+                &[
+                    (RegisterId::R1, 0b0011_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::FL, 0b1000),
+                ],
+                vec![0; 100],
+                false,
+                "SHR - CPU flags not correctly set",
+            ),
+            // The SHR command should clear the overflow flag and the
+            // carry flag in this case as the bit being shifted out is zero.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the overflow flag.
+                    Instruction::MovU32ImmU32Reg(0b0100, RegisterId::FL),
+                    // Execute the test instruction.
+                    Instruction::MovU32ImmU32Reg(
+                        0b0111_1111_1111_1111_1111_1111_1111_1110,
+                        RegisterId::R1,
+                    ),
+                    Instruction::RightShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0b0011_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::FL, 0b0000),
+                ],
                 vec![0; 100],
                 false,
                 "SHR - CPU flags not correctly set",
@@ -1296,22 +1325,47 @@ mod tests_cpu {
                 false,
                 "SHR - incorrect result value produced",
             ),
-            // The SHR command should clear the overflow and carry flags.
+            // The SHR command should clear the overflow flag but set the
+            // carry flag since the bit being shifted out is one.
             TestEntryU32Standard::new(
                 &[
-                    // Manually set the overflow and carry flags.
-                    Instruction::MovU32ImmU32Reg(0b0110, RegisterId::FL),
-                    // Execute the test instruction.
+                    // Manually set the overflow flag.
+                    Instruction::MovU32ImmU32Reg(0b0100, RegisterId::FL),
                     Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    // Execute the test instruction.
                     Instruction::MovU32ImmU32Reg(
-                        0b1011_1111_1111_1111_1111_1111_1111_1111,
+                        0b0111_1111_1111_1111_1111_1111_1111_1111,
                         RegisterId::R1,
                     ),
                     Instruction::RightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[
-                    (RegisterId::R1, 0b0101_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::R1, 0b0011_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::R2, 0x1),
+                    (RegisterId::FL, 0b1000),
+                ],
+                vec![0; 100],
+                false,
+                "SHR - CPU flags not correctly set",
+            ),
+            // The SHR command should clear the overflow flag and the
+            // carry flag in this case as the bit being shifted out is zero.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the overflow flag.
+                    Instruction::MovU32ImmU32Reg(0b0100, RegisterId::FL),
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    // Execute the test instruction.
+                    Instruction::MovU32ImmU32Reg(
+                        0b0111_1111_1111_1111_1111_1111_1111_1110,
+                        RegisterId::R1,
+                    ),
+                    Instruction::RightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0b0011_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::R2, 0x1),
+                    (RegisterId::FL, 0b0000),
                 ],
                 vec![0; 100],
                 false,

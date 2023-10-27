@@ -89,13 +89,14 @@ fn main() {
     let expr = expression_encoder.encode(&expr_args_1);
 
     let instructions = &[
-        Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+        /*Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
         Instruction::MovU32ImmU32Reg(0x2, RegisterId::R2),
         Instruction::SwapU32RegU32Reg(RegisterId::R1, RegisterId::R2),
         Instruction::Mret,
         Instruction::MovU32ImmU32Reg(50, RegisterId::R7),
         Instruction::MovU32ImmU32Reg(50, RegisterId::R8),
-        Instruction::MovU32ImmMemExprRel(0x123, expr),
+        Instruction::MovU32ImmMemExprRel(0x123, expr),*/
+
         /*Instruction::MovU32ImmMemRelSimple(0x123, 50),
         Instruction::MovMemExprU32RegRel(
             expression_encoder.encode(&[
@@ -105,6 +106,7 @@ fn main() {
             ]),
             RegisterId::R1,
         ),*/
+
         /*Instruction::MovU32ImmMemRelSimple(0x123, 50),
         Instruction::MovU32RegMemExprRel(
             RegisterId::R1,
@@ -114,6 +116,11 @@ fn main() {
                 ExpressionArgs::Constant(25),
             ]),
         ),*/
+        // Manually set the overflow flag.
+        Instruction::MovU32ImmU32Reg(0b0100, RegisterId::FL),
+        // Execute the test instruction.
+        Instruction::MovU32ImmU32Reg(0b0011_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+        Instruction::RightShiftU32ImmU32Reg(0x1, RegisterId::R1),
         Instruction::Hlt,
     ];
 
