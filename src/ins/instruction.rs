@@ -40,6 +40,8 @@ pub enum Instruction {
     RightShiftU32ImmU32Reg(u32, RegisterId),
     /// Right-shift a u32 register (B) by a u32 register (A). The result remains in register A.
     RightShiftU32RegU32Reg(RegisterId, RegisterId),
+    /// Arithmetic right-shift a u32 register by a u32 immediate. The result remains in the origin register.
+    ArithRightShiftU32ImmU32Reg(u32, RegisterId),
 
     /******** [Move Instructions - NO EXPRESSIONS] ********/
     /// Swap the values of the two registers.
@@ -106,6 +108,9 @@ impl Display for Instruction {
             }
             Instruction::RightShiftU32RegU32Reg(shift_reg, reg) => {
                 format!("shr {shift_reg}, {reg}")
+            }
+            Instruction::ArithRightShiftU32ImmU32Reg(imm, reg) => {
+                format!("sar ${imm:02X}, {reg}")
             }
 
             /******** [Move Instructions - NO EXPRESSIONS] ********/
@@ -176,6 +181,7 @@ impl Instruction {
             Instruction::ArithLeftShiftU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
             Instruction::RightShiftU32ImmU32Reg(_, _) => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
             Instruction::RightShiftU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
+            Instruction::ArithRightShiftU32ImmU32Reg(_, _) => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Move Instructions - NO EXPRESSIONS] ********/
             Instruction::SwapU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
@@ -215,6 +221,7 @@ impl Instruction {
             OpCode::ArithLeftShiftU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
             OpCode::RightShiftU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
             OpCode::RightShiftU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
+            OpCode::ArithRightShiftU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Move Instructions - NO EXPRESSIONS] ********/
             OpCode::SwapU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,

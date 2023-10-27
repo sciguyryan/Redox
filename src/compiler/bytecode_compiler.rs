@@ -18,6 +18,10 @@ impl Compiler {
     /// # Arguments
     ///
     /// * `instructions` - A slice of [`Instruction`] objects to be compiled.
+    ///
+    /// # Returns
+    ///
+    /// A slice of bytes containing the compiled bytecode.
     pub fn compile(&mut self, instructions: &[Instruction]) -> &[u8] {
         for ins in instructions {
             self.compile_instruction(ins);
@@ -37,7 +41,7 @@ impl Compiler {
     /// A vector of u8 bytes containing the compiled data in byte form.
     fn compile_instruction(&mut self, instruction: &Instruction) {
         // First, we push the bytes for the opcode.
-        self.write_opcode(&OpCode::from(*instruction));
+        self.write_opcode(OpCode::from(*instruction));
 
         // Next, we need to push the argument bytes.
         match *instruction {
@@ -76,6 +80,10 @@ impl Compiler {
             }
             Instruction::RightShiftU32RegU32Reg(shift_reg, reg) => {
                 self.write_register_id(&shift_reg);
+                self.write_register_id(&reg);
+            }
+            Instruction::ArithRightShiftU32ImmU32Reg(imm, reg) => {
+                self.write_u32(imm);
                 self.write_register_id(&reg);
             }
 
@@ -135,8 +143,8 @@ impl Compiler {
     /// # Arguments
     ///
     /// * `opcode` - The [`OpCode`] to be written.
-    fn write_opcode(&mut self, opcode: &OpCode) {
-        self.write_u32(*opcode as u32);
+    fn write_opcode(&mut self, opcode: OpCode) {
+        self.write_u32(opcode as u32);
     }
 
     /// Write a register ID into the byte sequence.
