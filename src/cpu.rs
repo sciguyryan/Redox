@@ -171,13 +171,14 @@ impl Cpu {
     /// This method sets and unsets the zero and overflow flags as required.
     #[inline(always)]
     fn perform_checked_add_u32(&mut self, value_1: u32, value_2: u32) -> u32 {
-        let final_value = value_1 as u64 + value_2 as u64;
-        self.set_flag_state(CpuFlag::OF, final_value > cpu::U32_MAX);
+        let (final_value, overflow) = match value_1.checked_add(value_2) {
+            Some(val) => (val, false),
+            None => ((value_1 as u64 + value_2 as u64) as u32, true),
+        };
+        self.set_flag_state(CpuFlag::OF, overflow);
+        self.set_flag_state(CpuFlag::ZF, final_value == 0);
 
-        let final_u32_value = final_value as u32;
-        self.set_flag_state(CpuFlag::ZF, final_u32_value == 0);
-
-        final_u32_value
+        final_value
     }
 
     /// Perform a checked left-shift of two u32 values.
@@ -206,7 +207,10 @@ impl Cpu {
         if shift_by == 1 {
             self.set_flag_state(CpuFlag::OF, final_value < value);
         }
-        self.set_flag_state(CpuFlag::CF, utils::is_bit_set_32(value, (32 - shift_by) & 1));
+        self.set_flag_state(
+            CpuFlag::CF,
+            utils::is_bit_set_32(value, (32 - shift_by) & 1),
+        );
         self.set_flag_state(CpuFlag::ZF, final_value == 0);
 
         final_value
@@ -535,7 +539,7 @@ impl Cpu {
     /// * `flag` - The [`CpuFlag`] to be set or unset.
     /// * `state` - The new state of the flag.
     #[inline(always)]
-    fn set_flag_state(&mut self, flag: CpuFlag, state: bool) {
+    pub fn set_flag_state(&mut self, flag: CpuFlag, state: bool) {
         let register = self.registers.get_register_u32_mut(RegisterId::FL);
         let flags = utils::set_bit_state(*register.read_unchecked(), flag.into(), state);
         register.write_unchecked(flags);

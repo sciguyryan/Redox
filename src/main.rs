@@ -79,7 +79,57 @@ fn testing() {
     let leading = val.leading_zeros();
 }
 
+/*fn run_test_2() {
+    use std::time::Instant;
+
+    let iterations = 1;
+
+    let mut out_val_1 = 0;
+    let mut out_val_2 = 0;
+
+    let val: u32 = 0b1111_1111_1111_1111_1111_1111_1111_1111;
+    let mut cpu1 = cpu::Cpu::new();
+    let mut cpu2 = cpu::Cpu::new();
+
+    let now1 = Instant::now();
+    {
+        for _ in 0..iterations {
+            out_val_1 = perform_checked_lsh_u32(&mut cpu1, val, 2);
+        }
+    }
+    let elapsed1 = now1.elapsed().as_nanos() as f32;
+
+    let now2 = Instant::now();
+    {
+        for _ in 0..iterations {
+            out_val_2 = perform_checked_lsh_u32_2(&mut cpu2, val, 2);
+        }
+    }
+    let elapsed2 = now2.elapsed().as_nanos() as f32;
+
+    println!(
+        "Elapsed (1): {:.2?} microseconds per iteration",
+        elapsed1 / iterations as f32
+    );
+    println!(
+        "Elapsed (2): {:.2?} microseconds per iteration",
+        elapsed2 / iterations as f32
+    );
+
+    assert_eq!(out_val_1, out_val_2);
+    assert_eq!(
+        cpu1.registers
+            .get_register_u32(RegisterId::FL)
+            .read_unchecked(),
+        cpu2.registers
+            .get_register_u32(RegisterId::FL)
+            .read_unchecked()
+    );
+}*/
+
 fn main() {
+    //run_test_2();
+
     let mut vm = VirtualMachine::new(64_000);
 
     //vm.ram.set(0, 0x12, &SecurityContext::Machine);
