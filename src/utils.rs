@@ -4,7 +4,7 @@ pub fn is_bit_set(value: u32, bit: u8) -> bool {
 }
 
 #[inline(always)]
-pub fn is_bit_set_64(value: u64, bit: u8) -> bool {
+pub fn is_bit_set_32(value: u32, bit: u32) -> bool {
     (value & (1 << bit)) != 0
 }
 

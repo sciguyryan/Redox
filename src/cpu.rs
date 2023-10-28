@@ -198,17 +198,18 @@ impl Cpu {
     #[inline(always)]
     fn perform_checked_left_shift_u32(&mut self, value: u32, shift_by: u32) -> u32 {
         assert!(shift_by <= 31);
-
-        let final_value = (value as u64) << shift_by;
-        if shift_by == 1 {
-            self.set_flag_state(CpuFlag::OF, final_value > cpu::U32_MAX);
+        if shift_by == 0 {
+            return value;
         }
-        self.set_flag_state(CpuFlag::CF, utils::is_bit_set_64(final_value, 32));
 
-        let final_u32_value = final_value as u32;
-        self.set_flag_state(CpuFlag::ZF, final_u32_value == 0);
+        let final_value = value << shift_by;
+        if shift_by == 1 {
+            self.set_flag_state(CpuFlag::OF, final_value < value);
+        }
+        self.set_flag_state(CpuFlag::CF, utils::is_bit_set_32(value, (32 - shift_by) & 1));
+        self.set_flag_state(CpuFlag::ZF, final_value == 0);
 
-        final_u32_value
+        final_value
     }
 
     /// Perform an arithmetic left-shift of two u32 values.
@@ -255,6 +256,9 @@ impl Cpu {
     #[inline(always)]
     fn perform_right_shift_u32(&mut self, value: u32, shift_by: u32) -> u32 {
         assert!(shift_by <= 31);
+        if shift_by == 0 {
+            return value;
+        }
 
         self.set_flag_state(CpuFlag::OF, false);
 

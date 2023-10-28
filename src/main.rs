@@ -69,6 +69,16 @@ fn run_test() {
     );
 }
 
+fn testing() {
+    let val: u64 = 0b0111_1111_1111_1111_1111_1111_1111_1111 << 2;
+
+    println!("{val:b}");
+    println!("{}", val.leading_zeros());
+    println!("{}", val.trailing_zeros());
+
+    let leading = val.leading_zeros();
+}
+
 fn main() {
     let mut vm = VirtualMachine::new(64_000);
 
