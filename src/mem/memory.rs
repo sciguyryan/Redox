@@ -356,7 +356,7 @@ mod tests_memory {
 
     /// Test basic reading and writing.
     #[test]
-    fn test_read_write() {
+    fn test_read_write_u8() {
         let mut ram = get_test_ram_instance();
 
         // Read/write a single byte.

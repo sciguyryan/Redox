@@ -2,7 +2,6 @@ use core::fmt;
 use std::{collections::BTreeMap, panic, slice::Iter};
 
 use crate::{
-    cpu,
     ins::{
         instruction::Instruction,
         move_expressions::{ExpressionArgs, ExpressionOperator, MoveExpressionHandler},
@@ -12,9 +11,6 @@ use crate::{
     reg::registers::{RegisterId, Registers},
     utils,
 };
-
-/// The u32 maximum value, as u64 constant.
-const U32_MAX: u64 = u32::MAX as u64;
 
 pub struct Cpu {
     pub registers: Registers,
@@ -516,6 +512,8 @@ impl Cpu {
 
             /******** [Logic Instructions] ********/
             Instruction::BitTest(bit, reg) => {
+                assert!(*bit <= 31);
+
                 // bt bit, reg
                 let value = self.registers.get_register_u32(*reg).read(privilege);
                 self.set_flag_state(CpuFlag::CF, utils::is_bit_set(*value, *bit));
@@ -2179,6 +2177,59 @@ mod tests_cpu {
                 ],
                 false,
                 "MOV - value not correctly moved from memory to register - using subtraction",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the bit-test instruction.
+    #[test]
+    fn test_bit_test_u32_reg() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(
+                        0b1111_1111_1111_1111_1111_1111_1111_1111,
+                        RegisterId::R1,
+                    ),
+                    Instruction::BitTest(0, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::CF])),
+                ],
+                vec![0; 100],
+                false,
+                "BT - incorrect result produced from the bit-test instruction",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(
+                        0b1111_1111_1111_1111_1111_1111_1111_1110,
+                        RegisterId::R1,
+                    ),
+                    Instruction::BitTest(0, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1110)],
+                vec![0; 100],
+                false,
+                "BT - incorrect result produced from the bit-test instruction",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(
+                        0b1111_1111_1111_1111_1111_1111_1111_1111,
+                        RegisterId::R1,
+                    ),
+                    Instruction::BitTest(32, RegisterId::R1),
+                ],
+                &[],
+                vec![0; 100],
+                true,
+                "BT - successfully executed instruction with invalid bit index",
             ),
         ];
 
