@@ -2185,7 +2185,7 @@ mod tests_cpu {
         }
     }
 
-    /// Test the bit-test instruction.
+    /// Test the bit-test instruction with a u32 register.
     #[test]
     fn test_bit_test_u32_reg() {
         let tests = [
@@ -2203,7 +2203,7 @@ mod tests_cpu {
                 ],
                 vec![0; 100],
                 false,
-                "BT - incorrect result produced from the bit-test instruction",
+                "BT - incorrect result produced from the bit-test instruction - carry flag not set",
             ),
             TestEntryU32Standard::new(
                 &[
@@ -2216,7 +2216,7 @@ mod tests_cpu {
                 &[(RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1110)],
                 vec![0; 100],
                 false,
-                "BT - incorrect result produced from the bit-test instruction",
+                "BT - incorrect result produced from the bit-test instruction - carry flag set",
             ),
             TestEntryU32Standard::new(
                 &[
