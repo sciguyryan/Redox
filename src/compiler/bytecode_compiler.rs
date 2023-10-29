@@ -83,7 +83,8 @@ impl Compiler {
 
             /******** [u32 register and u32 immediate] ********/
             Instruction::MovU32RegMemRelSimple(reg, imm)
-            | Instruction::MovU32RegMemExprRel(reg, imm) => {
+            | Instruction::MovU32RegMemExprRel(reg, imm)
+            | Instruction::BitScanReverseU32RegMem(reg, imm) => {
                 self.write_register_id(&reg);
                 self.write_u32(imm);
             }

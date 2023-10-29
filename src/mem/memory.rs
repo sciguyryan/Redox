@@ -253,6 +253,12 @@ impl Memory {
 
                 Instruction::BitScanReverseMemU32Reg(addr, reg)
             }
+            OpCode::BitScanReverseU32RegMem => {
+                let reg = block.read_register_id();
+                let out_addr = block.read_u32();
+
+                Instruction::BitScanReverseU32RegMem(reg, out_addr)
+            }
 
             /******** [Special Instructions] ********/
             OpCode::Ret => Instruction::Ret,

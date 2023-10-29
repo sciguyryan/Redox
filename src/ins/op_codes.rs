@@ -75,6 +75,8 @@ pub enum OpCode {
     BitScanReverseU32RegU32Reg,
     /// Search for the most significant bit in a memory address and store the index of the bit in a u32 register.
     BitScanReverseMemU32Reg,
+    /// Search for the most significant bit in a u32 register and store the index of the bit at a specified memory address.
+    BitScanReverseU32RegMem,
 
     /******** [Special Instructions] ********/
     /// Return from a subroutine.
@@ -128,6 +130,7 @@ impl From<Instruction> for OpCode {
             Instruction::BitTestSetMem(_, _) => OpCode::BitTestSetMem,
             Instruction::BitScanReverseU32RegU32Reg(_, _) => OpCode::BitScanReverseU32RegU32Reg,
             Instruction::BitScanReverseMemU32Reg(_, _) => OpCode::BitScanReverseMemU32Reg,
+            Instruction::BitScanReverseU32RegMem(_, _) => OpCode::BitScanReverseU32RegMem,
 
             /******** [Special Instructions] ********/
             Instruction::Ret => OpCode::Ret,

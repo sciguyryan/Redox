@@ -89,6 +89,8 @@ pub enum Instruction {
     BitScanReverseU32RegU32Reg(RegisterId, RegisterId),
     /// Search for the most significant bit in a memory address and store the index of the bit in a u32 register.
     BitScanReverseMemU32Reg(u32, RegisterId),
+    /// Search for the most significant bit in a u32 register (A) and store the index of the bit at a specified memory address.
+    BitScanReverseU32RegMem(RegisterId, u32),
 
     /******** [Special Instructions] ********/
     /// Return from a subroutine.
@@ -208,6 +210,9 @@ impl Display for Instruction {
             Instruction::BitScanReverseMemU32Reg(addr, reg) => {
                 format!("bsr [${addr:04X}], {reg}")
             }
+            Instruction::BitScanReverseU32RegMem(reg, out_addr) => {
+                format!("bsr {reg}, [${out_addr:04X}]")
+            }
 
             /******** [Special Instructions] ********/
             Instruction::Ret => String::from("ret"),
@@ -261,6 +266,7 @@ impl Instruction {
             Instruction::BitTestSetMem(_, _) => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
             Instruction::BitScanReverseU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
             Instruction::BitScanReverseMemU32Reg(_, _) => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
+            Instruction::BitScanReverseU32RegMem(_, _) => ARG_REG_ID_SIZE + ARG_MEM_ADDR_SIZE,
 
             /******** [Special Instructions] ********/
             Instruction::Ret => 0,
@@ -313,6 +319,7 @@ impl Instruction {
             OpCode::BitTestSetMem => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
             OpCode::BitScanReverseU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
             OpCode::BitScanReverseMemU32Reg => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
+            OpCode::BitScanReverseU32RegMem => ARG_REG_ID_SIZE + ARG_MEM_ADDR_SIZE,
 
             /******** [Special Instructions] ********/
             OpCode::Ret => 0,
