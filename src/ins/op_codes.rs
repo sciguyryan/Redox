@@ -59,12 +59,14 @@ pub enum OpCode {
     MovU32RegMemExprRel,
 
     /******** [Logic Instructions] ********/
-    /// Test the value of a bit in a u32 register. The CF flag will be set to the value of the bit.
+    /// Test the value of a bit in a u32 register. The CF flag will be set to the state of the bit.
     BitTestU32Reg,
-    /// Test the value of a bit at a specified memory address. The CF flag will be set to the value of the bit.
+    /// Test the value of a bit at a specified memory address. The CF flag will be set to the state of the bit.
     BitTestMem,
-    /// Test the value of a bit in a u32 register and clears the bit. The CF flag will be set to the original value of the bit.
+    /// Test the value of a bit in a u32 register and clears the bit. The CF flag will be set to the original state of the bit.
     BitTestResetU32Reg,
+    /// Test the value of a bit at a specified memory address and clear the bit. The CF flag will be set to the original state of the bit.
+    BitTestResetMem,
 
     /******** [Special Instructions] ********/
     /// Return from a subroutine.
@@ -113,6 +115,7 @@ impl From<Instruction> for OpCode {
             Instruction::BitTestU32Reg(_, _) => OpCode::BitTestU32Reg,
             Instruction::BitTestMem(_, _) => OpCode::BitTestMem,
             Instruction::BitTestResetU32Reg(_, _) => OpCode::BitTestResetU32Reg,
+            Instruction::BitTestResetMem(_, _) => OpCode::BitTestResetMem,
 
             /******** [Special Instructions] ********/
             Instruction::Ret => OpCode::Ret,

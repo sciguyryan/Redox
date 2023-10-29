@@ -93,7 +93,7 @@ impl Compiler {
             }
 
             /******** [u8 immediate and u32 immediate] ********/
-            Instruction::BitTestMem(imm1, imm2) => {
+            Instruction::BitTestMem(imm1, imm2) | Instruction::BitTestResetMem(imm1, imm2) => {
                 self.write_u8(imm1);
                 self.write_u32(imm2);
             }

@@ -11,6 +11,8 @@ mod reg;
 mod utils;
 pub mod vm;
 
+use std::f32::consts::PI;
+
 use vm::VirtualMachine;
 
 use crate::{
