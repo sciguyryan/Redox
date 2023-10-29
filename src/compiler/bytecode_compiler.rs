@@ -76,7 +76,8 @@ impl Compiler {
 
             /******** [u32 immediate and u32 immediate] ********/
             Instruction::MovU32ImmMemRelSimple(imm1, imm2)
-            | Instruction::MovU32ImmMemExprRel(imm1, imm2) => {
+            | Instruction::MovU32ImmMemExprRel(imm1, imm2)
+            | Instruction::BitScanReverseMemMem(imm1, imm2) => {
                 self.write_u32(imm1);
                 self.write_u32(imm2);
             }

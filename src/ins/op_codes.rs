@@ -61,22 +61,24 @@ pub enum OpCode {
     /******** [Logic Instructions] ********/
     /// Test the value of a bit in a u32 register. The CF flag will be set to the state of the bit.
     BitTestU32Reg,
-    /// Test the value of a bit at a specified memory address. The CF flag will be set to the state of the bit.
+    /// Test the value of a bit from 4 bytes starting at the specified memory address. The CF flag will be set to the state of the bit.
     BitTestMem,
     /// Test the value of a bit in a u32 register and clear the bit. The CF flag will be set to the original state of the bit.
     BitTestResetU32Reg,
-    /// Test the value of a bit at a specified memory address and clear the bit. The CF flag will be set to the original state of the bit.
+    /// Test the value of a bit from 4 bytes starting at the specified memory address and clear the bit. The CF flag will be set to the original state of the bit.
     BitTestResetMem,
     /// Test the value of a bit in a u32 register and set the bit. The CF flag will be set to the original state of the bit.
     BitTestSetU32Reg,
-    /// Test the value of a bit at a specified memory address and set the bit. The CF flag will be set to the original state of the bit.
+    /// Test the value of a bit from 4 bytes starting at the specified memory address and set the bit. The CF flag will be set to the original state of the bit.
     BitTestSetMem,
     /// Search for the most significant bit in a u32 register (A) and store the index of the bit in a u32 register (B).
     BitScanReverseU32RegU32Reg,
-    /// Search for the most significant bit in a memory address and store the index of the bit in a u32 register.
+    /// Search for the most significant bit from 4 bytes starting at the specified memory address and store the index of the bit in a u32 register.
     BitScanReverseMemU32Reg,
-    /// Search for the most significant bit in a u32 register and store the index of the bit at a specified memory address.
+    /// Search for the most significant bit in a u32 register and store the index of the bit as a u32 value starting at a specified memory address.
     BitScanReverseU32RegMem,
+    /// Search for the most significant bit from 4 bytes starting at the specified memory address and store the index of the bit as a u32 value starting at a specified memory address.
+    BitScanReverseMemMem,
 
     /******** [Special Instructions] ********/
     /// Return from a subroutine.
@@ -131,6 +133,7 @@ impl From<Instruction> for OpCode {
             Instruction::BitScanReverseU32RegU32Reg(_, _) => OpCode::BitScanReverseU32RegU32Reg,
             Instruction::BitScanReverseMemU32Reg(_, _) => OpCode::BitScanReverseMemU32Reg,
             Instruction::BitScanReverseU32RegMem(_, _) => OpCode::BitScanReverseU32RegMem,
+            Instruction::BitScanReverseMemMem(_, _) => OpCode::BitScanReverseMemMem,
 
             /******** [Special Instructions] ********/
             Instruction::Ret => OpCode::Ret,

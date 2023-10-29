@@ -627,6 +627,13 @@ impl Cpu {
 
                 mem.set_u32(*out_addr as usize, index);
             }
+            Instruction::BitScanReverseMemMem(in_addr, out_addr) => {
+                // bsr [in_addr], [out_addr]
+                let value = mem.get_u32(*in_addr as usize);
+                let index = self.perform_reverse_bit_search(value);
+
+                mem.set_u32(*out_addr as usize, index);
+            }
 
             /******** [Special Instructions] ********/
             Instruction::Ret => {
@@ -2769,6 +2776,65 @@ mod tests_cpu {
                 &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF]))],
                 vec![
                     32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                ],
+                false,
+                "BSR - incorrect result produced from the bit search",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the reverse bit scan with a source memory address and a destination memory address.
+    #[test]
+    fn test_bit_scan_reverse_mem_mem() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmMemRelSimple(
+                        0b1111_1111_1111_1111_1111_1111_1111_1111,
+                        0x0,
+                    ),
+                    Instruction::BitScanReverseMemMem(0x0, 0x4),
+                ],
+                &[],
+                vec![
+                    255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                ],
+                false,
+                "BSR - incorrect result produced from the bit search",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmMemRelSimple(
+                        0b0000_1111_1111_1111_1111_1111_1111_1111,
+                        0x0,
+                    ),
+                    Instruction::BitScanReverseMemMem(0x0, 0x4),
+                ],
+                &[],
+                vec![
+                    255, 255, 255, 15, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                ],
+                false,
+                "BSR - incorrect result produced from the bit search",
+            ),
+            TestEntryU32Standard::new(
+                &[Instruction::BitScanReverseMemMem(0x0, 0x4)],
+                &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF]))],
+                vec![
+                    0, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
