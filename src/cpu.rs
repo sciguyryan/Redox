@@ -553,7 +553,7 @@ impl Cpu {
             }
             Instruction::BitTestResetU32Reg(bit, reg) => {
                 // btr bit, reg
-                // Read the value and set the carry flag state, then update the bit state.
+                // Read the value and set the carry flag state, clear the bit.
                 let mut value = self.read_reg_u32(reg, privilege);
                 self.perform_bit_test_with_carry_flag_with_set(&mut value, *bit, false);
 
@@ -562,11 +562,20 @@ impl Cpu {
             }
             Instruction::BitTestResetMem(bit, addr) => {
                 // btr bit, [addr]
-                // Read the value and set the carry flag state, then update the bit state.
+                // Read the value and set the carry flag state, then clear the bit.
                 let mut value = mem.get_u32(*addr as usize);
                 self.perform_bit_test_with_carry_flag_with_set(&mut value, *bit, false);
 
                 mem.set_u32(*addr as usize, value);
+            }
+            Instruction::BitTestSetU32Reg(bit, reg) => {
+                // bts bit, reg
+                // Read the value and set the carry flag state, set the bit.
+                let mut value = self.read_reg_u32(reg, privilege);
+                self.perform_bit_test_with_carry_flag_with_set(&mut value, *bit, true);
+
+                // Write the value back to the register.
+                self.write_reg_u32(reg, value, privilege);
             }
 
             /******** [Special Instructions] ********/
@@ -2447,6 +2456,55 @@ mod tests_cpu {
                 vec![],
                 true,
                 "BTR - successfully executed instruction with invalid bit index",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the bit-test and set instruction with a u32 register.
+    #[test]
+    fn test_bit_test_set_u32_reg() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(
+                        0b1111_1111_1111_1111_1111_1111_1111_1111,
+                        RegisterId::R1,
+                    ),
+                    Instruction::BitTestSetU32Reg(0, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::CF])),
+                ],
+                vec![0; 100],
+                false,
+                "BTS - incorrect result produced from the bit-test instruction - carry flag not set",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(
+                        0b1111_1111_1111_1111_1111_1111_1111_1110,
+                        RegisterId::R1,
+                    ),
+                    Instruction::BitTestSetU32Reg(0, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111)],
+                vec![0; 100],
+                false,
+                "BTS - incorrect result produced from the bit-test instruction - carry flag set",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::BitTestSetU32Reg(32, RegisterId::R1),
+                ],
+                &[],
+                vec![],
+                true,
+                "BTS - successfully executed instruction with invalid bit index",
             ),
         ];
 

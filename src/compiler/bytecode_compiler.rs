@@ -87,7 +87,9 @@ impl Compiler {
             }
 
             /******** [u8 immediate and u32 register] ********/
-            Instruction::BitTestU32Reg(imm, reg) | Instruction::BitTestResetU32Reg(imm, reg) => {
+            Instruction::BitTestU32Reg(imm, reg)
+            | Instruction::BitTestResetU32Reg(imm, reg)
+            | Instruction::BitTestSetU32Reg(imm, reg) => {
                 self.write_u8(imm);
                 self.write_register_id(&reg);
             }
