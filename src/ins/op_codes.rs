@@ -33,6 +33,7 @@ pub enum OpCode {
     /// Arithmetic right-shift a u32 register (B) by a u32 register (A). The result remains in register A.
     ArithRightShiftU32RegU32Reg,
 
+    /******** [Data Instructions] ********/
     /******** [Simple Move Instructions - NO EXPRESSIONS] ********/
     /// Swap the values of the two registers.
     SwapU32RegU32Reg,
@@ -56,6 +57,9 @@ pub enum OpCode {
     MovMemExprU32RegRel,
     /// Move the value of a register to the address given by an expression (relative to the base address of the code block). The result is copied into the specified memory address.
     MovU32RegMemExprRel,
+
+    /******** [Logic Instructions] ********/
+    BitTest,
 
     /******** [Special Instructions] ********/
     /// Return from a subroutine.
@@ -87,6 +91,7 @@ impl From<Instruction> for OpCode {
             Instruction::ArithRightShiftU32ImmU32Reg(_, _) => OpCode::ArithRightShiftU32ImmU32Reg,
             Instruction::ArithRightShiftU32RegU32Reg(_, _) => OpCode::ArithRightShiftU32RegU32Reg,
 
+            /******** [Data Instructions] ********/
             /******** [Move Instructions - NO EXPRESSIONS] ********/
             Instruction::SwapU32RegU32Reg(_, _) => OpCode::SwapU32RegU32Reg,
             Instruction::MovU32ImmMemRelSimple(_, _) => OpCode::MovU32ImmMemRelSimple,
@@ -98,6 +103,9 @@ impl From<Instruction> for OpCode {
             Instruction::MovU32ImmMemExprRel(_, _) => OpCode::MovU32ImmMemExprRel,
             Instruction::MovMemExprU32RegRel(_, _) => OpCode::MovMemExprU32RegRel,
             Instruction::MovU32RegMemExprRel(_, _) => OpCode::MovU32RegMemExprRel,
+
+            /******** [Logic Instructions] ********/
+            Instruction::BitTest(_, _) => OpCode::BitTest,
 
             /******** [Special Instructions] ********/
             Instruction::Ret => OpCode::Ret,

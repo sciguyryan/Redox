@@ -13,13 +13,18 @@ impl<'a> MemoryBlockReader<'a> {
     }
 
     pub fn read_register_id(&mut self) -> RegisterId {
-        FromPrimitive::from_u8(*self.read_u8()).expect("failed to read register ID from memory")
+        FromPrimitive::from_u8(*self.read_u8_internal())
+            .expect("failed to read register ID from memory")
     }
 
-    fn read_u8(&mut self) -> &u8 {
+    fn read_u8_internal(&mut self) -> &u8 {
         let pos = self.cursor;
         self.cursor += 1;
         &self.data[pos]
+    }
+
+    pub fn read_u8(&mut self) -> u8 {
+        *self.read_u8_internal()
     }
 
     pub fn read_u32(&mut self) -> u32 {

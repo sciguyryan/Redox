@@ -8,9 +8,11 @@ use crate::{ins::move_expressions::MoveExpressionHandler, reg::registers::Regist
 use super::op_codes::OpCode;
 
 /// The size of the instruction, in bytes.
-const INSTRUCTION_SIZE: u32 = 4;
+const INSTRUCTION_SIZE: u32 = mem::size_of::<u32>() as u32;
 /// The size of a u32 argument, in bytes.
 const ARG_U32_IMM_SIZE: u32 = mem::size_of::<u32>() as u32;
+/// The size of a u8 argument, in bytes.
+const ARG_U8_IMM_SIZE: u32 = 1;
 /// The size of a memory address argument, in bytes.
 const ARG_MEM_ADDR_SIZE: u32 = mem::size_of::<u32>() as u32;
 /// The size of a register ID argument, in bytes.
@@ -45,6 +47,7 @@ pub enum Instruction {
     /// Arithmetic right-shift a u32 register (B) by a u32 register (A). The result remains in register A.
     ArithRightShiftU32RegU32Reg(RegisterId, RegisterId),
 
+    /******** [Data Instructions] ********/
     /******** [Move Instructions - NO EXPRESSIONS] ********/
     /// Swap the values of the two registers.
     SwapU32RegU32Reg(RegisterId, RegisterId),
@@ -68,6 +71,10 @@ pub enum Instruction {
     MovMemExprU32RegRel(u32, RegisterId),
     /// Move the value of a register to the address given by an expression (relative to the base address of the code block). The result is copied into the specified memory address.
     MovU32RegMemExprRel(RegisterId, u32),
+
+    /******** [Logic Instructions] ********/
+    /// Test the value of a bit in a register. The CF flag will be set to the value of the bit.
+    BitTest(u8, RegisterId),
 
     /******** [Special Instructions] ********/
     /// Return from a subroutine.
@@ -118,6 +125,7 @@ impl Display for Instruction {
                 format!("sar {shift_reg}, {reg}")
             }
 
+            /******** [Data Instructions] ********/
             /******** [Move Instructions - NO EXPRESSIONS] ********/
             Instruction::SwapU32RegU32Reg(reg1, reg2) => {
                 format!("swap {reg1}, {reg2}")
@@ -161,6 +169,11 @@ impl Display for Instruction {
                 format!("mov.rc {reg}, [{decoder}]")
             }
 
+            /******** [Logic Instructions] ********/
+            Instruction::BitTest(bit, reg) => {
+                format!("bt {bit}, {reg}")
+            }
+
             /******** [Special Instructions] ********/
             Instruction::Ret => String::from("ret"),
             Instruction::Mret => String::from("mret"),
@@ -189,6 +202,7 @@ impl Instruction {
             Instruction::ArithRightShiftU32ImmU32Reg(_, _) => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
             Instruction::ArithRightShiftU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
 
+            /******** [Data Instructions] ********/
             /******** [Move Instructions - NO EXPRESSIONS] ********/
             Instruction::SwapU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
             Instruction::MovU32ImmU32Reg(_, _) => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
@@ -202,6 +216,8 @@ impl Instruction {
             Instruction::MovU32ImmMemExprRel(_, _) => ARG_U32_IMM_SIZE + ARG_MEM_ADDR_SIZE,
             Instruction::MovMemExprU32RegRel(_, _) => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
             Instruction::MovU32RegMemExprRel(_, _) => ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE,
+
+            Instruction::BitTest(_, _) => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Special Instructions] ********/
             Instruction::Ret => 0,
@@ -230,6 +246,7 @@ impl Instruction {
             OpCode::ArithRightShiftU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
             OpCode::ArithRightShiftU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
 
+            /******** [Data Instructions] ********/
             /******** [Move Instructions - NO EXPRESSIONS] ********/
             OpCode::SwapU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
             OpCode::MovU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
@@ -238,6 +255,9 @@ impl Instruction {
             OpCode::MovU32RegMemRelSimple => ARG_REG_ID_SIZE + ARG_MEM_ADDR_SIZE,
             OpCode::MovMemU32RegRelSimple => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
             OpCode::MovU32RegPtrU32RegRelSimple => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
+
+            /******** [Logic Instructions] ********/
+            OpCode::BitTest => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Move Instructions - WITH EXPRESSIONS] ********/
             OpCode::MovU32ImmMemExprRel => ARG_U32_IMM_SIZE + ARG_MEM_ADDR_SIZE,

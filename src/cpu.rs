@@ -444,6 +444,7 @@ impl Cpu {
                     .write(shifted, privilege)
             }
 
+            /******** [Data Instructions] ********/
             /******** [Move Instructions - NO EXPRESSIONS] ********/
             Instruction::SwapU32RegU32Reg(reg1, reg2) => {
                 let reg1_val = *self.registers.get_register_u32(*reg1).read(privilege);
@@ -511,6 +512,13 @@ impl Cpu {
                 let addr = self.execute_u32_move_expression(&args, privilege);
                 let value = self.registers.get_register_u32(*reg).read(privilege);
                 mem.set_u32(addr as usize, *value);
+            }
+
+            /******** [Logic Instructions] ********/
+            Instruction::BitTest(bit, reg) => {
+                // bt bit, reg
+                let value = self.registers.get_register_u32(*reg).read(privilege);
+                self.set_flag_state(CpuFlag::CF, utils::is_bit_set(*value, *bit));
             }
 
             /******** [Special Instructions] ********/

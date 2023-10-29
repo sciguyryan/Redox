@@ -139,6 +139,7 @@ impl Memory {
                 Instruction::ArithRightShiftU32RegU32Reg(shift_reg, reg)
             }
 
+            /******** [Data Instructions] ********/
             /******** [Simple Move Instructions - NO EXPRESSIONS] ********/
             OpCode::SwapU32RegU32Reg => {
                 let reg1 = block.read_register_id();
@@ -201,6 +202,14 @@ impl Memory {
                 let expr = block.read_u32();
 
                 Instruction::MovU32RegMemExprRel(reg, expr)
+            }
+
+            /******** [Logic Instructions] ********/
+            OpCode::BitTest => {
+                let bit = block.read_u8();
+                let reg = block.read_register_id();
+
+                Instruction::BitTest(bit, reg)
             }
 
             /******** [Special Instructions] ********/

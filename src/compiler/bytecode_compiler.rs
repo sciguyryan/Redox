@@ -86,6 +86,12 @@ impl Compiler {
                 self.write_u32(imm);
             }
 
+            /**** [u8 immediate and u32 register] */
+            Instruction::BitTest(imm, reg) => {
+                self.write_register_id(&reg);
+                self.write_u8(imm);
+            }
+
             /******** [No Arguments] ********/
             Instruction::Nop | Instruction::Ret | Instruction::Mret | Instruction::Hlt => {}
         }
@@ -116,5 +122,14 @@ impl Compiler {
     /// * `value` - The value to be written.
     fn write_u32(&mut self, value: u32) {
         self.bytes.extend_from_slice(&value.to_le_bytes());
+    }
+
+    /// Write a u8 into the byte sequence.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The value to be written.
+    fn write_u8(&mut self, value: u8) {
+        self.bytes.push(value);
     }
 }
