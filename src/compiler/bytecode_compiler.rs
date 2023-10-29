@@ -54,7 +54,8 @@ impl Compiler {
             | Instruction::ArithRightShiftU32ImmU32Reg(imm, reg)
             | Instruction::MovU32ImmU32Reg(imm, reg)
             | Instruction::MovMemU32RegRelSimple(imm, reg)
-            | Instruction::MovMemExprU32RegRel(imm, reg) => {
+            | Instruction::MovMemExprU32RegRel(imm, reg)
+            | Instruction::BitScanReverseMemU32Reg(imm, reg) => {
                 self.write_u32(imm);
                 self.write_register_id(&reg);
             }

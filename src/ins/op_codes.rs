@@ -71,8 +71,10 @@ pub enum OpCode {
     BitTestSetU32Reg,
     /// Test the value of a bit at a specified memory address and set the bit. The CF flag will be set to the original state of the bit.
     BitTestSetMem,
-    /// Searches for the most significant bit in a u32 register (A) and store the index of the bit in a u32 register (B).
+    /// Search for the most significant bit in a u32 register (A) and store the index of the bit in a u32 register (B).
     BitScanReverseU32RegU32Reg,
+    /// Search for the most significant bit in a memory address and store the index of the bit in a u32 register.
+    BitScanReverseMemU32Reg,
 
     /******** [Special Instructions] ********/
     /// Return from a subroutine.
@@ -125,6 +127,7 @@ impl From<Instruction> for OpCode {
             Instruction::BitTestSetU32Reg(_, _) => OpCode::BitTestSetU32Reg,
             Instruction::BitTestSetMem(_, _) => OpCode::BitTestSetMem,
             Instruction::BitScanReverseU32RegU32Reg(_, _) => OpCode::BitScanReverseU32RegU32Reg,
+            Instruction::BitScanReverseMemU32Reg(_, _) => OpCode::BitScanReverseMemU32Reg,
 
             /******** [Special Instructions] ********/
             Instruction::Ret => OpCode::Ret,

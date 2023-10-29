@@ -85,8 +85,10 @@ pub enum Instruction {
     BitTestSetU32Reg(u8, RegisterId),
     /// Test the value of a bit at a specified memory address and set the bit. The CF flag will be set to the original state of the bit.
     BitTestSetMem(u8, u32),
-    /// Searches for the most significant bit in a u32 register (A) and store the index of the bit in a u32 register (B).
+    /// Search for the most significant bit in a u32 register (A) and store the index of the bit in a u32 register (B).
     BitScanReverseU32RegU32Reg(RegisterId, RegisterId),
+    /// Search for the most significant bit in a memory address and store the index of the bit in a u32 register.
+    BitScanReverseMemU32Reg(u32, RegisterId),
 
     /******** [Special Instructions] ********/
     /// Return from a subroutine.
@@ -186,22 +188,25 @@ impl Display for Instruction {
                 format!("bt {bit}, {reg}")
             }
             Instruction::BitTestMem(bit, addr) => {
-                format!("bt {bit}, [{addr}]")
+                format!("bt {bit}, [${addr:04X}]")
             }
             Instruction::BitTestResetU32Reg(bit, reg) => {
                 format!("btr {bit}, {reg}")
             }
             Instruction::BitTestResetMem(bit, addr) => {
-                format!("btr {bit}, [{addr}]")
+                format!("btr {bit}, [${addr:04X}]")
             }
             Instruction::BitTestSetU32Reg(bit, reg) => {
                 format!("bts {bit}, {reg}")
             }
             Instruction::BitTestSetMem(bit, addr) => {
-                format!("bts {bit}, [{addr}]")
+                format!("bts {bit}, [${addr:04X}]")
             }
             Instruction::BitScanReverseU32RegU32Reg(in_reg, out_reg) => {
                 format!("bsr {in_reg}, {out_reg}")
+            }
+            Instruction::BitScanReverseMemU32Reg(addr, reg) => {
+                format!("bsr [${addr:04X}], {reg}")
             }
 
             /******** [Special Instructions] ********/
@@ -255,6 +260,7 @@ impl Instruction {
             Instruction::BitTestSetU32Reg(_, _) => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
             Instruction::BitTestSetMem(_, _) => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
             Instruction::BitScanReverseU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
+            Instruction::BitScanReverseMemU32Reg(_, _) => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Special Instructions] ********/
             Instruction::Ret => 0,
@@ -306,6 +312,7 @@ impl Instruction {
             OpCode::BitTestSetU32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
             OpCode::BitTestSetMem => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
             OpCode::BitScanReverseU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
+            OpCode::BitScanReverseMemU32Reg => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Special Instructions] ********/
             OpCode::Ret => 0,

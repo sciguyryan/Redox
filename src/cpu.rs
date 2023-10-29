@@ -613,6 +613,13 @@ impl Cpu {
 
                 self.write_reg_u32(out_reg, index, privilege);
             }
+            Instruction::BitScanReverseMemU32Reg(addr, reg) => {
+                // bsr [addr], reg
+                let value = mem.get_u32(*addr as usize);
+                let index = self.perform_reverse_bit_search(value);
+
+                self.write_reg_u32(reg, index, privilege);
+            }
 
             /******** [Special Instructions] ********/
             Instruction::Ret => {
@@ -2304,7 +2311,7 @@ mod tests_cpu {
                         0b1111_1111_1111_1111_1111_1111_1111_1111,
                         RegisterId::R1,
                     ),
-                    Instruction::BitTestU32Reg(0, RegisterId::R1),
+                    Instruction::BitTestU32Reg(0x0, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
@@ -2320,7 +2327,7 @@ mod tests_cpu {
                         0b1111_1111_1111_1111_1111_1111_1111_1110,
                         RegisterId::R1,
                     ),
-                    Instruction::BitTestU32Reg(0, RegisterId::R1),
+                    Instruction::BitTestU32Reg(0x0, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1110)],
                 vec![0; 100],
@@ -2351,7 +2358,7 @@ mod tests_cpu {
                         0b1111_1111_1111_1111_1111_1111_1111_1111,
                         0x0,
                     ),
-                    Instruction::BitTestMem(0, 0x0),
+                    Instruction::BitTestMem(0x0, 0x0),
                 ],
                 &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::CF]))],
                 vec![
@@ -2369,7 +2376,7 @@ mod tests_cpu {
                         0b1111_1111_1111_1111_1111_1111_1111_1110,
                         0x0,
                     ),
-                    Instruction::BitTestMem(0, 0x0),
+                    Instruction::BitTestMem(0x0, 0x0),
                 ],
                 &[],
                 vec![
@@ -2405,7 +2412,7 @@ mod tests_cpu {
                         0b1111_1111_1111_1111_1111_1111_1111_1111,
                         RegisterId::R1,
                     ),
-                    Instruction::BitTestResetU32Reg(0, RegisterId::R1),
+                    Instruction::BitTestResetU32Reg(0x0, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
@@ -2421,7 +2428,7 @@ mod tests_cpu {
                         0b1111_1111_1111_1111_1111_1111_1111_1110,
                         RegisterId::R1,
                     ),
-                    Instruction::BitTestResetU32Reg(0, RegisterId::R1),
+                    Instruction::BitTestResetU32Reg(0x0, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1110)],
                 vec![0; 100],
@@ -2454,7 +2461,7 @@ mod tests_cpu {
                         0b1111_1111_1111_1111_1111_1111_1111_1111,
                         0x0,
                     ),
-                    Instruction::BitTestResetMem(0, 0x0),
+                    Instruction::BitTestResetMem(0x0, 0x0),
                 ],
                 &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::CF]))],
                 vec![
@@ -2472,7 +2479,7 @@ mod tests_cpu {
                         0b1111_1111_1111_1111_1111_1111_1111_1110,
                         0x0,
                     ),
-                    Instruction::BitTestResetMem(0, 0x0),
+                    Instruction::BitTestResetMem(0x0, 0x0),
                 ],
                 &[],
                 vec![
@@ -2510,7 +2517,7 @@ mod tests_cpu {
                         0b1111_1111_1111_1111_1111_1111_1111_1111,
                         RegisterId::R1,
                     ),
-                    Instruction::BitTestSetU32Reg(0, RegisterId::R1),
+                    Instruction::BitTestSetU32Reg(0x0, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
@@ -2526,7 +2533,7 @@ mod tests_cpu {
                         0b1111_1111_1111_1111_1111_1111_1111_1110,
                         RegisterId::R1,
                     ),
-                    Instruction::BitTestSetU32Reg(0, RegisterId::R1),
+                    Instruction::BitTestSetU32Reg(0x0, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111)],
                 vec![0; 100],
@@ -2559,7 +2566,7 @@ mod tests_cpu {
                         0b1111_1111_1111_1111_1111_1111_1111_1111,
                         0x0,
                     ),
-                    Instruction::BitTestSetMem(0, 0x0),
+                    Instruction::BitTestSetMem(0x0, 0x0),
                 ],
                 &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::CF]))],
                 vec![
@@ -2577,7 +2584,7 @@ mod tests_cpu {
                         0b1111_1111_1111_1111_1111_1111_1111_1110,
                         0x0,
                     ),
-                    Instruction::BitTestSetMem(0, 0x0),
+                    Instruction::BitTestSetMem(0x0, 0x0),
                 ],
                 &[],
                 vec![
@@ -2605,9 +2612,9 @@ mod tests_cpu {
         }
     }
 
-    /// Test the reverse set bit scan with a destination u32 register.
+    /// Test the reverse bit scan with a source u32 register and a destination u32 register.
     #[test]
-    fn test_bit_scan_reverse_u32_reg() {
+    fn test_bit_scan_reverse_u32_reg_u32_reg() {
         let tests = [
             TestEntryU32Standard::new(
                 &[
@@ -2617,10 +2624,7 @@ mod tests_cpu {
                     ),
                     Instruction::BitScanReverseU32RegU32Reg(RegisterId::R1, RegisterId::R2),
                 ],
-                &[
-                    (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::R2, 0),
-                ],
+                &[(RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111)],
                 vec![0; 100],
                 false,
                 "BSR - incorrect result produced from the bit search",
@@ -2635,7 +2639,7 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::R1, 0b0000_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::R2, 4),
+                    (RegisterId::R2, 0x4),
                 ],
                 vec![0; 100],
                 false,
@@ -2643,11 +2647,68 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0, RegisterId::R1),
+                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
                     Instruction::BitScanReverseU32RegU32Reg(RegisterId::R1, RegisterId::R2),
                 ],
                 &[
                     (RegisterId::R2, 32),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF])),
+                ],
+                vec![0; 100],
+                false,
+                "BSR - incorrect result produced from the bit search",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the reverse bit scan with a source memory address and a destination u32 register.
+    #[test]
+    fn test_bit_scan_reverse_u32_reg() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmMemRelSimple(
+                        0b1111_1111_1111_1111_1111_1111_1111_1111,
+                        0x0,
+                    ),
+                    Instruction::BitScanReverseMemU32Reg(0x0, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0x0)],
+                vec![
+                    255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                ],
+                false,
+                "BSR - incorrect result produced from the bit search",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmMemRelSimple(
+                        0b0000_1111_1111_1111_1111_1111_1111_1111,
+                        0x0,
+                    ),
+                    Instruction::BitScanReverseMemU32Reg(0x0, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0x4)],
+                vec![
+                    255, 255, 255, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                ],
+                false,
+                "BSR - incorrect result produced from the bit search",
+            ),
+            TestEntryU32Standard::new(
+                &[Instruction::BitScanReverseMemU32Reg(0x0, RegisterId::R1)],
+                &[
+                    (RegisterId::R1, 32),
                     (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF])),
                 ],
                 vec![0; 100],
