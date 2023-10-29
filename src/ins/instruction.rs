@@ -85,6 +85,8 @@ pub enum Instruction {
     BitTestSetU32Reg(u8, RegisterId),
     /// Test the value of a bit at a specified memory address and set the bit. The CF flag will be set to the original state of the bit.
     BitTestSetMem(u8, u32),
+    /// Searches for the most significant bit in a u32 register (A) and store the index of the bit in a u32 register (B).
+    BitScanReverseU32RegU32Reg(RegisterId, RegisterId),
 
     /******** [Special Instructions] ********/
     /// Return from a subroutine.
@@ -198,6 +200,9 @@ impl Display for Instruction {
             Instruction::BitTestSetMem(bit, addr) => {
                 format!("bts {bit}, [{addr}]")
             }
+            Instruction::BitScanReverseU32RegU32Reg(in_reg, out_reg) => {
+                format!("bsr {in_reg}, {out_reg}")
+            }
 
             /******** [Special Instructions] ********/
             Instruction::Ret => String::from("ret"),
@@ -249,6 +254,7 @@ impl Instruction {
             Instruction::BitTestResetMem(_, _) => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
             Instruction::BitTestSetU32Reg(_, _) => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
             Instruction::BitTestSetMem(_, _) => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
+            Instruction::BitScanReverseU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Special Instructions] ********/
             Instruction::Ret => 0,
@@ -299,6 +305,7 @@ impl Instruction {
             OpCode::BitTestResetMem => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
             OpCode::BitTestSetU32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
             OpCode::BitTestSetMem => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
+            OpCode::BitScanReverseU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Special Instructions] ********/
             OpCode::Ret => 0,

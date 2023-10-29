@@ -241,6 +241,12 @@ impl Memory {
 
                 Instruction::BitTestSetMem(bit, addr)
             }
+            OpCode::BitScanReverseU32RegU32Reg => {
+                let in_reg = block.read_register_id();
+                let out_reg = block.read_register_id();
+
+                Instruction::BitScanReverseU32RegU32Reg(in_reg, out_reg)
+            }
 
             /******** [Special Instructions] ********/
             OpCode::Ret => Instruction::Ret,

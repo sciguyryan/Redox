@@ -342,6 +342,27 @@ impl Cpu {
         utils::set_bit_state_inline(value, bit, new_state);
     }
 
+    /// Perform a reverse set bit search on the specified value.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The u32 value to be tested.
+    ///
+    /// # Note
+    ///
+    /// This method will set the zero flag if the value is zero, otherwise the flag will be cleared.
+    #[inline(always)]
+    fn perform_reverse_bit_search(&mut self, value: u32) -> u32 {
+        self.set_flag_state(CpuFlag::ZF, value == 0);
+
+        // TODO - if we end up only supporting little Endian, this an be removed.
+        if cfg!(target_endian = "little") {
+            value.leading_zeros()
+        } else {
+            value.trailing_zeros()
+        }
+    }
+
     /// Get the value of a specific u32 register.
     ///
     /// # Arguments
@@ -584,6 +605,13 @@ impl Cpu {
                 self.perform_bit_test_with_carry_flag_with_set(&mut value, *bit, true);
 
                 mem.set_u32(*addr as usize, value);
+            }
+            Instruction::BitScanReverseU32RegU32Reg(in_reg, out_reg) => {
+                // bsr in_reg, out_reg
+                let value = self.read_reg_u32(in_reg, privilege);
+                let index = self.perform_reverse_bit_search(value);
+
+                self.write_reg_u32(out_reg, index, privilege);
             }
 
             /******** [Special Instructions] ********/
@@ -2569,6 +2597,62 @@ mod tests_cpu {
                 vec![],
                 true,
                 "BTS - successfully executed instruction with invalid bit index",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the reverse set bit scan with a destination u32 register.
+    #[test]
+    fn test_bit_scan_reverse_u32_reg() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(
+                        0b1111_1111_1111_1111_1111_1111_1111_1111,
+                        RegisterId::R1,
+                    ),
+                    Instruction::BitScanReverseU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                ],
+                &[
+                    (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::R2, 0),
+                ],
+                vec![0; 100],
+                false,
+                "BSR - incorrect result produced from the bit search",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(
+                        0b0000_1111_1111_1111_1111_1111_1111_1111,
+                        RegisterId::R1,
+                    ),
+                    Instruction::BitScanReverseU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                ],
+                &[
+                    (RegisterId::R1, 0b0000_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::R2, 4),
+                ],
+                vec![0; 100],
+                false,
+                "BSR - incorrect result produced from the bit search",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0, RegisterId::R1),
+                    Instruction::BitScanReverseU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                ],
+                &[
+                    (RegisterId::R2, 32),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF])),
+                ],
+                vec![0; 100],
+                false,
+                "BSR - incorrect result produced from the bit search",
             ),
         ];
 

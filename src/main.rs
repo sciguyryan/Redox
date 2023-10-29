@@ -130,6 +130,10 @@ fn testing() {
 }*/
 
 fn main() {
+    if cfg!(target_endian = "big") {
+        panic!("currently unsupported");
+    }
+
     //run_test_2();
 
     let mut vm = VirtualMachine::new(64_000);
