@@ -153,11 +153,11 @@ fn main() {
         Instruction::MovU32ImmU32Reg(0x2, RegisterId::R2),
         Instruction::SwapU32RegU32Reg(RegisterId::R1, RegisterId::R2),
         Instruction::Mret,
-        Instruction::MovU32ImmU32Reg(50, RegisterId::R7),
+        Instruction::MovU32ImmU32Reg(100, RegisterId::R7),
         Instruction::MovU32ImmU32Reg(50, RegisterId::R8),
         Instruction::MovU32ImmMemExprRel(0x123, expr),*/
 
-        /*Instruction::MovU32ImmMemRelSimple(0x123, 50),
+        /*Instruction::MovU32ImmMemRelSimple(0x123, 150),
         Instruction::MovMemExprU32RegRel(
             expression_encoder.encode(&[
                 ExpressionArgs::Constant(25),
@@ -167,7 +167,7 @@ fn main() {
             RegisterId::R1,
         ),*/
 
-        /*Instruction::MovU32ImmMemRelSimple(0x123, 50),
+        /*Instruction::MovU32ImmMemRelSimple(0x123, 150),
         Instruction::MovU32RegMemExprRel(
             RegisterId::R1,
             expression_encoder.encode(&[

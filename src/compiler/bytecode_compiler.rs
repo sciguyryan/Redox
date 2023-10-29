@@ -86,10 +86,16 @@ impl Compiler {
                 self.write_u32(imm);
             }
 
-            /**** [u8 immediate and u32 register] */
+            /******** [u8 immediate and u32 register] ********/
             Instruction::BitTestU32Reg(imm, reg) => {
-                self.write_register_id(&reg);
                 self.write_u8(imm);
+                self.write_register_id(&reg);
+            }
+
+            /******** [u8 immediate and u32 immediate] ********/
+            Instruction::BitTestMem(imm1, imm2) => {
+                self.write_u8(imm1);
+                self.write_u32(imm2);
             }
 
             /******** [No Arguments] ********/

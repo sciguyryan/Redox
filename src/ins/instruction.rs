@@ -73,8 +73,10 @@ pub enum Instruction {
     MovU32RegMemExprRel(RegisterId, u32),
 
     /******** [Logic Instructions] ********/
-    /// Test the value of a bit in a register. The CF flag will be set to the value of the bit.
+    /// Test the value of a bit in a u32 register. The CF flag will be set to the value of the bit.
     BitTestU32Reg(u8, RegisterId),
+    /// Test the value of a bit at a specified memory address. The CF flag will be set to the value of the bit.
+    BitTestMem(u8, u32),
 
     /******** [Special Instructions] ********/
     /// Return from a subroutine.
@@ -173,6 +175,9 @@ impl Display for Instruction {
             Instruction::BitTestU32Reg(bit, reg) => {
                 format!("bt {bit}, {reg}")
             }
+            Instruction::BitTestMem(bit, addr) => {
+                format!("bt {bit}, [{addr}]")
+            }
 
             /******** [Special Instructions] ********/
             Instruction::Ret => String::from("ret"),
@@ -217,7 +222,9 @@ impl Instruction {
             Instruction::MovMemExprU32RegRel(_, _) => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
             Instruction::MovU32RegMemExprRel(_, _) => ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE,
 
+            /******** [Logic Instructions] ********/
             Instruction::BitTestU32Reg(_, _) => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
+            Instruction::BitTestMem(_, _) => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
 
             /******** [Special Instructions] ********/
             Instruction::Ret => 0,
@@ -256,13 +263,14 @@ impl Instruction {
             OpCode::MovMemU32RegRelSimple => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
             OpCode::MovU32RegPtrU32RegRelSimple => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
 
-            /******** [Logic Instructions] ********/
-            OpCode::BitTestU32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
-
             /******** [Move Instructions - WITH EXPRESSIONS] ********/
             OpCode::MovU32ImmMemExprRel => ARG_U32_IMM_SIZE + ARG_MEM_ADDR_SIZE,
             OpCode::MovMemExprU32RegRel => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
             OpCode::MovU32RegMemExprRel => ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE,
+
+            /******** [Logic Instructions] ********/
+            OpCode::BitTestU32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
+            OpCode::BitTestMem => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
 
             /******** [Special Instructions] ********/
             OpCode::Ret => 0,

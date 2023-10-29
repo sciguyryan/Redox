@@ -518,6 +518,13 @@ impl Cpu {
                 let value = self.registers.get_register_u32(*reg).read(privilege);
                 self.set_flag_state(CpuFlag::CF, utils::is_bit_set(*value, *bit));
             }
+            Instruction::BitTestMem(bit, addr) => {
+                assert!(*bit <= 31);
+                // bt bit, [addr]
+
+                let value = mem.get_u32(*addr as usize);
+                self.set_flag_state(CpuFlag::CF, utils::is_bit_set(value, *bit));
+            }
 
             /******** [Special Instructions] ********/
             Instruction::Ret => {
@@ -2225,6 +2232,66 @@ mod tests_cpu {
                         RegisterId::R1,
                     ),
                     Instruction::BitTestU32Reg(32, RegisterId::R1),
+                ],
+                &[],
+                vec![0; 100],
+                true,
+                "BT - successfully executed instruction with invalid bit index",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the bit-test instruction with a memory address.
+    #[test]
+    fn test_bit_test_mem() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmMemRelSimple(
+                        0b1111_1111_1111_1111_1111_1111_1111_1111,
+                        0x0,
+                    ),
+                    Instruction::BitTestMem(0, 0x0),
+                ],
+                &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::CF]))],
+                vec![
+                    255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                ],
+                false,
+                "BT - incorrect result produced from the bit-test instruction - carry flag not set",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmMemRelSimple(
+                        0b1111_1111_1111_1111_1111_1111_1111_1110,
+                        0x0,
+                    ),
+                    Instruction::BitTestMem(0, 0x0),
+                ],
+                &[],
+                vec![
+                    254, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                ],
+                false,
+                "BT - incorrect result produced from the bit-test instruction - carry flag set",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmMemRelSimple(
+                        0b1111_1111_1111_1111_1111_1111_1111_1111,
+                        0x0,
+                    ),
+                    Instruction::BitTestMem(32, 0x0),
                 ],
                 &[],
                 vec![0; 100],

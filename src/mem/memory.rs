@@ -211,6 +211,12 @@ impl Memory {
 
                 Instruction::BitTestU32Reg(bit, reg)
             }
+            OpCode::BitTestMem => {
+                let bit = block.read_u8();
+                let addr = block.read_u32();
+
+                Instruction::BitTestMem(bit, addr)
+            }
 
             /******** [Special Instructions] ********/
             OpCode::Ret => Instruction::Ret,
