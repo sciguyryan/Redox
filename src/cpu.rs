@@ -299,6 +299,49 @@ impl Cpu {
         final_value
     }
 
+    /// Perform a bit test on the specified value. The carry flag will be set to the value of the bit.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The u32 value to be tested.
+    /// * `bit` - The index of the bit to be tested.
+    ///
+    /// # Note
+    ///
+    /// This method will panic if the bit index is larger than the number of bytes in the value.
+    #[inline(always)]
+    fn perform_bit_test_with_carry_flag(&mut self, value: u32, bit: u8) {
+        // Values must be in range of the number of bits in the type.
+        assert!(bit <= 31);
+
+        // Set the carry flag to the current state of the bit.
+        self.set_flag_state(CpuFlag::CF, utils::is_bit_set(value, bit));
+    }
+
+    /// Perform a bit test on the specified value. The carry flag will be set to the value of the bit.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The u32 value to be tested.
+    /// * `bit` - The index of the bit to be tested.
+    /// * `new_state` - The new state of the bit.
+    ///
+    /// # Note
+    ///
+    /// This method will panic if the bit index is larger than the number of bytes in the value.
+    #[inline(always)]
+    fn perform_bit_test_with_carry_flag_with_set(
+        &mut self,
+        value: &mut u32,
+        bit: u8,
+        new_state: bool,
+    ) {
+        self.perform_bit_test_with_carry_flag(*value, bit);
+
+        // Set the bit state to the new state.
+        utils::set_bit_state_inline(value, bit, new_state);
+    }
+
     /// Get the value of a specific u32 register.
     ///
     /// # Arguments
@@ -499,20 +542,23 @@ impl Cpu {
 
             /******** [Logic Instructions] ********/
             Instruction::BitTestU32Reg(bit, reg) => {
-                // Values must be in range of the number of bits in the type.
-                assert!(*bit <= 31);
-
                 // bt bit, reg
                 let value = self.read_reg_u32(reg, privilege);
-                self.set_flag_state(CpuFlag::CF, utils::is_bit_set(value, *bit));
+                self.perform_bit_test_with_carry_flag(value, *bit);
             }
             Instruction::BitTestMem(bit, addr) => {
-                // Values must be in range of the number of bits in the type.
-                assert!(*bit <= 31);
-
                 // bt bit, [addr]
                 let value = mem.get_u32(*addr as usize);
-                self.set_flag_state(CpuFlag::CF, utils::is_bit_set(value, *bit));
+                self.perform_bit_test_with_carry_flag(value, *bit);
+            }
+            Instruction::BitTestResetU32Reg(bit, reg) => {
+                // btr bit, reg
+                // Read the value and set the carry flag state, then update the bit state.
+                let mut value = self.read_reg_u32(reg, privilege);
+                self.perform_bit_test_with_carry_flag_with_set(&mut value, *bit, false);
+
+                // Write the value back to the register.
+                self.write_reg_u32(reg, value, privilege);
             }
 
             /******** [Special Instructions] ********/
@@ -2300,6 +2346,59 @@ mod tests_cpu {
                 vec![0; 100],
                 true,
                 "BT - successfully executed instruction with invalid bit index",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the bit-test and reset instruction with a memory address.
+    #[test]
+    fn test_bit_test_reset_u32_reg() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(
+                        0b1111_1111_1111_1111_1111_1111_1111_1111,
+                        RegisterId::R1,
+                    ),
+                    Instruction::BitTestResetU32Reg(0, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::CF])),
+                ],
+                vec![0; 100],
+                false,
+                "BTR - incorrect result produced from the bit-test instruction - carry flag not set",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(
+                        0b1111_1111_1111_1111_1111_1111_1111_1110,
+                        RegisterId::R1,
+                    ),
+                    Instruction::BitTestResetU32Reg(0, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1110)],
+                vec![0; 100],
+                false,
+                "BTR - incorrect result produced from the bit-test instruction - carry flag set",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(
+                        0b1111_1111_1111_1111_1111_1111_1111_1111,
+                        RegisterId::R1,
+                    ),
+                    Instruction::BitTestResetU32Reg(32, RegisterId::R1),
+                ],
+                &[],
+                vec![0; 100],
+                true,
+                "BTR - successfully executed instruction with invalid bit index",
             ),
         ];
 
