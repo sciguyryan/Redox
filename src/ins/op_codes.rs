@@ -59,7 +59,7 @@ pub enum OpCode {
     MovU32RegMemExprRel,
 
     /******** [Logic Instructions] ********/
-    BitTest,
+    BitTestU32Reg,
 
     /******** [Special Instructions] ********/
     /// Return from a subroutine.
@@ -105,7 +105,7 @@ impl From<Instruction> for OpCode {
             Instruction::MovU32RegMemExprRel(_, _) => OpCode::MovU32RegMemExprRel,
 
             /******** [Logic Instructions] ********/
-            Instruction::BitTest(_, _) => OpCode::BitTest,
+            Instruction::BitTestU32Reg(_, _) => OpCode::BitTestU32Reg,
 
             /******** [Special Instructions] ********/
             Instruction::Ret => OpCode::Ret,

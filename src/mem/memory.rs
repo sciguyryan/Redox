@@ -205,11 +205,11 @@ impl Memory {
             }
 
             /******** [Logic Instructions] ********/
-            OpCode::BitTest => {
+            OpCode::BitTestU32Reg => {
                 let bit = block.read_u8();
                 let reg = block.read_register_id();
 
-                Instruction::BitTest(bit, reg)
+                Instruction::BitTestU32Reg(bit, reg)
             }
 
             /******** [Special Instructions] ********/

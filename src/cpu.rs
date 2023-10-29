@@ -511,7 +511,7 @@ impl Cpu {
             }
 
             /******** [Logic Instructions] ********/
-            Instruction::BitTest(bit, reg) => {
+            Instruction::BitTestU32Reg(bit, reg) => {
                 assert!(*bit <= 31);
 
                 // bt bit, reg
@@ -2195,7 +2195,7 @@ mod tests_cpu {
                         0b1111_1111_1111_1111_1111_1111_1111_1111,
                         RegisterId::R1,
                     ),
-                    Instruction::BitTest(0, RegisterId::R1),
+                    Instruction::BitTestU32Reg(0, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
@@ -2211,7 +2211,7 @@ mod tests_cpu {
                         0b1111_1111_1111_1111_1111_1111_1111_1110,
                         RegisterId::R1,
                     ),
-                    Instruction::BitTest(0, RegisterId::R1),
+                    Instruction::BitTestU32Reg(0, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1110)],
                 vec![0; 100],
@@ -2224,7 +2224,7 @@ mod tests_cpu {
                         0b1111_1111_1111_1111_1111_1111_1111_1111,
                         RegisterId::R1,
                     ),
-                    Instruction::BitTest(32, RegisterId::R1),
+                    Instruction::BitTestU32Reg(32, RegisterId::R1),
                 ],
                 &[],
                 vec![0; 100],

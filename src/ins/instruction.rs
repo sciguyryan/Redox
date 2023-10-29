@@ -74,7 +74,7 @@ pub enum Instruction {
 
     /******** [Logic Instructions] ********/
     /// Test the value of a bit in a register. The CF flag will be set to the value of the bit.
-    BitTest(u8, RegisterId),
+    BitTestU32Reg(u8, RegisterId),
 
     /******** [Special Instructions] ********/
     /// Return from a subroutine.
@@ -170,7 +170,7 @@ impl Display for Instruction {
             }
 
             /******** [Logic Instructions] ********/
-            Instruction::BitTest(bit, reg) => {
+            Instruction::BitTestU32Reg(bit, reg) => {
                 format!("bt {bit}, {reg}")
             }
 
@@ -217,7 +217,7 @@ impl Instruction {
             Instruction::MovMemExprU32RegRel(_, _) => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
             Instruction::MovU32RegMemExprRel(_, _) => ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE,
 
-            Instruction::BitTest(_, _) => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
+            Instruction::BitTestU32Reg(_, _) => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Special Instructions] ********/
             Instruction::Ret => 0,
@@ -257,7 +257,7 @@ impl Instruction {
             OpCode::MovU32RegPtrU32RegRelSimple => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Logic Instructions] ********/
-            OpCode::BitTest => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
+            OpCode::BitTestU32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Move Instructions - WITH EXPRESSIONS] ********/
             OpCode::MovU32ImmMemExprRel => ARG_U32_IMM_SIZE + ARG_MEM_ADDR_SIZE,
