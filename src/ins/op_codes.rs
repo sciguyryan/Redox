@@ -34,7 +34,7 @@ pub enum OpCode {
     ArithRightShiftU32RegU32Reg,
 
     /******** [Data Instructions] ********/
-    /******** [Simple Move Instructions - NO EXPRESSIONS] ********/
+    /**** [Simple Move Instructions - NO EXPRESSIONS] ****/
     /// Swap the values of the two registers.
     SwapU32RegU32Reg,
     /// Move a u32 immediate to u32 register (A). The result is copied into register A.
@@ -49,8 +49,7 @@ pub enum OpCode {
     MovMemU32RegRelSimple,
     /// Move the value from the memory address specified by a register (relative to the base address of the code block). The result is copied into the specified register.
     MovU32RegPtrU32RegRelSimple,
-
-    /******** [Complex Move Instructions - WITH EXPRESSIONS] ********/
+    /**** [Complex Move Instructions - WITH EXPRESSIONS] ****/
     /// Move a u32 immediate to memory (relative to the base address of the code block). The result is copied into the specified memory address.
     MovU32ImmMemExprRel,
     /// Move the address as given by an expression (from memory, relative to the base address of the code block). The result is copied into the specified register.
@@ -59,25 +58,26 @@ pub enum OpCode {
     MovU32RegMemExprRel,
 
     /******** [Logic Instructions] ********/
-    /// Test the value of a bit from a u32 register. The CF flag will be set to the state of the bit.
+    /// Test the state of a bit from a u32 register. The CF flag will be set to the state of the bit.
     BitTestU32Reg,
-    /// Test the value of a bit from a u32 value (starting at the specified memory address). The CF flag will be set to the state of the bit.
+    /// Test the state of a bit from a u32 value (starting at the specified memory address). The CF flag will be set to the state of the bit.
     BitTestU32Mem,
-    /// Test the value of a bit from a u32 register and clear the bit. The CF flag will be set to the original state of the bit.
+    /// Test the state of a bit from a u32 register and clear the bit. The CF flag will be set to the original state of the bit.
     BitTestResetU32Reg,
-    /// Test the value of a u32 value (starting at the specified memory address) and clear the bit. The CF flag will be set to the original state of the bit.
+    /// Test the state of a bit of a u32 value (starting at the specified memory address) and clear the bit. The CF flag will be set to the original state of the bit.
     BitTestResetU32Mem,
-    /// Test the value of a bit from a u32 register and set the bit. The CF flag will be set to the original state of the bit.
+    /// Test the state of a bit of a u32 register and set the bit. The CF flag will be set to the original state of the bit.
     BitTestSetU32Reg,
-    /// Test the value of a bit from a u32 value (starting at the specified memory address) and set the bit. The CF flag will be set to the original state of the bit.
+    /// Test the state of a bit of a u32 value (starting at the specified memory address) and set the bit. The CF flag will be set to the original state of the bit.
     BitTestSetU32Mem,
-    /// Search for the most significant bit from a u32 register (A) and store the index of the bit in a u32 register (B).
+    /**** [Reverse Bit Scan] ****/
+    /// Search for the most significant set bit of a u32 register (A) and store the index of the bit in a u32 register (B).
     BitScanReverseU32RegU32Reg,
-    /// Search for the most significant bit from a u32 value (starting at the specified memory address) and store the index of the bit in a u32 register.
+    /// Search for the most significant set bit of a u32 value (starting at the specified memory address) and store the index of the bit in a u32 register.
     BitScanReverseU32MemU32Reg,
-    /// Search for the most significant bit from a u32 register and store the index of the bit as a u32 value starting at a specified memory address.
+    /// Search for the most significant set bit of a u32 register and store the index of the bit as a u32 value starting at a specified memory address.
     BitScanReverseU32RegMemU32,
-    /// Search for the most significant bit from a u32 value (starting at the specified memory address) and store the index of the bit as a u32 value starting at a specified memory address.
+    /// Search for the most significant set bit of a u32 value (starting at the specified memory address) and store the index of the bit as a u32 value starting at a specified memory address.
     BitScanReverseU32MemU32Mem,
 
     /******** [Special Instructions] ********/
