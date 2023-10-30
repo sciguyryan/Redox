@@ -205,6 +205,13 @@ impl Memory {
 
                 Instruction::ByteSwapU32(reg)
             }
+            OpCode::ZeroHighBitsByIndexU32Reg => {
+                let in_reg = block.read_register_id();
+                let index_reg = block.read_register_id();
+                let out_reg = block.read_register_id();
+
+                Instruction::ZeroHighBitsByIndexU32Reg(in_reg, index_reg, out_reg)
+            }
 
             /******** [Logic Instructions] ********/
             OpCode::BitTestU32Reg => {

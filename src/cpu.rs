@@ -578,6 +578,32 @@ impl Cpu {
 
                 mem.set_u32(addr as usize, value);
             }
+            Instruction::ZeroHighBitsByIndexU32Reg(source_reg, index_reg, out_reg) => {
+                // zhbi source_reg, index_reg, out_reg
+
+                // Values must be in range of the number of bits in the type.
+                let index = self.read_reg_u32(index_reg, privilege);
+                assert!(index <= 31);
+
+                let value = self.read_reg_u32(source_reg, privilege);
+                let final_value = if index > 0 {
+                    value & ((1 << (32 - index)) - 1)
+                } else {
+                    value
+                };
+
+                self.set_flag_state(CpuFlag::ZF, final_value == 0);
+
+                // The carry flag is set if the if the number contained in the
+                // lowest 8 bits is greater than 31 (register size - 1).
+                self.set_flag_state(CpuFlag::CF, (final_value & 0xff) > 31);
+
+                // The overflow flag is always cleared.
+                self.set_flag_state(CpuFlag::OF, false);
+
+                // Write the value to the output register.
+                self.write_reg_u32(out_reg, final_value, privilege);
+            }
 
             /******** [Logic Instructions] ********/
             Instruction::BitTestU32Reg(bit, reg) => {
@@ -2380,6 +2406,157 @@ mod tests_cpu {
             false,
             "BSWAP - the byte order of the register was not correctly swapped",
         )];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the zero high bit by index instruction.
+    #[test]
+    fn test_zhbi_u32_reg() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(
+                        0b1111_1111_1111_1111_1111_1111_1111_1111,
+                        RegisterId::R1,
+                    ),
+                    Instruction::MovU32ImmU32Reg(0x4, RegisterId::R2),
+                    Instruction::ZeroHighBitsByIndexU32Reg(
+                        RegisterId::R1,
+                        RegisterId::R2,
+                        RegisterId::R3,
+                    ),
+                ],
+                &[
+                    (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::R2, 0x4),
+                    (RegisterId::R3, 0b0000_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::CF])),
+                ],
+                vec![0; 100],
+                false,
+                "ZHBI - incorrect result value produced",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(
+                        0b1111_1111_1111_1111_1111_1111_1111_1111,
+                        RegisterId::R1,
+                    ),
+                    Instruction::MovU32ImmU32Reg(0x18, RegisterId::R2),
+                    Instruction::ZeroHighBitsByIndexU32Reg(
+                        RegisterId::R1,
+                        RegisterId::R2,
+                        RegisterId::R3,
+                    ),
+                ],
+                &[
+                    (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::R2, 0x18),
+                    (RegisterId::R3, 0b0000_0000_0000_0000_0000_0000_1111_1111),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::CF])),
+                ],
+                vec![0; 100],
+                false,
+                "ZHBI - incorrect result value produced",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(
+                        0b1111_1111_1111_1111_1111_1111_1111_1111,
+                        RegisterId::R1,
+                    ),
+                    Instruction::MovU32ImmU32Reg(0x19, RegisterId::R2),
+                    Instruction::ZeroHighBitsByIndexU32Reg(
+                        RegisterId::R1,
+                        RegisterId::R2,
+                        RegisterId::R3,
+                    ),
+                ],
+                &[
+                    (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::R2, 0x19),
+                    (RegisterId::R3, 0b0000_0000_0000_0000_0000_0000_0111_1111),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::CF])),
+                ],
+                vec![0; 100],
+                false,
+                "ZHBI - incorrect result value produced",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(
+                        0b1111_1111_1111_1111_1111_1111_1111_1111,
+                        RegisterId::R1,
+                    ),
+                    Instruction::MovU32ImmU32Reg(0x1b, RegisterId::R2),
+                    Instruction::ZeroHighBitsByIndexU32Reg(
+                        RegisterId::R1,
+                        RegisterId::R2,
+                        RegisterId::R3,
+                    ),
+                ],
+                &[
+                    (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::R2, 0x1b),
+                    (RegisterId::R3, 0b0000_0000_0000_0000_0000_0000_0001_1111),
+                ],
+                vec![0; 100],
+                false,
+                "ZHBI - incorrect result value produced",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
+                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R2),
+                    Instruction::ZeroHighBitsByIndexU32Reg(
+                        RegisterId::R1,
+                        RegisterId::R2,
+                        RegisterId::R3,
+                    ),
+                ],
+                &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF]))],
+                vec![0; 100],
+                false,
+                "ZHBI - incorrect flag state - zero flag not set",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
+                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R2),
+                    // Manually set the overflow flag state.
+                    Instruction::MovU32ImmU32Reg(
+                        CpuFlag::compute_for(&[CpuFlag::OF]),
+                        RegisterId::FL,
+                    ),
+                    Instruction::ZeroHighBitsByIndexU32Reg(
+                        RegisterId::R1,
+                        RegisterId::R2,
+                        RegisterId::R3,
+                    ),
+                ],
+                &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF]))],
+                vec![0; 100],
+                false,
+                "ZHBI - incorrect flag state - overflow flag not cleared",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x20, RegisterId::R2),
+                    Instruction::ZeroHighBitsByIndexU32Reg(
+                        RegisterId::R1,
+                        RegisterId::R2,
+                        RegisterId::R3,
+                    ),
+                ],
+                &[],
+                vec![0; 100],
+                true,
+                "ZHBI - successfully executed instruction with invalid bit index",
+            ),
+        ];
 
         for (id, test) in tests.iter().enumerate() {
             test.run_test(id);

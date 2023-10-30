@@ -132,6 +132,18 @@ fn main() {
         panic!("currently unsupported");
     }
 
+    let bbbb: u32 = 0b1111_1111_1111_1111_1111_1111_1111_1111;
+    let cccc: u32 = 0b0000_0000_0000_0000_0000_0000_1111_1111;
+    let dddd = bbbb & cccc;
+    println!("{dddd:b} {dddd}");
+
+    let qqqq = 31;
+    println!("{qqqq:032b}");
+
+    let eeee = (dddd & 0xff) > 31;
+    println! {"{eeee}"}
+    return;
+
     //run_test_2();
 
     let mut vm = VirtualMachine::new(64_000);

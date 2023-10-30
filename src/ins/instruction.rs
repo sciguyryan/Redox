@@ -70,6 +70,8 @@ pub enum Instruction {
     MovU32RegMemExprRel(RegisterId, u32),
     /// Reverse the order of bytes in a specified register.
     ByteSwapU32(RegisterId),
+    /// Zero the high bits of the source value starting from a specified index.
+    ZeroHighBitsByIndexU32Reg(RegisterId, RegisterId, RegisterId),
 
     /******** [Logic Instructions] ********/
     /// Test the state of a bit from a u32 register. The CF flag will be set to the state of the bit.
@@ -193,6 +195,9 @@ impl Display for Instruction {
             Instruction::ByteSwapU32(reg) => {
                 format!("bswap {reg}")
             }
+            Instruction::ZeroHighBitsByIndexU32Reg(in_reg, index_reg, out_reg) => {
+                format!("zhbi {in_reg}, {index_reg}, {out_reg}")
+            }
 
             /******** [Logic Instructions] ********/
             Instruction::BitTestU32Reg(bit, reg) => {
@@ -278,6 +283,9 @@ impl Instruction {
             Instruction::MovMemExprU32RegRel(_, _) => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
             Instruction::MovU32RegMemExprRel(_, _) => ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE,
             Instruction::ByteSwapU32(_) => ARG_REG_ID_SIZE,
+            Instruction::ZeroHighBitsByIndexU32Reg(_, _, _) => {
+                ARG_REG_ID_SIZE + ARG_REG_ID_SIZE + ARG_REG_ID_SIZE
+            }
 
             /******** [Logic Instructions] ********/
             Instruction::BitTestU32Reg(_, _) => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
@@ -334,6 +342,9 @@ impl Instruction {
             OpCode::MovMemExprU32RegRel => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
             OpCode::MovU32RegMemExprRel => ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE,
             OpCode::ByteSwapU32 => ARG_REG_ID_SIZE,
+            OpCode::ZeroHighBitsByIndexU32Reg => {
+                ARG_REG_ID_SIZE + ARG_REG_ID_SIZE + ARG_REG_ID_SIZE
+            }
 
             /******** [Logic Instructions] ********/
             OpCode::BitTestU32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,

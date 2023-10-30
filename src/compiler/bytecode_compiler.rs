@@ -115,6 +115,13 @@ impl Compiler {
                 self.write_register_id(&reg);
             }
 
+            /******** [u32 register, u32 register and u32 register] ********/
+            Instruction::ZeroHighBitsByIndexU32Reg(reg1, reg2, reg3) => {
+                self.write_register_id(&reg1);
+                self.write_register_id(&reg2);
+                self.write_register_id(&reg3);
+            }
+
             /******** [No Arguments] ********/
             Instruction::Nop | Instruction::Ret | Instruction::Mret | Instruction::Hlt => {}
         }
