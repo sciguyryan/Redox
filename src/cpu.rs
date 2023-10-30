@@ -677,6 +677,13 @@ impl Cpu {
 
                 mem.set_u32(*out_addr as usize, index);
             }
+            Instruction::BitScanForwardU32MemU32Mem(in_addr, out_addr) => {
+                // bsf [in_addr], [out_addr]
+                let value = mem.get_u32(*in_addr as usize);
+                let index = self.perform_forward_bit_search(value);
+
+                mem.set_u32(*out_addr as usize, index);
+            }
 
             /******** [Special Instructions] ********/
             Instruction::Ret => {
@@ -3048,6 +3055,65 @@ mod tests_cpu {
                 ],
                 false,
                 "BSF - incorrect result produced from the bit search",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the forward bit scan with a source memory address and a destination memory address.
+    #[test]
+    fn test_bit_scan_forward_mem_mem() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmMemRelSimple(
+                        0b1111_1111_1111_1111_1111_1111_1111_1111,
+                        0x0,
+                    ),
+                    Instruction::BitScanForwardU32MemU32Mem(0x0, 0x4),
+                ],
+                &[],
+                vec![
+                    255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                ],
+                false,
+                "BSF - incorrect result produced from the bit search",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmMemRelSimple(
+                        0b1111_1111_1111_1111_1111_1111_1111_0000,
+                        0x0,
+                    ),
+                    Instruction::BitScanForwardU32MemU32Mem(0x0, 0x4),
+                ],
+                &[],
+                vec![
+                    240, 255, 255, 255, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                ],
+                false,
+                "BSR - incorrect result produced from the bit search",
+            ),
+            TestEntryU32Standard::new(
+                &[Instruction::BitScanForwardU32MemU32Mem(0x0, 0x4)],
+                &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF]))],
+                vec![
+                    0, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                ],
+                false,
+                "BSR - incorrect result produced from the bit search",
             ),
         ];
 

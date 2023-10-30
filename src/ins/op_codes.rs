@@ -86,6 +86,8 @@ pub enum OpCode {
     BitScanForwardU32MemU32Reg,
     /// Search for the least significant set bit of a u32 register and store the index of the bit as a u32 value starting at a specified memory address.
     BitScanForwardU32RegMemU32,
+    /// Search for the least significant set bit of a u32 value (starting at the specified memory address) and store the index of the bit as a u32 value starting at a specified memory address.
+    BitScanForwardU32MemU32Mem,
 
     /******** [Special Instructions] ********/
     /// Return from a subroutine.
@@ -145,6 +147,7 @@ impl From<Instruction> for OpCode {
             Instruction::BitScanForwardU32RegU32Reg(_, _) => OpCode::BitScanForwardU32RegU32Reg,
             Instruction::BitScanForwardU32MemU32Reg(_, _) => OpCode::BitScanForwardU32MemU32Reg,
             Instruction::BitScanForwardU32RegMemU32(_, _) => OpCode::BitScanForwardU32RegMemU32,
+            Instruction::BitScanForwardU32MemU32Mem(_, _) => OpCode::BitScanForwardU32MemU32Mem,
 
             /******** [Special Instructions] ********/
             Instruction::Ret => OpCode::Ret,

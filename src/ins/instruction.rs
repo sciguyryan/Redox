@@ -100,6 +100,8 @@ pub enum Instruction {
     BitScanForwardU32MemU32Reg(u32, RegisterId),
     /// Search for the least significant set bit of a u32 register and store the index of the bit as a u32 value starting at a specified memory address.
     BitScanForwardU32RegMemU32(RegisterId, u32),
+    /// Search for the least significant set bit of a u32 value (starting at the specified memory address) and store the index of the bit as a u32 value starting at a specified memory address.
+    BitScanForwardU32MemU32Mem(u32, u32),
 
     /******** [Special Instructions] ********/
     /// Return from a subroutine.
@@ -235,6 +237,9 @@ impl Display for Instruction {
             Instruction::BitScanForwardU32RegMemU32(reg, out_addr) => {
                 format!("bsr {reg}, [${out_addr:04X}]")
             }
+            Instruction::BitScanForwardU32MemU32Mem(in_addr, out_addr) => {
+                format!("bsr [${in_addr:04X}], [${out_addr:04X}]")
+            }
 
             /******** [Special Instructions] ********/
             Instruction::Ret => String::from("ret"),
@@ -294,6 +299,7 @@ impl Instruction {
             Instruction::BitScanForwardU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
             Instruction::BitScanForwardU32MemU32Reg(_, _) => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
             Instruction::BitScanForwardU32RegMemU32(_, _) => ARG_REG_ID_SIZE + ARG_MEM_ADDR_SIZE,
+            Instruction::BitScanForwardU32MemU32Mem(_, _) => ARG_MEM_ADDR_SIZE + ARG_MEM_ADDR_SIZE,
 
             /******** [Special Instructions] ********/
             Instruction::Ret => 0,
@@ -352,6 +358,7 @@ impl Instruction {
             OpCode::BitScanForwardU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
             OpCode::BitScanForwardU32MemU32Reg => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
             OpCode::BitScanForwardU32RegMemU32 => ARG_REG_ID_SIZE + ARG_MEM_ADDR_SIZE,
+            OpCode::BitScanForwardU32MemU32Mem => ARG_MEM_ADDR_SIZE + ARG_MEM_ADDR_SIZE,
 
             /******** [Special Instructions] ********/
             OpCode::Ret => 0,
