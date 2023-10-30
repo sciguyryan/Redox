@@ -34,7 +34,6 @@ pub enum OpCode {
     ArithRightShiftU32RegU32Reg,
 
     /******** [Data Instructions] ********/
-    /**** [Simple Move Instructions - NO EXPRESSIONS] ****/
     /// Swap the values of the two registers.
     SwapU32RegU32Reg,
     /// Move a u32 immediate to u32 register (A). The result is copied into register A.
@@ -49,13 +48,14 @@ pub enum OpCode {
     MovMemU32RegRelSimple,
     /// Move the value from the memory address specified by a register (relative to the base address of the code block). The result is copied into the specified register.
     MovU32RegPtrU32RegRelSimple,
-    /**** [Complex Move Instructions - WITH EXPRESSIONS] ****/
     /// Move a u32 immediate to memory (relative to the base address of the code block). The result is copied into the specified memory address.
     MovU32ImmMemExprRel,
     /// Move the address as given by an expression (from memory, relative to the base address of the code block). The result is copied into the specified register.
     MovMemExprU32RegRel,
     /// Move the value of a register to the address given by an expression (relative to the base address of the code block). The result is copied into the specified memory address.
     MovU32RegMemExprRel,
+    /// Reverse the order of bytes in a specified register.
+    ByteSwapU32,
 
     /******** [Logic Instructions] ********/
     /// Test the state of a bit from a u32 register. The CF flag will be set to the state of the bit.
@@ -70,7 +70,6 @@ pub enum OpCode {
     BitTestSetU32Reg,
     /// Test the state of a bit of a u32 value (starting at the specified memory address) and set the bit. The CF flag will be set to the original state of the bit.
     BitTestSetU32Mem,
-    /**** [Reverse Bit Scan] ****/
     /// Search for the most significant set bit of a u32 register (A) and store the index of the bit in a u32 register (B).
     BitScanReverseU32RegU32Reg,
     /// Search for the most significant set bit of a u32 value (starting at the specified memory address) and store the index of the bit in a u32 register.
@@ -79,7 +78,6 @@ pub enum OpCode {
     BitScanReverseU32RegMemU32,
     /// Search for the most significant set bit of a u32 value (starting at the specified memory address) and store the index of the bit as a u32 value starting at a specified memory address.
     BitScanReverseU32MemU32Mem,
-    /**** [Forward Bit Scan] ****/
     /// Search for the least significant set bit of a u32 register (A) and store the index of the bit in a u32 register (B).
     BitScanForwardU32RegU32Reg,
     /// Search for the least significant set bit of a u32 value (starting at the specified memory address) and store the index of the bit in a u32 register.
@@ -120,16 +118,15 @@ impl From<Instruction> for OpCode {
             Instruction::ArithRightShiftU32RegU32Reg(_, _) => OpCode::ArithRightShiftU32RegU32Reg,
 
             /******** [Data Instructions] ********/
-            /******** [Move Instructions - NO EXPRESSIONS] ********/
             Instruction::SwapU32RegU32Reg(_, _) => OpCode::SwapU32RegU32Reg,
             Instruction::MovU32ImmMemRelSimple(_, _) => OpCode::MovU32ImmMemRelSimple,
             Instruction::MovU32RegMemRelSimple(_, _) => OpCode::MovU32RegMemRelSimple,
             Instruction::MovMemU32RegRelSimple(_, _) => OpCode::MovMemU32RegRelSimple,
             Instruction::MovU32RegPtrU32RegRelSimple(_, _) => OpCode::MovU32RegPtrU32RegRelSimple,
-            /******** [Move Instructions - WITH EXPRESSIONS] ********/
             Instruction::MovU32ImmMemExprRel(_, _) => OpCode::MovU32ImmMemExprRel,
             Instruction::MovMemExprU32RegRel(_, _) => OpCode::MovMemExprU32RegRel,
             Instruction::MovU32RegMemExprRel(_, _) => OpCode::MovU32RegMemExprRel,
+            Instruction::ByteSwapU32(_) => OpCode::ByteSwapU32,
 
             /******** [Logic Instructions] ********/
             Instruction::BitTestU32Reg(_, _) => OpCode::BitTestU32Reg,
@@ -138,12 +135,10 @@ impl From<Instruction> for OpCode {
             Instruction::BitTestResetU32Mem(_, _) => OpCode::BitTestResetU32Mem,
             Instruction::BitTestSetU32Reg(_, _) => OpCode::BitTestSetU32Reg,
             Instruction::BitTestSetU32Mem(_, _) => OpCode::BitTestSetU32Mem,
-            /**** [Reverse Bit Scan] ****/
             Instruction::BitScanReverseU32RegU32Reg(_, _) => OpCode::BitScanReverseU32RegU32Reg,
             Instruction::BitScanReverseU32MemU32Reg(_, _) => OpCode::BitScanReverseU32MemU32Reg,
             Instruction::BitScanReverseU32RegMemU32(_, _) => OpCode::BitScanReverseU32RegMemU32,
             Instruction::BitScanReverseU32MemU32Mem(_, _) => OpCode::BitScanReverseU32MemU32Mem,
-            /**** [Forward Bit Scan] ****/
             Instruction::BitScanForwardU32RegU32Reg(_, _) => OpCode::BitScanForwardU32RegU32Reg,
             Instruction::BitScanForwardU32MemU32Reg(_, _) => OpCode::BitScanForwardU32MemU32Reg,
             Instruction::BitScanForwardU32RegMemU32(_, _) => OpCode::BitScanForwardU32RegMemU32,

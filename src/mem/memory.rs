@@ -140,7 +140,6 @@ impl Memory {
             }
 
             /******** [Data Instructions] ********/
-            /**** [Simple Move Instructions - NO EXPRESSIONS] ****/
             OpCode::SwapU32RegU32Reg => {
                 let reg1 = block.read_register_id();
                 let reg2 = block.read_register_id();
@@ -183,7 +182,6 @@ impl Memory {
 
                 Instruction::MovU32RegPtrU32RegRelSimple(in_reg, out_reg)
             }
-            /**** [Complex Move Instructions - WITH EXPRESSIONS] ****/
             OpCode::MovU32ImmMemExprRel => {
                 let imm = block.read_u32();
                 let expr = block.read_u32();
@@ -201,6 +199,11 @@ impl Memory {
                 let expr = block.read_u32();
 
                 Instruction::MovU32RegMemExprRel(reg, expr)
+            }
+            OpCode::ByteSwapU32 => {
+                let reg = block.read_register_id();
+
+                Instruction::ByteSwapU32(reg)
             }
 
             /******** [Logic Instructions] ********/
@@ -240,7 +243,6 @@ impl Memory {
 
                 Instruction::BitTestSetU32Mem(bit, addr)
             }
-            /**** [Reverse Bit Scan] ****/
             OpCode::BitScanReverseU32RegU32Reg => {
                 let in_reg = block.read_register_id();
                 let out_reg = block.read_register_id();
@@ -265,7 +267,6 @@ impl Memory {
 
                 Instruction::BitScanReverseU32MemU32Mem(in_addr, out_addr)
             }
-            /**** [Forward Bit Scan] ****/
             OpCode::BitScanForwardU32RegU32Reg => {
                 let in_reg = block.read_register_id();
                 let out_reg = block.read_register_id();

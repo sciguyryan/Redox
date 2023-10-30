@@ -110,6 +110,11 @@ impl Compiler {
                 self.write_u32(imm2);
             }
 
+            /******** [u32 register] ********/
+            Instruction::ByteSwapU32(reg) => {
+                self.write_register_id(&reg);
+            }
+
             /******** [No Arguments] ********/
             Instruction::Nop | Instruction::Ret | Instruction::Mret | Instruction::Hlt => {}
         }

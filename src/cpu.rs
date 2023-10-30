@@ -521,7 +521,6 @@ impl Cpu {
             }
 
             /******** [Data Instructions] ********/
-            /**** [Move Instructions - NO EXPRESSIONS] ****/
             Instruction::SwapU32RegU32Reg(reg1, reg2) => {
                 let reg1_val = self.read_reg_u32(reg1, privilege);
                 let reg2_val = self.read_reg_u32(reg2, privilege);
@@ -556,7 +555,6 @@ impl Cpu {
 
                 self.write_reg_u32(out_reg, value, privilege);
             }
-            /**** [Move Instructions - WITH EXPRESSIONS] ****/
             Instruction::MovU32ImmMemExprRel(imm, expr) => {
                 // mov imm, [addr] - move immediate to address.
                 let args = self.get_cache_move_expression_decode(expr);
@@ -626,7 +624,6 @@ impl Cpu {
 
                 mem.set_u32(*addr as usize, value);
             }
-            /**** [Reverse Bit Scan] ****/
             Instruction::BitScanReverseU32RegU32Reg(in_reg, out_reg) => {
                 // bsr in_reg, out_reg
                 let value = self.read_reg_u32(in_reg, privilege);
@@ -655,7 +652,6 @@ impl Cpu {
 
                 mem.set_u32(*out_addr as usize, index);
             }
-            /**** [Forward Bit Scan] ****/
             Instruction::BitScanForwardU32RegU32Reg(in_reg, out_reg) => {
                 // bsf in_reg, out_reg
                 let value = self.read_reg_u32(in_reg, privilege);
@@ -683,6 +679,12 @@ impl Cpu {
                 let index = self.perform_forward_bit_search(value);
 
                 mem.set_u32(*out_addr as usize, index);
+            }
+            Instruction::ByteSwapU32(reg) => {
+                // bswap reg
+                let value = self.read_reg_u32(reg, privilege).swap_bytes();
+
+                self.write_reg_u32(reg, value, privilege);
             }
 
             /******** [Special Instructions] ********/
@@ -2359,6 +2361,25 @@ mod tests_cpu {
                 "MOV - value not correctly moved from memory to register - using subtraction",
             ),
         ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the byte swap u32 register instruction.
+    #[test]
+    fn test_byte_swap_u32_reg() {
+        let tests = [TestEntryU32Standard::new(
+            &[
+                Instruction::MovU32ImmU32Reg(0xAABBCCDD, RegisterId::R1),
+                Instruction::ByteSwapU32(RegisterId::R1),
+            ],
+            &[(RegisterId::R1, 0xDDCCBBAA)],
+            vec![0; 100],
+            false,
+            "BSWAP - the byte order of the register was not correctly swapped",
+        )];
 
         for (id, test) in tests.iter().enumerate() {
             test.run_test(id);
