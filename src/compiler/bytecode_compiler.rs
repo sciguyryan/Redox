@@ -55,7 +55,7 @@ impl Compiler {
             | Instruction::MovU32ImmU32Reg(imm, reg)
             | Instruction::MovMemU32RegRelSimple(imm, reg)
             | Instruction::MovMemExprU32RegRel(imm, reg)
-            | Instruction::BitScanReverseMemU32Reg(imm, reg) => {
+            | Instruction::BitScanReverseU32MemU32Reg(imm, reg) => {
                 self.write_u32(imm);
                 self.write_register_id(&reg);
             }
@@ -77,7 +77,7 @@ impl Compiler {
             /******** [u32 immediate and u32 immediate] ********/
             Instruction::MovU32ImmMemRelSimple(imm1, imm2)
             | Instruction::MovU32ImmMemExprRel(imm1, imm2)
-            | Instruction::BitScanReverseMemMem(imm1, imm2) => {
+            | Instruction::BitScanReverseU32MemU32Mem(imm1, imm2) => {
                 self.write_u32(imm1);
                 self.write_u32(imm2);
             }
@@ -85,7 +85,7 @@ impl Compiler {
             /******** [u32 register and u32 immediate] ********/
             Instruction::MovU32RegMemRelSimple(reg, imm)
             | Instruction::MovU32RegMemExprRel(reg, imm)
-            | Instruction::BitScanReverseU32RegMem(reg, imm) => {
+            | Instruction::BitScanReverseU32RegMemU32(reg, imm) => {
                 self.write_register_id(&reg);
                 self.write_u32(imm);
             }
@@ -99,9 +99,9 @@ impl Compiler {
             }
 
             /******** [u8 immediate and u32 immediate] ********/
-            Instruction::BitTestMem(imm1, imm2)
-            | Instruction::BitTestResetMem(imm1, imm2)
-            | Instruction::BitTestSetMem(imm1, imm2) => {
+            Instruction::BitTestU32Mem(imm1, imm2)
+            | Instruction::BitTestResetU32Mem(imm1, imm2)
+            | Instruction::BitTestSetU32Mem(imm1, imm2) => {
                 self.write_u8(imm1);
                 self.write_u32(imm2);
             }

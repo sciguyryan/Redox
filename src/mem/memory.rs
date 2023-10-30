@@ -211,11 +211,11 @@ impl Memory {
 
                 Instruction::BitTestU32Reg(bit, reg)
             }
-            OpCode::BitTestMem => {
+            OpCode::BitTestU32Mem => {
                 let bit = block.read_u8();
                 let addr = block.read_u32();
 
-                Instruction::BitTestMem(bit, addr)
+                Instruction::BitTestU32Mem(bit, addr)
             }
             OpCode::BitTestResetU32Reg => {
                 let bit = block.read_u8();
@@ -223,11 +223,11 @@ impl Memory {
 
                 Instruction::BitTestResetU32Reg(bit, reg)
             }
-            OpCode::BitTestResetMem => {
+            OpCode::BitTestResetU32Mem => {
                 let bit = block.read_u8();
                 let addr = block.read_u32();
 
-                Instruction::BitTestResetMem(bit, addr)
+                Instruction::BitTestResetU32Mem(bit, addr)
             }
             OpCode::BitTestSetU32Reg => {
                 let bit = block.read_u8();
@@ -235,11 +235,11 @@ impl Memory {
 
                 Instruction::BitTestSetU32Reg(bit, reg)
             }
-            OpCode::BitTestSetMem => {
+            OpCode::BitTestSetU32Mem => {
                 let bit = block.read_u8();
                 let addr = block.read_u32();
 
-                Instruction::BitTestSetMem(bit, addr)
+                Instruction::BitTestSetU32Mem(bit, addr)
             }
             OpCode::BitScanReverseU32RegU32Reg => {
                 let in_reg = block.read_register_id();
@@ -247,23 +247,23 @@ impl Memory {
 
                 Instruction::BitScanReverseU32RegU32Reg(in_reg, out_reg)
             }
-            OpCode::BitScanReverseMemU32Reg => {
+            OpCode::BitScanReverseU32MemU32Reg => {
                 let addr = block.read_u32();
                 let reg = block.read_register_id();
 
-                Instruction::BitScanReverseMemU32Reg(addr, reg)
+                Instruction::BitScanReverseU32MemU32Reg(addr, reg)
             }
-            OpCode::BitScanReverseU32RegMem => {
+            OpCode::BitScanReverseU32RegMemU32 => {
                 let reg = block.read_register_id();
                 let out_addr = block.read_u32();
 
-                Instruction::BitScanReverseU32RegMem(reg, out_addr)
+                Instruction::BitScanReverseU32RegMemU32(reg, out_addr)
             }
-            OpCode::BitScanReverseMemMem => {
+            OpCode::BitScanReverseU32MemU32Mem => {
                 let in_addr = block.read_u32();
                 let out_addr = block.read_u32();
 
-                Instruction::BitScanReverseMemMem(in_addr, out_addr)
+                Instruction::BitScanReverseU32MemU32Mem(in_addr, out_addr)
             }
 
             /******** [Special Instructions] ********/
