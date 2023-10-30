@@ -96,6 +96,8 @@ pub enum Instruction {
     /**** [Forward Bit Scan] ****/
     /// Search for the least significant set bit of a u32 register (A) and store the index of the bit in a u32 register (B).
     BitScanForwardU32RegU32Reg(RegisterId, RegisterId),
+    /// Search for the least significant set bit of a u32 value (starting at the specified memory address) and store the index of the bit in a u32 register.
+    BitScanForwardU32MemU32Reg(u32, RegisterId),
 
     /******** [Special Instructions] ********/
     /// Return from a subroutine.
@@ -225,6 +227,9 @@ impl Display for Instruction {
             Instruction::BitScanForwardU32RegU32Reg(in_reg, out_reg) => {
                 format!("bsf {in_reg}, {out_reg}")
             }
+            Instruction::BitScanForwardU32MemU32Reg(addr, reg) => {
+                format!("bsf [${addr:04X}], {reg}")
+            }
 
             /******** [Special Instructions] ********/
             Instruction::Ret => String::from("ret"),
@@ -282,6 +287,7 @@ impl Instruction {
             Instruction::BitScanReverseU32MemU32Mem(_, _) => ARG_MEM_ADDR_SIZE + ARG_MEM_ADDR_SIZE,
             /**** [Forward Bit Scan] ****/
             Instruction::BitScanForwardU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
+            Instruction::BitScanForwardU32MemU32Reg(_, _) => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Special Instructions] ********/
             Instruction::Ret => 0,
@@ -331,11 +337,14 @@ impl Instruction {
             OpCode::BitTestResetU32Mem => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
             OpCode::BitTestSetU32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
             OpCode::BitTestSetU32Mem => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
+            /**** [Reverse Bit Scan] ****/
             OpCode::BitScanReverseU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
             OpCode::BitScanReverseU32MemU32Reg => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
             OpCode::BitScanReverseU32RegMemU32 => ARG_REG_ID_SIZE + ARG_MEM_ADDR_SIZE,
             OpCode::BitScanReverseU32MemU32Mem => ARG_MEM_ADDR_SIZE + ARG_MEM_ADDR_SIZE,
             OpCode::BitScanForwardU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
+            /**** [Forward Bit Scan] ****/
+            OpCode::BitScanForwardU32MemU32Reg => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Special Instructions] ********/
             OpCode::Ret => 0,

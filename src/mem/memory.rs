@@ -272,6 +272,12 @@ impl Memory {
 
                 Instruction::BitScanForwardU32RegU32Reg(in_reg, out_reg)
             }
+            OpCode::BitScanForwardU32MemU32Reg => {
+                let addr = block.read_u32();
+                let reg = block.read_register_id();
+
+                Instruction::BitScanForwardU32MemU32Reg(addr, reg)
+            }
 
             /******** [Special Instructions] ********/
             OpCode::Ret => Instruction::Ret,
