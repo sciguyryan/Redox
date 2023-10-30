@@ -79,6 +79,9 @@ pub enum OpCode {
     BitScanReverseU32RegMemU32,
     /// Search for the most significant set bit of a u32 value (starting at the specified memory address) and store the index of the bit as a u32 value starting at a specified memory address.
     BitScanReverseU32MemU32Mem,
+    /**** [Forward Bit Scan] ****/
+    /// Search for the least significant set bit of a u32 register (A) and store the index of the bit in a u32 register (B).
+    BitScanForwardU32RegU32Reg,
 
     /******** [Special Instructions] ********/
     /// Return from a subroutine.
@@ -117,7 +120,6 @@ impl From<Instruction> for OpCode {
             Instruction::MovU32RegMemRelSimple(_, _) => OpCode::MovU32RegMemRelSimple,
             Instruction::MovMemU32RegRelSimple(_, _) => OpCode::MovMemU32RegRelSimple,
             Instruction::MovU32RegPtrU32RegRelSimple(_, _) => OpCode::MovU32RegPtrU32RegRelSimple,
-
             /******** [Move Instructions - WITH EXPRESSIONS] ********/
             Instruction::MovU32ImmMemExprRel(_, _) => OpCode::MovU32ImmMemExprRel,
             Instruction::MovMemExprU32RegRel(_, _) => OpCode::MovMemExprU32RegRel,
@@ -130,10 +132,13 @@ impl From<Instruction> for OpCode {
             Instruction::BitTestResetU32Mem(_, _) => OpCode::BitTestResetU32Mem,
             Instruction::BitTestSetU32Reg(_, _) => OpCode::BitTestSetU32Reg,
             Instruction::BitTestSetU32Mem(_, _) => OpCode::BitTestSetU32Mem,
+            /**** [Reverse Bit Scan] ****/
             Instruction::BitScanReverseU32RegU32Reg(_, _) => OpCode::BitScanReverseU32RegU32Reg,
             Instruction::BitScanReverseU32MemU32Reg(_, _) => OpCode::BitScanReverseU32MemU32Reg,
             Instruction::BitScanReverseU32RegMemU32(_, _) => OpCode::BitScanReverseU32RegMemU32,
             Instruction::BitScanReverseU32MemU32Mem(_, _) => OpCode::BitScanReverseU32MemU32Mem,
+            /**** [Forward Bit Scan] ****/
+            Instruction::BitScanForwardU32RegU32Reg(_, _) => OpCode::BitScanForwardU32RegU32Reg,
 
             /******** [Special Instructions] ********/
             Instruction::Ret => OpCode::Ret,

@@ -69,7 +69,8 @@ impl Compiler {
             | Instruction::SwapU32RegU32Reg(reg1, reg2)
             | Instruction::MovU32RegU32Reg(reg1, reg2)
             | Instruction::MovU32RegPtrU32RegRelSimple(reg1, reg2)
-            | Instruction::BitScanReverseU32RegU32Reg(reg1, reg2) => {
+            | Instruction::BitScanReverseU32RegU32Reg(reg1, reg2)
+            | Instruction::BitScanForwardU32RegU32Reg(reg1, reg2) => {
                 self.write_register_id(&reg1);
                 self.write_register_id(&reg2);
             }

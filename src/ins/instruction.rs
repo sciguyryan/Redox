@@ -93,6 +93,9 @@ pub enum Instruction {
     BitScanReverseU32RegMemU32(RegisterId, u32),
     /// Search for the most significant set bit of a u32 value (starting at the specified memory address) and store the index of the bit as a u32 value starting at a specified memory address.
     BitScanReverseU32MemU32Mem(u32, u32),
+    /**** [Forward Bit Scan] ****/
+    /// Search for the least significant set bit of a u32 register (A) and store the index of the bit in a u32 register (B).
+    BitScanForwardU32RegU32Reg(RegisterId, RegisterId),
 
     /******** [Special Instructions] ********/
     /// Return from a subroutine.
@@ -144,7 +147,7 @@ impl Display for Instruction {
             }
 
             /******** [Data Instructions] ********/
-            /******** [Move Instructions - NO EXPRESSIONS] ********/
+            /**** [Move Instructions - NO EXPRESSIONS] ****/
             Instruction::SwapU32RegU32Reg(reg1, reg2) => {
                 format!("swap {reg1}, {reg2}")
             }
@@ -166,8 +169,7 @@ impl Display for Instruction {
             Instruction::MovU32RegPtrU32RegRelSimple(in_reg, out_reg) => {
                 format!("mov.rs [{in_reg}], {out_reg}")
             }
-
-            /******** [Move Instructions - WITH EXPRESSIONS] ********/
+            /**** [Move Instructions - WITH EXPRESSIONS] ****/
             Instruction::MovU32ImmMemExprRel(imm, expr) => {
                 let mut decoder = MoveExpressionHandler::new();
                 decoder.decode(expr);
@@ -206,6 +208,7 @@ impl Display for Instruction {
             Instruction::BitTestSetU32Mem(bit, addr) => {
                 format!("bts {bit}, [${addr:04X}]")
             }
+            /**** [Reverse Bit Scan] ****/
             Instruction::BitScanReverseU32RegU32Reg(in_reg, out_reg) => {
                 format!("bsr {in_reg}, {out_reg}")
             }
@@ -217,6 +220,10 @@ impl Display for Instruction {
             }
             Instruction::BitScanReverseU32MemU32Mem(in_addr, out_addr) => {
                 format!("bsr [${in_addr:04X}], [${out_addr:04X}]")
+            }
+            /**** [Forward Bit Scan] ****/
+            Instruction::BitScanForwardU32RegU32Reg(in_reg, out_reg) => {
+                format!("bsf {in_reg}, {out_reg}")
             }
 
             /******** [Special Instructions] ********/
@@ -248,7 +255,7 @@ impl Instruction {
             Instruction::ArithRightShiftU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Data Instructions] ********/
-            /******** [Move Instructions - NO EXPRESSIONS] ********/
+            /**** [Move Instructions - NO EXPRESSIONS] ****/
             Instruction::SwapU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
             Instruction::MovU32ImmU32Reg(_, _) => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
             Instruction::MovU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
@@ -256,8 +263,7 @@ impl Instruction {
             Instruction::MovU32RegMemRelSimple(_, _) => ARG_REG_ID_SIZE + ARG_MEM_ADDR_SIZE,
             Instruction::MovMemU32RegRelSimple(_, _) => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
             Instruction::MovU32RegPtrU32RegRelSimple(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-
-            /******** [Move Instructions - WITH EXPRESSIONS] ********/
+            /**** [Move Instructions - WITH EXPRESSIONS] ****/
             Instruction::MovU32ImmMemExprRel(_, _) => ARG_U32_IMM_SIZE + ARG_MEM_ADDR_SIZE,
             Instruction::MovMemExprU32RegRel(_, _) => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
             Instruction::MovU32RegMemExprRel(_, _) => ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE,
@@ -269,10 +275,13 @@ impl Instruction {
             Instruction::BitTestResetU32Mem(_, _) => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
             Instruction::BitTestSetU32Reg(_, _) => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
             Instruction::BitTestSetU32Mem(_, _) => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
+            /**** [Reverse Bit Scan] ****/
             Instruction::BitScanReverseU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
             Instruction::BitScanReverseU32MemU32Reg(_, _) => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
             Instruction::BitScanReverseU32RegMemU32(_, _) => ARG_REG_ID_SIZE + ARG_MEM_ADDR_SIZE,
             Instruction::BitScanReverseU32MemU32Mem(_, _) => ARG_MEM_ADDR_SIZE + ARG_MEM_ADDR_SIZE,
+            /**** [Forward Bit Scan] ****/
+            Instruction::BitScanForwardU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Special Instructions] ********/
             Instruction::Ret => 0,
@@ -302,7 +311,7 @@ impl Instruction {
             OpCode::ArithRightShiftU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Data Instructions] ********/
-            /******** [Move Instructions - NO EXPRESSIONS] ********/
+            /**** [Move Instructions - NO EXPRESSIONS] ****/
             OpCode::SwapU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
             OpCode::MovU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
             OpCode::MovU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
@@ -310,8 +319,7 @@ impl Instruction {
             OpCode::MovU32RegMemRelSimple => ARG_REG_ID_SIZE + ARG_MEM_ADDR_SIZE,
             OpCode::MovMemU32RegRelSimple => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
             OpCode::MovU32RegPtrU32RegRelSimple => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-
-            /******** [Move Instructions - WITH EXPRESSIONS] ********/
+            /**** [Move Instructions - WITH EXPRESSIONS] ****/
             OpCode::MovU32ImmMemExprRel => ARG_U32_IMM_SIZE + ARG_MEM_ADDR_SIZE,
             OpCode::MovMemExprU32RegRel => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
             OpCode::MovU32RegMemExprRel => ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE,
@@ -327,6 +335,7 @@ impl Instruction {
             OpCode::BitScanReverseU32MemU32Reg => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
             OpCode::BitScanReverseU32RegMemU32 => ARG_REG_ID_SIZE + ARG_MEM_ADDR_SIZE,
             OpCode::BitScanReverseU32MemU32Mem => ARG_MEM_ADDR_SIZE + ARG_MEM_ADDR_SIZE,
+            OpCode::BitScanForwardU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Special Instructions] ********/
             OpCode::Ret => 0,

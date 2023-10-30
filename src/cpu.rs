@@ -342,6 +342,27 @@ impl Cpu {
         utils::set_bit_state_inline(value, bit, new_state);
     }
 
+    /// Perform a forward set bit search on the specified value.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The u32 value to be tested.
+    ///
+    /// # Note
+    ///
+    /// This method will set the zero flag if the value is zero, otherwise the flag will be cleared.
+    #[inline(always)]
+    fn perform_forward_bit_search(&mut self, value: u32) -> u32 {
+        self.set_flag_state(CpuFlag::ZF, value == 0);
+
+        // TODO - if we end up only supporting little Endian, this an be removed.
+        if cfg!(target_endian = "little") {
+            value.trailing_zeros()
+        } else {
+            value.leading_zeros()
+        }
+    }
+
     /// Perform a reverse set bit search on the specified value.
     ///
     /// # Arguments
@@ -500,7 +521,7 @@ impl Cpu {
             }
 
             /******** [Data Instructions] ********/
-            /******** [Move Instructions - NO EXPRESSIONS] ********/
+            /**** [Move Instructions - NO EXPRESSIONS] ****/
             Instruction::SwapU32RegU32Reg(reg1, reg2) => {
                 let reg1_val = self.read_reg_u32(reg1, privilege);
                 let reg2_val = self.read_reg_u32(reg2, privilege);
@@ -535,8 +556,7 @@ impl Cpu {
 
                 self.write_reg_u32(out_reg, value, privilege);
             }
-
-            /******** [Move Instructions - WITH EXPRESSIONS] ********/
+            /**** [Move Instructions - WITH EXPRESSIONS] ****/
             Instruction::MovU32ImmMemExprRel(imm, expr) => {
                 // mov imm, [addr] - move immediate to address.
                 let args = self.get_cache_move_expression_decode(expr);
@@ -606,6 +626,7 @@ impl Cpu {
 
                 mem.set_u32(*addr as usize, value);
             }
+            /**** [Reverse Bit Scan] ****/
             Instruction::BitScanReverseU32RegU32Reg(in_reg, out_reg) => {
                 // bsr in_reg, out_reg
                 let value = self.read_reg_u32(in_reg, privilege);
@@ -633,6 +654,14 @@ impl Cpu {
                 let index = self.perform_reverse_bit_search(value);
 
                 mem.set_u32(*out_addr as usize, index);
+            }
+            /**** [Forward Bit Scan] ****/
+            Instruction::BitScanForwardU32RegU32Reg(in_reg, out_reg) => {
+                // bsf in_reg, out_reg
+                let value = self.read_reg_u32(in_reg, privilege);
+                let index = self.perform_forward_bit_search(value);
+
+                self.write_reg_u32(out_reg, index, privilege);
             }
 
             /******** [Special Instructions] ********/
@@ -2349,7 +2378,7 @@ mod tests_cpu {
                 "BT - incorrect result produced from the bit-test instruction - carry flag set",
             ),
             TestEntryU32Standard::new(
-                &[Instruction::BitTestU32Reg(32, RegisterId::R1)],
+                &[Instruction::BitTestU32Reg(0x20, RegisterId::R1)],
                 &[],
                 vec![],
                 true,
@@ -2403,7 +2432,7 @@ mod tests_cpu {
                 "BT - incorrect result produced from the bit-test instruction - carry flag set",
             ),
             TestEntryU32Standard::new(
-                &[Instruction::BitTestU32Mem(32, 0x0)],
+                &[Instruction::BitTestU32Mem(0x20, 0x0)],
                 &[],
                 vec![],
                 true,
@@ -2451,7 +2480,7 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::BitTestResetU32Reg(32, RegisterId::R1),
+                    Instruction::BitTestResetU32Reg(0x20, RegisterId::R1),
                 ],
                 &[],
                 vec![],
@@ -2507,7 +2536,7 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::BitTestResetU32Mem(32, 0x0),
+                    Instruction::BitTestResetU32Mem(0x20, 0x0),
                 ],
                 &[],
                 vec![],
@@ -2556,7 +2585,7 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::BitTestSetU32Reg(32, RegisterId::R1),
+                    Instruction::BitTestSetU32Reg(0x20, RegisterId::R1),
                 ],
                 &[],
                 vec![],
@@ -2612,7 +2641,7 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::BitTestSetU32Mem(32, 0x0),
+                    Instruction::BitTestSetU32Mem(0x20, 0x0),
                 ],
                 &[],
                 vec![],
@@ -2665,7 +2694,7 @@ mod tests_cpu {
                     Instruction::BitScanReverseU32RegU32Reg(RegisterId::R1, RegisterId::R2),
                 ],
                 &[
-                    (RegisterId::R2, 32),
+                    (RegisterId::R2, 0x20),
                     (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF])),
                 ],
                 vec![0; 100],
@@ -2722,7 +2751,7 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[Instruction::BitScanReverseU32MemU32Reg(0x0, RegisterId::R1)],
                 &[
-                    (RegisterId::R1, 32),
+                    (RegisterId::R1, 0x20),
                     (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF])),
                 ],
                 vec![0; 100],
@@ -2841,6 +2870,59 @@ mod tests_cpu {
                 ],
                 false,
                 "BSR - incorrect result produced from the bit search",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the forward bit scan with a source u32 register and a destination u32 register.
+    #[test]
+    fn test_bit_scan_forward_u32_reg_u32_reg() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(
+                        0b1111_1111_1111_1111_1111_1111_1111_1111,
+                        RegisterId::R1,
+                    ),
+                    Instruction::BitScanForwardU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                ],
+                &[(RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111)],
+                vec![0; 100],
+                false,
+                "BSF - incorrect result produced from the bit search",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(
+                        0b1111_1111_1111_1111_1111_1111_1111_0000,
+                        RegisterId::R1,
+                    ),
+                    Instruction::BitScanForwardU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                ],
+                &[
+                    (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_0000),
+                    (RegisterId::R2, 0x4),
+                ],
+                vec![0; 100],
+                false,
+                "BSF - incorrect result produced from the bit search",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
+                    Instruction::BitScanForwardU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                ],
+                &[
+                    (RegisterId::R2, 0x20),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF])),
+                ],
+                vec![0; 100],
+                false,
+                "BSF - incorrect result produced from the bit search",
             ),
         ];
 
