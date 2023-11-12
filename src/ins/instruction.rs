@@ -72,6 +72,8 @@ pub enum Instruction {
     ByteSwapU32(RegisterId),
     /// Zero the high bits of the source value starting from a specified index.
     ZeroHighBitsByIndexU32Reg(RegisterId, RegisterId, RegisterId),
+    /// Zero the high bits of the source value starting from a specified index.
+    ZeroHighBitsByIndexU32RegU32Imm(RegisterId, u32, RegisterId),
 
     /******** [Logic Instructions] ********/
     /// Test the state of a bit from a u32 register. The CF flag will be set to the state of the bit.
@@ -198,6 +200,9 @@ impl Display for Instruction {
             Instruction::ZeroHighBitsByIndexU32Reg(in_reg, index_reg, out_reg) => {
                 format!("zhbi {in_reg}, {index_reg}, {out_reg}")
             }
+            Instruction::ZeroHighBitsByIndexU32RegU32Imm(in_reg, index, out_reg) => {
+                format!("zhbi {in_reg}, {index}, {out_reg}")
+            }
 
             /******** [Logic Instructions] ********/
             Instruction::BitTestU32Reg(bit, reg) => {
@@ -286,6 +291,9 @@ impl Instruction {
             Instruction::ZeroHighBitsByIndexU32Reg(_, _, _) => {
                 ARG_REG_ID_SIZE + ARG_REG_ID_SIZE + ARG_REG_ID_SIZE
             }
+            Instruction::ZeroHighBitsByIndexU32RegU32Imm(_, _, _) => {
+                ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE
+            }
 
             /******** [Logic Instructions] ********/
             Instruction::BitTestU32Reg(_, _) => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
@@ -344,6 +352,9 @@ impl Instruction {
             OpCode::ByteSwapU32 => ARG_REG_ID_SIZE,
             OpCode::ZeroHighBitsByIndexU32Reg => {
                 ARG_REG_ID_SIZE + ARG_REG_ID_SIZE + ARG_REG_ID_SIZE
+            }
+            OpCode::ZeroHighBitsByIndexU32RegU32Imm => {
+                ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE
             }
 
             /******** [Logic Instructions] ********/

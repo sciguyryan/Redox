@@ -60,6 +60,10 @@ pub enum OpCode {
     ///
     /// The carry and zero flags may be set depending on the result and the overflow flag will always be cleared.
     ZeroHighBitsByIndexU32Reg,
+    /// Zero the high bits of the source value starting from a specified index.
+    ///
+    /// The carry and zero flags may be set depending on the result and the overflow flag will always be cleared.
+    ZeroHighBitsByIndexU32RegU32Imm,
 
     /******** [Logic Instructions] ********/
     /// Test the state of a bit from a u32 register. The CF flag will be set to the state of the bit.
@@ -132,6 +136,9 @@ impl From<Instruction> for OpCode {
             Instruction::MovU32RegMemExprRel(_, _) => OpCode::MovU32RegMemExprRel,
             Instruction::ByteSwapU32(_) => OpCode::ByteSwapU32,
             Instruction::ZeroHighBitsByIndexU32Reg(_, _, _) => OpCode::ZeroHighBitsByIndexU32Reg,
+            Instruction::ZeroHighBitsByIndexU32RegU32Imm(_, _, _) => {
+                OpCode::ZeroHighBitsByIndexU32RegU32Imm
+            }
 
             /******** [Logic Instructions] ********/
             Instruction::BitTestU32Reg(_, _) => OpCode::BitTestU32Reg,
