@@ -24,10 +24,12 @@ pub enum Instruction {
     Nop,
 
     /******** [Arithmetic Instructions] ********/
-    /// Add u32 immediate to u32 register. The result is stored in the accumulator register.
+    /// Add a u32 immediate to u32 register. The result is stored in the accumulator register.
     AddU32ImmU32Reg(u32, RegisterId),
-    /// Add u32 register to u32 register. The result is stored in the accumulator register.
+    /// Add a u32 register to u32 register. The result is stored in the accumulator register.
     AddU32RegU32Reg(RegisterId, RegisterId),
+    /// Subtract a u32 immediate from a u32 register. The result is stored in the accumulator register.
+    SubU32ImmU32Reg(u32, RegisterId),
 
     /******** [Bit Operation Instructions] ********/
     /// Left-shift a u32 register by a u32 immediate. The result remains in the origin register.
@@ -126,6 +128,9 @@ impl Display for Instruction {
             }
             Instruction::AddU32RegU32Reg(in_reg, out_reg) => {
                 format!("add {in_reg}, {out_reg}")
+            }
+            Instruction::SubU32ImmU32Reg(imm, reg) => {
+                format!("add ${imm:02X}, {reg}")
             }
 
             /******** [Bit Operation Instructions] ********/
@@ -265,6 +270,7 @@ impl Instruction {
             /******** [Arithmetic Instructions] ********/
             Instruction::AddU32ImmU32Reg(_, _) => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
             Instruction::AddU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
+            Instruction::SubU32ImmU32Reg(_, _) => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Bit Operation Instructions] ********/
             Instruction::LeftShiftU32ImmU32Reg(_, _) => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
@@ -327,6 +333,7 @@ impl Instruction {
             /******** [Arithmetic Instructions] ********/
             OpCode::AddU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
             OpCode::AddU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
+            OpCode::SubU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Bit Operation Instructions] ********/
             OpCode::LeftShiftU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,

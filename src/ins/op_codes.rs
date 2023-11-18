@@ -10,10 +10,12 @@ pub enum OpCode {
     Nop,
 
     /******** [Arithmetic Instructions] ********/
-    /// Add u32 immediate to u32 register. The result is stored in the accumulator register.
+    /// Add a u32 immediate to u32 register. The result is stored in the accumulator register.
     AddU32ImmU32Reg,
-    /// Add u32 register to u32 register. The result is stored in the accumulator register.
+    /// Add a u32 register to u32 register. The result is stored in the accumulator register.
     AddU32RegU32Reg,
+    /// Subtract a u32 immediate from a u32 register. The result is stored in the accumulator register.
+    SubU32ImmU32Reg,
 
     /******** [Bit Operation Instructions] ********/
     /// Left-shift a u32 register by a u32 immediate. The result remains in the origin register.
@@ -112,8 +114,7 @@ impl From<Instruction> for OpCode {
             /******** [Arithmetic Instructions] ********/
             Instruction::AddU32ImmU32Reg(_, _) => OpCode::AddU32ImmU32Reg,
             Instruction::AddU32RegU32Reg(_, _) => OpCode::AddU32RegU32Reg,
-            Instruction::MovU32ImmU32Reg(_, _) => OpCode::MovU32ImmU32Reg,
-            Instruction::MovU32RegU32Reg(_, _) => OpCode::MovU32RegU32Reg,
+            Instruction::SubU32ImmU32Reg(_, _) => OpCode::SubU32ImmU32Reg,
 
             /******** [Bit Operation Instructions] ********/
             Instruction::LeftShiftU32ImmU32Reg(_, _) => OpCode::LeftShiftU32ImmU32Reg,
@@ -127,6 +128,8 @@ impl From<Instruction> for OpCode {
 
             /******** [Data Instructions] ********/
             Instruction::SwapU32RegU32Reg(_, _) => OpCode::SwapU32RegU32Reg,
+            Instruction::MovU32ImmU32Reg(_, _) => OpCode::MovU32ImmU32Reg,
+            Instruction::MovU32RegU32Reg(_, _) => OpCode::MovU32RegU32Reg,
             Instruction::MovU32ImmMemRelSimple(_, _) => OpCode::MovU32ImmMemRelSimple,
             Instruction::MovU32RegMemRelSimple(_, _) => OpCode::MovU32RegMemRelSimple,
             Instruction::MovMemU32RegRelSimple(_, _) => OpCode::MovMemU32RegRelSimple,

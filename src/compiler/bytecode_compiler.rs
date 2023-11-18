@@ -56,7 +56,8 @@ impl Compiler {
             | Instruction::MovMemU32RegRelSimple(imm, reg)
             | Instruction::MovMemExprU32RegRel(imm, reg)
             | Instruction::BitScanReverseU32MemU32Reg(imm, reg)
-            | Instruction::BitScanForwardU32MemU32Reg(imm, reg) => {
+            | Instruction::BitScanForwardU32MemU32Reg(imm, reg)
+            | Instruction::SubU32ImmU32Reg(imm, reg) => {
                 self.write_u32(imm);
                 self.write_register_id(&reg);
             }
