@@ -524,33 +524,33 @@ impl Cpu {
                 let old_value = self.read_reg_u32(reg, privilege);
                 let new_value = self.perform_checked_add_u32(old_value, *imm);
 
-                self.write_reg_u32(&RegisterId::AC, new_value, privilege);
+                self.update_u32_accumulator(new_value);
             }
             Instruction::AddU32RegU32Reg(in_reg, out_reg) => {
                 let value1 = self.read_reg_u32(in_reg, privilege);
                 let value2 = self.read_reg_u32(out_reg, privilege);
                 let new_value = self.perform_checked_add_u32(value1, value2);
 
-                self.write_reg_u32(&RegisterId::AC, new_value, privilege);
+                self.update_u32_accumulator(new_value);
             }
             Instruction::SubU32ImmU32Reg(imm, reg) => {
                 let old_value = self.read_reg_u32(reg, privilege);
                 let new_value = self.perform_checked_subtract_u32(old_value, *imm);
 
-                self.write_reg_u32(&RegisterId::AC, new_value, privilege);
+                self.update_u32_accumulator(new_value);
             }
             Instruction::SubU32RegU32Imm(reg, imm) => {
                 let old_value = self.read_reg_u32(reg, privilege);
                 let new_value = self.perform_checked_subtract_u32(*imm, old_value);
 
-                self.write_reg_u32(&RegisterId::AC, new_value, privilege);
+                self.update_u32_accumulator(new_value);
             }
             Instruction::SubU32RegU32Reg(reg1, reg2) => {
                 let reg_1 = self.read_reg_u32(reg1, privilege);
                 let reg_2 = self.read_reg_u32(reg2, privilege);
                 let new_value = self.perform_checked_subtract_u32(reg_2, reg_1);
 
-                self.write_reg_u32(&RegisterId::AC, new_value, privilege);
+                self.update_u32_accumulator(new_value);
             }
 
             /******** [Bit Operation Instructions] ********/
@@ -833,6 +833,18 @@ impl Cpu {
     #[inline(always)]
     fn set_halted(&mut self, state: bool) {
         self.is_halted = state;
+    }
+
+    /// Update the u32 accumulator (AC) register.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The new value of the accumulator register.
+    #[inline(always)]
+    fn update_u32_accumulator(&mut self, value: u32) {
+        self.registers
+            .get_register_u32_mut(RegisterId::AC)
+            .write_unchecked(value);
     }
 
     /// Update the instruction pointer (IP) register.
