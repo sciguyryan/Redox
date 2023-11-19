@@ -18,6 +18,8 @@ pub enum OpCode {
     SubU32ImmU32Reg,
     /// Subtract a u32 register from a u32 immediate. The result is stored in the accumulator register.
     SubU32RegU32Imm,
+    /// Subtract a u32 register (A) from a u32 register (B). The result is stored in the accumulator register.
+    SubU32RegU32Reg,
 
     /******** [Bit Operation Instructions] ********/
     /// Left-shift a u32 register by a u32 immediate. The result remains in the origin register.
@@ -118,6 +120,7 @@ impl From<Instruction> for OpCode {
             Instruction::AddU32RegU32Reg(_, _) => OpCode::AddU32RegU32Reg,
             Instruction::SubU32ImmU32Reg(_, _) => OpCode::SubU32ImmU32Reg,
             Instruction::SubU32RegU32Imm(_, _) => OpCode::SubU32RegU32Imm,
+            Instruction::SubU32RegU32Reg(_, _) => OpCode::SubU32RegU32Reg,
 
             /******** [Bit Operation Instructions] ********/
             Instruction::LeftShiftU32ImmU32Reg(_, _) => OpCode::LeftShiftU32ImmU32Reg,

@@ -545,6 +545,13 @@ impl Cpu {
 
                 self.write_reg_u32(&RegisterId::AC, new_value, privilege);
             }
+            Instruction::SubU32RegU32Reg(reg1, reg2) => {
+                let reg_1 = self.read_reg_u32(reg1, privilege);
+                let reg_2 = self.read_reg_u32(reg2, privilege);
+                let new_value = self.perform_checked_subtract_u32(reg_2, reg_1);
+
+                self.write_reg_u32(&RegisterId::AC, new_value, privilege);
+            }
 
             /******** [Bit Operation Instructions] ********/
             Instruction::LeftShiftU32ImmU32Reg(imm, reg) => {
@@ -1213,7 +1220,7 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[Instruction::AddU32RegU32Reg(RegisterId::R1, RegisterId::R2)],
-                &[(RegisterId::FL, 0b0000_0010)],
+                &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF]))],
                 vec![0; 100],
                 false,
                 "ADD - CPU flags not correctly set",
@@ -1297,6 +1304,55 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[Instruction::SubU32RegU32Imm(RegisterId::R1, 0)],
+                &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF]))],
+                vec![0; 100],
+                false,
+                "SUB - CPU flags not correctly set",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the subtract u32 register from u32 register instruction.
+    #[test]
+    fn test_sub_u32_reg_u32_reg() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::MovU32ImmU32Reg(0xf, RegisterId::R2),
+                    Instruction::SubU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                ],
+                &[
+                    (RegisterId::R1, 0x1),
+                    (RegisterId::R2, 0xf),
+                    (RegisterId::AC, 0xe),
+                ],
+                vec![0; 100],
+                false,
+                "SUB - incorrect result value produced",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
+                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R2),
+                    Instruction::SubU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                ],
+                &[
+                    (RegisterId::R1, u32::MAX),
+                    (RegisterId::R2, 0x2),
+                    (RegisterId::AC, 0x1),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::OF])),
+                ],
+                vec![0; 100],
+                false,
+                "SUB - CPU flags not correctly set",
+            ),
+            TestEntryU32Standard::new(
+                &[Instruction::SubU32RegU32Reg(RegisterId::R1, RegisterId::R2)],
                 &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF]))],
                 vec![0; 100],
                 false,
