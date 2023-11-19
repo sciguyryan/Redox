@@ -174,14 +174,14 @@ impl Registers {
                 register_u32!(RegisterId::R6, &rw, 0),
                 register_u32!(RegisterId::R7, &rw, 0),
                 register_u32!(RegisterId::R8, &rw, 0),
-                // [System Registers] //
+                // [ System Registers ] //
                 register_u32!(RegisterId::AC, &rw, 0),
                 register_u32!(RegisterId::IP, &rw, 0),
                 register_u32!(RegisterId::SP, &prpw, 0),
                 register_u32!(RegisterId::FP, &prpw, 0),
                 register_u32!(RegisterId::FL, &rpw, 0),
                 register_u32!(RegisterId::PC, &rpw, 0),
-                // [Test Registers] //
+                // [ Test Registers ] //
                 #[cfg(test)]
                 register_u32!(RegisterId::TEST0, &prpw, 0),
             ]),
