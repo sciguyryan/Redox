@@ -44,7 +44,7 @@ impl Cpu {
     ///
     /// A boolean, true indicating that the parity bit should be 1, false indicating it should be 0,
     #[inline(always)]
-    fn calculate_lowest_byte_parity(&self, value: u32) -> bool {
+    fn calculate_lowest_byte_parity(value: u32) -> bool {
         (value & U32_LOW_BYTE_MASK).count_ones() % 2 == 0
     }
 
@@ -190,7 +190,7 @@ impl Cpu {
         };
         self.set_flag_state(CpuFlag::OF, overflow);
         self.set_flag_state(CpuFlag::ZF, final_value == 0);
-        self.set_flag_state(CpuFlag::PF, self.calculate_lowest_byte_parity(final_value));
+        self.set_flag_state(CpuFlag::PF, Cpu::calculate_lowest_byte_parity(final_value));
 
         final_value
     }
@@ -217,7 +217,7 @@ impl Cpu {
         };
         self.set_flag_state(CpuFlag::OF, overflow);
         self.set_flag_state(CpuFlag::ZF, final_value == 0);
-        self.set_flag_state(CpuFlag::PF, self.calculate_lowest_byte_parity(final_value));
+        self.set_flag_state(CpuFlag::PF, Cpu::calculate_lowest_byte_parity(final_value));
 
         final_value
     }
@@ -1122,6 +1122,20 @@ mod tests_cpu {
     /// A tuple containing a [`Memory`] instance and a [`Cpu`] instance.
     fn create_instance() -> (Memory, Cpu) {
         (Memory::new(100), Cpu::default())
+    }
+
+    /// Test the parity checking.
+    #[test]
+    fn test_parity() {
+        let value_1 = 0b0000_0000_0000_0000_0000_0000_1111_1111;
+        assert!(Cpu::calculate_lowest_byte_parity(value_1), "Test 1 - parity check failed: expected true, got false");
+
+        // We are only interested in the lowest byte, everything else should be ignored.
+        let value_2 = 0b0000_0000_0000_0000_0000_0001_1111_1111;
+        assert!(Cpu::calculate_lowest_byte_parity(value_2), "Test 2 - parity check failed: expected true, got false");
+
+        let value_3 = 0b0000_0000_0000_0000_0000_0000_0111_1111;
+        assert!(!Cpu::calculate_lowest_byte_parity(value_3), "Test 3 - parity check failed: expected false, got true");
     }
 
     /// Test the NOP instruction.
