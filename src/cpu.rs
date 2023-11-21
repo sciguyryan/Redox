@@ -1442,7 +1442,7 @@ mod tests_cpu {
     }
 
     /// Test the increment u32 register instruction.
-    /*#[test]
+    #[test]
     fn test_inc_u32_reg() {
         let tests = [
             TestEntryU32Standard::new(
@@ -1461,7 +1461,7 @@ mod tests_cpu {
                     (RegisterId::R1, 0),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::OF, CpuFlag::ZF]),
+                        CpuFlag::compute_for(&[CpuFlag::OF, CpuFlag::ZF, CpuFlag::PF]),
                     ),
                 ],
                 vec![0; 100],
@@ -1473,7 +1473,7 @@ mod tests_cpu {
         for (id, test) in tests.iter().enumerate() {
             test.run_test(id);
         }
-    }*/
+    }
 
     /// Test the left-shift u32 register by u32 immediate value.
     #[test]
