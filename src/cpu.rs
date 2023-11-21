@@ -1081,7 +1081,7 @@ mod tests_cpu {
 
             let (mem, cpu) = result.unwrap();
 
-            // First, check the registers.
+            // Check the registers.
             if cpu.registers != self.expected_registers {
                 // Print the register values that are different.
                 self.expected_registers
@@ -1091,6 +1091,7 @@ mod tests_cpu {
                 panic!("{}", self.fail_message(id, false));
             }
 
+            // Check the VM memory.
             assert_eq!(
                 mem.get_storage(),
                 self.expected_memory,
