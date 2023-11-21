@@ -1079,12 +1079,16 @@ mod tests_cpu {
             }
 
             let (mem, cpu) = result.unwrap();
-            assert_eq!(
-                cpu.registers,
-                self.expected_registers,
-                "{}",
-                self.fail_message(id, false)
-            );
+
+            // First, check the registers.
+            if cpu.registers != self.expected_registers {
+                // Print the register values that are different.
+                self.expected_registers
+                    .print_differences(&cpu.registers, &["Expected", "Actual"]);
+
+                // Fail the test.
+                panic!("{}", self.fail_message(id, false));
+            }
 
             assert_eq!(
                 mem.get_storage(),

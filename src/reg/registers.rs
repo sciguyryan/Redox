@@ -214,33 +214,60 @@ impl Registers {
             .expect("failed to get register")
     }
 
-    pub fn print_differences(&self, other: &Registers) {
-        println!("--- [u32 Register Differences] ---");
+    pub fn print_differences(&self, other: &Registers, names: &[&str; 2]) {
+        let mut u32_different = vec![];
+        let mut f32_different = vec![];
+
         for (self_reg, other_reg) in self
             .registers_u32
             .values()
             .zip(other.registers_u32.values())
         {
-            println!(
-                "{} - Self = {}, Other = {}",
-                self_reg.id,
-                self_reg.read_unchecked(),
-                other_reg.read_unchecked()
-            );
+            if self_reg.read_unchecked() != other_reg.read_unchecked() {
+                u32_different.push(format!(
+                    "{} - {} = {}, {} = {}",
+                    self_reg.id,
+                    names[0],
+                    self_reg.read_unchecked(),
+                    names[1],
+                    other_reg.read_unchecked()
+                ));
+            }
         }
 
-        println!("--- [f32 Register Differences] ---");
         for (self_reg, other_reg) in self
             .registers_f32
             .values()
             .zip(other.registers_f32.values())
         {
-            println!(
-                "{} - Self = {}, Other = {}",
-                self_reg.id,
-                self_reg.read_unchecked(),
-                other_reg.read_unchecked()
-            );
+            if self_reg.read_unchecked() != other_reg.read_unchecked() {
+                f32_different.push(format!(
+                    "{} - {} = {}, {} = {}",
+                    self_reg.id,
+                    names[0],
+                    self_reg.read_unchecked(),
+                    names[1],
+                    other_reg.read_unchecked()
+                ));
+            }
+        }
+
+        if !u32_different.is_empty() {
+            println!();
+            println!("---- [u32 Register Differences] ----");
+            for s in u32_different {
+                println!("{s}");
+            }
+            println!();
+        }
+
+        if !f32_different.is_empty() {
+            println!();
+            println!("---- [f32 Register Differences] ----");
+            for s in f32_different {
+                println!("{s}");
+            }
+            println!();
         }
     }
 
