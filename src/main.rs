@@ -25,60 +25,6 @@ use crate::{
 // https://onlinedocs.microchip.com/pr/GUID-0E320577-28E6-4365-9BB8-9E1416A0A6E4-en-US-6/index.html?GUID-4983CB0C-7FEB-40F1-99D3-0608805404F3
 // https://www.youtube.com/watch?v=KkenLT8S9Hs&list=WL&index=17
 
-fn run_test() {
-    use std::time::Instant;
-
-    let expr_args = [
-        ExpressionArgs::Register(RegisterId::R7),
-        ExpressionArgs::Operator(ExpressionOperator::Add),
-        ExpressionArgs::Register(RegisterId::R8),
-    ];
-
-    let mut expression_encoder = MoveExpressionHandler::new();
-    let expr = expression_encoder.encode(&expr_args);
-
-    let instructions = &[
-        Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-        Instruction::MovU32ImmU32Reg(0x2, RegisterId::R2),
-        Instruction::SwapU32RegU32Reg(RegisterId::R1, RegisterId::R2),
-        Instruction::Mret,
-        Instruction::MovU32ImmU32Reg(50, RegisterId::R7),
-        Instruction::MovU32ImmU32Reg(50, RegisterId::R8),
-        Instruction::MovU32ImmMemExprRel(0x123, expr),
-        Instruction::Hlt,
-    ];
-
-    let mut compiler = Compiler::new();
-    let data = compiler.compile(instructions);
-
-    let iterations = 100_000;
-
-    let now = Instant::now();
-    {
-        for _ in 0..iterations {
-            let mut vm = VirtualMachine::new(500);
-            vm.load_code_block(0, data);
-            vm.run();
-        }
-    }
-
-    let elapsed = now.elapsed().as_micros() as f32;
-    println!(
-        "Elapsed: {:.2?} microseconds per iteration",
-        elapsed / iterations as f32
-    );
-}
-
-fn testing() {
-    let val: u64 = 0b0111_1111_1111_1111_1111_1111_1111_1111 << 2;
-
-    println!("{val:b}");
-    println!("{}", val.leading_zeros());
-    println!("{}", val.trailing_zeros());
-
-    let leading = val.leading_zeros();
-}
-
 /*fn run_test_2() {
     use std::time::Instant;
 
@@ -132,19 +78,7 @@ fn main() {
         panic!("currently unsupported");
     }
 
-    let bbbb: u32 = 0b1111_1111_1111_1111_1111_1111_1111_1111;
-    let cccc: u32 = 0b0000_0000_0000_0000_0000_0000_1111_1111;
-    let dddd = bbbb & cccc;
-    println!("{dddd:b} {dddd}");
-
-    let qqqq = 31;
-    println!("{qqqq:032b}");
-
-    let eeee = (dddd & 0xff) > 31;
-    println! {"{eeee}"}
-    return;
-
-    //run_test_2();
+    println!("{}", (2 % 2));
 
     let mut vm = VirtualMachine::new(64_000);
 
@@ -192,8 +126,10 @@ fn main() {
                 ExpressionArgs::Constant(25),
             ]),
         ),*/
-        Instruction::MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
-        Instruction::AddU32ImmU32Reg(0x2, RegisterId::R1),
+        Instruction::MovU32ImmU32Reg(0x2, RegisterId::R2),
+        Instruction::AddU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+        /*Instruction::MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
+        Instruction::AddU32ImmU32Reg(0x2, RegisterId::R1),*/
         Instruction::Hlt,
     ];
 
