@@ -905,6 +905,8 @@ pub enum CpuFlag {
     OF,
     /// The carry flag - set to true if the carry bit has been set by an operation.
     CF,
+    // The parity flag - set to true depending on the parity of the bits.
+    PF,
 }
 
 impl fmt::Display for CpuFlag {
@@ -914,13 +916,20 @@ impl fmt::Display for CpuFlag {
             CpuFlag::ZF => write!(f, "ZF"),
             CpuFlag::OF => write!(f, "OF"),
             CpuFlag::CF => write!(f, "CF"),
+            CpuFlag::PF => write!(f, "PF"),
         }
     }
 }
 
 impl CpuFlag {
     pub fn iterator() -> Iter<'static, CpuFlag> {
-        static FLAGS: [CpuFlag; 4] = [CpuFlag::SF, CpuFlag::ZF, CpuFlag::OF, CpuFlag::CF];
+        static FLAGS: [CpuFlag; 5] = [
+            CpuFlag::SF,
+            CpuFlag::ZF,
+            CpuFlag::OF,
+            CpuFlag::CF,
+            CpuFlag::PF,
+        ];
         FLAGS.iter()
     }
 
