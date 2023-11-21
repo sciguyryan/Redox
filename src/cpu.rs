@@ -164,7 +164,7 @@ impl Cpu {
     ///
     /// # Note
     ///
-    /// This method sets and unsets the zero and overflow flags as required.
+    /// This method sets or clears the zero and overflow flags as required.
     #[inline(always)]
     fn perform_checked_add_u32(&mut self, value_1: u32, value_2: u32) -> u32 {
         let (final_value, overflow) = match value_1.checked_add(value_2) {
@@ -190,7 +190,7 @@ impl Cpu {
     ///
     /// # Note
     ///
-    /// This method sets and unsets the zero and overflow flags as required.
+    /// This method sets or clears the zero and overflow flags as required.
     #[inline(always)]
     fn perform_checked_subtract_u32(&mut self, value_1: u32, value_2: u32) -> u32 {
         let (final_value, overflow) = match value_1.checked_sub(value_2) {
@@ -551,6 +551,12 @@ impl Cpu {
                 let new_value = self.perform_checked_subtract_u32(reg_2, reg_1);
 
                 self.update_u32_accumulator(new_value);
+            }
+            Instruction::IncU32Reg(reg) => {
+                let value = self.read_reg_u32(reg, privilege);
+                let new_value = self.perform_checked_add_u32(value, 1);
+
+                self.write_reg_u32(reg, new_value, privilege);
             }
 
             /******** [Bit Operation Instructions] ********/
@@ -1369,6 +1375,40 @@ mod tests_cpu {
                 vec![0; 100],
                 false,
                 "SUB - CPU flags not correctly set",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the increment u32 register instruction.
+    #[test]
+    fn test_inc_u32_reg() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[Instruction::IncU32Reg(RegisterId::R1)],
+                &[(RegisterId::R1, 0x1)],
+                vec![0; 100],
+                false,
+                "INC - incorrect result value produced",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
+                    Instruction::IncU32Reg(RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_for(&[CpuFlag::OF, CpuFlag::ZF]),
+                    ),
+                ],
+                vec![0; 100],
+                false,
+                "INC - CPU flags not correctly set",
             ),
         ];
 

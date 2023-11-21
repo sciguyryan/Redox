@@ -34,6 +34,8 @@ pub enum Instruction {
     SubU32RegU32Imm(RegisterId, u32),
     /// Subtract a u32 register (A) from a u32 register (B). The result is stored in the accumulator register.
     SubU32RegU32Reg(RegisterId, RegisterId),
+    /// Increment a u32 register.
+    IncU32Reg(RegisterId),
 
     /******** [Bit Operation Instructions] ********/
     /// Left-shift a u32 register by a u32 immediate. The result remains in the origin register.
@@ -141,6 +143,9 @@ impl Display for Instruction {
             }
             Instruction::SubU32RegU32Reg(reg_1, reg_2) => {
                 format!("sub {reg_1}, ${reg_2}")
+            }
+            Instruction::IncU32Reg(reg) => {
+                format!("inc {reg}")
             }
 
             /******** [Bit Operation Instructions] ********/
@@ -283,6 +288,7 @@ impl Instruction {
             Instruction::SubU32ImmU32Reg(_, _) => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
             Instruction::SubU32RegU32Imm(_, _) => ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE,
             Instruction::SubU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
+            Instruction::IncU32Reg(_) => ARG_REG_ID_SIZE,
 
             /******** [Bit Operation Instructions] ********/
             Instruction::LeftShiftU32ImmU32Reg(_, _) => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
@@ -348,6 +354,7 @@ impl Instruction {
             OpCode::SubU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
             OpCode::SubU32RegU32Imm => ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE,
             OpCode::SubU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
+            OpCode::IncU32Reg => ARG_REG_ID_SIZE,
 
             /******** [Bit Operation Instructions] ********/
             OpCode::LeftShiftU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,

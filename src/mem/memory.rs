@@ -106,6 +106,11 @@ impl Memory {
 
                 Instruction::SubU32RegU32Reg(reg_1, reg_2)
             }
+            OpCode::IncU32Reg => {
+                let reg = block.read_register_id();
+
+                Instruction::IncU32Reg(reg)
+            }
 
             /******** [Bit Operation Instructions] ********/
             OpCode::LeftShiftU32ImmU32Reg => {
