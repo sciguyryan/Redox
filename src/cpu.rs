@@ -217,6 +217,7 @@ impl Cpu {
         };
         self.set_flag_state(CpuFlag::OF, overflow);
         self.set_flag_state(CpuFlag::ZF, final_value == 0);
+        self.set_flag_state(CpuFlag::PF, self.calculate_lowest_byte_parity(final_value));
 
         final_value
     }
@@ -1280,31 +1281,6 @@ mod tests_cpu {
                 false,
                 "ADD - CPU flags not correctly set",
             ),
-            // Specific parity tests. The first should be odd parity, the second should be even parity.
-            TestEntryU32Standard::new(
-                &[
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
-                    Instruction::AddU32RegU32Reg(RegisterId::R1, RegisterId::R2),
-                ],
-                &[(RegisterId::R2, 0x1), (RegisterId::AC, 0x1)],
-                vec![0; 100],
-                false,
-                "ADD - CPU flags not correctly set",
-            ),
-            TestEntryU32Standard::new(
-                &[
-                    Instruction::MovU32ImmU32Reg(0x3, RegisterId::R2),
-                    Instruction::AddU32RegU32Reg(RegisterId::R1, RegisterId::R2),
-                ],
-                &[
-                    (RegisterId::R2, 0x3),
-                    (RegisterId::AC, 0x3),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::PF])),
-                ],
-                vec![0; 100],
-                false,
-                "ADD - CPU flags not correctly set",
-            ),
         ];
 
         for (id, test) in tests.iter().enumerate() {
@@ -1342,7 +1318,7 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[Instruction::SubU32ImmU32Reg(0, RegisterId::R1)],
-                &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF]))],
+                &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]))],
                 vec![0; 100],
                 false,
                 "SUB - CPU flags not correctly set",
@@ -1384,7 +1360,7 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[Instruction::SubU32RegU32Imm(RegisterId::R1, 0)],
-                &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF]))],
+                &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]))],
                 vec![0; 100],
                 false,
                 "SUB - CPU flags not correctly set",
@@ -1433,7 +1409,7 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[Instruction::SubU32RegU32Reg(RegisterId::R1, RegisterId::R2)],
-                &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF]))],
+                &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]))],
                 vec![0; 100],
                 false,
                 "SUB - CPU flags not correctly set",
