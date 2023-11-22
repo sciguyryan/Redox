@@ -1129,14 +1129,23 @@ mod tests_cpu {
     #[test]
     fn test_parity() {
         let value_1 = 0b0000_0000_0000_0000_0000_0000_1111_1111;
-        assert!(Cpu::calculate_lowest_byte_parity(value_1), "Test 1 - parity check failed: expected true, got false");
+        assert!(
+            Cpu::calculate_lowest_byte_parity(value_1),
+            "Test 1 - parity check failed: expected true, got false"
+        );
 
         // We are only interested in the lowest byte, everything else should be ignored.
         let value_2 = 0b0000_0000_0000_0000_0000_0001_1111_1111;
-        assert!(Cpu::calculate_lowest_byte_parity(value_2), "Test 2 - parity check failed: expected true, got false");
+        assert!(
+            Cpu::calculate_lowest_byte_parity(value_2),
+            "Test 2 - parity check failed: expected true, got false"
+        );
 
         let value_3 = 0b0000_0000_0000_0000_0000_0000_0111_1111;
-        assert!(!Cpu::calculate_lowest_byte_parity(value_3), "Test 3 - parity check failed: expected false, got true");
+        assert!(
+            !Cpu::calculate_lowest_byte_parity(value_3),
+            "Test 3 - parity check failed: expected false, got true"
+        );
     }
 
     /// Test the NOP instruction.
@@ -1244,6 +1253,45 @@ mod tests_cpu {
                 false,
                 "ADD - CPU flags not correctly set",
             ),
+            // Test the parity flag is enabled.
+            TestEntryU32Standard::new(
+                &[
+                    // Clear any set flags.
+                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    // Perform the calculation.
+                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    Instruction::AddU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0x2),
+                    (RegisterId::AC, 0x3),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::PF])),
+                ],
+                vec![0; 100],
+                false,
+                "ADD - CPU parity flag not correctly set",
+            ),
+            // Test the parity flag gets unset.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the parity flag.
+                    Instruction::MovU32ImmU32Reg(
+                        CpuFlag::compute_for(&[CpuFlag::PF]),
+                        RegisterId::FL,
+                    ),
+                    // Perform the calculation.
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::AddU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0x1),
+                    (RegisterId::AC, 0x2),
+                    (RegisterId::FL, 0x0),
+                ],
+                vec![0; 100],
+                false,
+                "ADD - CPU parity flag not correctly cleared",
+            ),
         ];
 
         for (id, test) in tests.iter().enumerate() {
@@ -1296,6 +1344,47 @@ mod tests_cpu {
                 false,
                 "ADD - CPU flags not correctly set",
             ),
+            // Test the parity flag is enabled.
+            TestEntryU32Standard::new(
+                &[
+                    // Clear any set flags.
+                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    // Perform the calculation.
+                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    Instruction::AddU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                ],
+                &[
+                    (RegisterId::R1, 0x2),
+                    (RegisterId::R2, 0x1),
+                    (RegisterId::AC, 0x3),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::PF])),
+                ],
+                vec![0; 100],
+                false,
+                "ADD - CPU parity flag not correctly set",
+            ),
+            // Test the parity flag gets unset.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the parity flag.
+                    Instruction::MovU32ImmU32Reg(
+                        CpuFlag::compute_for(&[CpuFlag::PF]),
+                        RegisterId::FL,
+                    ),
+                    // Perform the calculation.
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::AddU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0x1),
+                    (RegisterId::AC, 0x2),
+                    (RegisterId::FL, 0x0),
+                ],
+                vec![0; 100],
+                false,
+                "ADD - CPU parity flag not correctly cleared",
+            ),
         ];
 
         for (id, test) in tests.iter().enumerate() {
@@ -1333,10 +1422,52 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[Instruction::SubU32ImmU32Reg(0, RegisterId::R1)],
-                &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]))],
+                &[(
+                    RegisterId::FL,
+                    CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
+                )],
                 vec![0; 100],
                 false,
                 "SUB - CPU flags not correctly set",
+            ),
+            // Test the parity flag is enabled.
+            TestEntryU32Standard::new(
+                &[
+                    // Clear any set flags.
+                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    // Perform the calculation.
+                    Instruction::MovU32ImmU32Reg(0x4, RegisterId::R1),
+                    Instruction::SubU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0x4),
+                    (RegisterId::AC, 0x3),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::PF])),
+                ],
+                vec![0; 100],
+                false,
+                "SUB - CPU parity flag not correctly set",
+            ),
+            // Test the parity flag gets unset.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the parity flag.
+                    Instruction::MovU32ImmU32Reg(
+                        CpuFlag::compute_for(&[CpuFlag::PF]),
+                        RegisterId::FL,
+                    ),
+                    // Perform the calculation.
+                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    Instruction::SubU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0x2),
+                    (RegisterId::AC, 0x1),
+                    (RegisterId::FL, 0x0),
+                ],
+                vec![0; 100],
+                false,
+                "SUB - CPU parity flag not correctly cleared",
             ),
         ];
 
@@ -1375,10 +1506,52 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[Instruction::SubU32RegU32Imm(RegisterId::R1, 0)],
-                &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]))],
+                &[(
+                    RegisterId::FL,
+                    CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
+                )],
                 vec![0; 100],
                 false,
                 "SUB - CPU flags not correctly set",
+            ),
+            // Test the parity flag is enabled.
+            TestEntryU32Standard::new(
+                &[
+                    // Clear any set flags.
+                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    // Perform the calculation.
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::SubU32RegU32Imm(RegisterId::R1, 0x4),
+                ],
+                &[
+                    (RegisterId::R1, 0x1),
+                    (RegisterId::AC, 0x3),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::PF])),
+                ],
+                vec![0; 100],
+                false,
+                "SUB - CPU parity flag not correctly set",
+            ),
+            // Test the parity flag gets unset.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the parity flag.
+                    Instruction::MovU32ImmU32Reg(
+                        CpuFlag::compute_for(&[CpuFlag::PF]),
+                        RegisterId::FL,
+                    ),
+                    // Perform the calculation.
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::SubU32RegU32Imm(RegisterId::R1, 0x2),
+                ],
+                &[
+                    (RegisterId::R1, 0x1),
+                    (RegisterId::AC, 0x1),
+                    (RegisterId::FL, 0x0),
+                ],
+                vec![0; 100],
+                false,
+                "SUB - CPU parity flag not correctly cleared",
             ),
         ];
 
@@ -1424,10 +1597,56 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[Instruction::SubU32RegU32Reg(RegisterId::R1, RegisterId::R2)],
-                &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]))],
+                &[(
+                    RegisterId::FL,
+                    CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
+                )],
                 vec![0; 100],
                 false,
                 "SUB - CPU flags not correctly set",
+            ),
+            // Test the parity flag is enabled.
+            TestEntryU32Standard::new(
+                &[
+                    // Clear any set flags.
+                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    // Perform the calculation.
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::MovU32ImmU32Reg(0x4, RegisterId::R2),
+                    Instruction::SubU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                ],
+                &[
+                    (RegisterId::R1, 0x1),
+                    (RegisterId::R2, 0x4),
+                    (RegisterId::AC, 0x3),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::PF])),
+                ],
+                vec![0; 100],
+                false,
+                "SUB - CPU parity flag not correctly set",
+            ),
+            // Test the parity flag gets unset.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the parity flag.
+                    Instruction::MovU32ImmU32Reg(
+                        CpuFlag::compute_for(&[CpuFlag::PF]),
+                        RegisterId::FL,
+                    ),
+                    // Perform the calculation.
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R2),
+                    Instruction::SubU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                ],
+                &[
+                    (RegisterId::R1, 0x1),
+                    (RegisterId::R2, 0x2),
+                    (RegisterId::AC, 0x1),
+                    (RegisterId::FL, 0x0),
+                ],
+                vec![0; 100],
+                false,
+                "SUB - CPU parity flag not correctly cleared",
             ),
         ];
 
