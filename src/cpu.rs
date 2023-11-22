@@ -316,6 +316,7 @@ impl Cpu {
 
         let final_value = value >> shift_by;
         self.set_flag_state(CpuFlag::ZF, final_value == 0);
+        self.set_flag_state(CpuFlag::PF, Cpu::calculate_lowest_byte_parity(final_value));
 
         final_value
     }
@@ -342,6 +343,7 @@ impl Cpu {
 
         let final_value = value.rotate_right(shift_by);
         self.set_flag_state(CpuFlag::ZF, final_value == 0);
+        self.set_flag_state(CpuFlag::PF, Cpu::calculate_lowest_byte_parity(final_value));
 
         final_value
     }
@@ -2158,11 +2160,14 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::R1, 0b0011_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::CF])),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_for(&[CpuFlag::CF, CpuFlag::PF]),
+                    ),
                 ],
                 vec![0; 100],
                 false,
-                "SHR - CPU flags not correctly set",
+                "SHR - carry or parity CPU flags were not correctly set",
             ),
             // The SHR command should clear the overflow flag and the
             // carry flag in this case as the bit being shifted out is zero.
@@ -2180,10 +2185,13 @@ mod tests_cpu {
                     ),
                     Instruction::RightShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
-                &[(RegisterId::R1, 0b0011_1111_1111_1111_1111_1111_1111_1111)],
+                &[
+                    (RegisterId::R1, 0b0011_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::PF])),
+                ],
                 vec![0; 100],
                 false,
-                "SHR - CPU flags not correctly set",
+                "SHR - CPU flags were not correctly set",
             ),
             // Just zero flag should be set here since zero left-shifted by anything will be zero.
             TestEntryU32Standard::new(
@@ -2191,10 +2199,13 @@ mod tests_cpu {
                     Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
                     Instruction::RightShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
-                &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF]))],
+                &[(
+                    RegisterId::FL,
+                    CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
+                )],
                 vec![0; 100],
                 false,
-                "SHR - CPU flags not correctly set",
+                "SHR - zero or parity CPU flags were not correctly set",
             ),
             // This should assert as a shift of value higher than 31 is unsupported.
             TestEntryU32Standard::new(
@@ -2203,6 +2214,17 @@ mod tests_cpu {
                 vec![],
                 true,
                 "SHR - successfully executed instruction with invalid shift value",
+            ),
+            // Test that a right-shift by zero leaves the value unchanged.
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::RightShiftU32ImmU32Reg(0x0, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0x1)],
+                vec![0; 100],
+                false,
+                "SHR - zero right-shift did not leave the result unchanged",
             ),
         ];
 
@@ -2246,11 +2268,14 @@ mod tests_cpu {
                 &[
                     (RegisterId::R1, 0b0011_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::R2, 0x1),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::CF])),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_for(&[CpuFlag::CF, CpuFlag::PF]),
+                    ),
                 ],
                 vec![0; 100],
                 false,
-                "SHR - CPU flags not correctly set",
+                "SHR - carry or parity CPU flags were not correctly set",
             ),
             // The SHR command should clear the overflow flag and the
             // carry flag in this case as the bit being shifted out is zero.
@@ -2272,10 +2297,11 @@ mod tests_cpu {
                 &[
                     (RegisterId::R1, 0b0011_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::R2, 0x1),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::PF])),
                 ],
                 vec![0; 100],
                 false,
-                "SHR - CPU flags not correctly set",
+                "SHR - CPU flags were not correctly set",
             ),
             // Just zero flag should be set here since zero left-shifted by anything will be zero.
             TestEntryU32Standard::new(
@@ -2286,11 +2312,14 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::R2, 0x1),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF])),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
+                    ),
                 ],
                 vec![0; 100],
                 false,
-                "SHR - CPU flags not correctly set",
+                "SHR - zero or parity CPU flags were not correctly set",
             ),
             // This should assert as a shift of value higher than 31 is unsupported.
             TestEntryU32Standard::new(
@@ -2302,6 +2331,17 @@ mod tests_cpu {
                 vec![],
                 true,
                 "SHR - successfully executed instruction with invalid shift value",
+            ),
+            // Test that a right-shift by zero leaves the value unchanged.
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::RightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0x1)],
+                vec![0; 100],
+                false,
+                "SHR - zero right-shift did not leave the result unchanged",
             ),
         ];
 
@@ -2332,7 +2372,10 @@ mod tests_cpu {
                     ),
                     Instruction::ArithRightShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
-                &[(RegisterId::R1, 0b1011_1111_1111_1111_1111_1111_1111_1111)],
+                &[
+                    (RegisterId::R1, 0b1011_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::PF])),
+                ],
                 vec![0; 100],
                 false,
                 "SAR - incorrect result value produced",
@@ -2343,10 +2386,24 @@ mod tests_cpu {
                     Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
                     Instruction::ArithRightShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
-                &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF]))],
+                &[(
+                    RegisterId::FL,
+                    CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
+                )],
                 vec![0; 100],
                 false,
-                "SAR - CPU flags not correctly set",
+                "SAR - zero or parity CPU flags were not correctly set",
+            ),
+            // Test that a right-shift by zero leaves the value unchanged.
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::ArithRightShiftU32ImmU32Reg(0x0, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0x1)],
+                vec![0; 100],
+                false,
+                "SAR - zero right-shift did not leave the result unchanged",
             ),
         ];
 
@@ -2382,6 +2439,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::R1, 0b1011_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::R2, 0x1),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::PF])),
                 ],
                 vec![0; 100],
                 false,
@@ -2396,11 +2454,25 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::R2, 0x1),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF])),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
+                    ),
                 ],
                 vec![0; 100],
                 false,
-                "SAR - CPU flags not correctly set",
+                "SAR - zero or parity CPU flags were not correctly set",
+            ),
+            // Test that a right-shift by zero leaves the value unchanged.
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::ArithRightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0x1)],
+                vec![0; 100],
+                false,
+                "SAR - zero right-shift did not leave the result unchanged",
             ),
         ];
 
