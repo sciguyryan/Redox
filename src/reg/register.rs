@@ -31,7 +31,7 @@ impl Display for RegisterPermission {
 
 #[derive(Debug)]
 pub struct RegisterU32 {
-    /// The ID of this register.
+    /// The [`RegisterId`] of this register.
     pub id: RegisterId,
     /// The permissions of this register.
     pub permissions: RegisterPermission,
@@ -48,6 +48,12 @@ impl RegisterU32 {
         }
     }
 
+    /// Add a specific value to this register.
+    ///
+    /// # Arguments
+    ///
+    /// * `val` - The value to be added.
+    /// * `privilege` - A reference to the [`PrivilegeLevel`] to be used when completing this action.
     #[inline(always)]
     pub fn add(&mut self, val: u32, privilege: &PrivilegeLevel) {
         // Check whether the register has read/write permissions.
@@ -56,6 +62,11 @@ impl RegisterU32 {
         self.value += val;
     }
 
+    /// Add a specific value to this register without performing a permission check.
+    ///
+    /// # Arguments
+    ///
+    /// * `val` - The value to be added.
     #[inline(always)]
     pub fn add_unchecked(&mut self, value: u32) {
         self.value += value;
@@ -77,16 +88,31 @@ impl RegisterU32 {
         flags
     }
 
+    /// Increment the value of this register.
+    ///
+    /// # Arguments
+    ///
+    /// * `privilege` - A reference to the [`PrivilegeLevel`] to be used when completing this action.
     #[inline(always)]
     pub fn increment(&mut self, privilege: &PrivilegeLevel) {
         self.add(1, privilege);
     }
 
+    /// Increment the value of this register without performing a permission check.
     #[inline(always)]
     pub fn increment_unchecked(&mut self) {
         self.add_unchecked(1);
     }
 
+    /// Read the value of this register.
+    ///
+    /// # Arguments
+    ///
+    /// * `privilege` - A reference to the [`PrivilegeLevel`] to be used when completing this action.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the u32 value of this register.
     pub fn read(&self, privilege: &PrivilegeLevel) -> &u32 {
         // Check whether the register has read permissions.
         self.validate_access(&DataAccessType::Read, privilege);
@@ -94,10 +120,21 @@ impl RegisterU32 {
         &self.value
     }
 
+    /// Read the value of this register without performing a permission check.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the u32 value of this register.
     pub fn read_unchecked(&self) -> &u32 {
         &self.value
     }
 
+    /// Subtract a specific value from this register.
+    ///
+    /// # Arguments
+    ///
+    /// * `val` - The value to be subtracted.
+    /// * `privilege` - The [`PrivilegeLevel`] to be used when completing this action.
     #[inline(always)]
     pub fn subtract(&mut self, val: u32, privilege: &PrivilegeLevel) {
         // Check whether the register has read/write permissions.
@@ -106,6 +143,12 @@ impl RegisterU32 {
         self.value -= val;
     }
 
+    /// Write a value to this register.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The u32 value to be written to this register.
+    /// * `privilege` - The [`PrivilegeLevel`] to be used when completing this action.
     pub fn write(&mut self, value: u32, privilege: &PrivilegeLevel) {
         // Check whether the register has write permissions.
         self.validate_access(&DataAccessType::Write, privilege);
@@ -113,14 +156,25 @@ impl RegisterU32 {
         self.value = value;
     }
 
+    /// Write a value to this register without performing a permission check.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The u32 value to be written to this register.
     pub fn write_unchecked(&mut self, value: u32) {
         self.value = value;
     }
 
+    /// Validate whether a specific action can be performed based on the privilege level.
+    ///
+    /// # Arguments
+    ///
+    /// * `access_type` - A reference to the [`DataAccessType`] indicating the action to be performed.
+    /// * `privilege` - A reference to the [`PrivilegeLevel`] to be used when completing this action.
     #[inline(always)]
-    fn validate_access(&self, access_type: &DataAccessType, context: &PrivilegeLevel) {
+    fn validate_access(&self, access_type: &DataAccessType, privilege: &PrivilegeLevel) {
         // System-level contexts are permitted to do anything, without limitation.
-        if *context == PrivilegeLevel::Machine {
+        if *privilege == PrivilegeLevel::Machine {
             return;
         }
 
@@ -140,7 +194,7 @@ impl RegisterU32 {
 
 #[derive(Debug)]
 pub struct RegisterF32 {
-    /// The ID of this register.
+    /// The [`RegisterId`] of this register.
     pub id: RegisterId,
     /// The permissions of this register.
     pub permissions: RegisterPermission,
@@ -157,6 +211,15 @@ impl RegisterF32 {
         }
     }
 
+    /// Read the value of this register.
+    ///
+    /// # Arguments
+    ///
+    /// * `privilege` - A reference to the [`PrivilegeLevel`] to be used when completing this action.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the f32 value of this register.
     pub fn read(&self, privilege: &PrivilegeLevel) -> &f32 {
         // Check whether the register has read permissions.
         self.validate_access(&DataAccessType::Read, privilege);
@@ -164,10 +227,20 @@ impl RegisterF32 {
         &self.value
     }
 
+    /// Read the value of this register without performing a permission check.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the f32 value of this register.
     pub fn read_unchecked(&self) -> &f32 {
         &self.value
     }
 
+    /// Write a value to this register without performing a permission check.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The f32 value to be written to this register.
     pub fn write(&mut self, value: f32, privilege: &PrivilegeLevel) {
         // Check whether the register has write permissions.
         self.validate_access(&DataAccessType::Write, privilege);
@@ -175,14 +248,25 @@ impl RegisterF32 {
         self.value = value;
     }
 
+    /// Write a value to this register without performing a permission check.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The f32 value to be written to this register.
     pub fn write_unchecked(&mut self, value: f32) {
         self.value = value;
     }
 
+    /// Validate whether a specific action can be performed based on the privilege level.
+    ///
+    /// # Arguments
+    ///
+    /// * `access_type` - A reference to the [`DataAccessType`] indicating the action to be performed.
+    /// * `privilege` - A reference to the [`PrivilegeLevel`] to be used when completing this action.
     #[inline]
-    fn validate_access(&self, access_type: &DataAccessType, context: &PrivilegeLevel) {
+    fn validate_access(&self, access_type: &DataAccessType, privilege: &PrivilegeLevel) {
         // System-level contexts are permitted to do anything, without limitation.
-        if *context == PrivilegeLevel::Machine {
+        if *privilege == PrivilegeLevel::Machine {
             return;
         }
 
