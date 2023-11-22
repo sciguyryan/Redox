@@ -224,13 +224,18 @@ impl Registers {
             .zip(other.registers_u32.values())
         {
             if self_reg.read_unchecked() != other_reg.read_unchecked() {
+                let mut self_val = self_reg.read_unchecked().to_string();
+                let mut other_val = other_reg.read_unchecked().to_string();
+
+                // We want to show the flags (rather than the value) for simplicity.
+                if self_reg.id == RegisterId::FL {
+                    self_val = format!("[{}]", self_reg.get_flags_register_string());
+                    other_val = format!("[{}]", other_reg.get_flags_register_string());
+                }
+
                 u32_different.push(format!(
-                    "{} - {} = {}, {} = {}",
-                    self_reg.id,
-                    names[0],
-                    self_reg.read_unchecked(),
-                    names[1],
-                    other_reg.read_unchecked()
+                    "{} - {} = {self_val}, {} = {other_val}",
+                    self_reg.id, names[0], names[1],
                 ));
             }
         }
@@ -282,13 +287,7 @@ impl Registers {
             let mut notes = String::new();
 
             if *id == RegisterId::FL {
-                let states: Vec<String> = CpuFlag::iterator()
-                    .map(|flag_type| {
-                        let is_set = utils::is_bit_set(reg_value, (*flag_type) as u8);
-                        format!("{flag_type} = {is_set}")
-                    })
-                    .collect();
-                notes = states.join(", ");
+                notes = reg.get_flags_register_string();
             }
 
             table.add_row(row![id, formatted_value, "u32", notes]);

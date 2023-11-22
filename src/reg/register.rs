@@ -1,7 +1,9 @@
 use bitflags::bitflags;
 use std::fmt::{self, Display};
 
-use crate::{data_access_type::DataAccessType, privilege_level::PrivilegeLevel};
+use crate::{
+    cpu::CpuFlag, data_access_type::DataAccessType, privilege_level::PrivilegeLevel, utils,
+};
 
 use super::registers::RegisterId;
 
@@ -57,6 +59,22 @@ impl RegisterU32 {
     #[inline(always)]
     pub fn add_unchecked(&mut self, value: u32) {
         self.value += value;
+    }
+
+    pub fn get_flags_register_string(&self) -> String {
+        let mut flags = String::new();
+
+        if self.id == RegisterId::FL {
+            let states: Vec<String> = CpuFlag::iterator()
+                .map(|flag_type| {
+                    let is_set = utils::is_bit_set(self.value, (*flag_type) as u8);
+                    format!("{flag_type} = {is_set}")
+                })
+                .collect();
+            flags = states.join(", ");
+        }
+
+        flags
     }
 
     #[inline(always)]
