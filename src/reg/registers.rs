@@ -3,8 +3,6 @@ use num_derive::FromPrimitive;
 use prettytable::{row, Table};
 use std::{collections::BTreeMap, fmt::Display};
 
-use crate::{cpu::CpuFlag, utils};
-
 use super::register::{RegisterF32, RegisterPermission, RegisterU32};
 
 #[derive(Clone, Copy, Debug, Eq, FromPrimitive, Hash, Ord, PartialEq, PartialOrd)]
@@ -192,6 +190,7 @@ impl Registers {
         }
     }
 
+    /// Reset every register back to the default value.
     pub fn reset(&mut self) {
         for reg in &mut self.registers_u32 {
             reg.1.write_unchecked(0);
@@ -202,11 +201,29 @@ impl Registers {
         }
     }
 
+    /// Get a reference to a specific u32 register.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - The [`RegisterId`] for the register in question.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the specific [`RegisterU32`] instance.
     #[inline(always)]
     pub fn get_register_u32(&self, id: RegisterId) -> &RegisterU32 {
         self.registers_u32.get(&id).expect("failed to get register")
     }
 
+    /// Get a mutable reference to a specific u32 register.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - The [`RegisterId`] for the register in question.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the specific [`RegisterU32`] instance.
     #[inline(always)]
     pub fn get_register_u32_mut(&mut self, id: RegisterId) -> &mut RegisterU32 {
         self.registers_u32
@@ -214,6 +231,12 @@ impl Registers {
             .expect("failed to get register")
     }
 
+    /// Print the differences between two [`Registers`] instances.
+    ///
+    /// # Arguments
+    ///
+    /// * `other` - A reference to the other [`Registers`] instance against which this instance should be compared.
+    /// * `names` - The names to be displayed in the output.
     pub fn print_differences(&self, other: &Registers, names: &[&str; 2]) {
         let mut u32_different = vec![];
         let mut f32_different = vec![];
@@ -276,6 +299,7 @@ impl Registers {
         }
     }
 
+    /// Print the value of each register in the collection.
     pub fn print_registers(&self) {
         let mut table = Table::new();
 
