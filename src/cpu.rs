@@ -1682,6 +1682,40 @@ mod tests_cpu {
                 false,
                 "INC - CPU flags not correctly set",
             ),
+            // Test the parity flag is enabled.
+            TestEntryU32Standard::new(
+                &[
+                    // Clear any set flags.
+                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    Instruction::IncU32Reg(RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0x3),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::PF])),
+                ],
+                vec![0; 100],
+                false,
+                "INC - CPU parity flag not correctly set",
+            ),
+            // Test the parity flag gets unset.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the parity flag.
+                    Instruction::MovU32ImmU32Reg(
+                        CpuFlag::compute_for(&[CpuFlag::PF]),
+                        RegisterId::FL,
+                    ),
+                    Instruction::IncU32Reg(RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0x1),
+                    (RegisterId::FL, 0x0),
+                ],
+                vec![0; 100],
+                false,
+                "INC - CPU parity flag not correctly cleared",
+            ),
         ];
 
         for (id, test) in tests.iter().enumerate() {
