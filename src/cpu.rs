@@ -280,6 +280,7 @@ impl Cpu {
 
         let final_value = value.rotate_left(shift_by);
         self.set_flag_state(CpuFlag::ZF, final_value == 0);
+        self.set_flag_state(CpuFlag::PF, Cpu::calculate_lowest_byte_parity(final_value));
 
         final_value
     }
@@ -1806,7 +1807,7 @@ mod tests_cpu {
                 )],
                 vec![0; 100],
                 false,
-                "SHL - correct flags not set",
+                "SHL - parity or zero flags are not set",
             ),
             // This should assert as a shift of value higher than 31 is unsupported.
             TestEntryU32Standard::new(
@@ -1815,6 +1816,33 @@ mod tests_cpu {
                 vec![],
                 true,
                 "SHL - successfully executed instruction with invalid shift value",
+            ),
+            // Test the parity flag gets unset.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the parity flag.
+                    Instruction::MovU32ImmU32Reg(
+                        CpuFlag::compute_for(&[CpuFlag::PF]),
+                        RegisterId::FL,
+                    ),
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0x2), (RegisterId::FL, 0x0)],
+                vec![0; 100],
+                false,
+                "SHL - CPU parity flag not correctly cleared",
+            ),
+            // Test that a left-shift by zero leaves the value unchanged.
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::LeftShiftU32ImmU32Reg(0x0, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0x1)],
+                vec![0; 100],
+                false,
+                "SHL - zero left-shift did not leave the result unchanged",
             ),
         ];
 
@@ -1953,6 +1981,17 @@ mod tests_cpu {
                 true,
                 "SHL - successfully executed instruction with invalid shift value",
             ),
+            // Test that a left-shift by zero leaves the value unchanged.
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0x1)],
+                vec![0; 100],
+                false,
+                "SHL - zero left-shift did not leave the result unchanged",
+            ),
         ];
 
         for (id, test) in tests.iter().enumerate() {
@@ -1991,7 +2030,7 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
-                    Instruction::LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::ArithLeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[(
                     RegisterId::FL,
@@ -2000,6 +2039,17 @@ mod tests_cpu {
                 vec![0; 100],
                 false,
                 "SAL - CPU flags not correctly set",
+            ),
+            // Test that a left-shift by zero leaves the value unchanged.
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::ArithLeftShiftU32ImmU32Reg(0x0, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0x1)],
+                vec![0; 100],
+                false,
+                "SAL - zero left-shift did not leave the result unchanged",
             ),
         ];
 
@@ -2049,11 +2099,25 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::R2, 0x1),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF])),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
+                    ),
                 ],
                 vec![0; 100],
                 false,
                 "SAL - CPU flags not correctly set",
+            ),
+            // Test that a left-shift by zero leaves the value unchanged.
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::ArithLeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0x1)],
+                vec![0; 100],
+                false,
+                "SAL - zero left-shift did not leave the result unchanged",
             ),
         ];
 
