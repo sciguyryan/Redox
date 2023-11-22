@@ -926,7 +926,7 @@ impl Default for Cpu {
 #[derive(Clone, Copy, Debug)]
 #[repr(u8)]
 pub enum CpuFlag {
-    /// The negative flag - set to true if the result of an operation is negative.
+    /// The signed (negative) flag - set to true if the result of an operation is negative.
     SF,
     /// The zero flag - set to true if the result of an operation is zero.
     ZF,

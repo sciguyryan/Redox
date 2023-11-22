@@ -10,8 +10,6 @@ pub struct Memory {
 }
 
 impl Memory {
-    // https://stackoverflow.com/questions/15045375/what-enforces-memory-protection-in-an-os
-
     pub fn new(size: usize) -> Self {
         Self {
             storage: vec![0x0; size],

@@ -78,8 +78,6 @@ fn main() {
         panic!("currently unsupported");
     }
 
-    println!("{}", (2 % 2));
-
     let mut vm = VirtualMachine::new(64_000);
 
     //vm.ram.set(0, 0x12, &SecurityContext::Machine);
