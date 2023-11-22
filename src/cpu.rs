@@ -253,6 +253,7 @@ impl Cpu {
             utils::is_bit_set_32(value, (32 - shift_by) & 1),
         );
         self.set_flag_state(CpuFlag::ZF, final_value == 0);
+        self.set_flag_state(CpuFlag::PF, Cpu::calculate_lowest_byte_parity(final_value));
 
         final_value
     }
@@ -1708,10 +1709,7 @@ mod tests_cpu {
                     ),
                     Instruction::IncU32Reg(RegisterId::R1),
                 ],
-                &[
-                    (RegisterId::R1, 0x1),
-                    (RegisterId::FL, 0x0),
-                ],
+                &[(RegisterId::R1, 0x1), (RegisterId::FL, 0x0)],
                 vec![0; 100],
                 false,
                 "INC - CPU parity flag not correctly cleared",
@@ -1782,7 +1780,10 @@ mod tests_cpu {
                     Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
                     Instruction::LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
-                &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF]))],
+                &[(
+                    RegisterId::FL,
+                    CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
+                )],
                 vec![0; 100],
                 false,
                 "SHL - CPU flags not correctly set",
@@ -1799,7 +1800,10 @@ mod tests_cpu {
                     Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
                     Instruction::LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
-                &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF]))],
+                &[(
+                    RegisterId::FL,
+                    CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
+                )],
                 vec![0; 100],
                 false,
                 "SHL - correct flags not set",
@@ -1905,7 +1909,10 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::R2, 0x1),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF])),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
+                    ),
                 ],
                 vec![0; 100],
                 false,
@@ -1926,7 +1933,10 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::R2, 0x1),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF])),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
+                    ),
                 ],
                 vec![0; 100],
                 false,
@@ -1983,7 +1993,10 @@ mod tests_cpu {
                     Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
                     Instruction::LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
-                &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF]))],
+                &[(
+                    RegisterId::FL,
+                    CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
+                )],
                 vec![0; 100],
                 false,
                 "SAL - CPU flags not correctly set",
