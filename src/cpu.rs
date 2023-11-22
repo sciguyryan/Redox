@@ -208,7 +208,7 @@ impl Cpu {
     ///
     /// # Note
     ///
-    /// This method sets or clears the zero and overflow flags as required.
+    /// This method affects the following flags: Overflow (OF), Zero (ZF) and Parity (PF).
     #[inline(always)]
     fn perform_checked_subtract_u32(&mut self, value_1: u32, value_2: u32) -> u32 {
         let (final_value, overflow) = match value_1.checked_sub(value_2) {
@@ -235,14 +235,16 @@ impl Cpu {
     ///
     /// # Note
     ///
-    /// This method sets and unsets the zero, overflow and carry flags as required.
+    /// This method affects the following flags: Overflow (OF), Zero (ZF), Carry (CF) and Parity (PF).
+    ///
     /// The overflow (OF) flag will only be affected by 1-bit shifts.
     #[inline(always)]
     fn perform_checked_left_shift_u32(&mut self, value: u32, shift_by: u32) -> u32 {
-        assert!(shift_by <= 31);
         if shift_by == 0 {
             return value;
         }
+
+        assert!(shift_by <= 31);
 
         let final_value = value << shift_by;
         if shift_by == 1 {
@@ -271,8 +273,9 @@ impl Cpu {
     ///
     /// # Note
     ///
-    /// This method sets and unsets the zero flag as required and always clears the overflow
-    /// and carry flags.
+    /// This method affects the following flags: Zero (ZF) and Parity (PF).
+    ///
+    /// The Overflow (OF) and Carry (CF) flags will always be cleared.
     #[inline(always)]
     fn perform_arithmetic_left_shift_u32(&mut self, value: u32, shift_by: u32) -> u32 {
         self.set_flag_state(CpuFlag::OF, false);
@@ -298,14 +301,16 @@ impl Cpu {
     ///
     /// # Note
     ///
-    /// This method sets and unsets the zero and carry flags as required,
-    /// and always clears the overflow flag.
+    /// This method affects the following flags: Zero (ZF), Carry (CF) and Parity (PF).
+    ///
+    /// The Overflow (OF) flag will always be cleared.
     #[inline(always)]
     fn perform_right_shift_u32(&mut self, value: u32, shift_by: u32) -> u32 {
-        assert!(shift_by <= 31);
         if shift_by == 0 {
             return value;
         }
+
+        assert!(shift_by <= 31);
 
         self.set_flag_state(CpuFlag::OF, false);
 
@@ -334,8 +339,9 @@ impl Cpu {
     ///
     /// # Note
     ///
-    /// This method sets and unsets the zero flag as required and always clears the overflow
-    /// and carry flags.
+    /// This method affects the following flags: Zero (ZF) and Parity (PF).
+    ///
+    /// The Overflow (OF) and Carry (CF) flags will always be cleared.
     #[inline(always)]
     fn perform_arithmetic_right_shift_u32(&mut self, value: u32, shift_by: u32) -> u32 {
         self.set_flag_state(CpuFlag::OF, false);
