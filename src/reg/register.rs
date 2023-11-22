@@ -11,15 +11,15 @@ bitflags! {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub struct RegisterPermission: u8 {
         /// None.
-        const N = 1 << 0;
+        const N = 0b00000001;
         /// Public read.
-        const R = 1 << 1;
+        const R = 0b00000010;
         /// Public write.
-        const W = 1 << 2;
+        const W = 0b00000100;
         /// Private read.
-        const PR = 1 << 3;
+        const PR = 0b00001000;
         /// Private write.
-        const PW = 1 << 4;
+        const PW = 0b00010000;
     }
 }
 
