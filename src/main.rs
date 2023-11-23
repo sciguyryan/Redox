@@ -11,8 +11,6 @@ mod reg;
 mod utils;
 pub mod vm;
 
-use std::arch::asm;
-
 use vm::VirtualMachine;
 
 use crate::{
