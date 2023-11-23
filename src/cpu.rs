@@ -250,7 +250,6 @@ impl Cpu {
         assert!(shift_by <= 31);
 
         let final_value = value << shift_by;
-
         self.set_flag_state(CpuFlag::ZF, final_value == 0);
         if shift_by == 1 {
             self.set_flag_state(CpuFlag::OF, final_value < value);
@@ -346,7 +345,6 @@ impl Cpu {
     #[inline(always)]
     fn perform_arithmetic_right_shift_u32(&mut self, value: u32, shift_by: u32) -> u32 {
         let final_value = value.rotate_right(shift_by);
-
         self.set_flag_state(CpuFlag::ZF, final_value == 0);
         self.set_flag_state(CpuFlag::OF, false);
         self.set_flag_state(CpuFlag::CF, false);
