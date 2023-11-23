@@ -1837,7 +1837,7 @@ mod tests_cpu {
                 ],
                 vec![0; 100],
                 false,
-                "ADD - CPU parity flag not correctly cleared",
+                "INC - CPU parity flag not correctly cleared",
             ),
             // Test the signed flag is set.
             TestEntryU32Standard::new(
