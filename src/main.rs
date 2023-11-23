@@ -11,6 +11,8 @@ mod reg;
 mod utils;
 pub mod vm;
 
+use std::arch::asm;
+
 use vm::VirtualMachine;
 
 use crate::{
@@ -73,10 +75,101 @@ use crate::{
     );
 }*/
 
+fn run_test_3() {
+    use std::time::Instant;
+
+    let iterations = 10_000_000;
+
+    let mut out_val_1 = false;
+    let mut out_val_2 = false;
+    let mut out_val_3 = false;
+
+    let val: u32 = 0b1111_1111_1111_1111_1111_1111_1111_1111;
+
+    let now1 = Instant::now();
+    {
+        for _ in 0..iterations {
+            out_val_1 = utils::is_bit_set(val, 0);
+        }
+    }
+    let elapsed1 = now1.elapsed().as_nanos() as f32;
+
+    let now2 = Instant::now();
+    {
+        for _ in 0..iterations {
+            out_val_2 = is_bit_set_asm_1(val, 0);
+        }
+    }
+    let elapsed2 = now2.elapsed().as_nanos() as f32;
+
+    let now3 = Instant::now();
+    {
+        for _ in 0..iterations {
+            out_val_3 = is_bit_set_asm_2(val, 0);
+        }
+    }
+    let elapsed3 = now3.elapsed().as_nanos() as f32;
+
+    println!(
+        "Elapsed (1): {:.2?} nanoseconds",
+        elapsed1/* / iterations as f32*/
+    );
+    println!(
+        "Elapsed (2): {:.2?} nanoseconds",
+        elapsed2/* / iterations as f32*/
+    );
+    println!(
+        "Elapsed (3): {:.2?} nanoseconds",
+        elapsed3/* / iterations as f32*/
+    );
+
+    assert_eq!(out_val_1, out_val_2);
+    assert_eq!(out_val_1, out_val_3);
+}
+
+fn is_bit_set_asm_1(number: u32, bit_position: u32) -> bool {
+    let result: u32;
+
+    // Inline assembly to check if the bit is set
+    unsafe {
+        asm!(
+            "bt {0:e}, {1:e}",
+            "sbb {2:e}, {2:e}",
+            in(reg) number,
+            in(reg) bit_position,
+            out(reg) result,
+        );
+    }
+
+    result != 0
+}
+
+fn is_bit_set_asm_2(number: u32, bit_position: u32) -> bool {
+    let result: u32;
+
+    // Inline assembly to check if the bit is set
+    unsafe {
+        asm!(
+            "bt {0:e}, {1:e}",
+            "jnc 1f",
+            "mov {2:e}, 1",
+            "1:",
+            in(reg) number,
+            in(reg) bit_position,
+            out(reg) result,
+        );
+    }
+
+    result != 0
+}
+
 fn main() {
     if cfg!(target_endian = "big") {
         panic!("currently unsupported");
     }
+
+    run_test_3();
+    return;
 
     let mut vm = VirtualMachine::new(64_000);
 
