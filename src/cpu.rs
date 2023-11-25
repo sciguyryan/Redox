@@ -242,7 +242,7 @@ impl Cpu {
     ///
     /// # Note
     ///
-    /// This method affects the following flags: Overflow (OF), Zero (ZF), Carry (CF) and Parity (PF).
+    /// This method affects the following flags: Sign (SF), Overflow (OF), Zero (ZF), Carry (CF) and Parity (PF).
     ///
     /// The overflow (OF) flag will only be affected by 1-bit shifts.
     #[inline(always)]
@@ -281,12 +281,13 @@ impl Cpu {
     ///
     /// # Note
     ///
-    /// This method affects the following flags: Zero (ZF) and Parity (PF).
+    /// This method affects the following flags: Sign (SF), Zero (ZF) and Parity (PF).
     ///
     /// The Overflow (OF) and Carry (CF) flags will always be cleared.
     #[inline(always)]
     fn perform_arithmetic_left_shift_u32(&mut self, value: u32, shift_by: u32) -> u32 {
         let final_value = value.rotate_left(shift_by);
+        self.set_flag_state(CpuFlag::SF, utils::is_bit_set(final_value, 31));
         self.set_flag_state(CpuFlag::ZF, final_value == 0);
         self.set_flag_state(CpuFlag::OF, false);
         self.set_flag_state(CpuFlag::CF, false);
@@ -2410,7 +2411,10 @@ mod tests_cpu {
                     ),
                     Instruction::ArithLeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
-                &[(RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1101)],
+                &[
+                    (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1101),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::SF])),
+                ],
                 vec![0; 100],
                 false,
                 "SAL - incorrect result value produced",
@@ -2439,6 +2443,46 @@ mod tests_cpu {
                 vec![0; 100],
                 false,
                 "SAL - zero left-shift did not leave the result unchanged",
+            ),
+            // Test the signed flag is set.
+            TestEntryU32Standard::new(
+                &[
+                    // Clear any set flags.
+                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    // Perform the calculation.
+                    Instruction::MovU32ImmU32Reg(
+                        0b0100_0000_0000_0000_0000_0000_0000_0000,
+                        RegisterId::R1,
+                    ),
+                    Instruction::ArithLeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0b1000_0000_0000_0000_0000_0000_0000_0000),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::PF]),
+                    ),
+                ],
+                vec![0; 100],
+                false,
+                "SAL - CPU signed flag not correctly set",
+            ),
+            // Test the signed flag is cleared.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the signed flag.
+                    Instruction::MovU32ImmU32Reg(
+                        CpuFlag::compute_for(&[CpuFlag::SF]),
+                        RegisterId::FL,
+                    ),
+                    // Perform the calculation.
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::ArithLeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0x2), (RegisterId::FL, 0x0)],
+                vec![0; 100],
+                false,
+                "SAL - CPU signed flag not correctly cleared",
             ),
         ];
 
@@ -2474,6 +2518,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1101),
                     (RegisterId::R2, 0x1),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::SF])),
                 ],
                 vec![0; 100],
                 false,
@@ -2507,6 +2552,53 @@ mod tests_cpu {
                 vec![0; 100],
                 false,
                 "SAL - zero left-shift did not leave the result unchanged",
+            ),
+            // Test the signed flag is set.
+            TestEntryU32Standard::new(
+                &[
+                    // Clear any set flags.
+                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    // Perform the calculation.
+                    Instruction::MovU32ImmU32Reg(
+                        0b0100_0000_0000_0000_0000_0000_0000_0000,
+                        RegisterId::R1,
+                    ),
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    Instruction::ArithLeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0b1000_0000_0000_0000_0000_0000_0000_0000),
+                    (RegisterId::R2, 0x1),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::PF]),
+                    ),
+                ],
+                vec![0; 100],
+                false,
+                "SAL - CPU signed flag not correctly set",
+            ),
+            // Test the signed flag is cleared.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the signed flag.
+                    Instruction::MovU32ImmU32Reg(
+                        CpuFlag::compute_for(&[CpuFlag::SF]),
+                        RegisterId::FL,
+                    ),
+                    // Perform the calculation.
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    Instruction::ArithLeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0x2),
+                    (RegisterId::R2, 0x1),
+                    (RegisterId::FL, 0x0),
+                ],
+                vec![0; 100],
+                false,
+                "SAL - CPU signed flag not correctly cleared",
             ),
         ];
 
