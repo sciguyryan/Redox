@@ -114,7 +114,9 @@ impl Compiler {
             }
 
             /******** [u32 register] ********/
-            Instruction::ByteSwapU32(reg) | Instruction::IncU32Reg(reg) => {
+            Instruction::ByteSwapU32(reg)
+            | Instruction::IncU32Reg(reg)
+            | Instruction::DecU32Reg(reg) => {
                 self.write_register_id(&reg);
             }
 

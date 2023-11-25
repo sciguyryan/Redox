@@ -36,6 +36,8 @@ pub enum Instruction {
     SubU32RegU32Reg(RegisterId, RegisterId),
     /// Increment a u32 register.
     IncU32Reg(RegisterId),
+    /// Decrement a u32 register.
+    DecU32Reg(RegisterId),
 
     /******** [Bit Operation Instructions] ********/
     /// Left-shift a u32 register by a u32 immediate. The result remains in the origin register.
@@ -147,6 +149,9 @@ impl Display for Instruction {
             Instruction::IncU32Reg(reg) => {
                 format!("inc {reg}")
             }
+            Instruction::DecU32Reg(reg) => {
+                format!("dec {reg}")
+            }
 
             /******** [Bit Operation Instructions] ********/
             Instruction::LeftShiftU32ImmU32Reg(imm, reg) => {
@@ -217,11 +222,11 @@ impl Display for Instruction {
             Instruction::ByteSwapU32(reg) => {
                 format!("bswap {reg}")
             }
-            Instruction::ZeroHighBitsByIndexU32Reg(in_reg, index_reg, out_reg) => {
-                format!("zhbi {in_reg}, {index_reg}, {out_reg}")
+            Instruction::ZeroHighBitsByIndexU32Reg(index_reg, in_reg, out_reg) => {
+                format!("zhbi {index_reg}, {in_reg}, {out_reg}")
             }
-            Instruction::ZeroHighBitsByIndexU32RegU32Imm(in_reg, index, out_reg) => {
-                format!("zhbi {in_reg}, {index}, {out_reg}")
+            Instruction::ZeroHighBitsByIndexU32RegU32Imm(index, in_reg, out_reg) => {
+                format!("zhbi {index}, {in_reg}, {out_reg}")
             }
 
             /******** [Logic Instructions] ********/
@@ -289,6 +294,7 @@ impl Instruction {
             Instruction::SubU32RegU32Imm(_, _) => ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE,
             Instruction::SubU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
             Instruction::IncU32Reg(_) => ARG_REG_ID_SIZE,
+            Instruction::DecU32Reg(_) => ARG_REG_ID_SIZE,
 
             /******** [Bit Operation Instructions] ********/
             Instruction::LeftShiftU32ImmU32Reg(_, _) => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
@@ -316,7 +322,7 @@ impl Instruction {
                 ARG_REG_ID_SIZE + ARG_REG_ID_SIZE + ARG_REG_ID_SIZE
             }
             Instruction::ZeroHighBitsByIndexU32RegU32Imm(_, _, _) => {
-                ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE
+                ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE + ARG_REG_ID_SIZE
             }
 
             /******** [Logic Instructions] ********/
@@ -355,6 +361,7 @@ impl Instruction {
             OpCode::SubU32RegU32Imm => ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE,
             OpCode::SubU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
             OpCode::IncU32Reg => ARG_REG_ID_SIZE,
+            OpCode::DecU32Reg => ARG_REG_ID_SIZE,
 
             /******** [Bit Operation Instructions] ********/
             OpCode::LeftShiftU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
@@ -382,7 +389,7 @@ impl Instruction {
                 ARG_REG_ID_SIZE + ARG_REG_ID_SIZE + ARG_REG_ID_SIZE
             }
             OpCode::ZeroHighBitsByIndexU32RegU32Imm => {
-                ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE
+                ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE + ARG_REG_ID_SIZE
             }
 
             /******** [Logic Instructions] ********/
