@@ -455,9 +455,10 @@ impl Cpu {
     /// * `out_reg` - The destination u32 register.
     /// * `privilege` - The privilege level of the command.
     ///
-    /// # Note
     ///
-    /// This method will set the carry and zero flags depending on the result and the overflow flag will always be cleared.
+    /// This method affects the following flags: Sign (SF), Zero (ZF), Carry (CF) and Parity (PF).
+    ///
+    /// The Overflow (OF) flag will always be cleared.
     #[inline(always)]
     fn perform_zero_high_bit_u32_reg(
         &mut self,
@@ -475,6 +476,7 @@ impl Cpu {
             value
         };
 
+        self.set_flag_state(CpuFlag::SF, utils::is_bit_set(final_value, 31));
         self.set_flag_state(CpuFlag::ZF, final_value == 0);
 
         // The carry flag is set if the if the number contained in the
@@ -3862,6 +3864,74 @@ mod tests_cpu {
                 vec![0; 100],
                 true,
                 "ZHBI - successfully executed instruction with invalid bit index",
+            ),
+            // Test the signed flag is set.
+            TestEntryU32Standard::new(
+                &[
+                    // Clear any set flags.
+                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    // Perform the calculation.
+                    Instruction::MovU32ImmU32Reg(
+                        0b1111_1111_1111_1111_1111_1111_1111_1111,
+                        RegisterId::R1,
+                    ),
+                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R2),
+                    Instruction::MovU32ImmU32Reg(
+                        0b1111_1111_1111_1111_1111_1111_1111_1111,
+                        RegisterId::R3,
+                    ),
+                    Instruction::ZeroHighBitsByIndexU32Reg(
+                        RegisterId::R1,
+                        RegisterId::R2,
+                        RegisterId::R3,
+                    ),
+                ],
+                &[
+                    (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::R2, 0x0),
+                    (RegisterId::R3, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::CF]),
+                    ),
+                ],
+                vec![0; 100],
+                false,
+                "ZHBI - CPU signed flag not correctly set",
+            ),
+            // Test the signed flag is cleared.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the signed flag.
+                    Instruction::MovU32ImmU32Reg(
+                        CpuFlag::compute_for(&[CpuFlag::SF]),
+                        RegisterId::FL,
+                    ),
+                    // Perform the calculation.
+                    Instruction::MovU32ImmU32Reg(
+                        0b0111_1111_1111_1111_1111_1111_1111_1111,
+                        RegisterId::R1,
+                    ),
+                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R2),
+                    Instruction::MovU32ImmU32Reg(
+                        0b0111_1111_1111_1111_1111_1111_1111_1111,
+                        RegisterId::R3,
+                    ),
+                    Instruction::ZeroHighBitsByIndexU32Reg(
+                        RegisterId::R1,
+                        RegisterId::R2,
+                        RegisterId::R3,
+                    ),
+                ],
+                &[
+                    (RegisterId::R1, 0b0111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::R2, 0x0),
+                    (RegisterId::R3, 0b0111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::CF])),
+                ],
+                vec![0; 100],
+                false,
+                "ZHBI - CPU signed flag not correctly cleared",
             ),
         ];
 
