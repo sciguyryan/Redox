@@ -213,7 +213,7 @@ impl Cpu {
     ///
     /// # Note
     ///
-    /// This method affects the following flags: Overflow (OF), Zero (ZF) and Parity (PF).
+    /// This method affects the following flags: Sign (SF), Overflow (OF), Zero (ZF) and Parity (PF).
     #[inline(always)]
     fn perform_checked_subtract_u32(&mut self, value_1: u32, value_2: u32) -> u32 {
         let (final_value, overflow) = match value_1.checked_sub(value_2) {
@@ -254,6 +254,7 @@ impl Cpu {
         assert!(shift_by <= 31);
 
         let final_value = value << shift_by;
+        self.set_flag_state(CpuFlag::SF, utils::is_bit_set(final_value, 31));
         self.set_flag_state(CpuFlag::ZF, final_value == 0);
         if shift_by == 1 {
             self.set_flag_state(CpuFlag::OF, final_value < value);
@@ -2043,7 +2044,10 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1000),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::CF])),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::CF]),
+                    ),
                 ],
                 vec![0; 100],
                 false,
@@ -2063,7 +2067,7 @@ mod tests_cpu {
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::CF, CpuFlag::OF]),
+                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::CF, CpuFlag::OF]),
                     ),
                 ],
                 vec![0; 100],
@@ -2139,6 +2143,46 @@ mod tests_cpu {
                 false,
                 "SHL - zero left-shift did not leave the result unchanged",
             ),
+            // Test the signed flag is set.
+            TestEntryU32Standard::new(
+                &[
+                    // Clear any set flags.
+                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    // Perform the calculation.
+                    Instruction::MovU32ImmU32Reg(
+                        0b0100_0000_0000_0000_0000_0000_0000_0000,
+                        RegisterId::R1,
+                    ),
+                    Instruction::LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0b1000_0000_0000_0000_0000_0000_0000_0000),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::PF]),
+                    ),
+                ],
+                vec![0; 100],
+                false,
+                "SHL - CPU signed flag not correctly set",
+            ),
+            // Test the signed flag is cleared.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the signed flag.
+                    Instruction::MovU32ImmU32Reg(
+                        CpuFlag::compute_for(&[CpuFlag::SF]),
+                        RegisterId::FL,
+                    ),
+                    // Perform the calculation.
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0x2), (RegisterId::FL, 0x0)],
+                vec![0; 100],
+                false,
+                "SHL - CPU signed flag not correctly cleared",
+            ),
         ];
 
         for (id, test) in tests.iter().enumerate() {
@@ -2175,7 +2219,10 @@ mod tests_cpu {
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1000),
                     (RegisterId::R2, 0x3),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::CF])),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::CF]),
+                    ),
                 ],
                 vec![0; 100],
                 false,
@@ -2197,7 +2244,7 @@ mod tests_cpu {
                     (RegisterId::R2, 0x1),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::OF, CpuFlag::CF]),
+                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::OF, CpuFlag::CF]),
                     ),
                 ],
                 vec![0; 100],
@@ -2216,7 +2263,7 @@ mod tests_cpu {
                     (RegisterId::R2, 0x1),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::OF, CpuFlag::CF]),
+                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::OF, CpuFlag::CF]),
                     ),
                 ],
                 vec![0; 100],
@@ -2286,6 +2333,53 @@ mod tests_cpu {
                 vec![0; 100],
                 false,
                 "SHL - zero left-shift did not leave the result unchanged",
+            ),
+            // Test the signed flag is set.
+            TestEntryU32Standard::new(
+                &[
+                    // Clear any set flags.
+                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    // Perform the calculation.
+                    Instruction::MovU32ImmU32Reg(
+                        0b0100_0000_0000_0000_0000_0000_0000_0000,
+                        RegisterId::R1,
+                    ),
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    Instruction::LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0b1000_0000_0000_0000_0000_0000_0000_0000),
+                    (RegisterId::R2, 0x1),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::PF]),
+                    ),
+                ],
+                vec![0; 100],
+                false,
+                "SHL - CPU signed flag not correctly set",
+            ),
+            // Test the signed flag is cleared.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the signed flag.
+                    Instruction::MovU32ImmU32Reg(
+                        CpuFlag::compute_for(&[CpuFlag::SF]),
+                        RegisterId::FL,
+                    ),
+                    // Perform the calculation.
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    Instruction::LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0x2),
+                    (RegisterId::R2, 0x1),
+                    (RegisterId::FL, 0x0),
+                ],
+                vec![0; 100],
+                false,
+                "SHL - CPU signed flag not correctly cleared",
             ),
         ];
 
