@@ -231,7 +231,7 @@ impl Memory {
                 let index_reg = block.read_register_id();
                 let out_reg = block.read_register_id();
 
-                Instruction::ZeroHighBitsByIndexU32Reg(in_reg, index_reg, out_reg)
+                Instruction::ZeroHighBitsByIndexU32Reg(index_reg, in_reg, out_reg)
             }
             OpCode::ZeroHighBitsByIndexU32RegU32Imm => {
                 let index = block.read_u32();
