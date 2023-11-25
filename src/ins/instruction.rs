@@ -81,7 +81,7 @@ pub enum Instruction {
     /// Zero the high bits of the source value starting from a specified index.
     ZeroHighBitsByIndexU32Reg(RegisterId, RegisterId, RegisterId),
     /// Zero the high bits of the source value starting from a specified index.
-    ZeroHighBitsByIndexU32RegU32Imm(RegisterId, u32, RegisterId),
+    ZeroHighBitsByIndexU32RegU32Imm(u32, RegisterId, RegisterId),
 
     /******** [Logic Instructions] ********/
     /// Test the state of a bit from a u32 register. The CF flag will be set to the state of the bit.

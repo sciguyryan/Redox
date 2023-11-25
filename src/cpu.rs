@@ -709,12 +709,12 @@ impl Cpu {
 
                 mem.set_u32(addr as usize, value);
             }
-            Instruction::ZeroHighBitsByIndexU32Reg(source_reg, index_reg, out_reg) => {
+            Instruction::ZeroHighBitsByIndexU32Reg(index_reg, source_reg, out_reg) => {
                 // zhbi source_reg, index_reg, out_reg
                 let index = self.read_reg_u32(index_reg, privilege);
                 self.perform_zero_high_bit_u32_reg(source_reg, index, out_reg, privilege);
             }
-            Instruction::ZeroHighBitsByIndexU32RegU32Imm(source_reg, index, out_reg) => {
+            Instruction::ZeroHighBitsByIndexU32RegU32Imm(index, source_reg, out_reg) => {
                 // zhbi source_reg, index, out_reg
                 self.perform_zero_high_bit_u32_reg(source_reg, *index, out_reg, privilege);
             }
@@ -3733,8 +3733,8 @@ mod tests_cpu {
                     ),
                     Instruction::MovU32ImmU32Reg(0x4, RegisterId::R2),
                     Instruction::ZeroHighBitsByIndexU32Reg(
-                        RegisterId::R1,
                         RegisterId::R2,
+                        RegisterId::R1,
                         RegisterId::R3,
                     ),
                 ],
@@ -3756,8 +3756,8 @@ mod tests_cpu {
                     ),
                     Instruction::MovU32ImmU32Reg(0x18, RegisterId::R2),
                     Instruction::ZeroHighBitsByIndexU32Reg(
-                        RegisterId::R1,
                         RegisterId::R2,
+                        RegisterId::R1,
                         RegisterId::R3,
                     ),
                 ],
@@ -3779,8 +3779,8 @@ mod tests_cpu {
                     ),
                     Instruction::MovU32ImmU32Reg(0x19, RegisterId::R2),
                     Instruction::ZeroHighBitsByIndexU32Reg(
-                        RegisterId::R1,
                         RegisterId::R2,
+                        RegisterId::R1,
                         RegisterId::R3,
                     ),
                 ],
@@ -3802,8 +3802,8 @@ mod tests_cpu {
                     ),
                     Instruction::MovU32ImmU32Reg(0x1b, RegisterId::R2),
                     Instruction::ZeroHighBitsByIndexU32Reg(
-                        RegisterId::R1,
                         RegisterId::R2,
+                        RegisterId::R1,
                         RegisterId::R3,
                     ),
                 ],
@@ -3821,8 +3821,8 @@ mod tests_cpu {
                     Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
                     Instruction::MovU32ImmU32Reg(0x0, RegisterId::R2),
                     Instruction::ZeroHighBitsByIndexU32Reg(
-                        RegisterId::R1,
                         RegisterId::R2,
+                        RegisterId::R1,
                         RegisterId::R3,
                     ),
                 ],
@@ -3855,8 +3855,8 @@ mod tests_cpu {
                 &[
                     Instruction::MovU32ImmU32Reg(0x20, RegisterId::R2),
                     Instruction::ZeroHighBitsByIndexU32Reg(
-                        RegisterId::R1,
                         RegisterId::R2,
+                        RegisterId::R1,
                         RegisterId::R3,
                     ),
                 ],
@@ -3881,8 +3881,8 @@ mod tests_cpu {
                         RegisterId::R3,
                     ),
                     Instruction::ZeroHighBitsByIndexU32Reg(
-                        RegisterId::R1,
                         RegisterId::R2,
+                        RegisterId::R1,
                         RegisterId::R3,
                     ),
                 ],
@@ -3918,8 +3918,8 @@ mod tests_cpu {
                         RegisterId::R3,
                     ),
                     Instruction::ZeroHighBitsByIndexU32Reg(
-                        RegisterId::R1,
                         RegisterId::R2,
+                        RegisterId::R1,
                         RegisterId::R3,
                     ),
                 ],
@@ -3951,8 +3951,8 @@ mod tests_cpu {
                         RegisterId::R1,
                     ),
                     Instruction::ZeroHighBitsByIndexU32RegU32Imm(
-                        RegisterId::R1,
                         0x4,
+                        RegisterId::R1,
                         RegisterId::R2,
                     ),
                 ],
@@ -3972,8 +3972,8 @@ mod tests_cpu {
                         RegisterId::R1,
                     ),
                     Instruction::ZeroHighBitsByIndexU32RegU32Imm(
-                        RegisterId::R1,
                         0x18,
+                        RegisterId::R1,
                         RegisterId::R2,
                     ),
                 ],
@@ -3993,8 +3993,8 @@ mod tests_cpu {
                         RegisterId::R1,
                     ),
                     Instruction::ZeroHighBitsByIndexU32RegU32Imm(
-                        RegisterId::R1,
                         0x19,
+                        RegisterId::R1,
                         RegisterId::R2,
                     ),
                 ],
@@ -4014,8 +4014,8 @@ mod tests_cpu {
                         RegisterId::R1,
                     ),
                     Instruction::ZeroHighBitsByIndexU32RegU32Imm(
-                        RegisterId::R1,
                         0x1b,
+                        RegisterId::R1,
                         RegisterId::R2,
                     ),
                 ],
@@ -4031,8 +4031,8 @@ mod tests_cpu {
                 &[
                     Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
                     Instruction::ZeroHighBitsByIndexU32RegU32Imm(
-                        RegisterId::R1,
                         0x0,
+                        RegisterId::R1,
                         RegisterId::R2,
                     ),
                 ],
@@ -4050,8 +4050,8 @@ mod tests_cpu {
                         RegisterId::FL,
                     ),
                     Instruction::ZeroHighBitsByIndexU32RegU32Imm(
-                        RegisterId::R1,
                         0x0,
+                        RegisterId::R1,
                         RegisterId::R2,
                     ),
                 ],
@@ -4062,8 +4062,8 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[Instruction::ZeroHighBitsByIndexU32RegU32Imm(
-                    RegisterId::R1,
                     0x20,
+                    RegisterId::R1,
                     RegisterId::R2,
                 )],
                 &[],

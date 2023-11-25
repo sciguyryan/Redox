@@ -125,10 +125,10 @@ impl Compiler {
                 self.write_register_id(&reg3);
             }
 
-            /******** [u32 register, u32 immediate and u32 register] ********/
-            Instruction::ZeroHighBitsByIndexU32RegU32Imm(reg1, imm, reg2) => {
-                self.write_register_id(&reg1);
+            /******** [u32 immediate, u32 register, and u32 register] ********/
+            Instruction::ZeroHighBitsByIndexU32RegU32Imm(imm, reg1, reg2) => {
                 self.write_u32(imm);
+                self.write_register_id(&reg1);
                 self.write_register_id(&reg2);
             }
 
