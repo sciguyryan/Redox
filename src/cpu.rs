@@ -156,8 +156,11 @@ impl Cpu {
     /// * `flag` - The [`CpuFlag`] to be checked.
     #[inline(always)]
     fn get_flag_state(&self, flag: CpuFlag) -> bool {
-        let register = self.registers.get_register_u32(RegisterId::FL);
-        utils::is_bit_set(*register.read_unchecked(), flag.into())
+        let value = self
+            .registers
+            .get_register_u32(RegisterId::FL)
+            .read_unchecked();
+        utils::is_bit_set(*value, flag.into())
     }
 
     /// Get the current value of the program counter (PC) register.
@@ -218,6 +221,7 @@ impl Cpu {
             None => ((value_1 as u64 + value_2 as u64) as u32, true),
         };
 
+        self.set_flag_state(CpuFlag::SF, utils::is_bit_set(final_value, 31));
         self.set_flag_state(CpuFlag::ZF, final_value == 0);
         self.set_flag_state(CpuFlag::OF, overflow);
         self.set_flag_state(CpuFlag::PF, Cpu::calculate_lowest_byte_parity(final_value));
@@ -1328,7 +1332,7 @@ mod tests_cpu {
             // Test the signed flag is cleared.
             TestEntryU32Standard::new(
                 &[
-                    // Manually set the parity flag.
+                    // Manually set the signed flag.
                     Instruction::MovU32ImmU32Reg(
                         CpuFlag::compute_for(&[CpuFlag::SF]),
                         RegisterId::FL,
@@ -1468,7 +1472,7 @@ mod tests_cpu {
             // Test the signed flag is cleared.
             TestEntryU32Standard::new(
                 &[
-                    // Manually set the parity flag.
+                    // Manually set the signed flag.
                     Instruction::MovU32ImmU32Reg(
                         CpuFlag::compute_for(&[CpuFlag::SF]),
                         RegisterId::FL,
@@ -1572,6 +1576,48 @@ mod tests_cpu {
                 false,
                 "SUB - CPU parity flag not correctly cleared",
             ),
+            // Test the signed flag is set.
+            TestEntryU32Standard::new(
+                &[
+                    // Clear any set flags.
+                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    // Perform the calculation.
+                    Instruction::MovU32ImmU32Reg(
+                        0b1111_1111_1111_1111_1111_1111_1111_1111,
+                        RegisterId::R1,
+                    ),
+                    Instruction::SubU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::AC, 0b1111_1111_1111_1111_1111_1111_1111_1110),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::SF])),
+                ],
+                vec![0; 100],
+                false,
+                "SUB - CPU signed flag not correctly set",
+            ),
+            // Test the signed flag is cleared.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the signed flag.
+                    Instruction::MovU32ImmU32Reg(
+                        CpuFlag::compute_for(&[CpuFlag::SF]),
+                        RegisterId::FL,
+                    ),
+                    // Perform the calculation.
+                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    Instruction::SubU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0x2),
+                    (RegisterId::AC, 0x1),
+                    (RegisterId::FL, 0x0),
+                ],
+                vec![0; 100],
+                false,
+                "SUB - CPU signed flag not correctly cleared",
+            ),
         ];
 
         for (id, test) in tests.iter().enumerate() {
@@ -1655,6 +1701,48 @@ mod tests_cpu {
                 vec![0; 100],
                 false,
                 "SUB - CPU parity flag not correctly cleared",
+            ),
+            // Test the signed flag is set.
+            TestEntryU32Standard::new(
+                &[
+                    // Clear any set flags.
+                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    // Perform the calculation.
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::SubU32RegU32Imm(
+                        RegisterId::R1,
+                        0b1111_1111_1111_1111_1111_1111_1111_1111,
+                    ),
+                ],
+                &[
+                    (RegisterId::R1, 0x1),
+                    (RegisterId::AC, 0b1111_1111_1111_1111_1111_1111_1111_1110),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::SF])),
+                ],
+                vec![0; 100],
+                false,
+                "SUB - CPU signed flag not correctly set",
+            ),
+            // Test the signed flag is cleared.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the signed flag.
+                    Instruction::MovU32ImmU32Reg(
+                        CpuFlag::compute_for(&[CpuFlag::SF]),
+                        RegisterId::FL,
+                    ),
+                    // Perform the calculation.
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::SubU32RegU32Imm(RegisterId::R1, 0x2),
+                ],
+                &[
+                    (RegisterId::R1, 0x1),
+                    (RegisterId::AC, 0x1),
+                    (RegisterId::FL, 0x0),
+                ],
+                vec![0; 100],
+                false,
+                "SUB - CPU signed flag not correctly cleared",
             ),
         ];
 
@@ -1750,6 +1838,52 @@ mod tests_cpu {
                 vec![0; 100],
                 false,
                 "SUB - CPU parity flag not correctly cleared",
+            ),
+            // Test the signed flag is set.
+            TestEntryU32Standard::new(
+                &[
+                    // Clear any set flags.
+                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    // Perform the calculation.
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::MovU32ImmU32Reg(
+                        0b1111_1111_1111_1111_1111_1111_1111_1111,
+                        RegisterId::R2,
+                    ),
+                    Instruction::SubU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                ],
+                &[
+                    (RegisterId::R1, 0x1),
+                    (RegisterId::R2, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::AC, 0b1111_1111_1111_1111_1111_1111_1111_1110),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::SF])),
+                ],
+                vec![0; 100],
+                false,
+                "SUB - CPU signed flag not correctly set",
+            ),
+            // Test the signed flag is cleared.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the signed flag.
+                    Instruction::MovU32ImmU32Reg(
+                        CpuFlag::compute_for(&[CpuFlag::SF]),
+                        RegisterId::FL,
+                    ),
+                    // Perform the calculation.
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R2),
+                    Instruction::SubU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                ],
+                &[
+                    (RegisterId::R1, 0x1),
+                    (RegisterId::R2, 0x2),
+                    (RegisterId::AC, 0x1),
+                    (RegisterId::FL, 0x0),
+                ],
+                vec![0; 100],
+                false,
+                "SUB - CPU signed flag not correctly cleared",
             ),
         ];
 
@@ -1863,7 +1997,7 @@ mod tests_cpu {
             // Test the signed flag is cleared.
             TestEntryU32Standard::new(
                 &[
-                    // Manually set the parity flag.
+                    // Manually set the signed flag.
                     Instruction::MovU32ImmU32Reg(
                         CpuFlag::compute_for(&[CpuFlag::SF]),
                         RegisterId::FL,
