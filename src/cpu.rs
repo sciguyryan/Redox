@@ -3887,16 +3887,14 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R2),
                     // Manually set the overflow flag state.
                     Instruction::MovU32ImmU32Reg(
                         CpuFlag::compute_for(&[CpuFlag::OF]),
                         RegisterId::FL,
                     ),
                     Instruction::ZeroHighBitsByIndexU32Reg(
-                        RegisterId::R1,
-                        RegisterId::R2,
+                        RegisterId::R1, // Already has the value of 0.
+                        RegisterId::R2, // Already has the value of 0.
                         RegisterId::R3,
                     ),
                 ],
@@ -3910,7 +3908,7 @@ mod tests_cpu {
                     Instruction::MovU32ImmU32Reg(0x20, RegisterId::R2),
                     Instruction::ZeroHighBitsByIndexU32Reg(
                         RegisterId::R2,
-                        RegisterId::R1,
+                        RegisterId::R1, // Already has the value of 0.
                         RegisterId::R3,
                     ),
                 ],
@@ -3928,20 +3926,18 @@ mod tests_cpu {
                         0b1111_1111_1111_1111_1111_1111_1111_1111,
                         RegisterId::R1,
                     ),
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R2),
                     Instruction::MovU32ImmU32Reg(
                         0b1111_1111_1111_1111_1111_1111_1111_1111,
                         RegisterId::R3,
                     ),
                     Instruction::ZeroHighBitsByIndexU32Reg(
-                        RegisterId::R2,
+                        RegisterId::R2, // Already has the value of 0.
                         RegisterId::R1,
                         RegisterId::R3,
                     ),
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::R2, 0x0),
                     (RegisterId::R3, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (
                         RegisterId::FL,
@@ -3964,20 +3960,18 @@ mod tests_cpu {
                         0b0111_1111_1111_1111_1111_1111_1111_1111,
                         RegisterId::R1,
                     ),
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R2),
                     Instruction::MovU32ImmU32Reg(
                         0b0111_1111_1111_1111_1111_1111_1111_1111,
                         RegisterId::R3,
                     ),
                     Instruction::ZeroHighBitsByIndexU32Reg(
-                        RegisterId::R2,
+                        RegisterId::R2, // Already has the value of 0.
                         RegisterId::R1,
                         RegisterId::R3,
                     ),
                 ],
                 &[
                     (RegisterId::R1, 0b0111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::R2, 0x0),
                     (RegisterId::R3, 0b0111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::CF])),
                 ],
@@ -4081,10 +4075,9 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
                     Instruction::ZeroHighBitsByIndexU32RegU32Imm(
                         0x0,
-                        RegisterId::R1,
+                        RegisterId::R1, // Already has the value of 0.
                         RegisterId::R2,
                     ),
                 ],
@@ -4095,7 +4088,6 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
                     // Manually set the overflow flag state.
                     Instruction::MovU32ImmU32Reg(
                         CpuFlag::compute_for(&[CpuFlag::OF]),
@@ -4104,7 +4096,7 @@ mod tests_cpu {
                     Instruction::ZeroHighBitsByIndexU32RegU32Imm(
                         0x0,
                         RegisterId::R1,
-                        RegisterId::R2,
+                        RegisterId::R2, // Already has the value of 0.
                     ),
                 ],
                 &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF]))],
