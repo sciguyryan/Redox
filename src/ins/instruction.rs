@@ -3,6 +3,9 @@ use std::{
     mem,
 };
 
+#[cfg(test)]
+use strum_macros::EnumIter;
+
 use crate::{ins::move_expressions::MoveExpressionHandler, reg::registers::RegisterId};
 
 use super::op_codes::OpCode;
@@ -19,6 +22,7 @@ const ARG_MEM_ADDR_SIZE: u32 = mem::size_of::<u32>() as u32;
 const ARG_REG_ID_SIZE: u32 = mem::size_of::<RegisterId>() as u32;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[cfg_attr(test, derive(EnumIter))]
 pub enum Instruction {
     /// No operation.
     Nop,

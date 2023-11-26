@@ -1,11 +1,13 @@
-use super::instruction::Instruction;
-
 use num_derive::FromPrimitive;
+#[cfg(test)]
 use strum_macros::EnumIter;
+
+use super::instruction::Instruction;
 
 #[repr(u32)]
 /// The opcode for an instruction.
-#[derive(Clone, Copy, Debug, FromPrimitive, EnumIter)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, FromPrimitive)]
+#[cfg_attr(test, derive(EnumIter))]
 pub enum OpCode {
     /// No Operation - an empty instruction.
     Nop,
@@ -177,5 +179,56 @@ impl From<Instruction> for OpCode {
             Instruction::Mret => OpCode::Mret,
             Instruction::Hlt => OpCode::Hlt,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests_opcodes {
+    use strum::IntoEnumIterator;
+
+    use crate::ins::instruction::Instruction;
+
+    use super::OpCode;
+
+    /// Test to ensure every [`OpCode`] is mapped to an [`Instruction`] and vice versa. Also checks to ensure they have equal sizes.
+    #[test]
+    fn test_mapped_opcodes() {
+        let opcodes: Vec<OpCode> = OpCode::iter().collect();
+        let instructions: Vec<Instruction> = Instruction::iter().collect();
+
+        // Ensure that the collections are the same length.
+        assert_eq!(opcodes.len(), instructions.len());
+
+        let mut success = true;
+
+        // Ensure that each instruction produces the same opcode back.
+        for (op, ins) in opcodes.iter().zip(instructions.iter()) {
+            // Get the opcode from the instruction.
+            let op_from_ins: OpCode = (*ins).into();
+            if op_from_ins != *op {
+                eprintln!("instruction {ins} has an opcode mismatch - expected {op_from_ins:?} but got {:?}", *op);
+                success = false;
+            }
+        }
+
+        assert!(
+            success,
+            "one or more opcodes failed to match with an instruction"
+        );
+
+        // Now we want to check that the argument sizes of each are matching.
+        for (op, ins) in opcodes.iter().zip(instructions.iter()) {
+            let size_op = ins.get_instruction_arg_size();
+            let size_ins = Instruction::get_instruction_arg_size_from_op(*op);
+            if size_op != size_ins {
+                eprintln!("instruction {ins} has an argument size mismatch - expected {size_op} but got {size_ins}");
+                success = false;
+            }
+        }
+
+        assert!(
+            success,
+            "one or more opcodes failed to produce matching sizes"
+        );
     }
 }

@@ -5,7 +5,7 @@ use std::{collections::BTreeMap, fmt::Display};
 
 use super::register::{RegisterF32, RegisterPermission, RegisterU32};
 
-#[derive(Clone, Copy, Debug, Eq, FromPrimitive, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Default, Eq, FromPrimitive, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(u8)]
 pub enum RegisterId {
     // Layout
@@ -27,6 +27,7 @@ pub enum RegisterId {
 
     // [ User Registers ] //
     /// Data register 1.
+    #[default]
     R1,
     /// Data register 1, two highest order bytes.
     //R1X,
