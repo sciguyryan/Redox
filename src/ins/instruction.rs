@@ -18,7 +18,7 @@ const ARG_MEM_ADDR_SIZE: u32 = mem::size_of::<u32>() as u32;
 /// The size of a register ID argument, in bytes.
 const ARG_REG_ID_SIZE: u32 = mem::size_of::<RegisterId>() as u32;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Instruction {
     /// No operation.
     Nop,
@@ -330,7 +330,7 @@ impl Instruction {
             Instruction::BitTestU32Mem(_, _) => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
             Instruction::BitTestResetU32Reg(_, _) => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
             Instruction::BitTestResetU32Mem(_, _) => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
-            Instruction::BitTestSetU32Reg(_, _) => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
+            Instruction::BitTestSetU32Reg(_, _) => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
             Instruction::BitTestSetU32Mem(_, _) => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
             Instruction::BitScanReverseU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
             Instruction::BitScanReverseU32MemU32Reg(_, _) => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,

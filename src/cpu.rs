@@ -4074,13 +4074,11 @@ mod tests_cpu {
                 "ZHBI - incorrect result value produced",
             ),
             TestEntryU32Standard::new(
-                &[
-                    Instruction::ZeroHighBitsByIndexU32RegU32Imm(
-                        0x0,
-                        RegisterId::R1, // Already has the value of 0.
-                        RegisterId::R2,
-                    ),
-                ],
+                &[Instruction::ZeroHighBitsByIndexU32RegU32Imm(
+                    0x0,
+                    RegisterId::R1, // Already has the value of 0.
+                    RegisterId::R2,
+                )],
                 &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF]))],
                 vec![0; 100],
                 false,

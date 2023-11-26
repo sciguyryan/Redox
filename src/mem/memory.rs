@@ -426,6 +426,15 @@ impl Memory {
     }
 }
 
+impl From<&[u8]> for Memory {
+    fn from(values: &[u8]) -> Self {
+        let mut mem = Memory::new(values.len());
+        mem.storage = values.to_vec();
+
+        mem
+    }
+}
+
 #[cfg(test)]
 mod tests_memory {
     use super::Memory;

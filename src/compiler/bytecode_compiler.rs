@@ -175,3 +175,134 @@ impl Compiler {
         self.bytes.push(value);
     }
 }
+
+#[cfg(test)]
+mod tests_compiler {
+    use crate::{
+        compiler::bytecode_decompiler::Decompiler,
+        ins::{instruction::Instruction, op_codes::OpCode},
+        reg::registers::RegisterId,
+    };
+
+    use super::Compiler;
+
+    use strum::IntoEnumIterator;
+
+    /// Test a round trip instruction compile and decompile.
+    #[test]
+    fn test_compile_roundtrip() {
+        use RegisterId::*;
+
+        let mut instructions_in = Vec::new();
+
+        // This might seem a little long-winded, but it's done this way to ensure
+        // that each time a new instruction is added that a corresponding entry
+        // is added here.
+        for opcode in OpCode::iter() {
+            let ins = match opcode {
+                OpCode::Nop => Instruction::Nop,
+                OpCode::AddU32ImmU32Reg => Instruction::AddU32ImmU32Reg(0x123, R2),
+                OpCode::AddU32RegU32Reg => Instruction::AddU32RegU32Reg(R2, R3),
+                OpCode::SubU32ImmU32Reg => Instruction::SubU32ImmU32Reg(0x123, R2),
+                OpCode::SubU32RegU32Imm => Instruction::SubU32RegU32Imm(R2, 0x123),
+                OpCode::SubU32RegU32Reg => Instruction::SubU32RegU32Reg(R2, R3),
+                OpCode::IncU32Reg => Instruction::IncU32Reg(R2),
+                OpCode::DecU32Reg => Instruction::DecU32Reg(R2),
+                OpCode::LeftShiftU32ImmU32Reg => Instruction::LeftShiftU32ImmU32Reg(31, R2),
+                OpCode::LeftShiftU32RegU32Reg => Instruction::LeftShiftU32RegU32Reg(R2, R3),
+                OpCode::ArithLeftShiftU32ImmU32Reg => {
+                    Instruction::ArithLeftShiftU32ImmU32Reg(31, R2)
+                }
+                OpCode::ArithLeftShiftU32RegU32Reg => {
+                    Instruction::ArithLeftShiftU32RegU32Reg(R2, R3)
+                }
+                OpCode::RightShiftU32ImmU32Reg => Instruction::RightShiftU32ImmU32Reg(31, R2),
+                OpCode::RightShiftU32RegU32Reg => Instruction::RightShiftU32RegU32Reg(R2, R3),
+                OpCode::ArithRightShiftU32ImmU32Reg => {
+                    Instruction::ArithRightShiftU32ImmU32Reg(31, R2)
+                }
+                OpCode::ArithRightShiftU32RegU32Reg => {
+                    Instruction::ArithRightShiftU32RegU32Reg(R2, R3)
+                }
+                OpCode::SwapU32RegU32Reg => Instruction::SwapU32RegU32Reg(R2, R3),
+                OpCode::MovU32ImmU32Reg => Instruction::MovU32ImmU32Reg(0x123, R2),
+                OpCode::MovU32RegU32Reg => Instruction::MovU32RegU32Reg(R2, R3),
+                OpCode::MovU32ImmMemRelSimple => Instruction::MovU32ImmMemRelSimple(0x123, 0x321),
+                OpCode::MovU32RegMemRelSimple => Instruction::MovU32RegMemRelSimple(R2, 0x123),
+                OpCode::MovMemU32RegRelSimple => Instruction::MovMemU32RegRelSimple(0x123, R2),
+                OpCode::MovU32RegPtrU32RegRelSimple => {
+                    Instruction::MovU32RegPtrU32RegRelSimple(R2, R3)
+                }
+                OpCode::MovU32ImmMemExprRel => Instruction::MovU32ImmMemExprRel(0x123, 0x321),
+                OpCode::MovMemExprU32RegRel => Instruction::MovMemExprU32RegRel(0x123, R2),
+                OpCode::MovU32RegMemExprRel => Instruction::MovU32RegMemExprRel(R2, 0x123),
+                OpCode::ByteSwapU32 => Instruction::ByteSwapU32(R2),
+                OpCode::ZeroHighBitsByIndexU32Reg => {
+                    Instruction::ZeroHighBitsByIndexU32Reg(R2, R3, R4)
+                }
+                OpCode::ZeroHighBitsByIndexU32RegU32Imm => {
+                    Instruction::ZeroHighBitsByIndexU32RegU32Imm(0x123, R2, R3)
+                }
+                OpCode::BitTestU32Reg => Instruction::BitTestU32Reg(0x40, R2),
+                OpCode::BitTestU32Mem => Instruction::BitTestU32Mem(0x40, 0x123),
+                OpCode::BitTestResetU32Reg => Instruction::BitTestResetU32Reg(0x40, R2),
+                OpCode::BitTestResetU32Mem => Instruction::BitTestResetU32Mem(0x40, 0x123),
+                OpCode::BitTestSetU32Reg => Instruction::BitTestSetU32Reg(0x40, R2),
+                OpCode::BitTestSetU32Mem => Instruction::BitTestSetU32Mem(0x40, 0x123),
+                OpCode::BitScanReverseU32RegU32Reg => {
+                    Instruction::BitScanReverseU32RegU32Reg(R2, R3)
+                }
+                OpCode::BitScanReverseU32MemU32Reg => {
+                    Instruction::BitScanReverseU32MemU32Reg(0x123, R2)
+                }
+                OpCode::BitScanReverseU32RegMemU32 => {
+                    Instruction::BitScanReverseU32RegMemU32(R2, 0x123)
+                }
+                OpCode::BitScanReverseU32MemU32Mem => {
+                    Instruction::BitScanReverseU32MemU32Mem(0x123, 0x321)
+                }
+                OpCode::BitScanForwardU32RegU32Reg => {
+                    Instruction::BitScanForwardU32RegU32Reg(R2, R3)
+                }
+                OpCode::BitScanForwardU32MemU32Reg => {
+                    Instruction::BitScanForwardU32MemU32Reg(0x123, R2)
+                }
+                OpCode::BitScanForwardU32RegMemU32 => {
+                    Instruction::BitScanForwardU32RegMemU32(R2, 0x123)
+                }
+                OpCode::BitScanForwardU32MemU32Mem => {
+                    Instruction::BitScanForwardU32MemU32Mem(0x123, 0x321)
+                }
+                OpCode::Ret => Instruction::Ret,
+                OpCode::Mret => Instruction::Mret,
+                OpCode::Hlt => Instruction::Hlt,
+            };
+
+            instructions_in.push(ins);
+        }
+
+        // Now we can compile the instructions into bytecode.
+        let mut compiler = Compiler::new();
+        compiler.compile(&instructions_in);
+
+        // Finally we can decompile the code.
+        // We should end up with the original instructions.
+        let decompiled_instructions = Decompiler::decompile(&compiler.bytes);
+
+        let mut success = true;
+        for (i, (original, decompiled)) in decompiled_instructions
+            .iter()
+            .zip(&instructions_in)
+            .enumerate()
+        {
+            if original != decompiled {
+                eprintln!("instruction {i} did not correctly round-trip. Expected = {original}, Actual = {decompiled}");
+                success = false;
+            }
+        }
+        assert!(
+            success,
+            "failed to successfully compile and decompile one or more instructions"
+        );
+    }
+}
