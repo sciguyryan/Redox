@@ -4,8 +4,8 @@ use strum_macros::EnumIter;
 
 use super::instruction::Instruction;
 
-#[repr(u32)]
 /// The opcode for an instruction.
+#[repr(u32)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, FromPrimitive)]
 #[cfg_attr(test, derive(EnumIter))]
 pub enum OpCode {
@@ -214,21 +214,6 @@ mod tests_opcodes {
         assert!(
             success,
             "one or more opcodes failed to match with an instruction"
-        );
-
-        // Now we want to check that the argument sizes of each are matching.
-        for (op, ins) in opcodes.iter().zip(instructions.iter()) {
-            let size_op = ins.get_instruction_arg_size();
-            let size_ins = Instruction::get_instruction_arg_size_from_op(*op);
-            if size_op != size_ins {
-                eprintln!("instruction {ins} has an argument size mismatch - expected {size_op} but got {size_ins}");
-                success = false;
-            }
-        }
-
-        assert!(
-            success,
-            "one or more opcodes failed to produce matching sizes"
         );
     }
 }

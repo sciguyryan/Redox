@@ -288,68 +288,7 @@ impl Display for Instruction {
 
 impl Instruction {
     pub fn get_instruction_arg_size(&self) -> u32 {
-        match *self {
-            Instruction::Nop => 0,
-
-            /******** [Arithmetic Instructions] ********/
-            Instruction::AddU32ImmU32Reg(_, _) => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
-            Instruction::AddU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-            Instruction::SubU32ImmU32Reg(_, _) => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
-            Instruction::SubU32RegU32Imm(_, _) => ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE,
-            Instruction::SubU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-            Instruction::IncU32Reg(_) => ARG_REG_ID_SIZE,
-            Instruction::DecU32Reg(_) => ARG_REG_ID_SIZE,
-
-            /******** [Bit Operation Instructions] ********/
-            Instruction::LeftShiftU32ImmU32Reg(_, _) => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
-            Instruction::LeftShiftU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-            Instruction::ArithLeftShiftU32ImmU32Reg(_, _) => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
-            Instruction::ArithLeftShiftU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-            Instruction::RightShiftU32ImmU32Reg(_, _) => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
-            Instruction::RightShiftU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-            Instruction::ArithRightShiftU32ImmU32Reg(_, _) => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
-            Instruction::ArithRightShiftU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-
-            /******** [Data Instructions] ********/
-            Instruction::SwapU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-            Instruction::MovU32ImmU32Reg(_, _) => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
-            Instruction::MovU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-            Instruction::MovU32ImmMemRelSimple(_, _) => ARG_U32_IMM_SIZE + ARG_MEM_ADDR_SIZE,
-            Instruction::MovU32RegMemRelSimple(_, _) => ARG_REG_ID_SIZE + ARG_MEM_ADDR_SIZE,
-            Instruction::MovMemU32RegRelSimple(_, _) => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
-            Instruction::MovU32RegPtrU32RegRelSimple(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-            Instruction::MovU32ImmMemExprRel(_, _) => ARG_U32_IMM_SIZE + ARG_MEM_ADDR_SIZE,
-            Instruction::MovMemExprU32RegRel(_, _) => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
-            Instruction::MovU32RegMemExprRel(_, _) => ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE,
-            Instruction::ByteSwapU32(_) => ARG_REG_ID_SIZE,
-            Instruction::ZeroHighBitsByIndexU32Reg(_, _, _) => {
-                ARG_REG_ID_SIZE + ARG_REG_ID_SIZE + ARG_REG_ID_SIZE
-            }
-            Instruction::ZeroHighBitsByIndexU32RegU32Imm(_, _, _) => {
-                ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE + ARG_REG_ID_SIZE
-            }
-
-            /******** [Logic Instructions] ********/
-            Instruction::BitTestU32Reg(_, _) => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
-            Instruction::BitTestU32Mem(_, _) => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
-            Instruction::BitTestResetU32Reg(_, _) => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
-            Instruction::BitTestResetU32Mem(_, _) => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
-            Instruction::BitTestSetU32Reg(_, _) => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
-            Instruction::BitTestSetU32Mem(_, _) => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
-            Instruction::BitScanReverseU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-            Instruction::BitScanReverseU32MemU32Reg(_, _) => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
-            Instruction::BitScanReverseU32RegMemU32(_, _) => ARG_REG_ID_SIZE + ARG_MEM_ADDR_SIZE,
-            Instruction::BitScanReverseU32MemU32Mem(_, _) => ARG_MEM_ADDR_SIZE + ARG_MEM_ADDR_SIZE,
-            Instruction::BitScanForwardU32RegU32Reg(_, _) => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-            Instruction::BitScanForwardU32MemU32Reg(_, _) => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
-            Instruction::BitScanForwardU32RegMemU32(_, _) => ARG_REG_ID_SIZE + ARG_MEM_ADDR_SIZE,
-            Instruction::BitScanForwardU32MemU32Mem(_, _) => ARG_MEM_ADDR_SIZE + ARG_MEM_ADDR_SIZE,
-
-            /******** [Special Instructions] ********/
-            Instruction::Ret => 0,
-            Instruction::Mret => 0,
-            Instruction::Hlt => 0,
-        }
+        Instruction::get_instruction_arg_size_from_op((*self).into())
     }
 
     pub fn get_instruction_arg_size_from_op(opcode: OpCode) -> u32 {
