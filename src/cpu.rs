@@ -184,7 +184,7 @@ impl Cpu {
     ///
     /// # Note
     ///
-    /// This method affects the following flags: Sign (SF), Overflow (OF), Zero (ZF) and Parity (PF).
+    /// This method affects the following flags: Sign (SF), Overflow (OF), Zero (ZF) and Parity (PF). Any other flags are undefined.
     #[inline(always)]
     fn perform_checked_add_u32(&mut self, value_1: u32, value_2: u32) -> u32 {
         let (final_value, overflow) = match value_1.checked_add(value_2) {
@@ -210,7 +210,7 @@ impl Cpu {
     ///
     /// # Note
     ///
-    /// This method affects the following flags: Sign (SF), Overflow (OF), Zero (ZF) and Parity (PF).
+    /// This method affects the following flags: Sign (SF), Overflow (OF), Zero (ZF) and Parity (PF). Any other flags are undefined.
     #[inline(always)]
     fn perform_checked_subtract_u32(&mut self, value_1: u32, value_2: u32) -> u32 {
         let (final_value, overflow) = match value_1.checked_sub(value_2) {
@@ -236,15 +236,16 @@ impl Cpu {
     ///
     /// # Note
     ///
-    /// This method affects the following flags: Sign (SF), Overflow (OF), Zero (ZF) and Parity (PF).
+    /// This method affects the following flags: Overflow (OF) and Carry (CF). Any other flags are undefined.
     #[inline(always)]
     fn perform_checked_mul_u32(&mut self, value_1: u32, value_2: u32) -> u32 {
-        let (final_value, overflow) = match value_1.checked_mul(value_2) {
-            Some(val) => (val, false),
-            None => (value_1.wrapping_mul(value_2), true),
-        };
+        let final_value = value_1.wrapping_mul(value_2);
 
-        self.set_standard_flags_by_value(final_value, overflow);
+        // The overflow and carry flags will be true if the upper bits 16
+        // bits of the value are not zero.
+        let state = (final_value >> 16) != 0;
+        self.set_flag_state(CpuFlag::OF, state);
+        self.set_flag_state(CpuFlag::CF, state);
 
         final_value
     }
@@ -262,17 +263,10 @@ impl Cpu {
     ///
     /// # Note
     ///
-    /// This method affects the following flags: Sign (SF), Overflow (OF), Zero (ZF) and Parity (PF).
+    /// This method affects the following flags: none. Any other flags are undefined.
     #[inline(always)]
     fn perform_checked_div_u32(&mut self, value_1: u32, value_2: u32) -> u32 {
-        let (final_value, overflow) = match value_1.checked_div(value_2) {
-            Some(val) => (val, false),
-            None => (value_1.wrapping_div(value_2), true),
-        };
-
-        self.set_standard_flags_by_value(final_value, overflow);
-
-        final_value
+        value_1.wrapping_div(value_2)
     }
 
     /// Perform a checked left-shift of two u32 values.
@@ -329,7 +323,7 @@ impl Cpu {
     ///
     /// This method affects the following flags: Sign (SF), Zero (ZF) and Parity (PF).
     ///
-    /// The Overflow (OF) and Carry (CF) flags will always be cleared.
+    /// The Overflow (OF) and Carry (CF) flags will always be cleared. Any other flags are undefined.
     #[inline(always)]
     fn perform_arithmetic_left_shift_u32(&mut self, value: u32, shift_by: u32) -> u32 {
         let final_value = value.rotate_left(shift_by);
@@ -357,7 +351,7 @@ impl Cpu {
     ///
     /// This method affects the following flags: Sign (SF), Zero (ZF), Carry (CF) and Parity (PF).
     ///
-    /// The Overflow (OF) flag will always be cleared.
+    /// The Overflow (OF) flag will always be cleared. Any other flags are undefined.
     #[inline(always)]
     fn perform_right_shift_u32(&mut self, value: u32, shift_by: u32) -> u32 {
         if shift_by == 0 {
@@ -394,7 +388,7 @@ impl Cpu {
     ///
     /// This method affects the following flags: Sign (SF), Zero (ZF) and Parity (PF).
     ///
-    /// The Overflow (OF) and Carry (CF) flags will always be cleared.
+    /// The Overflow (OF) and Carry (CF) flags will always be cleared. Any other flags are undefined.
     #[inline(always)]
     fn perform_arithmetic_right_shift_u32(&mut self, value: u32, shift_by: u32) -> u32 {
         let final_value = value.rotate_right(shift_by);
@@ -1955,93 +1949,12 @@ mod tests_cpu {
                     (RegisterId::AC, 4294967294),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::OF]),
+                        CpuFlag::compute_for(&[CpuFlag::OF, CpuFlag::CF]),
                     ),
                 ],
                 vec![0; 100],
                 false,
                 "MUL - CPU flags not correctly set",
-            ),
-            TestEntryU32Standard::new(
-                &[MulU32ImmU32Reg(0, RegisterId::R1)],
-                &[(
-                    RegisterId::FL,
-                    CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
-                )],
-                vec![0; 100],
-                false,
-                "MUL - CPU flags not correctly set",
-            ),
-            // Test the parity flag gets set.
-            TestEntryU32Standard::new(
-                &[
-                    // Clear any set flags.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    MovU32ImmU32Reg(0x3, RegisterId::R1),
-                    MulU32ImmU32Reg(0x1, RegisterId::R1),
-                ],
-                &[
-                    (RegisterId::R1, 0x3),
-                    (RegisterId::AC, 0x3),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::PF])),
-                ],
-                vec![0; 100],
-                false,
-                "MUL - CPU parity flag not correctly set",
-            ),
-            // Test the parity flag gets cleared.
-            TestEntryU32Standard::new(
-                &[
-                    // Manually set the parity flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::PF]), RegisterId::FL),
-                    MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    MulU32ImmU32Reg(0x1, RegisterId::R1),
-                ],
-                &[
-                    (RegisterId::R1, 0x1),
-                    (RegisterId::AC, 0x1),
-                    (RegisterId::FL, 0x0),
-                ],
-                vec![0; 100],
-                false,
-                "MUL - CPU parity flag not correctly cleared",
-            ),
-            // Test the signed flag gets set.
-            TestEntryU32Standard::new(
-                &[
-                    // Clear every flag.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    MovU32ImmU32Reg(1073741824, RegisterId::R1),
-                    MulU32ImmU32Reg(0x2, RegisterId::R1),
-                ],
-                &[
-                    (RegisterId::R1, 1073741824),
-                    (RegisterId::AC, 2147483648),
-                    (
-                        RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::PF]),
-                    ),
-                ],
-                vec![0; 100],
-                false,
-                "MUL - CPU signed flag not correctly set",
-            ),
-            // Test the signed flag gets cleared.
-            TestEntryU32Standard::new(
-                &[
-                    // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
-                    MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    MulU32ImmU32Reg(0x1, RegisterId::R1),
-                ],
-                &[
-                    (RegisterId::R1, 0x1),
-                    (RegisterId::AC, 0x1),
-                    (RegisterId::FL, 0x0),
-                ],
-                vec![0; 100],
-                false,
-                "MUL - CPU signed flag not correctly cleared",
             ),
         ];
 
@@ -2081,99 +1994,12 @@ mod tests_cpu {
                     (RegisterId::AC, 4294967294),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::OF]),
+                        CpuFlag::compute_for(&[CpuFlag::OF, CpuFlag::CF]),
                     ),
                 ],
                 vec![0; 100],
                 false,
                 "MUL - CPU flags not correctly set",
-            ),
-            TestEntryU32Standard::new(
-                &[MulU32RegU32Reg(RegisterId::R1, RegisterId::R2)],
-                &[(
-                    RegisterId::FL,
-                    CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
-                )],
-                vec![0; 100],
-                false,
-                "MUL - CPU flags not correctly set",
-            ),
-            // Test the parity flag gets set.
-            TestEntryU32Standard::new(
-                &[
-                    // Clear any set flags.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    MovU32ImmU32Reg(0x3, RegisterId::R1),
-                    MovU32ImmU32Reg(0x1, RegisterId::R2),
-                    MulU32RegU32Reg(RegisterId::R1, RegisterId::R2),
-                ],
-                &[
-                    (RegisterId::R1, 0x3),
-                    (RegisterId::R2, 0x1),
-                    (RegisterId::AC, 0x3),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::PF])),
-                ],
-                vec![0; 100],
-                false,
-                "MUL - CPU parity flag not correctly set",
-            ),
-            // Test the parity flag gets cleared.
-            TestEntryU32Standard::new(
-                &[
-                    // Manually set the parity flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::PF]), RegisterId::FL),
-                    MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    MulU32ImmU32Reg(0x1, RegisterId::R1),
-                ],
-                &[
-                    (RegisterId::R1, 0x1),
-                    (RegisterId::AC, 0x1),
-                    (RegisterId::FL, 0x0),
-                ],
-                vec![0; 100],
-                false,
-                "MUL - CPU parity flag not correctly cleared",
-            ),
-            // Test the signed flag gets set.
-            TestEntryU32Standard::new(
-                &[
-                    // Clear every flag.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    MovU32ImmU32Reg(1073741824, RegisterId::R1),
-                    MovU32ImmU32Reg(0x2, RegisterId::R2),
-                    MulU32RegU32Reg(RegisterId::R1, RegisterId::R2),
-                ],
-                &[
-                    (RegisterId::R1, 1073741824),
-                    (RegisterId::R2, 0x2),
-                    (RegisterId::AC, 2147483648),
-                    (
-                        RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::PF]),
-                    ),
-                ],
-                vec![0; 100],
-                false,
-                "MUL - CPU signed flag not correctly set",
-            ),
-            // Test the signed flag gets cleared.
-            TestEntryU32Standard::new(
-                &[
-                    // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
-                    MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    MovU32ImmU32Reg(0x1, RegisterId::R2),
-                    MulU32RegU32Reg(RegisterId::R1, RegisterId::R2),
-                ],
-                &[
-                    (RegisterId::R1, 0x1),
-                    (RegisterId::R2, 0x1),
-                    (RegisterId::AC, 0x1),
-                    (RegisterId::FL, 0x0),
-                ],
-                vec![0; 100],
-                false,
-                "MUL - CPU signed flag not correctly cleared",
             ),
         ];
 
@@ -2201,58 +2027,17 @@ mod tests_cpu {
                     MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
                     DivU32ImmU32Reg(0x2, RegisterId::R1),
                 ],
-                &[
-                    (RegisterId::R1, u32::MAX),
-                    (RegisterId::AC, 2147483647),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::PF])),
-                ],
+                &[(RegisterId::R1, u32::MAX), (RegisterId::AC, 2147483647)],
                 vec![0; 100],
                 false,
                 "DIV - CPU flags not correctly set",
             ),
             TestEntryU32Standard::new(
-                &[DivU32ImmU32Reg(0x1, RegisterId::R1)],
-                &[(
-                    RegisterId::FL,
-                    CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
-                )],
+                &[DivU32ImmU32Reg(0x0, RegisterId::R1)],
+                &[],
                 vec![0; 100],
-                false,
-                "DIV - CPU flags not correctly set",
-            ),
-            // Test the parity flag gets set.
-            TestEntryU32Standard::new(
-                &[
-                    // Clear any set flags.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    MovU32ImmU32Reg(0x3, RegisterId::R1),
-                    DivU32ImmU32Reg(0x1, RegisterId::R1),
-                ],
-                &[
-                    (RegisterId::R1, 0x3),
-                    (RegisterId::AC, 0x3),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::PF])),
-                ],
-                vec![0; 100],
-                false,
-                "DIV - CPU parity flag not correctly set",
-            ),
-            // Test the parity flag gets cleared.
-            TestEntryU32Standard::new(
-                &[
-                    // Manually set the parity flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::PF]), RegisterId::FL),
-                    MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    DivU32ImmU32Reg(0x1, RegisterId::R1),
-                ],
-                &[
-                    (RegisterId::R1, 0x1),
-                    (RegisterId::AC, 0x1),
-                    (RegisterId::FL, 0x0),
-                ],
-                vec![0; 100],
-                false,
-                "DIV - CPU parity flag not correctly cleared",
+                true,
+                "DIV - failed to panic when attempting to divide by zero",
             ),
         ];
 
