@@ -266,6 +266,8 @@ impl Cpu {
     /// This method affects the following flags: none. Any other flags are undefined.
     #[inline(always)]
     fn perform_checked_div_u32(&mut self, value_1: u32, value_2: u32) -> u32 {
+        // TODO - when implementing exceptions and interrupts, ensure one is triggered with division by zero.
+
         value_1.wrapping_div(value_2)
     }
 

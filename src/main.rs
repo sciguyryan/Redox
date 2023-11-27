@@ -24,6 +24,7 @@ use crate::{
 
 // https://onlinedocs.microchip.com/pr/GUID-0E320577-28E6-4365-9BB8-9E1416A0A6E4-en-US-6/index.html?GUID-4983CB0C-7FEB-40F1-99D3-0608805404F3
 // https://www.youtube.com/watch?v=KkenLT8S9Hs&list=WL&index=17
+// https://stackoverflow.com/questions/71621573/how-does-the-processor-know-where-to-go-when-an-exception-is-thrown
 
 /*fn run_test_2() {
     use std::time::Instant;
