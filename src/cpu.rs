@@ -189,13 +189,10 @@ impl Cpu {
     fn perform_checked_add_u32(&mut self, value_1: u32, value_2: u32) -> u32 {
         let (final_value, overflow) = match value_1.checked_add(value_2) {
             Some(val) => (val, false),
-            None => ((value_1 as u64 + value_2 as u64) as u32, true),
+            None => (value_1.wrapping_add(value_2), true),
         };
 
-        self.set_flag_state(CpuFlag::SF, utils::is_bit_set(final_value, 31));
-        self.set_flag_state(CpuFlag::ZF, final_value == 0);
-        self.set_flag_state(CpuFlag::OF, overflow);
-        self.set_flag_state(CpuFlag::PF, Cpu::calculate_lowest_byte_parity(final_value));
+        self.set_standard_flags_by_value(final_value, overflow);
 
         final_value
     }
@@ -221,10 +218,33 @@ impl Cpu {
             None => (value_1.wrapping_sub(value_2), true),
         };
 
-        self.set_flag_state(CpuFlag::SF, utils::is_bit_set(final_value, 31));
-        self.set_flag_state(CpuFlag::ZF, final_value == 0);
-        self.set_flag_state(CpuFlag::OF, overflow);
-        self.set_flag_state(CpuFlag::PF, Cpu::calculate_lowest_byte_parity(final_value));
+        self.set_standard_flags_by_value(final_value, overflow);
+
+        final_value
+    }
+
+    /// Perform a checked multiply of two u32 values.
+    ///
+    /// # Arguments
+    ///
+    /// * `value_1` - The first u32 value.
+    /// * `value_2` - The second u32 value.
+    ///
+    /// # Returns
+    ///
+    /// The result of the operation, truncated in the case of an overflow.
+    ///
+    /// # Note
+    ///
+    /// This method affects the following flags: Sign (SF), Overflow (OF), Zero (ZF) and Parity (PF).
+    #[inline(always)]
+    fn perform_checked_mul_u32(&mut self, value_1: u32, value_2: u32) -> u32 {
+        let (final_value, overflow) = match value_1.checked_mul(value_2) {
+            Some(val) => (val, false),
+            None => (value_1.wrapping_mul(value_2), true),
+        };
+
+        self.set_standard_flags_by_value(final_value, overflow);
 
         final_value
     }
@@ -591,10 +611,10 @@ impl Cpu {
                 self.update_u32_accumulator(new_value);
             }
             Instruction::MulU32ImmU32Reg(imm, reg) => {
-                /*let old_value = self.read_reg_u32(reg, privilege);
-                let new_value = self.perform_checked_multiply_u32(old_value, *imm);
+                let old_value = self.read_reg_u32(reg, privilege);
+                let new_value = self.perform_checked_mul_u32(old_value, *imm);
 
-                self.update_u32_accumulator(new_value);*/
+                self.update_u32_accumulator(new_value);
             }
             Instruction::IncU32Reg(reg) => {
                 let value = self.read_reg_u32(reg, privilege);
@@ -871,6 +891,16 @@ impl Cpu {
         register.write_unchecked(flags);
     }
 
+    /// Set the halted state of the processor.
+    ///
+    /// # Arguments
+    ///
+    /// * `state` - Whether the CPU should be halted or not.
+    #[inline(always)]
+    fn set_halted(&mut self, state: bool) {
+        self.is_halted = state;
+    }
+
     /// Set the machine mode privilege level of the processor.
     ///
     /// # Arguments
@@ -881,14 +911,22 @@ impl Cpu {
         self.is_machine_mode = state;
     }
 
-    /// Set the halted state of the processor.
+    /// Set the standard CPU flags based on the specified value and overflow.
     ///
     /// # Arguments
     ///
-    /// * `state` - Whether the CPU should be halted or not.
+    /// * `value` - The input u32 value
+    /// * `is_overflow` - Did the operation result in an overflow?
+    ///
+    /// # Note
+    ///
+    /// This method affects the following flags: Sign (SF), Overflow (OF), Zero (ZF) and Parity (PF).
     #[inline(always)]
-    fn set_halted(&mut self, state: bool) {
-        self.is_halted = state;
+    fn set_standard_flags_by_value(&mut self, value: u32, is_overflow: bool) {
+        self.set_flag_state(CpuFlag::SF, utils::is_bit_set(value, 31));
+        self.set_flag_state(CpuFlag::ZF, value == 0);
+        self.set_flag_state(CpuFlag::OF, is_overflow);
+        self.set_flag_state(CpuFlag::PF, Cpu::calculate_lowest_byte_parity(value));
     }
 
     /// Update the u32 accumulator (AC) register.
@@ -1891,6 +1929,131 @@ mod tests_cpu {
                 vec![0; 100],
                 false,
                 "SUB - CPU signed flag not correctly cleared",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the multiply u32 immediate by a u32 register instruction.
+    #[test]
+    fn test_mul_u32_imm_u32_reg() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::MulU32ImmU32Reg(0x2, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0x1), (RegisterId::AC, 0x2)],
+                vec![0; 100],
+                false,
+                "MUL - incorrect result value produced",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    Instruction::MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
+                    Instruction::MulU32ImmU32Reg(0x2, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, u32::MAX),
+                    (RegisterId::AC, 4294967294),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::OF]),
+                    ),
+                ],
+                vec![0; 100],
+                false,
+                "MUL - CPU flags not correctly set",
+            ),
+            TestEntryU32Standard::new(
+                &[Instruction::MulU32ImmU32Reg(0, RegisterId::R1)],
+                &[(
+                    RegisterId::FL,
+                    CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
+                )],
+                vec![0; 100],
+                false,
+                "MUL - CPU flags not correctly set",
+            ),
+            // Test the parity flag gets set.
+            TestEntryU32Standard::new(
+                &[
+                    // Clear any set flags.
+                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    Instruction::MovU32ImmU32Reg(0x3, RegisterId::R1),
+                    Instruction::MulU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0x3),
+                    (RegisterId::AC, 0x3),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::PF])),
+                ],
+                vec![0; 100],
+                false,
+                "MUL - CPU parity flag not correctly set",
+            ),
+            // Test the parity flag gets cleared.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the parity flag.
+                    Instruction::MovU32ImmU32Reg(
+                        CpuFlag::compute_for(&[CpuFlag::PF]),
+                        RegisterId::FL,
+                    ),
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::MulU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0x1),
+                    (RegisterId::AC, 0x1),
+                    (RegisterId::FL, 0x0),
+                ],
+                vec![0; 100],
+                false,
+                "MUL - CPU parity flag not correctly cleared",
+            ),
+            // Test the signed flag gets set.
+            TestEntryU32Standard::new(
+                &[
+                    // Clear every flag.
+                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    Instruction::MovU32ImmU32Reg(1073741824, RegisterId::R1),
+                    Instruction::MulU32ImmU32Reg(0x2, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 1073741824),
+                    (RegisterId::AC, 2147483648),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::PF]),
+                    ),
+                ],
+                vec![0; 100],
+                false,
+                "MUL - CPU signed flag not correctly set",
+            ),
+            // Test the signed flag gets cleared.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the signed flag.
+                    Instruction::MovU32ImmU32Reg(
+                        CpuFlag::compute_for(&[CpuFlag::SF]),
+                        RegisterId::FL,
+                    ),
+                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    Instruction::MulU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0x1),
+                    (RegisterId::AC, 0x1),
+                    (RegisterId::FL, 0x0),
+                ],
+                vec![0; 100],
+                false,
+                "MUL - CPU signed flag not correctly cleared",
             ),
         ];
 
