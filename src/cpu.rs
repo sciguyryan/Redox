@@ -218,7 +218,7 @@ impl Cpu {
     fn perform_checked_subtract_u32(&mut self, value_1: u32, value_2: u32) -> u32 {
         let (final_value, overflow) = match value_1.checked_sub(value_2) {
             Some(val) => (val, false),
-            None => ((value_1 as u64 + value_2 as u64) as u32, true),
+            None => (value_1.wrapping_sub(value_2), true),
         };
 
         self.set_flag_state(CpuFlag::SF, utils::is_bit_set(final_value, 31));
@@ -1530,8 +1530,11 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::R1, 0x2),
-                    (RegisterId::AC, 0x1),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::OF])),
+                    (RegisterId::AC, 0x3),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_for(&[CpuFlag::OF, CpuFlag::PF]),
+                    ),
                 ],
                 vec![0; 100],
                 false,
@@ -1652,8 +1655,11 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::R1, u32::MAX),
-                    (RegisterId::AC, 0x1),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::OF])),
+                    (RegisterId::AC, 0x3),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_for(&[CpuFlag::OF, CpuFlag::PF]),
+                    ),
                 ],
                 vec![0; 100],
                 false,
@@ -1781,8 +1787,11 @@ mod tests_cpu {
                 &[
                     (RegisterId::R1, u32::MAX),
                     (RegisterId::R2, 0x2),
-                    (RegisterId::AC, 0x1),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::OF])),
+                    (RegisterId::AC, 0x3),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_for(&[CpuFlag::OF, CpuFlag::PF]),
+                    ),
                 ],
                 vec![0; 100],
                 false,
@@ -2015,8 +2024,11 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[Instruction::DecU32Reg(RegisterId::R1)],
                 &[
-                    (RegisterId::R1, 0x1),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::OF])),
+                    (RegisterId::R1, u32::MAX),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::OF, CpuFlag::PF]),
+                    ),
                 ],
                 vec![0; 100],
                 false,
