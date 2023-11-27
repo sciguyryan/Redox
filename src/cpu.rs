@@ -249,6 +249,32 @@ impl Cpu {
         final_value
     }
 
+    /// Perform a checked integer division of two u32 values.
+    ///
+    /// # Arguments
+    ///
+    /// * `value_1` - The first u32 value.
+    /// * `value_2` - The second u32 value.
+    ///
+    /// # Returns
+    ///
+    /// The result of the operation, truncated in the case of an overflow.
+    ///
+    /// # Note
+    ///
+    /// This method affects the following flags: Sign (SF), Overflow (OF), Zero (ZF) and Parity (PF).
+    #[inline(always)]
+    fn perform_checked_div_u32(&mut self, value_1: u32, value_2: u32) -> u32 {
+        let (final_value, overflow) = match value_1.checked_div(value_2) {
+            Some(val) => (val, false),
+            None => (value_1.wrapping_div(value_2), true),
+        };
+
+        self.set_standard_flags_by_value(final_value, overflow);
+
+        final_value
+    }
+
     /// Perform a checked left-shift of two u32 values.
     ///
     /// # Arguments
@@ -603,10 +629,10 @@ impl Cpu {
 
                 self.update_u32_accumulator(new_value);
             }
-            Instruction::SubU32RegU32Reg(reg1, reg2) => {
-                let reg_1 = self.read_reg_u32(reg1, privilege);
-                let reg_2 = self.read_reg_u32(reg2, privilege);
-                let new_value = self.perform_checked_subtract_u32(reg_2, reg_1);
+            Instruction::SubU32RegU32Reg(reg_1, reg_2) => {
+                let reg_1_val = self.read_reg_u32(reg_1, privilege);
+                let reg_2_val = self.read_reg_u32(reg_2, privilege);
+                let new_value = self.perform_checked_subtract_u32(reg_2_val, reg_1_val);
 
                 self.update_u32_accumulator(new_value);
             }
@@ -616,10 +642,16 @@ impl Cpu {
 
                 self.update_u32_accumulator(new_value);
             }
-            Instruction::MulU32RegU32Reg(reg1, reg2) => {
-                let reg_1 = self.read_reg_u32(reg1, privilege);
-                let reg_2 = self.read_reg_u32(reg2, privilege);
-                let new_value = self.perform_checked_mul_u32(reg_1, reg_2);
+            Instruction::MulU32RegU32Reg(reg_1, reg_2) => {
+                let reg_1_val = self.read_reg_u32(reg_1, privilege);
+                let reg_2_val = self.read_reg_u32(reg_2, privilege);
+                let new_value = self.perform_checked_mul_u32(reg_1_val, reg_2_val);
+
+                self.update_u32_accumulator(new_value);
+            }
+            Instruction::DivU32ImmU32Reg(imm, reg) => {
+                let old_value = self.read_reg_u32(reg, privilege);
+                let new_value = self.perform_checked_div_u32(old_value, *imm);
 
                 self.update_u32_accumulator(new_value);
             }
@@ -691,12 +723,12 @@ impl Cpu {
             }
 
             /******** [Data Instructions] ********/
-            Instruction::SwapU32RegU32Reg(reg1, reg2) => {
-                let reg1_val = self.read_reg_u32(reg1, privilege);
-                let reg2_val = self.read_reg_u32(reg2, privilege);
+            Instruction::SwapU32RegU32Reg(reg_1, reg_2) => {
+                let reg_1_val = self.read_reg_u32(reg_1, privilege);
+                let reg_2_val = self.read_reg_u32(reg_2, privilege);
 
-                self.write_reg_u32(reg1, reg2_val, privilege);
-                self.write_reg_u32(reg2, reg1_val, privilege);
+                self.write_reg_u32(reg_1, reg_2_val, privilege);
+                self.write_reg_u32(reg_2, reg_1_val, privilege);
             }
             Instruction::MovU32ImmU32Reg(imm, reg) => {
                 self.write_reg_u32(reg, *imm, privilege);
@@ -2142,6 +2174,85 @@ mod tests_cpu {
                 vec![0; 100],
                 false,
                 "MUL - CPU signed flag not correctly cleared",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the division a u32 register by a u32 immediate instruction.
+    #[test]
+    fn test_div_u32_imm_u32_reg() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    DivU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0x2), (RegisterId::AC, 0x2)],
+                vec![0; 100],
+                false,
+                "DIV - incorrect result value produced",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
+                    DivU32ImmU32Reg(0x2, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, u32::MAX),
+                    (RegisterId::AC, 2147483647),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::PF])),
+                ],
+                vec![0; 100],
+                false,
+                "DIV - CPU flags not correctly set",
+            ),
+            TestEntryU32Standard::new(
+                &[DivU32ImmU32Reg(0x1, RegisterId::R1)],
+                &[(
+                    RegisterId::FL,
+                    CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
+                )],
+                vec![0; 100],
+                false,
+                "DIV - CPU flags not correctly set",
+            ),
+            // Test the parity flag gets set.
+            TestEntryU32Standard::new(
+                &[
+                    // Clear any set flags.
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x3, RegisterId::R1),
+                    DivU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0x3),
+                    (RegisterId::AC, 0x3),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::PF])),
+                ],
+                vec![0; 100],
+                false,
+                "DIV - CPU parity flag not correctly set",
+            ),
+            // Test the parity flag gets cleared.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the parity flag.
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::PF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    DivU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0x1),
+                    (RegisterId::AC, 0x1),
+                    (RegisterId::FL, 0x0),
+                ],
+                vec![0; 100],
+                false,
+                "DIV - CPU parity flag not correctly cleared",
             ),
         ];
 
