@@ -1,7 +1,4 @@
-use std::{
-    fmt::{self, Display, Formatter},
-    mem,
-};
+use std::fmt::{self, Display, Formatter};
 
 #[cfg(test)]
 use strum_macros::EnumIter;
@@ -11,15 +8,15 @@ use crate::{ins::move_expressions::MoveExpressionHandler, reg::registers::Regist
 use super::op_codes::OpCode;
 
 /// The size of the instruction, in bytes.
-const INSTRUCTION_SIZE: u32 = mem::size_of::<u32>() as u32;
+const INSTRUCTION_SIZE: u32 = 4;
 /// The size of a u32 argument, in bytes.
-const ARG_U32_IMM_SIZE: u32 = mem::size_of::<u32>() as u32;
+const ARG_U32_IMM_SIZE: u32 = 4;
 /// The size of a u8 argument, in bytes.
 const ARG_U8_IMM_SIZE: u32 = 1;
 /// The size of a memory address argument, in bytes.
-const ARG_MEM_ADDR_SIZE: u32 = mem::size_of::<u32>() as u32;
+const ARG_MEM_ADDR_SIZE: u32 = 4;
 /// The size of a register ID argument, in bytes.
-const ARG_REG_ID_SIZE: u32 = mem::size_of::<RegisterId>() as u32;
+const ARG_REG_ID_SIZE: u32 = 1;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[cfg_attr(test, derive(EnumIter))]
@@ -38,6 +35,8 @@ pub enum Instruction {
     SubU32RegU32Imm(RegisterId, u32),
     /// Subtract a u32 register (A) from a u32 register (B). The result is stored in the accumulator register.
     SubU32RegU32Reg(RegisterId, RegisterId),
+    /// Multiply a u32 register by a u32 immediate. The result is stored in the accumulator register.
+    MulU32ImmU32Reg(u32, RegisterId),
     /// Increment a u32 register.
     IncU32Reg(RegisterId),
     /// Decrement a u32 register.
@@ -149,6 +148,9 @@ impl Display for Instruction {
             }
             Instruction::SubU32RegU32Reg(reg_1, reg_2) => {
                 format!("sub {reg_1}, ${reg_2}")
+            }
+            Instruction::MulU32ImmU32Reg(imm, reg) => {
+                format!("mul {imm}, {reg}")
             }
             Instruction::IncU32Reg(reg) => {
                 format!("inc {reg}")
@@ -303,6 +305,7 @@ impl Instruction {
             OpCode::SubU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
             OpCode::SubU32RegU32Imm => ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE,
             OpCode::SubU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
+            OpCode::MulU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
             OpCode::IncU32Reg => ARG_REG_ID_SIZE,
             OpCode::DecU32Reg => ARG_REG_ID_SIZE,
 

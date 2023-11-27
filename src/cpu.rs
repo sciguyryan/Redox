@@ -590,6 +590,12 @@ impl Cpu {
 
                 self.update_u32_accumulator(new_value);
             }
+            Instruction::MulU32ImmU32Reg(imm, reg) => {
+                /*let old_value = self.read_reg_u32(reg, privilege);
+                let new_value = self.perform_checked_multiply_u32(old_value, *imm);
+
+                self.update_u32_accumulator(new_value);*/
+            }
             Instruction::IncU32Reg(reg) => {
                 let value = self.read_reg_u32(reg, privilege);
                 let new_value = self.perform_checked_add_u32(value, 1);
