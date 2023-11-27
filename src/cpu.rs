@@ -1048,7 +1048,7 @@ mod tests_cpu {
 
     use crate::{
         ins::{
-            instruction::Instruction,
+            instruction::Instruction::{self, *},
             move_expressions::{ExpressionArgs, ExpressionOperator, MoveExpressionHandler},
         },
         mem::memory::Memory,
@@ -1076,8 +1076,8 @@ mod tests_cpu {
             // Ensure we always end with a halt instruction.
             let mut instructions_vec = instructions.to_vec();
             if let Some(ins) = instructions_vec.last() {
-                if !matches!(ins, Instruction::Hlt) {
-                    instructions_vec.push(Instruction::Hlt);
+                if !matches!(ins, Hlt) {
+                    instructions_vec.push(Hlt);
                 }
             }
 
@@ -1221,7 +1221,7 @@ mod tests_cpu {
     #[test]
     fn test_nop() {
         let tests = [TestEntryU32Standard::new(
-            &[Instruction::Nop],
+            &[Nop],
             &[],
             vec![0; 100],
             false,
@@ -1238,7 +1238,7 @@ mod tests_cpu {
     fn test_hlt() {
         let tests = [
             TestEntryU32Standard::new(
-                &[Instruction::Hlt],
+                &[Hlt],
                 &[],
                 vec![0; 100],
                 false,
@@ -1247,7 +1247,7 @@ mod tests_cpu {
             // The halt instruction should prevent any following instructions from executing, which
             // means that the program counter should also not increase.
             TestEntryU32Standard::new(
-                &[Instruction::Hlt, Instruction::Nop],
+                &[Hlt, Nop],
                 &[(RegisterId::IP, 4), (RegisterId::PC, 1)],
                 vec![0; 100],
                 false,
@@ -1264,7 +1264,7 @@ mod tests_cpu {
     #[test]
     fn test_mret() {
         let tests = [TestEntryU32Standard::new(
-            &[Instruction::Mret],
+            &[Mret],
             &[],
             vec![0; 100],
             false,
@@ -1286,8 +1286,8 @@ mod tests_cpu {
         let tests = [
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::AddU32ImmU32Reg(0x2, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    AddU32ImmU32Reg(0x2, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0x1),
@@ -1300,8 +1300,8 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
-                    Instruction::AddU32ImmU32Reg(0x2, RegisterId::R1),
+                    MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
+                    AddU32ImmU32Reg(0x2, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, u32::MAX),
@@ -1313,7 +1313,7 @@ mod tests_cpu {
                 "ADD - CPU flags not correctly set",
             ),
             TestEntryU32Standard::new(
-                &[Instruction::AddU32ImmU32Reg(0, RegisterId::R1)],
+                &[AddU32ImmU32Reg(0, RegisterId::R1)],
                 &[(
                     RegisterId::FL,
                     CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
@@ -1326,9 +1326,9 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Clear any set flags.
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R1),
-                    Instruction::AddU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    AddU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0x2),
@@ -1343,12 +1343,9 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the parity flag.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::PF]),
-                        RegisterId::FL,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::AddU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::PF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    AddU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0x1),
@@ -1363,12 +1360,9 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Clear every flag.
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    Instruction::MovU32ImmU32Reg(
-                        0b0111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::AddU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    AddU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0b0111_1111_1111_1111_1111_1111_1111_1111),
@@ -1386,12 +1380,9 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the signed flag.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::SF]),
-                        RegisterId::FL,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::AddU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    AddU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0x1),
@@ -1415,9 +1406,9 @@ mod tests_cpu {
         let tests = [
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0xf, RegisterId::R1),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
-                    Instruction::AddU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                    MovU32ImmU32Reg(0xf, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    AddU32RegU32Reg(RegisterId::R1, RegisterId::R2),
                 ],
                 &[
                     (RegisterId::R1, 0xf),
@@ -1430,9 +1421,9 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
-                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R2),
-                    Instruction::AddU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                    MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
+                    MovU32ImmU32Reg(0x2, RegisterId::R2),
+                    AddU32RegU32Reg(RegisterId::R1, RegisterId::R2),
                 ],
                 &[
                     (RegisterId::R1, u32::MAX),
@@ -1445,7 +1436,7 @@ mod tests_cpu {
                 "ADD - CPU flags not correctly set",
             ),
             TestEntryU32Standard::new(
-                &[Instruction::AddU32RegU32Reg(RegisterId::R1, RegisterId::R2)],
+                &[AddU32RegU32Reg(RegisterId::R1, RegisterId::R2)],
                 &[(
                     RegisterId::FL,
                     CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
@@ -1458,10 +1449,10 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Clear every flag.
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R1),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
-                    Instruction::AddU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    AddU32RegU32Reg(RegisterId::R1, RegisterId::R2),
                 ],
                 &[
                     (RegisterId::R1, 0x2),
@@ -1477,12 +1468,9 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the parity flag.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::PF]),
-                        RegisterId::FL,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::AddU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::PF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    AddU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0x1),
@@ -1497,13 +1485,10 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Clear every flag.
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    Instruction::MovU32ImmU32Reg(
-                        0b0111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
-                    Instruction::AddU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    AddU32RegU32Reg(RegisterId::R1, RegisterId::R2),
                 ],
                 &[
                     (RegisterId::R1, 0b0111_1111_1111_1111_1111_1111_1111_1111),
@@ -1522,13 +1507,10 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the signed flag.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::SF]),
-                        RegisterId::FL,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
-                    Instruction::AddU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    AddU32RegU32Reg(RegisterId::R1, RegisterId::R2),
                 ],
                 &[
                     (RegisterId::R1, 0x1),
@@ -1553,8 +1535,8 @@ mod tests_cpu {
         let tests = [
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R1),
-                    Instruction::SubU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    SubU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x2), (RegisterId::AC, 0x1)],
                 vec![0; 100],
@@ -1563,8 +1545,8 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R1),
-                    Instruction::SubU32ImmU32Reg(u32::MAX, RegisterId::R1),
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    SubU32ImmU32Reg(u32::MAX, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0x2),
@@ -1579,7 +1561,7 @@ mod tests_cpu {
                 "SUB - CPU flags not correctly set",
             ),
             TestEntryU32Standard::new(
-                &[Instruction::SubU32ImmU32Reg(0, RegisterId::R1)],
+                &[SubU32ImmU32Reg(0, RegisterId::R1)],
                 &[(
                     RegisterId::FL,
                     CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
@@ -1592,9 +1574,9 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Clear every flag.
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    Instruction::MovU32ImmU32Reg(0x4, RegisterId::R1),
-                    Instruction::SubU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x4, RegisterId::R1),
+                    SubU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0x4),
@@ -1609,12 +1591,9 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the parity flag.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::PF]),
-                        RegisterId::FL,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R1),
-                    Instruction::SubU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::PF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    SubU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0x2),
@@ -1629,12 +1608,9 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Clear any set flags.
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    Instruction::MovU32ImmU32Reg(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::SubU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    SubU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
@@ -1649,12 +1625,9 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the signed flag.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::SF]),
-                        RegisterId::FL,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R1),
-                    Instruction::SubU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    SubU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0x2),
@@ -1678,8 +1651,8 @@ mod tests_cpu {
         let tests = [
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R1),
-                    Instruction::SubU32RegU32Imm(RegisterId::R1, 0x3),
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    SubU32RegU32Imm(RegisterId::R1, 0x3),
                 ],
                 &[(RegisterId::R1, 0x2), (RegisterId::AC, 0x1)],
                 vec![0; 100],
@@ -1688,8 +1661,8 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
-                    Instruction::SubU32RegU32Imm(RegisterId::R1, 0x2),
+                    MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
+                    SubU32RegU32Imm(RegisterId::R1, 0x2),
                 ],
                 &[
                     (RegisterId::R1, u32::MAX),
@@ -1704,7 +1677,7 @@ mod tests_cpu {
                 "SUB - CPU flags not correctly set",
             ),
             TestEntryU32Standard::new(
-                &[Instruction::SubU32RegU32Imm(RegisterId::R1, 0)],
+                &[SubU32RegU32Imm(RegisterId::R1, 0)],
                 &[(
                     RegisterId::FL,
                     CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
@@ -1717,9 +1690,9 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Clear every flag.
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::SubU32RegU32Imm(RegisterId::R1, 0x4),
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    SubU32RegU32Imm(RegisterId::R1, 0x4),
                 ],
                 &[
                     (RegisterId::R1, 0x1),
@@ -1734,12 +1707,9 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the parity flag.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::PF]),
-                        RegisterId::FL,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::SubU32RegU32Imm(RegisterId::R1, 0x2),
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::PF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    SubU32RegU32Imm(RegisterId::R1, 0x2),
                 ],
                 &[
                     (RegisterId::R1, 0x1),
@@ -1754,12 +1724,9 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Clear every flag.
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::SubU32RegU32Imm(
-                        RegisterId::R1,
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                    ),
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    SubU32RegU32Imm(RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                 ],
                 &[
                     (RegisterId::R1, 0x1),
@@ -1774,12 +1741,9 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the signed flag.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::SF]),
-                        RegisterId::FL,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::SubU32RegU32Imm(RegisterId::R1, 0x2),
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    SubU32RegU32Imm(RegisterId::R1, 0x2),
                 ],
                 &[
                     (RegisterId::R1, 0x1),
@@ -1803,9 +1767,9 @@ mod tests_cpu {
         let tests = [
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::MovU32ImmU32Reg(0xf, RegisterId::R2),
-                    Instruction::SubU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0xf, RegisterId::R2),
+                    SubU32RegU32Reg(RegisterId::R1, RegisterId::R2),
                 ],
                 &[
                     (RegisterId::R1, 0x1),
@@ -1818,9 +1782,9 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
-                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R2),
-                    Instruction::SubU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                    MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
+                    MovU32ImmU32Reg(0x2, RegisterId::R2),
+                    SubU32RegU32Reg(RegisterId::R1, RegisterId::R2),
                 ],
                 &[
                     (RegisterId::R1, u32::MAX),
@@ -1836,7 +1800,7 @@ mod tests_cpu {
                 "SUB - CPU flags not correctly set",
             ),
             TestEntryU32Standard::new(
-                &[Instruction::SubU32RegU32Reg(RegisterId::R1, RegisterId::R2)],
+                &[SubU32RegU32Reg(RegisterId::R1, RegisterId::R2)],
                 &[(
                     RegisterId::FL,
                     CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
@@ -1849,10 +1813,10 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Clear every flag.
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::MovU32ImmU32Reg(0x4, RegisterId::R2),
-                    Instruction::SubU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x4, RegisterId::R2),
+                    SubU32RegU32Reg(RegisterId::R1, RegisterId::R2),
                 ],
                 &[
                     (RegisterId::R1, 0x1),
@@ -1868,13 +1832,10 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the parity flag.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::PF]),
-                        RegisterId::FL,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R2),
-                    Instruction::SubU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::PF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x2, RegisterId::R2),
+                    SubU32RegU32Reg(RegisterId::R1, RegisterId::R2),
                 ],
                 &[
                     (RegisterId::R1, 0x1),
@@ -1890,13 +1851,10 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Clear every flag.
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::MovU32ImmU32Reg(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R2,
-                    ),
-                    Instruction::SubU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R2),
+                    SubU32RegU32Reg(RegisterId::R1, RegisterId::R2),
                 ],
                 &[
                     (RegisterId::R1, 0x1),
@@ -1912,13 +1870,10 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the signed flag.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::SF]),
-                        RegisterId::FL,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R2),
-                    Instruction::SubU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x2, RegisterId::R2),
+                    SubU32RegU32Reg(RegisterId::R1, RegisterId::R2),
                 ],
                 &[
                     (RegisterId::R1, 0x1),
@@ -1943,8 +1898,8 @@ mod tests_cpu {
         let tests = [
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::MulU32ImmU32Reg(0x2, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    MulU32ImmU32Reg(0x2, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1), (RegisterId::AC, 0x2)],
                 vec![0; 100],
@@ -1953,8 +1908,8 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
-                    Instruction::MulU32ImmU32Reg(0x2, RegisterId::R1),
+                    MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
+                    MulU32ImmU32Reg(0x2, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, u32::MAX),
@@ -1969,7 +1924,7 @@ mod tests_cpu {
                 "MUL - CPU flags not correctly set",
             ),
             TestEntryU32Standard::new(
-                &[Instruction::MulU32ImmU32Reg(0, RegisterId::R1)],
+                &[MulU32ImmU32Reg(0, RegisterId::R1)],
                 &[(
                     RegisterId::FL,
                     CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
@@ -1982,9 +1937,9 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Clear any set flags.
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    Instruction::MovU32ImmU32Reg(0x3, RegisterId::R1),
-                    Instruction::MulU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x3, RegisterId::R1),
+                    MulU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0x3),
@@ -1999,12 +1954,9 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the parity flag.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::PF]),
-                        RegisterId::FL,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::MulU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::PF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    MulU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0x1),
@@ -2019,9 +1971,9 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Clear every flag.
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    Instruction::MovU32ImmU32Reg(1073741824, RegisterId::R1),
-                    Instruction::MulU32ImmU32Reg(0x2, RegisterId::R1),
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(1073741824, RegisterId::R1),
+                    MulU32ImmU32Reg(0x2, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 1073741824),
@@ -2039,12 +1991,9 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the signed flag.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::SF]),
-                        RegisterId::FL,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::MulU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    MulU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0x1),
@@ -2067,7 +2016,7 @@ mod tests_cpu {
     fn test_inc_u32_reg() {
         let tests = [
             TestEntryU32Standard::new(
-                &[Instruction::IncU32Reg(RegisterId::R1)],
+                &[IncU32Reg(RegisterId::R1)],
                 &[(RegisterId::R1, 0x1)],
                 vec![0; 100],
                 false,
@@ -2075,8 +2024,8 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
-                    Instruction::IncU32Reg(RegisterId::R1),
+                    MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
+                    IncU32Reg(RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0),
@@ -2093,9 +2042,9 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Clear every flag.
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R1),
-                    Instruction::IncU32Reg(RegisterId::R1),
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    IncU32Reg(RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0x3),
@@ -2109,11 +2058,8 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the parity flag.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::PF]),
-                        RegisterId::FL,
-                    ),
-                    Instruction::IncU32Reg(RegisterId::R1),
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::PF]), RegisterId::FL),
+                    IncU32Reg(RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1), (RegisterId::FL, 0x0)],
                 vec![0; 100],
@@ -2124,12 +2070,9 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Clear any set flags.
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    Instruction::MovU32ImmU32Reg(
-                        0b0111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::IncU32Reg(RegisterId::R1),
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    IncU32Reg(RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0b1000_0000_0000_0000_0000_0000_0000_0000),
@@ -2146,11 +2089,8 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the signed flag.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::SF]),
-                        RegisterId::FL,
-                    ),
-                    Instruction::IncU32Reg(RegisterId::R1),
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
+                    IncU32Reg(RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1), (RegisterId::FL, 0x0)],
                 vec![0; 100],
@@ -2170,8 +2110,8 @@ mod tests_cpu {
         let tests = [
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::DecU32Reg(RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    DecU32Reg(RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0x0),
@@ -2185,7 +2125,7 @@ mod tests_cpu {
                 "DEC - incorrect result value produced",
             ),
             TestEntryU32Standard::new(
-                &[Instruction::DecU32Reg(RegisterId::R1)],
+                &[DecU32Reg(RegisterId::R1)],
                 &[
                     (RegisterId::R1, u32::MAX),
                     (
@@ -2201,9 +2141,9 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Clear any set flags.
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    Instruction::MovU32ImmU32Reg(0x4, RegisterId::R1),
-                    Instruction::DecU32Reg(RegisterId::R1),
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x4, RegisterId::R1),
+                    DecU32Reg(RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0x3),
@@ -2217,12 +2157,9 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the parity flag.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::PF]),
-                        RegisterId::FL,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x3, RegisterId::R1),
-                    Instruction::DecU32Reg(RegisterId::R1),
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::PF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x3, RegisterId::R1),
+                    DecU32Reg(RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x2), (RegisterId::FL, 0x0)],
                 vec![0; 100],
@@ -2233,12 +2170,9 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Clear every flag.
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    Instruction::MovU32ImmU32Reg(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::DecU32Reg(RegisterId::R1),
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    DecU32Reg(RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
@@ -2252,12 +2186,9 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the signed flag.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::SF]),
-                        RegisterId::FL,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R1),
-                    Instruction::DecU32Reg(RegisterId::R1),
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    DecU32Reg(RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1), (RegisterId::FL, 0x0)],
                 vec![0; 100],
@@ -2277,8 +2208,8 @@ mod tests_cpu {
         let tests = [
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x2)],
                 vec![0; 100],
@@ -2289,11 +2220,8 @@ mod tests_cpu {
             // overflow flag. The overflow flag is only set when computing 1-bit shifts.
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(
-                        0b1011_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::LeftShiftU32ImmU32Reg(0x3, RegisterId::R1),
+                    MovU32ImmU32Reg(0b1011_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    LeftShiftU32ImmU32Reg(0x3, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1000),
@@ -2310,11 +2238,8 @@ mod tests_cpu {
             // The overflow flag is only set when computing 1-bit shifts.
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
@@ -2330,8 +2255,8 @@ mod tests_cpu {
             // Just zero flag should be set here since zero left-shifted by anything will be zero.
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
-                    Instruction::LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x0, RegisterId::R1),
+                    LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[(
                     RegisterId::FL,
@@ -2345,13 +2270,10 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the overflow flag.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::OF]),
-                        RegisterId::FL,
-                    ),
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::OF]), RegisterId::FL),
                     // This will unset the overflow flag and set the zero flag instead.
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
-                    Instruction::LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x0, RegisterId::R1),
+                    LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[(
                     RegisterId::FL,
@@ -2363,7 +2285,7 @@ mod tests_cpu {
             ),
             // This should assert as a shift of value higher than 31 is unsupported.
             TestEntryU32Standard::new(
-                &[Instruction::LeftShiftU32ImmU32Reg(0x20, RegisterId::R1)],
+                &[LeftShiftU32ImmU32Reg(0x20, RegisterId::R1)],
                 &[],
                 vec![],
                 true,
@@ -2373,12 +2295,9 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the parity flag.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::PF]),
-                        RegisterId::FL,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::PF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x2), (RegisterId::FL, 0x0)],
                 vec![0; 100],
@@ -2388,8 +2307,8 @@ mod tests_cpu {
             // Test that a left-shift by zero leaves the value unchanged.
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::LeftShiftU32ImmU32Reg(0x0, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    LeftShiftU32ImmU32Reg(0x0, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1)],
                 vec![0; 100],
@@ -2400,12 +2319,9 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Clear every flag.
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    Instruction::MovU32ImmU32Reg(
-                        0b0100_0000_0000_0000_0000_0000_0000_0000,
-                        RegisterId::R1,
-                    ),
-                    Instruction::LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0b0100_0000_0000_0000_0000_0000_0000_0000, RegisterId::R1),
+                    LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0b1000_0000_0000_0000_0000_0000_0000_0000),
@@ -2422,12 +2338,9 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the signed flag.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::SF]),
-                        RegisterId::FL,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x2), (RegisterId::FL, 0x0)],
                 vec![0; 100],
@@ -2447,9 +2360,9 @@ mod tests_cpu {
         let tests = [
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
-                    Instruction::LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x2), (RegisterId::R2, 0x1)],
                 vec![0; 100],
@@ -2460,12 +2373,9 @@ mod tests_cpu {
             // overflow flag. The overflow flag is only set when computing 1-bit shifts.
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(
-                        0b1011_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x3, RegisterId::R2),
-                    Instruction::LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                    MovU32ImmU32Reg(0b1011_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    MovU32ImmU32Reg(0x3, RegisterId::R2),
+                    LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1000),
@@ -2483,12 +2393,9 @@ mod tests_cpu {
             // The overflow flag is only set when computing 1-bit shifts.
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
-                    Instruction::LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
@@ -2505,9 +2412,9 @@ mod tests_cpu {
             // When shifted left by two places, this value will set the overflow and carry flags.
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
-                    Instruction::LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                    MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
@@ -2524,9 +2431,9 @@ mod tests_cpu {
             // Just zero flag should be set here since zero left-shifted by anything will be zero.
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
-                    Instruction::LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                    MovU32ImmU32Reg(0x0, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R2, 0x1),
@@ -2543,14 +2450,11 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the overflow flag.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::OF]),
-                        RegisterId::FL,
-                    ),
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::OF]), RegisterId::FL),
                     // This will unset the overflow flag and set the zero flag instead.
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
-                    Instruction::LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                    MovU32ImmU32Reg(0x0, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R2, 0x1),
@@ -2566,8 +2470,8 @@ mod tests_cpu {
             // This should assert as a shift of value higher than 31 is unsupported.
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x20, RegisterId::R2),
-                    Instruction::LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                    MovU32ImmU32Reg(0x20, RegisterId::R2),
+                    LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[],
                 vec![],
@@ -2577,8 +2481,8 @@ mod tests_cpu {
             // Test that a left-shift by zero leaves the value unchanged.
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1)],
                 vec![0; 100],
@@ -2589,13 +2493,10 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Clear any set flags.
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    Instruction::MovU32ImmU32Reg(
-                        0b0100_0000_0000_0000_0000_0000_0000_0000,
-                        RegisterId::R1,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
-                    Instruction::LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0b0100_0000_0000_0000_0000_0000_0000_0000, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0b1000_0000_0000_0000_0000_0000_0000_0000),
@@ -2613,13 +2514,10 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the signed flag.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::SF]),
-                        RegisterId::FL,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
-                    Instruction::LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0x2),
@@ -2643,8 +2541,8 @@ mod tests_cpu {
         let tests = [
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::ArithLeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    ArithLeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x2)],
                 vec![0; 100],
@@ -2653,11 +2551,8 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(
-                        0b1111_1111_1111_1111_1111_1111_1111_1110,
-                        RegisterId::R1,
-                    ),
-                    Instruction::ArithLeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1110, RegisterId::R1),
+                    ArithLeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1101),
@@ -2670,8 +2565,8 @@ mod tests_cpu {
             // Just zero flag should be set here since zero left-shifted by anything will be zero.
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
-                    Instruction::ArithLeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x0, RegisterId::R1),
+                    ArithLeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[(
                     RegisterId::FL,
@@ -2684,8 +2579,8 @@ mod tests_cpu {
             // Test that a left-shift by zero leaves the value unchanged.
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::ArithLeftShiftU32ImmU32Reg(0x0, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    ArithLeftShiftU32ImmU32Reg(0x0, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1)],
                 vec![0; 100],
@@ -2696,12 +2591,9 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Clear any set flags.
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    Instruction::MovU32ImmU32Reg(
-                        0b0100_0000_0000_0000_0000_0000_0000_0000,
-                        RegisterId::R1,
-                    ),
-                    Instruction::ArithLeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0b0100_0000_0000_0000_0000_0000_0000_0000, RegisterId::R1),
+                    ArithLeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0b1000_0000_0000_0000_0000_0000_0000_0000),
@@ -2718,12 +2610,9 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the signed flag.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::SF]),
-                        RegisterId::FL,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::ArithLeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    ArithLeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x2), (RegisterId::FL, 0x0)],
                 vec![0; 100],
@@ -2743,9 +2632,9 @@ mod tests_cpu {
         let tests = [
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
-                    Instruction::ArithLeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    ArithLeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x2), (RegisterId::R2, 0x1)],
                 vec![0; 100],
@@ -2754,12 +2643,9 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(
-                        0b1111_1111_1111_1111_1111_1111_1111_1110,
-                        RegisterId::R1,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
-                    Instruction::ArithLeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1110, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    ArithLeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1101),
@@ -2773,9 +2659,9 @@ mod tests_cpu {
             // Just zero flag should be set here since zero left-shifted by anything will be zero.
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
-                    Instruction::ArithLeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                    MovU32ImmU32Reg(0x0, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    ArithLeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R2, 0x1),
@@ -2791,8 +2677,8 @@ mod tests_cpu {
             // Test that a left-shift by zero leaves the value unchanged.
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::ArithLeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    ArithLeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1)],
                 vec![0; 100],
@@ -2803,13 +2689,10 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Clear any set flags.
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    Instruction::MovU32ImmU32Reg(
-                        0b0100_0000_0000_0000_0000_0000_0000_0000,
-                        RegisterId::R1,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
-                    Instruction::ArithLeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0b0100_0000_0000_0000_0000_0000_0000_0000, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    ArithLeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0b1000_0000_0000_0000_0000_0000_0000_0000),
@@ -2827,13 +2710,10 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the signed flag.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::SF]),
-                        RegisterId::FL,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
-                    Instruction::ArithLeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    ArithLeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0x2),
@@ -2857,8 +2737,8 @@ mod tests_cpu {
         let tests = [
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R1),
-                    Instruction::RightShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    RightShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1)],
                 vec![0; 100],
@@ -2870,16 +2750,10 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the overflow flag.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::OF]),
-                        RegisterId::FL,
-                    ),
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::OF]), RegisterId::FL),
                     // Execute the test instruction.
-                    Instruction::MovU32ImmU32Reg(
-                        0b0111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::RightShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    RightShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0b0011_1111_1111_1111_1111_1111_1111_1111),
@@ -2897,16 +2771,10 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the overflow flag.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::OF]),
-                        RegisterId::FL,
-                    ),
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::OF]), RegisterId::FL),
                     // Execute the test instruction.
-                    Instruction::MovU32ImmU32Reg(
-                        0b0111_1111_1111_1111_1111_1111_1111_1110,
-                        RegisterId::R1,
-                    ),
-                    Instruction::RightShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1110, RegisterId::R1),
+                    RightShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0b0011_1111_1111_1111_1111_1111_1111_1111),
@@ -2919,8 +2787,8 @@ mod tests_cpu {
             // Just zero flag should be set here since zero left-shifted by anything will be zero.
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
-                    Instruction::RightShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x0, RegisterId::R1),
+                    RightShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[(
                     RegisterId::FL,
@@ -2932,7 +2800,7 @@ mod tests_cpu {
             ),
             // This should assert as a shift of value higher than 31 is unsupported.
             TestEntryU32Standard::new(
-                &[Instruction::RightShiftU32ImmU32Reg(0x20, RegisterId::R1)],
+                &[RightShiftU32ImmU32Reg(0x20, RegisterId::R1)],
                 &[],
                 vec![],
                 true,
@@ -2941,8 +2809,8 @@ mod tests_cpu {
             // Test that a right-shift by zero leaves the value unchanged.
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::RightShiftU32ImmU32Reg(0x0, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    RightShiftU32ImmU32Reg(0x0, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1)],
                 vec![0; 100],
@@ -2953,12 +2821,9 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the signed flag.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::SF]),
-                        RegisterId::FL,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::RightShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    RightShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0x0),
@@ -2984,9 +2849,9 @@ mod tests_cpu {
         let tests = [
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R1),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
-                    Instruction::RightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    RightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1), (RegisterId::R2, 0x1)],
                 vec![0; 100],
@@ -2998,17 +2863,11 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the overflow flag.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::OF]),
-                        RegisterId::FL,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::OF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R2),
                     // Execute the test instruction.
-                    Instruction::MovU32ImmU32Reg(
-                        0b0111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::RightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                    MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    RightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0b0011_1111_1111_1111_1111_1111_1111_1111),
@@ -3027,17 +2886,11 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the overflow flag.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::OF]),
-                        RegisterId::FL,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::OF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R2),
                     // Execute the test instruction.
-                    Instruction::MovU32ImmU32Reg(
-                        0b0111_1111_1111_1111_1111_1111_1111_1110,
-                        RegisterId::R1,
-                    ),
-                    Instruction::RightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                    MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1110, RegisterId::R1),
+                    RightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0b0011_1111_1111_1111_1111_1111_1111_1111),
@@ -3051,9 +2904,9 @@ mod tests_cpu {
             // Just zero flag should be set here since zero left-shifted by anything will be zero.
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
-                    Instruction::RightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                    MovU32ImmU32Reg(0x0, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    RightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R2, 0x1),
@@ -3069,8 +2922,8 @@ mod tests_cpu {
             // This should assert as a shift of value higher than 31 is unsupported.
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x20, RegisterId::R2),
-                    Instruction::RightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                    MovU32ImmU32Reg(0x20, RegisterId::R2),
+                    RightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[],
                 vec![],
@@ -3080,8 +2933,8 @@ mod tests_cpu {
             // Test that a right-shift by zero leaves the value unchanged.
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::RightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    RightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1)],
                 vec![0; 100],
@@ -3101,8 +2954,8 @@ mod tests_cpu {
         let tests = [
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R1),
-                    Instruction::ArithRightShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    ArithRightShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1)],
                 vec![0; 100],
@@ -3111,11 +2964,8 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(
-                        0b0111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::ArithRightShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    ArithRightShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0b1011_1111_1111_1111_1111_1111_1111_1111),
@@ -3131,8 +2981,8 @@ mod tests_cpu {
             // Just zero flag should be set here since zero right-shifted by anything will be zero.
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
-                    Instruction::ArithRightShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x0, RegisterId::R1),
+                    ArithRightShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[(
                     RegisterId::FL,
@@ -3145,8 +2995,8 @@ mod tests_cpu {
             // Test that a right-shift by zero leaves the value unchanged.
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::ArithRightShiftU32ImmU32Reg(0x0, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    ArithRightShiftU32ImmU32Reg(0x0, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1)],
                 vec![0; 100],
@@ -3157,12 +3007,9 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Clear every flag.
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    Instruction::MovU32ImmU32Reg(
-                        0b0000_0000_0000_0000_0000_0000_0000_0001,
-                        RegisterId::R1,
-                    ),
-                    Instruction::ArithRightShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0b0000_0000_0000_0000_0000_0000_0000_0001, RegisterId::R1),
+                    ArithRightShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0b1000_0000_0000_0000_0000_0000_0000_0000),
@@ -3179,12 +3026,9 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the signed flag.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::SF]),
-                        RegisterId::FL,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R1),
-                    Instruction::ArithRightShiftU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    ArithRightShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1), (RegisterId::FL, 0x0)],
                 vec![0; 100],
@@ -3204,9 +3048,9 @@ mod tests_cpu {
         let tests = [
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R1),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
-                    Instruction::ArithRightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    ArithRightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1), (RegisterId::R2, 0x1)],
                 vec![0; 100],
@@ -3215,12 +3059,9 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(
-                        0b0111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
-                    Instruction::ArithRightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                    MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    ArithRightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0b1011_1111_1111_1111_1111_1111_1111_1111),
@@ -3237,9 +3078,9 @@ mod tests_cpu {
             // Just zero flag should be set here since zero left-shifted by anything will be zero.
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
-                    Instruction::ArithRightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                    MovU32ImmU32Reg(0x0, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    ArithRightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R2, 0x1),
@@ -3255,8 +3096,8 @@ mod tests_cpu {
             // Test that a right-shift by zero leaves the value unchanged.
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::ArithRightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    ArithRightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1)],
                 vec![0; 100],
@@ -3267,13 +3108,10 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Clear every flag.
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    Instruction::MovU32ImmU32Reg(
-                        0b0000_0000_0000_0000_0000_0000_0000_0001,
-                        RegisterId::R1,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
-                    Instruction::ArithRightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0b0000_0000_0000_0000_0000_0000_0000_0001, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    ArithRightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0b1000_0000_0000_0000_0000_0000_0000_0000),
@@ -3291,13 +3129,10 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the signed flag.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::SF]),
-                        RegisterId::FL,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R1),
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R2),
-                    Instruction::ArithRightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    ArithRightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0x1),
@@ -3320,7 +3155,7 @@ mod tests_cpu {
     fn test_move_u32_imm_u32_reg() {
         let tests = [
             TestEntryU32Standard::new(
-                &[Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1)],
+                &[MovU32ImmU32Reg(0x1, RegisterId::R1)],
                 &[(RegisterId::R1, 0x1)],
                 vec![0; 100],
                 false,
@@ -3328,8 +3163,8 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x2)],
                 vec![0; 100],
@@ -3349,8 +3184,8 @@ mod tests_cpu {
         let tests = [
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::MovU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32RegU32Reg(RegisterId::R1, RegisterId::R2),
                 ],
                 &[(RegisterId::R1, 0x1), (RegisterId::R2, 0x1)],
                 vec![0; 100],
@@ -3359,9 +3194,9 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    Instruction::MovU32ImmU32Reg(0x2, RegisterId::R2),
-                    Instruction::MovU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x2, RegisterId::R2),
+                    MovU32RegU32Reg(RegisterId::R1, RegisterId::R2),
                 ],
                 &[(RegisterId::R1, 0x1), (RegisterId::R2, 0x1)],
                 vec![0; 100],
@@ -3379,7 +3214,7 @@ mod tests_cpu {
     #[test]
     fn test_move_u32_lit_mem() {
         let tests = [TestEntryU32Standard::new(
-            &[Instruction::MovU32ImmMemRelSimple(0x123, 0x0)],
+            &[MovU32ImmMemRelSimple(0x123, 0x0)],
             &[],
             vec![
                 35, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3401,8 +3236,8 @@ mod tests_cpu {
     fn test_move_u32_reg_mem() {
         let tests = [TestEntryU32Standard::new(
             &[
-                Instruction::MovU32ImmU32Reg(0x123, RegisterId::R1),
-                Instruction::MovU32RegMemRelSimple(RegisterId::R1, 0x0),
+                MovU32ImmU32Reg(0x123, RegisterId::R1),
+                MovU32RegMemRelSimple(RegisterId::R1, 0x0),
             ],
             &[(RegisterId::R1, 0x123)],
             vec![
@@ -3426,10 +3261,10 @@ mod tests_cpu {
         let tests = [TestEntryU32Standard::new(
             &[
                 // Move the value to memory.
-                Instruction::MovU32ImmU32Reg(0x123, RegisterId::R1),
-                Instruction::MovU32RegMemRelSimple(RegisterId::R1, 0x0),
+                MovU32ImmU32Reg(0x123, RegisterId::R1),
+                MovU32RegMemRelSimple(RegisterId::R1, 0x0),
                 // Move the value from memory to a register.
-                Instruction::MovMemU32RegRelSimple(0x0, RegisterId::R2),
+                MovMemU32RegRelSimple(0x0, RegisterId::R2),
             ],
             &[(RegisterId::R1, 0x123), (RegisterId::R2, 0x123)],
             vec![
@@ -3453,12 +3288,12 @@ mod tests_cpu {
         let tests = [TestEntryU32Standard::new(
             &[
                 // Store value in memory.
-                Instruction::MovU32ImmU32Reg(0x123, RegisterId::R1),
-                Instruction::MovU32RegMemRelSimple(RegisterId::R1, 0x0),
+                MovU32ImmU32Reg(0x123, RegisterId::R1),
+                MovU32RegMemRelSimple(RegisterId::R1, 0x0),
                 // Set the address pointer in R2.
-                Instruction::MovU32ImmU32Reg(0x0, RegisterId::R2),
+                MovU32ImmU32Reg(0x0, RegisterId::R2),
                 // Read the value from the address of R2 into R1.
-                Instruction::MovU32RegPtrU32RegRelSimple(RegisterId::R2, RegisterId::R3),
+                MovU32RegPtrU32RegRelSimple(RegisterId::R2, RegisterId::R3),
             ],
             &[(RegisterId::R1, 0x123), (RegisterId::R3, 0x123)],
             vec![
@@ -3481,9 +3316,9 @@ mod tests_cpu {
     fn test_swap_u32_reg_u32_reg() {
         let tests = [TestEntryU32Standard::new(
             &[
-                Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-                Instruction::MovU32ImmU32Reg(0x2, RegisterId::R2),
-                Instruction::SwapU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                MovU32ImmU32Reg(0x1, RegisterId::R1),
+                MovU32ImmU32Reg(0x2, RegisterId::R2),
+                SwapU32RegU32Reg(RegisterId::R1, RegisterId::R2),
             ],
             &[(RegisterId::R1, 0x2), (RegisterId::R2, 0x1)],
             vec![0; 100],
@@ -3501,7 +3336,7 @@ mod tests_cpu {
     fn test_move_u32_imm_expr() {
         let mut handler = MoveExpressionHandler::new();
 
-        let test_1_args = [Instruction::MovU32ImmMemExprRel(
+        let test_1_args = [MovU32ImmMemExprRel(
             0x123,
             handler.encode(&[
                 ExpressionArgs::Constant(0x8),
@@ -3511,9 +3346,9 @@ mod tests_cpu {
         )];
 
         let test_2_args = [
-            Instruction::MovU32ImmU32Reg(0x8, RegisterId::R1),
-            Instruction::MovU32ImmU32Reg(0x8, RegisterId::R2),
-            Instruction::MovU32ImmMemExprRel(
+            MovU32ImmU32Reg(0x8, RegisterId::R1),
+            MovU32ImmU32Reg(0x8, RegisterId::R2),
+            MovU32ImmMemExprRel(
                 0x123,
                 handler.encode(&[
                     ExpressionArgs::Register(RegisterId::R1),
@@ -3524,8 +3359,8 @@ mod tests_cpu {
         ];
 
         let test_3_args = [
-            Instruction::MovU32ImmU32Reg(0x8, RegisterId::R1),
-            Instruction::MovU32ImmMemExprRel(
+            MovU32ImmU32Reg(0x8, RegisterId::R1),
+            MovU32ImmMemExprRel(
                 0x123,
                 handler.encode(&[
                     ExpressionArgs::Register(RegisterId::R1),
@@ -3536,9 +3371,9 @@ mod tests_cpu {
         ];
 
         let test_4_args = [
-            Instruction::MovU32ImmU32Reg(0x2, RegisterId::R1),
-            Instruction::MovU32ImmU32Reg(0x8, RegisterId::R2),
-            Instruction::MovU32ImmMemExprRel(
+            MovU32ImmU32Reg(0x2, RegisterId::R1),
+            MovU32ImmU32Reg(0x8, RegisterId::R2),
+            MovU32ImmMemExprRel(
                 0x123,
                 handler.encode(&[
                     ExpressionArgs::Register(RegisterId::R1),
@@ -3549,9 +3384,9 @@ mod tests_cpu {
         ];
 
         let test_5_args = [
-            Instruction::MovU32ImmU32Reg(0x1a, RegisterId::R1),
-            Instruction::MovU32ImmU32Reg(0x4, RegisterId::R2),
-            Instruction::MovU32ImmMemExprRel(
+            MovU32ImmU32Reg(0x1a, RegisterId::R1),
+            MovU32ImmU32Reg(0x4, RegisterId::R2),
+            MovU32ImmMemExprRel(
                 0x123,
                 handler.encode(&[
                     ExpressionArgs::Register(RegisterId::R1),
@@ -3635,8 +3470,8 @@ mod tests_cpu {
         let mut handler = MoveExpressionHandler::new();
 
         let test_1_args = [
-            Instruction::MovU32ImmMemRelSimple(0x123, 0x10),
-            Instruction::MovMemExprU32RegRel(
+            MovU32ImmMemRelSimple(0x123, 0x10),
+            MovMemExprU32RegRel(
                 handler.encode(&[
                     ExpressionArgs::Constant(0x8),
                     ExpressionArgs::Operator(ExpressionOperator::Add),
@@ -3647,10 +3482,10 @@ mod tests_cpu {
         ];
 
         let test_2_args = [
-            Instruction::MovU32ImmMemRelSimple(0x123, 0x10),
-            Instruction::MovU32ImmU32Reg(0x8, RegisterId::R1),
-            Instruction::MovU32ImmU32Reg(0x8, RegisterId::R2),
-            Instruction::MovMemExprU32RegRel(
+            MovU32ImmMemRelSimple(0x123, 0x10),
+            MovU32ImmU32Reg(0x8, RegisterId::R1),
+            MovU32ImmU32Reg(0x8, RegisterId::R2),
+            MovMemExprU32RegRel(
                 handler.encode(&[
                     ExpressionArgs::Register(RegisterId::R1),
                     ExpressionArgs::Operator(ExpressionOperator::Add),
@@ -3661,9 +3496,9 @@ mod tests_cpu {
         ];
 
         let test_3_args = [
-            Instruction::MovU32ImmMemRelSimple(0x123, 0x10),
-            Instruction::MovU32ImmU32Reg(0x8, RegisterId::R1),
-            Instruction::MovMemExprU32RegRel(
+            MovU32ImmMemRelSimple(0x123, 0x10),
+            MovU32ImmU32Reg(0x8, RegisterId::R1),
+            MovMemExprU32RegRel(
                 handler.encode(&[
                     ExpressionArgs::Register(RegisterId::R1),
                     ExpressionArgs::Operator(ExpressionOperator::Add),
@@ -3674,10 +3509,10 @@ mod tests_cpu {
         ];
 
         let test_4_args = [
-            Instruction::MovU32ImmMemRelSimple(0x123, 0x10),
-            Instruction::MovU32ImmU32Reg(0x2, RegisterId::R1),
-            Instruction::MovU32ImmU32Reg(0x8, RegisterId::R2),
-            Instruction::MovMemExprU32RegRel(
+            MovU32ImmMemRelSimple(0x123, 0x10),
+            MovU32ImmU32Reg(0x2, RegisterId::R1),
+            MovU32ImmU32Reg(0x8, RegisterId::R2),
+            MovMemExprU32RegRel(
                 handler.encode(&[
                     ExpressionArgs::Register(RegisterId::R1),
                     ExpressionArgs::Operator(ExpressionOperator::Multiply),
@@ -3688,10 +3523,10 @@ mod tests_cpu {
         ];
 
         let test_5_args = [
-            Instruction::MovU32ImmMemRelSimple(0x123, 0x16),
-            Instruction::MovU32ImmU32Reg(0x1A, RegisterId::R1),
-            Instruction::MovU32ImmU32Reg(0x4, RegisterId::R2),
-            Instruction::MovMemExprU32RegRel(
+            MovU32ImmMemRelSimple(0x123, 0x16),
+            MovU32ImmU32Reg(0x1A, RegisterId::R1),
+            MovU32ImmU32Reg(0x4, RegisterId::R2),
+            MovMemExprU32RegRel(
                 handler.encode(&[
                     ExpressionArgs::Register(RegisterId::R1),
                     ExpressionArgs::Operator(ExpressionOperator::Subtract),
@@ -3787,8 +3622,8 @@ mod tests_cpu {
         let mut handler = MoveExpressionHandler::new();
 
         let test_1_args = [
-            Instruction::MovU32ImmU32Reg(0x123, RegisterId::R8),
-            Instruction::MovU32RegMemExprRel(
+            MovU32ImmU32Reg(0x123, RegisterId::R8),
+            MovU32RegMemExprRel(
                 RegisterId::R8,
                 handler.encode(&[
                     ExpressionArgs::Constant(0x8),
@@ -3799,10 +3634,10 @@ mod tests_cpu {
         ];
 
         let test_2_args = [
-            Instruction::MovU32ImmU32Reg(0x8, RegisterId::R1),
-            Instruction::MovU32ImmU32Reg(0x8, RegisterId::R2),
-            Instruction::MovU32ImmU32Reg(0x123, RegisterId::R8),
-            Instruction::MovU32RegMemExprRel(
+            MovU32ImmU32Reg(0x8, RegisterId::R1),
+            MovU32ImmU32Reg(0x8, RegisterId::R2),
+            MovU32ImmU32Reg(0x123, RegisterId::R8),
+            MovU32RegMemExprRel(
                 RegisterId::R8,
                 handler.encode(&[
                     ExpressionArgs::Register(RegisterId::R1),
@@ -3813,9 +3648,9 @@ mod tests_cpu {
         ];
 
         let test_3_args = [
-            Instruction::MovU32ImmU32Reg(0x8, RegisterId::R1),
-            Instruction::MovU32ImmU32Reg(0x123, RegisterId::R8),
-            Instruction::MovU32RegMemExprRel(
+            MovU32ImmU32Reg(0x8, RegisterId::R1),
+            MovU32ImmU32Reg(0x123, RegisterId::R8),
+            MovU32RegMemExprRel(
                 RegisterId::R8,
                 handler.encode(&[
                     ExpressionArgs::Register(RegisterId::R1),
@@ -3826,10 +3661,10 @@ mod tests_cpu {
         ];
 
         let test_4_args = [
-            Instruction::MovU32ImmU32Reg(0x2, RegisterId::R1),
-            Instruction::MovU32ImmU32Reg(0x8, RegisterId::R2),
-            Instruction::MovU32ImmU32Reg(0x123, RegisterId::R8),
-            Instruction::MovU32RegMemExprRel(
+            MovU32ImmU32Reg(0x2, RegisterId::R1),
+            MovU32ImmU32Reg(0x8, RegisterId::R2),
+            MovU32ImmU32Reg(0x123, RegisterId::R8),
+            MovU32RegMemExprRel(
                 RegisterId::R8,
                 handler.encode(&[
                     ExpressionArgs::Register(RegisterId::R1),
@@ -3840,10 +3675,10 @@ mod tests_cpu {
         ];
 
         let test_5_args = [
-            Instruction::MovU32ImmU32Reg(0x1A, RegisterId::R1),
-            Instruction::MovU32ImmU32Reg(0x4, RegisterId::R2),
-            Instruction::MovU32ImmU32Reg(0x123, RegisterId::R8),
-            Instruction::MovU32RegMemExprRel(
+            MovU32ImmU32Reg(0x1A, RegisterId::R1),
+            MovU32ImmU32Reg(0x4, RegisterId::R2),
+            MovU32ImmU32Reg(0x123, RegisterId::R8),
+            MovU32RegMemExprRel(
                 RegisterId::R8,
                 handler.encode(&[
                     ExpressionArgs::Register(RegisterId::R1),
@@ -3942,8 +3777,8 @@ mod tests_cpu {
     fn test_byte_swap_u32_reg() {
         let tests = [TestEntryU32Standard::new(
             &[
-                Instruction::MovU32ImmU32Reg(0xAABBCCDD, RegisterId::R1),
-                Instruction::ByteSwapU32(RegisterId::R1),
+                MovU32ImmU32Reg(0xAABBCCDD, RegisterId::R1),
+                ByteSwapU32(RegisterId::R1),
             ],
             &[(RegisterId::R1, 0xDDCCBBAA)],
             vec![0; 100],
@@ -3962,16 +3797,9 @@ mod tests_cpu {
         let tests = [
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x4, RegisterId::R2),
-                    Instruction::ZeroHighBitsByIndexU32Reg(
-                        RegisterId::R2,
-                        RegisterId::R1,
-                        RegisterId::R3,
-                    ),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    MovU32ImmU32Reg(0x4, RegisterId::R2),
+                    ZeroHighBitsByIndexU32Reg(RegisterId::R2, RegisterId::R1, RegisterId::R3),
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
@@ -3985,16 +3813,9 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x18, RegisterId::R2),
-                    Instruction::ZeroHighBitsByIndexU32Reg(
-                        RegisterId::R2,
-                        RegisterId::R1,
-                        RegisterId::R3,
-                    ),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    MovU32ImmU32Reg(0x18, RegisterId::R2),
+                    ZeroHighBitsByIndexU32Reg(RegisterId::R2, RegisterId::R1, RegisterId::R3),
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
@@ -4008,16 +3829,9 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x19, RegisterId::R2),
-                    Instruction::ZeroHighBitsByIndexU32Reg(
-                        RegisterId::R2,
-                        RegisterId::R1,
-                        RegisterId::R3,
-                    ),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    MovU32ImmU32Reg(0x19, RegisterId::R2),
+                    ZeroHighBitsByIndexU32Reg(RegisterId::R2, RegisterId::R1, RegisterId::R3),
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
@@ -4031,16 +3845,9 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::MovU32ImmU32Reg(0x1b, RegisterId::R2),
-                    Instruction::ZeroHighBitsByIndexU32Reg(
-                        RegisterId::R2,
-                        RegisterId::R1,
-                        RegisterId::R3,
-                    ),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1b, RegisterId::R2),
+                    ZeroHighBitsByIndexU32Reg(RegisterId::R2, RegisterId::R1, RegisterId::R3),
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
@@ -4053,13 +3860,9 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R2),
-                    Instruction::ZeroHighBitsByIndexU32Reg(
-                        RegisterId::R2,
-                        RegisterId::R1,
-                        RegisterId::R3,
-                    ),
+                    MovU32ImmU32Reg(0x0, RegisterId::R1),
+                    MovU32ImmU32Reg(0x0, RegisterId::R2),
+                    ZeroHighBitsByIndexU32Reg(RegisterId::R2, RegisterId::R1, RegisterId::R3),
                 ],
                 &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF]))],
                 vec![0; 100],
@@ -4069,11 +3872,8 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the overflow flag state.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::OF]),
-                        RegisterId::FL,
-                    ),
-                    Instruction::ZeroHighBitsByIndexU32Reg(
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::OF]), RegisterId::FL),
+                    ZeroHighBitsByIndexU32Reg(
                         RegisterId::R1, // Already has the value of 0.
                         RegisterId::R2, // Already has the value of 0.
                         RegisterId::R3,
@@ -4086,8 +3886,8 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x20, RegisterId::R2),
-                    Instruction::ZeroHighBitsByIndexU32Reg(
+                    MovU32ImmU32Reg(0x20, RegisterId::R2),
+                    ZeroHighBitsByIndexU32Reg(
                         RegisterId::R2,
                         RegisterId::R1, // Already has the value of 0.
                         RegisterId::R3,
@@ -4102,16 +3902,10 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Clear every flag.
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    Instruction::MovU32ImmU32Reg(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::MovU32ImmU32Reg(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R3,
-                    ),
-                    Instruction::ZeroHighBitsByIndexU32Reg(
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R3),
+                    ZeroHighBitsByIndexU32Reg(
                         RegisterId::R2, // Already has the value of 0.
                         RegisterId::R1,
                         RegisterId::R3,
@@ -4133,19 +3927,10 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the signed flag.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::SF]),
-                        RegisterId::FL,
-                    ),
-                    Instruction::MovU32ImmU32Reg(
-                        0b0111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::MovU32ImmU32Reg(
-                        0b0111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R3,
-                    ),
-                    Instruction::ZeroHighBitsByIndexU32Reg(
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R3),
+                    ZeroHighBitsByIndexU32Reg(
                         RegisterId::R2, // Already has the value of 0.
                         RegisterId::R1,
                         RegisterId::R3,
@@ -4173,15 +3958,8 @@ mod tests_cpu {
         let tests = [
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::ZeroHighBitsByIndexU32RegU32Imm(
-                        0x4,
-                        RegisterId::R1,
-                        RegisterId::R2,
-                    ),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    ZeroHighBitsByIndexU32RegU32Imm(0x4, RegisterId::R1, RegisterId::R2),
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
@@ -4194,15 +3972,8 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::ZeroHighBitsByIndexU32RegU32Imm(
-                        0x18,
-                        RegisterId::R1,
-                        RegisterId::R2,
-                    ),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    ZeroHighBitsByIndexU32RegU32Imm(0x18, RegisterId::R1, RegisterId::R2),
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
@@ -4215,15 +3986,8 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::ZeroHighBitsByIndexU32RegU32Imm(
-                        0x19,
-                        RegisterId::R1,
-                        RegisterId::R2,
-                    ),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    ZeroHighBitsByIndexU32RegU32Imm(0x19, RegisterId::R1, RegisterId::R2),
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
@@ -4236,15 +4000,8 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::ZeroHighBitsByIndexU32RegU32Imm(
-                        0x1b,
-                        RegisterId::R1,
-                        RegisterId::R2,
-                    ),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    ZeroHighBitsByIndexU32RegU32Imm(0x1b, RegisterId::R1, RegisterId::R2),
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
@@ -4255,7 +4012,7 @@ mod tests_cpu {
                 "ZHBI - incorrect result value produced",
             ),
             TestEntryU32Standard::new(
-                &[Instruction::ZeroHighBitsByIndexU32RegU32Imm(
+                &[ZeroHighBitsByIndexU32RegU32Imm(
                     0x0,
                     RegisterId::R1, // Already has the value of 0.
                     RegisterId::R2,
@@ -4268,11 +4025,8 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the overflow flag state.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::OF]),
-                        RegisterId::FL,
-                    ),
-                    Instruction::ZeroHighBitsByIndexU32RegU32Imm(
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::OF]), RegisterId::FL),
+                    ZeroHighBitsByIndexU32RegU32Imm(
                         0x0,
                         RegisterId::R1,
                         RegisterId::R2, // Already has the value of 0.
@@ -4284,7 +4038,7 @@ mod tests_cpu {
                 "ZHBI - incorrect flag state - overflow flag not cleared",
             ),
             TestEntryU32Standard::new(
-                &[Instruction::ZeroHighBitsByIndexU32RegU32Imm(
+                &[ZeroHighBitsByIndexU32RegU32Imm(
                     0x20,
                     RegisterId::R1,
                     RegisterId::R2,
@@ -4298,20 +4052,10 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Clear every flag.
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    Instruction::MovU32ImmU32Reg(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::MovU32ImmU32Reg(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R2,
-                    ),
-                    Instruction::ZeroHighBitsByIndexU32RegU32Imm(
-                        0x0,
-                        RegisterId::R1,
-                        RegisterId::R2,
-                    ),
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R2),
+                    ZeroHighBitsByIndexU32RegU32Imm(0x0, RegisterId::R1, RegisterId::R2),
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
@@ -4329,23 +4073,10 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the signed flag.
-                    Instruction::MovU32ImmU32Reg(
-                        CpuFlag::compute_for(&[CpuFlag::SF]),
-                        RegisterId::FL,
-                    ),
-                    Instruction::MovU32ImmU32Reg(
-                        0b0111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::MovU32ImmU32Reg(
-                        0b0111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R2,
-                    ),
-                    Instruction::ZeroHighBitsByIndexU32RegU32Imm(
-                        0x0,
-                        RegisterId::R1,
-                        RegisterId::R2,
-                    ),
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R2),
+                    ZeroHighBitsByIndexU32RegU32Imm(0x0, RegisterId::R1, RegisterId::R2),
                 ],
                 &[
                     (RegisterId::R1, 0b0111_1111_1111_1111_1111_1111_1111_1111),
@@ -4369,11 +4100,8 @@ mod tests_cpu {
         let tests = [
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::BitTestU32Reg(0x0, RegisterId::R1),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    BitTestU32Reg(0x0, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
@@ -4385,11 +4113,8 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(
-                        0b1111_1111_1111_1111_1111_1111_1111_1110,
-                        RegisterId::R1,
-                    ),
-                    Instruction::BitTestU32Reg(0x0, RegisterId::R1),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1110, RegisterId::R1),
+                    BitTestU32Reg(0x0, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1110)],
                 vec![0; 100],
@@ -4397,7 +4122,7 @@ mod tests_cpu {
                 "BT - incorrect result produced from the bit-test instruction - carry flag set",
             ),
             TestEntryU32Standard::new(
-                &[Instruction::BitTestU32Reg(0x20, RegisterId::R1)],
+                &[BitTestU32Reg(0x20, RegisterId::R1)],
                 &[],
                 vec![],
                 true,
@@ -4416,11 +4141,8 @@ mod tests_cpu {
         let tests = [
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmMemRelSimple(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        0x0,
-                    ),
-                    Instruction::BitTestU32Mem(0x0, 0x0),
+                    MovU32ImmMemRelSimple(0b1111_1111_1111_1111_1111_1111_1111_1111, 0x0),
+                    BitTestU32Mem(0x0, 0x0),
                 ],
                 &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::CF]))],
                 vec![
@@ -4434,11 +4156,8 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmMemRelSimple(
-                        0b1111_1111_1111_1111_1111_1111_1111_1110,
-                        0x0,
-                    ),
-                    Instruction::BitTestU32Mem(0x0, 0x0),
+                    MovU32ImmMemRelSimple(0b1111_1111_1111_1111_1111_1111_1111_1110, 0x0),
+                    BitTestU32Mem(0x0, 0x0),
                 ],
                 &[],
                 vec![
@@ -4451,7 +4170,7 @@ mod tests_cpu {
                 "BT - incorrect result produced from the bit-test instruction - carry flag set",
             ),
             TestEntryU32Standard::new(
-                &[Instruction::BitTestU32Mem(0x20, 0x0)],
+                &[BitTestU32Mem(0x20, 0x0)],
                 &[],
                 vec![],
                 true,
@@ -4470,11 +4189,11 @@ mod tests_cpu {
         let tests = [
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(
+                    MovU32ImmU32Reg(
                         0b1111_1111_1111_1111_1111_1111_1111_1111,
                         RegisterId::R1,
                     ),
-                    Instruction::BitTestResetU32Reg(0x0, RegisterId::R1),
+                    BitTestResetU32Reg(0x0, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
@@ -4486,11 +4205,11 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(
+                    MovU32ImmU32Reg(
                         0b1111_1111_1111_1111_1111_1111_1111_1110,
                         RegisterId::R1,
                     ),
-                    Instruction::BitTestResetU32Reg(0x0, RegisterId::R1),
+                    BitTestResetU32Reg(0x0, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1110)],
                 vec![0; 100],
@@ -4499,7 +4218,7 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::BitTestResetU32Reg(0x20, RegisterId::R1),
+                    BitTestResetU32Reg(0x20, RegisterId::R1),
                 ],
                 &[],
                 vec![],
@@ -4519,11 +4238,11 @@ mod tests_cpu {
         let tests = [
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmMemRelSimple(
+                    MovU32ImmMemRelSimple(
                         0b1111_1111_1111_1111_1111_1111_1111_1111,
                         0x0,
                     ),
-                    Instruction::BitTestResetU32Mem(0x0, 0x0),
+                    BitTestResetU32Mem(0x0, 0x0),
                 ],
                 &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::CF]))],
                 vec![
@@ -4537,11 +4256,11 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmMemRelSimple(
+                    MovU32ImmMemRelSimple(
                         0b1111_1111_1111_1111_1111_1111_1111_1110,
                         0x0,
                     ),
-                    Instruction::BitTestResetU32Mem(0x0, 0x0),
+                    BitTestResetU32Mem(0x0, 0x0),
                 ],
                 &[],
                 vec![
@@ -4555,7 +4274,7 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::BitTestResetU32Mem(0x20, 0x0),
+                    BitTestResetU32Mem(0x20, 0x0),
                 ],
                 &[],
                 vec![],
@@ -4575,11 +4294,11 @@ mod tests_cpu {
         let tests = [
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(
+                    MovU32ImmU32Reg(
                         0b1111_1111_1111_1111_1111_1111_1111_1111,
                         RegisterId::R1,
                     ),
-                    Instruction::BitTestSetU32Reg(0x0, RegisterId::R1),
+                    BitTestSetU32Reg(0x0, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
@@ -4591,11 +4310,11 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(
+                    MovU32ImmU32Reg(
                         0b1111_1111_1111_1111_1111_1111_1111_1110,
                         RegisterId::R1,
                     ),
-                    Instruction::BitTestSetU32Reg(0x0, RegisterId::R1),
+                    BitTestSetU32Reg(0x0, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111)],
                 vec![0; 100],
@@ -4604,7 +4323,7 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::BitTestSetU32Reg(0x20, RegisterId::R1),
+                    BitTestSetU32Reg(0x20, RegisterId::R1),
                 ],
                 &[],
                 vec![],
@@ -4624,11 +4343,11 @@ mod tests_cpu {
         let tests = [
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmMemRelSimple(
+                    MovU32ImmMemRelSimple(
                         0b1111_1111_1111_1111_1111_1111_1111_1111,
                         0x0,
                     ),
-                    Instruction::BitTestSetU32Mem(0x0, 0x0),
+                    BitTestSetU32Mem(0x0, 0x0),
                 ],
                 &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::CF]))],
                 vec![
@@ -4642,11 +4361,11 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmMemRelSimple(
+                    MovU32ImmMemRelSimple(
                         0b1111_1111_1111_1111_1111_1111_1111_1110,
                         0x0,
                     ),
-                    Instruction::BitTestSetU32Mem(0x0, 0x0),
+                    BitTestSetU32Mem(0x0, 0x0),
                 ],
                 &[],
                 vec![
@@ -4660,7 +4379,7 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::BitTestSetU32Mem(0x20, 0x0),
+                    BitTestSetU32Mem(0x20, 0x0),
                 ],
                 &[],
                 vec![],
@@ -4680,11 +4399,8 @@ mod tests_cpu {
         let tests = [
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::BitScanReverseU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    BitScanReverseU32RegU32Reg(RegisterId::R1, RegisterId::R2),
                 ],
                 &[(RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111)],
                 vec![0; 100],
@@ -4693,11 +4409,8 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(
-                        0b0000_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::BitScanReverseU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                    MovU32ImmU32Reg(0b0000_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    BitScanReverseU32RegU32Reg(RegisterId::R1, RegisterId::R2),
                 ],
                 &[
                     (RegisterId::R1, 0b0000_1111_1111_1111_1111_1111_1111_1111),
@@ -4709,8 +4422,8 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
-                    Instruction::BitScanReverseU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                    MovU32ImmU32Reg(0x0, RegisterId::R1),
+                    BitScanReverseU32RegU32Reg(RegisterId::R1, RegisterId::R2),
                 ],
                 &[
                     (RegisterId::R2, 0x20),
@@ -4733,11 +4446,8 @@ mod tests_cpu {
         let tests = [
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmMemRelSimple(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        0x0,
-                    ),
-                    Instruction::BitScanReverseU32MemU32Reg(0x0, RegisterId::R1),
+                    MovU32ImmMemRelSimple(0b1111_1111_1111_1111_1111_1111_1111_1111, 0x0),
+                    BitScanReverseU32MemU32Reg(0x0, RegisterId::R1),
                 ],
                 &[],
                 vec![
@@ -4751,11 +4461,8 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmMemRelSimple(
-                        0b0000_1111_1111_1111_1111_1111_1111_1111,
-                        0x0,
-                    ),
-                    Instruction::BitScanReverseU32MemU32Reg(0x0, RegisterId::R1),
+                    MovU32ImmMemRelSimple(0b0000_1111_1111_1111_1111_1111_1111_1111, 0x0),
+                    BitScanReverseU32MemU32Reg(0x0, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x4)],
                 vec![
@@ -4768,7 +4475,7 @@ mod tests_cpu {
                 "BSR - incorrect result produced from the bit search",
             ),
             TestEntryU32Standard::new(
-                &[Instruction::BitScanReverseU32MemU32Reg(0x0, RegisterId::R1)],
+                &[BitScanReverseU32MemU32Reg(0x0, RegisterId::R1)],
                 &[
                     (RegisterId::R1, 0x20),
                     (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF])),
@@ -4790,11 +4497,8 @@ mod tests_cpu {
         let tests = [
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::BitScanReverseU32RegMemU32(RegisterId::R1, 0x0),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    BitScanReverseU32RegMemU32(RegisterId::R1, 0x0),
                 ],
                 &[(RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111)],
                 vec![0; 100],
@@ -4803,11 +4507,8 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(
-                        0b0000_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::BitScanReverseU32RegMemU32(RegisterId::R1, 0x0),
+                    MovU32ImmU32Reg(0b0000_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    BitScanReverseU32RegMemU32(RegisterId::R1, 0x0),
                 ],
                 &[(RegisterId::R1, 0b0000_1111_1111_1111_1111_1111_1111_1111)],
                 vec![
@@ -4820,7 +4521,7 @@ mod tests_cpu {
                 "BSR - incorrect result produced from the bit search",
             ),
             TestEntryU32Standard::new(
-                &[Instruction::BitScanReverseU32RegMemU32(RegisterId::R1, 0x0)],
+                &[BitScanReverseU32RegMemU32(RegisterId::R1, 0x0)],
                 &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF]))],
                 vec![
                     32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4844,11 +4545,8 @@ mod tests_cpu {
         let tests = [
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmMemRelSimple(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        0x0,
-                    ),
-                    Instruction::BitScanReverseU32MemU32Mem(0x0, 0x4),
+                    MovU32ImmMemRelSimple(0b1111_1111_1111_1111_1111_1111_1111_1111, 0x0),
+                    BitScanReverseU32MemU32Mem(0x0, 0x4),
                 ],
                 &[],
                 vec![
@@ -4862,11 +4560,8 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmMemRelSimple(
-                        0b0000_1111_1111_1111_1111_1111_1111_1111,
-                        0x0,
-                    ),
-                    Instruction::BitScanReverseU32MemU32Mem(0x0, 0x4),
+                    MovU32ImmMemRelSimple(0b0000_1111_1111_1111_1111_1111_1111_1111, 0x0),
+                    BitScanReverseU32MemU32Mem(0x0, 0x4),
                 ],
                 &[],
                 vec![
@@ -4879,7 +4574,7 @@ mod tests_cpu {
                 "BSR - incorrect result produced from the bit search",
             ),
             TestEntryU32Standard::new(
-                &[Instruction::BitScanReverseU32MemU32Mem(0x0, 0x4)],
+                &[BitScanReverseU32MemU32Mem(0x0, 0x4)],
                 &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF]))],
                 vec![
                     0, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4903,11 +4598,8 @@ mod tests_cpu {
         let tests = [
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::BitScanForwardU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    BitScanForwardU32RegU32Reg(RegisterId::R1, RegisterId::R2),
                 ],
                 &[(RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111)],
                 vec![0; 100],
@@ -4916,11 +4608,8 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(
-                        0b1111_1111_1111_1111_1111_1111_1111_0000,
-                        RegisterId::R1,
-                    ),
-                    Instruction::BitScanForwardU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_0000, RegisterId::R1),
+                    BitScanForwardU32RegU32Reg(RegisterId::R1, RegisterId::R2),
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_0000),
@@ -4932,8 +4621,8 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(0x0, RegisterId::R1),
-                    Instruction::BitScanForwardU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                    MovU32ImmU32Reg(0x0, RegisterId::R1),
+                    BitScanForwardU32RegU32Reg(RegisterId::R1, RegisterId::R2),
                 ],
                 &[
                     (RegisterId::R2, 0x20),
@@ -4956,11 +4645,8 @@ mod tests_cpu {
         let tests = [
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmMemRelSimple(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        0x0,
-                    ),
-                    Instruction::BitScanForwardU32MemU32Reg(0x0, RegisterId::R1),
+                    MovU32ImmMemRelSimple(0b1111_1111_1111_1111_1111_1111_1111_1111, 0x0),
+                    BitScanForwardU32MemU32Reg(0x0, RegisterId::R1),
                 ],
                 &[],
                 vec![
@@ -4974,11 +4660,8 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmMemRelSimple(
-                        0b1111_1111_1111_1111_1111_1111_1111_0000,
-                        0x0,
-                    ),
-                    Instruction::BitScanForwardU32MemU32Reg(0x0, RegisterId::R1),
+                    MovU32ImmMemRelSimple(0b1111_1111_1111_1111_1111_1111_1111_0000, 0x0),
+                    BitScanForwardU32MemU32Reg(0x0, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x4)],
                 vec![
@@ -4991,7 +4674,7 @@ mod tests_cpu {
                 "BSF - incorrect result produced from the bit search",
             ),
             TestEntryU32Standard::new(
-                &[Instruction::BitScanForwardU32MemU32Reg(0x0, RegisterId::R1)],
+                &[BitScanForwardU32MemU32Reg(0x0, RegisterId::R1)],
                 &[
                     (RegisterId::R1, 0x20),
                     (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF])),
@@ -5013,11 +4696,8 @@ mod tests_cpu {
         let tests = [
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::R1,
-                    ),
-                    Instruction::BitScanForwardU32RegMemU32(RegisterId::R1, 0x0),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    BitScanForwardU32RegMemU32(RegisterId::R1, 0x0),
                 ],
                 &[(RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111)],
                 vec![0; 100],
@@ -5026,11 +4706,8 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmU32Reg(
-                        0b1111_1111_1111_1111_1111_1111_1111_0000,
-                        RegisterId::R1,
-                    ),
-                    Instruction::BitScanForwardU32RegMemU32(RegisterId::R1, 0x0),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_0000, RegisterId::R1),
+                    BitScanForwardU32RegMemU32(RegisterId::R1, 0x0),
                 ],
                 &[(RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_0000)],
                 vec![
@@ -5043,7 +4720,7 @@ mod tests_cpu {
                 "BSF - incorrect result produced from the bit search",
             ),
             TestEntryU32Standard::new(
-                &[Instruction::BitScanForwardU32RegMemU32(RegisterId::R1, 0x0)],
+                &[BitScanForwardU32RegMemU32(RegisterId::R1, 0x0)],
                 &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF]))],
                 vec![
                     32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -5067,11 +4744,8 @@ mod tests_cpu {
         let tests = [
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmMemRelSimple(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        0x0,
-                    ),
-                    Instruction::BitScanForwardU32MemU32Mem(0x0, 0x4),
+                    MovU32ImmMemRelSimple(0b1111_1111_1111_1111_1111_1111_1111_1111, 0x0),
+                    BitScanForwardU32MemU32Mem(0x0, 0x4),
                 ],
                 &[],
                 vec![
@@ -5085,11 +4759,8 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
-                    Instruction::MovU32ImmMemRelSimple(
-                        0b1111_1111_1111_1111_1111_1111_1111_0000,
-                        0x0,
-                    ),
-                    Instruction::BitScanForwardU32MemU32Mem(0x0, 0x4),
+                    MovU32ImmMemRelSimple(0b1111_1111_1111_1111_1111_1111_1111_0000, 0x0),
+                    BitScanForwardU32MemU32Mem(0x0, 0x4),
                 ],
                 &[],
                 vec![
@@ -5102,7 +4773,7 @@ mod tests_cpu {
                 "BSR - incorrect result produced from the bit search",
             ),
             TestEntryU32Standard::new(
-                &[Instruction::BitScanForwardU32MemU32Mem(0x0, 0x4)],
+                &[BitScanForwardU32MemU32Mem(0x0, 0x4)],
                 &[(RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::ZF]))],
                 vec![
                     0, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
