@@ -124,9 +124,6 @@ fn main() {
                 ExpressionArgs::Constant(25),
             ]),
         ),*/
-        Instruction::LeftShiftU32ImmU32Reg(0x0, RegisterId::R1),
-        /*Instruction::MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
-        Instruction::AddU32ImmU32Reg(0x2, RegisterId::R1),*/
         Instruction::Hlt,
     ];
 

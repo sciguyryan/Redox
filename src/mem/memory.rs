@@ -110,6 +110,12 @@ impl Memory {
 
                 Instruction::MulU32ImmU32Reg(imm, reg)
             }
+            OpCode::MulU32RegU32Reg => {
+                let reg_1 = block.read_register_id();
+                let reg_2 = block.read_register_id();
+
+                Instruction::MulU32RegU32Reg(reg_1, reg_2)
+            }
             OpCode::IncU32Reg => {
                 let reg = block.read_register_id();
 

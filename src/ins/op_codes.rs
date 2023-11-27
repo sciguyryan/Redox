@@ -25,6 +25,8 @@ pub enum OpCode {
     SubU32RegU32Reg,
     /// Multiply a u32 register by a u32 immediate. The result is stored in the accumulator register.
     MulU32ImmU32Reg,
+    /// Multiply a u32 register by a u32 register. The result is stored in the accumulator register.
+    MulU32RegU32Reg,
     /// Increment a u32 register.
     IncU32Reg,
     /// Decrement a u32 register.
@@ -131,6 +133,7 @@ impl From<Instruction> for OpCode {
             Instruction::SubU32RegU32Imm(_, _) => OpCode::SubU32RegU32Imm,
             Instruction::SubU32RegU32Reg(_, _) => OpCode::SubU32RegU32Reg,
             Instruction::MulU32ImmU32Reg(_, _) => OpCode::MulU32ImmU32Reg,
+            Instruction::MulU32RegU32Reg(_, _) => OpCode::MulU32RegU32Reg,
             Instruction::IncU32Reg(_) => OpCode::IncU32Reg,
             Instruction::DecU32Reg(_) => OpCode::DecU32Reg,
 
