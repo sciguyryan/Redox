@@ -29,6 +29,8 @@ pub enum OpCode {
     MulU32RegU32Reg,
     /// Divide a u32 register by a u32 immediate. The result is stored in the accumulator register.
     DivU32ImmU32Reg,
+    /// Divide a u32 immediate by a u32 register. The result is stored in the accumulator register.
+    DivU32RegU32Imm,
     /// Increment a u32 register.
     IncU32Reg,
     /// Decrement a u32 register.
@@ -137,6 +139,7 @@ impl From<Instruction> for OpCode {
             Instruction::MulU32ImmU32Reg(_, _) => OpCode::MulU32ImmU32Reg,
             Instruction::MulU32RegU32Reg(_, _) => OpCode::MulU32RegU32Reg,
             Instruction::DivU32ImmU32Reg(_, _) => OpCode::DivU32ImmU32Reg,
+            Instruction::DivU32RegU32Imm(_, _) => OpCode::DivU32RegU32Imm,
             Instruction::IncU32Reg(_) => OpCode::IncU32Reg,
             Instruction::DecU32Reg(_) => OpCode::DecU32Reg,
 

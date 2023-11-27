@@ -649,6 +649,12 @@ impl Cpu {
 
                 self.update_u32_accumulator(new_value);
             }
+            Instruction::DivU32RegU32Imm(reg, imm) => {
+                let old_value = self.read_reg_u32(reg, privilege);
+                let new_value = self.perform_checked_div_u32(*imm, old_value);
+
+                self.update_u32_accumulator(new_value);
+            }
             Instruction::IncU32Reg(reg) => {
                 let value = self.read_reg_u32(reg, privilege);
                 let new_value = self.perform_checked_add_u32(value, 1);
@@ -2008,7 +2014,7 @@ mod tests_cpu {
         }
     }
 
-    /// Test the division a u32 register by a u32 immediate instruction.
+    /// Test the division of a u32 register by a u32 immediate instruction.
     #[test]
     fn test_div_u32_imm_u32_reg() {
         let tests = [
@@ -2034,6 +2040,44 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[DivU32ImmU32Reg(0x0, RegisterId::R1)],
+                &[],
+                vec![0; 100],
+                true,
+                "DIV - failed to panic when attempting to divide by zero",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the division of a u32 immediate by a u32 register instruction.
+    #[test]
+    fn test_div_u32_reg_u32_imm() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    DivU32RegU32Imm(RegisterId::R1, 0x1),
+                ],
+                &[(RegisterId::R1, 0x2), (RegisterId::AC, 0x2)],
+                vec![0; 100],
+                false,
+                "DIV - incorrect result value produced",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
+                    DivU32RegU32Imm(RegisterId::R1, 0x2),
+                ],
+                &[(RegisterId::R1, u32::MAX), (RegisterId::AC, 2147483647)],
+                vec![0; 100],
+                false,
+                "DIV - CPU flags not correctly set",
+            ),
+            TestEntryU32Standard::new(
+                &[DivU32RegU32Imm(RegisterId::R1, 0x0)],
                 &[],
                 vec![0; 100],
                 true,
