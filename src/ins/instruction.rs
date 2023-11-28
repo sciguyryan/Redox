@@ -43,6 +43,8 @@ pub enum Instruction {
     DivU32ImmU32Reg(u32, RegisterId),
     /// Divide a u32 immediate by a u32 register. The result is stored in the accumulator register.
     DivU32RegU32Imm(RegisterId, u32),
+    // Divide a u32 register by a u32 register. The result is stored in the accumulator register.
+    DivU32RegU32Reg(RegisterId, RegisterId),
     /// Increment a u32 register.
     IncU32Reg(RegisterId),
     /// Decrement a u32 register.
@@ -166,6 +168,9 @@ impl Display for Instruction {
             }
             Instruction::DivU32RegU32Imm(reg, imm) => {
                 format!("div {reg}, ${imm:02X}")
+            }
+            Instruction::DivU32RegU32Reg(reg_1, reg_2) => {
+                format!("div {reg_1} {reg_2}")
             }
             Instruction::IncU32Reg(reg) => {
                 format!("inc {reg}")
@@ -324,6 +329,7 @@ impl Instruction {
             OpCode::MulU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
             OpCode::DivU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
             OpCode::DivU32RegU32Imm => ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE,
+            OpCode::DivU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
             OpCode::IncU32Reg => ARG_REG_ID_SIZE,
             OpCode::DecU32Reg => ARG_REG_ID_SIZE,
 
