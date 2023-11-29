@@ -140,6 +140,12 @@ impl Memory {
 
                 Instruction::ModU32ImmU32Reg(imm, reg)
             }
+            OpCode::ModU32RegU32Imm => {
+                let reg = block.read_register_id();
+                let imm = block.read_u32();
+
+                Instruction::ModU32RegU32Imm(reg, imm)
+            }
             OpCode::IncU32Reg => {
                 let reg = block.read_register_id();
 
