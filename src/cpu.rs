@@ -695,6 +695,13 @@ impl Cpu {
 
                 self.update_u32_accumulator(new_value);
             }
+            Instruction::ModU32RegU32Reg(reg_1, reg_2) => {
+                let reg_1_val = self.read_reg_u32(reg_1, privilege);
+                let reg_2_val = self.read_reg_u32(reg_2, privilege);
+                let new_value = self.perform_modulo_u32(reg_2_val, reg_1_val);
+
+                self.update_u32_accumulator(new_value);
+            }
             Instruction::IncU32Reg(reg) => {
                 let value = self.read_reg_u32(reg, privilege);
                 let new_value = self.perform_checked_add_u32(value, 1);
@@ -2245,6 +2252,54 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[ModU32RegU32Imm(RegisterId::R1, 0x0)],
+                &[],
+                vec![0; 100],
+                true,
+                "MOD - failed to panic when attempting to divide by zero",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the modulo of a u32 register by a u32 register instruction.
+    #[test]
+    fn test_mod_u32_reg_u32_reg() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x2, RegisterId::R2),
+                    ModU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                ],
+                &[
+                    (RegisterId::R1, 0x1),
+                    (RegisterId::R2, 0x2),
+                    (RegisterId::AC, 0x0),
+                ],
+                vec![0; 100],
+                false,
+                "MOD - incorrect result value produced",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    MovU32ImmU32Reg(0x3, RegisterId::R2),
+                    ModU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                ],
+                &[
+                    (RegisterId::R1, 0x2),
+                    (RegisterId::R2, 0x3),
+                    (RegisterId::AC, 0x1),
+                ],
+                vec![0; 100],
+                false,
+                "MOD - incorrect result value produced",
+            ),
+            TestEntryU32Standard::new(
+                &[ModU32RegU32Reg(RegisterId::R1, RegisterId::R2)],
                 &[],
                 vec![0; 100],
                 true,

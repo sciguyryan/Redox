@@ -31,12 +31,14 @@ pub enum OpCode {
     DivU32ImmU32Reg,
     /// Divide a u32 immediate by a u32 register. The result is stored in the accumulator register.
     DivU32RegU32Imm,
-    /// Divide a u32 register by a u32 register. The result is stored in the accumulator register.
+    /// Divide a u32 register (B) by a u32 register (A). The result is stored in the accumulator register.
     DivU32RegU32Reg,
-    /// The modulo of a u32 register by a u32 immediate. The result is stored in the accumulator register.
+    /// Calculate the modulo of a u32 register by a u32 immediate. The result is stored in the accumulator register.
     ModU32ImmU32Reg,
-    /// The modulo of a u32 immediate by a u32 register. The result is stored in the accumulator register.
+    /// Calculate the modulo of a u32 immediate by a u32 register. The result is stored in the accumulator register.
     ModU32RegU32Imm,
+    /// Calculate the modulo of a u32 register (B) by a u32 register (A). The result is stored in the accumulator register.
+    ModU32RegU32Reg,
     /// Increment a u32 register.
     IncU32Reg,
     /// Decrement a u32 register.
@@ -149,6 +151,7 @@ impl From<Instruction> for OpCode {
             Instruction::DivU32RegU32Reg(_, _) => OpCode::DivU32RegU32Reg,
             Instruction::ModU32ImmU32Reg(_, _) => OpCode::ModU32ImmU32Reg,
             Instruction::ModU32RegU32Imm(_, _) => OpCode::ModU32RegU32Imm,
+            Instruction::ModU32RegU32Reg(_, _) => OpCode::ModU32RegU32Reg,
             Instruction::IncU32Reg(_) => OpCode::IncU32Reg,
             Instruction::DecU32Reg(_) => OpCode::DecU32Reg,
 
