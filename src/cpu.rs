@@ -263,7 +263,7 @@ impl Cpu {
     ///
     /// # Note
     ///
-    /// This method affects the following flags: none. Any other flags are undefined.
+    /// This method affects the following flags: none. All flags are undefined.
     #[inline(always)]
     fn perform_checked_div_u32(&mut self, value_1: u32, value_2: u32) -> u32 {
         // TODO - when implementing exceptions and interrupts, ensure one is triggered with division by zero.
@@ -284,7 +284,7 @@ impl Cpu {
     ///
     /// # Note
     ///
-    /// This method affects the following flags: none. Any other flags are undefined.
+    /// This method affects the following flags: none. All flags are undefined.
     #[inline(always)]
     fn perform_modulo_u32(&mut self, value_1: u32, value_2: u32) -> u32 {
         value_1 % value_2
@@ -305,7 +305,7 @@ impl Cpu {
     ///
     /// This method affects the following flags: Sign (SF), Overflow (OF), Zero (ZF), Carry (CF) and Parity (PF).
     ///
-    /// The overflow (OF) flag will only be affected by 1-bit shifts.
+    /// The Overflow (OF) flag will only be affected by 1-bit shifts. Any other flags are undefined.
     #[inline(always)]
     fn perform_checked_left_shift_u32(&mut self, value: u32, shift_by: u32) -> u32 {
         if shift_by == 0 {
@@ -431,6 +431,8 @@ impl Cpu {
     ///
     /// # Note
     ///
+    /// This method affects the following flags: Carry (CF). Any other flags are undefined.
+    ///
     /// This method will panic if the bit index is larger than the number of bytes in the value.
     #[inline(always)]
     fn perform_bit_test_with_carry_flag(&mut self, value: u32, bit: u8) {
@@ -450,6 +452,8 @@ impl Cpu {
     /// * `new_state` - The new state of the bit.
     ///
     /// # Note
+    ///
+    /// This method affects the following flags: Carry (CF). Any other flags are undefined.
     ///
     /// This method will panic if the bit index is larger than the number of bytes in the value.
     #[inline(always)]
@@ -473,17 +477,14 @@ impl Cpu {
     ///
     /// # Note
     ///
-    /// This method will set the zero flag if the value is zero, otherwise the flag will be cleared.
+    /// This method affects the following flags: ZF (CF). Any other flags are undefined.
+    ///
+    /// The Zero flag (ZF) will be set if the value is zero, otherwise the flag will be cleared.
     #[inline(always)]
     fn perform_forward_bit_search(&mut self, value: u32) -> u32 {
         self.set_flag_state(CpuFlag::ZF, value == 0);
 
-        // TODO - if we end up only supporting little Endian, this an be removed.
-        if cfg!(target_endian = "little") {
-            value.trailing_zeros()
-        } else {
-            value.leading_zeros()
-        }
+        value.trailing_zeros()
     }
 
     /// Perform a reverse set bit search on the specified value.
@@ -494,17 +495,14 @@ impl Cpu {
     ///
     /// # Note
     ///
-    /// This method will set the zero flag if the value is zero, otherwise the flag will be cleared.
+    /// This method affects the following flags: ZF (CF). Any other flags are undefined.
+    ///
+    /// The Zero flag (ZF) will be set if the value is zero, otherwise the flag will be cleared.
     #[inline(always)]
     fn perform_reverse_bit_search(&mut self, value: u32) -> u32 {
         self.set_flag_state(CpuFlag::ZF, value == 0);
 
-        // TODO - if we end up only supporting little Endian, this an be removed.
-        if cfg!(target_endian = "little") {
-            value.leading_zeros()
-        } else {
-            value.trailing_zeros()
-        }
+        value.leading_zeros()
     }
 
     /// Perform a zero of the high bits of the source value starting from a specified index.
@@ -519,7 +517,7 @@ impl Cpu {
     ///
     /// This method affects the following flags: Sign (SF), Zero (ZF), Carry (CF) and Parity (PF).
     ///
-    /// The Overflow (OF) flag will always be cleared.
+    /// The Overflow (OF) flag will always be cleared. Any other flags are undefined.
     #[inline(always)]
     fn perform_zero_high_bit_u32_reg(
         &mut self,
