@@ -271,6 +271,25 @@ impl Cpu {
         value_1.wrapping_div(value_2)
     }
 
+    /// Perform an integer modulo of two u32 values.
+    ///
+    /// # Arguments
+    ///
+    /// * `value_1` - The first u32 value.
+    /// * `value_2` - The second u32 value.
+    ///
+    /// # Returns
+    ///
+    /// The result of the operation.
+    ///
+    /// # Note
+    ///
+    /// This method affects the following flags: none. Any other flags are undefined.
+    #[inline(always)]
+    fn perform_modulo_u32(&mut self, value_1: u32, value_2: u32) -> u32 {
+        value_1 % value_2
+    }
+
     /// Perform a checked left-shift of two u32 values.
     ///
     /// # Arguments
@@ -661,6 +680,12 @@ impl Cpu {
                 let reg_1_val = self.read_reg_u32(reg_1, privilege);
                 let reg_2_val = self.read_reg_u32(reg_2, privilege);
                 let new_value = self.perform_checked_div_u32(reg_2_val, reg_1_val);
+
+                self.update_u32_accumulator(new_value);
+            }
+            Instruction::ModU32ImmU32Reg(imm, reg) => {
+                let reg_val = self.read_reg_u32(reg, privilege);
+                let new_value = self.perform_modulo_u32(reg_val, *imm);
 
                 self.update_u32_accumulator(new_value);
             }
@@ -2142,6 +2167,44 @@ mod tests_cpu {
                 vec![0; 100],
                 true,
                 "DIV - failed to panic when attempting to divide by zero",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the modulo of a u32 register by a u32 immediate instruction.
+    #[test]
+    fn test_mod_u32_imm_u32_reg() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    ModU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0x2), (RegisterId::AC, 0x0)],
+                vec![0; 100],
+                false,
+                "MOD - incorrect result value produced",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmU32Reg(0x3, RegisterId::R1),
+                    ModU32ImmU32Reg(0x2, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0x3), (RegisterId::AC, 0x1)],
+                vec![0; 100],
+                false,
+                "MOD - incorrect result value produced",
+            ),
+            TestEntryU32Standard::new(
+                &[DivU32ImmU32Reg(0x0, RegisterId::R1)],
+                &[],
+                vec![0; 100],
+                true,
+                "MOD - failed to panic when attempting to divide by zero",
             ),
         ];
 
