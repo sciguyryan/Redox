@@ -43,6 +43,8 @@ pub enum OpCode {
     IncU32Reg,
     /// Decrement a u32 register.
     DecU32Reg,
+    /// Perform a logical AND operation on a u32 immediate and a u32 register.
+    AndU32ImmU32Reg,
 
     /******** [Bit Operation Instructions] ********/
     /// Left-shift a u32 register by a u32 immediate. The result remains in the origin register.
@@ -154,6 +156,7 @@ impl From<Instruction> for OpCode {
             Instruction::ModU32RegU32Reg(_, _) => OpCode::ModU32RegU32Reg,
             Instruction::IncU32Reg(_) => OpCode::IncU32Reg,
             Instruction::DecU32Reg(_) => OpCode::DecU32Reg,
+            Instruction::AndU32ImmU32Reg(_, _) => OpCode::AndU32ImmU32Reg,
 
             /******** [Bit Operation Instructions] ********/
             Instruction::LeftShiftU32ImmU32Reg(_, _) => OpCode::LeftShiftU32ImmU32Reg,

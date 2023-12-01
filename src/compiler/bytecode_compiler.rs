@@ -60,7 +60,8 @@ impl Compiler {
             | Instruction::SubU32ImmU32Reg(imm, reg)
             | Instruction::MulU32ImmU32Reg(imm, reg)
             | Instruction::DivU32ImmU32Reg(imm, reg)
-            | Instruction::ModU32ImmU32Reg(imm, reg) => {
+            | Instruction::ModU32ImmU32Reg(imm, reg)
+            | Instruction::AndU32ImmU32Reg(imm, reg) => {
                 self.write_u32(imm);
                 self.write_register_id(&reg);
             }
@@ -224,6 +225,7 @@ mod tests_compiler {
                 OpCode::ModU32RegU32Reg => Instruction::ModU32RegU32Reg(R2, R3),
                 OpCode::IncU32Reg => Instruction::IncU32Reg(R2),
                 OpCode::DecU32Reg => Instruction::DecU32Reg(R2),
+                OpCode::AndU32ImmU32Reg => Instruction::AndU32ImmU32Reg(0x123, R2),
                 OpCode::LeftShiftU32ImmU32Reg => Instruction::LeftShiftU32ImmU32Reg(31, R2),
                 OpCode::LeftShiftU32RegU32Reg => Instruction::LeftShiftU32RegU32Reg(R2, R3),
                 OpCode::ArithLeftShiftU32ImmU32Reg => {

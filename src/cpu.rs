@@ -290,6 +290,35 @@ impl Cpu {
         value_1 % value_2
     }
 
+    /// Perform a bitwise and of two u32 values.
+    ///
+    /// # Arguments
+    ///
+    /// * `value_1` - The first u32 value.
+    /// * `value_2` - The second u32 value.
+    ///
+    /// # Returns
+    ///
+    /// The result of the operation.
+    ///
+    /// # Note
+    ///
+    /// This method affects the following flags: Sign (SF), Zero (ZF) and Parity (PF).
+    ///
+    /// The Overflow (OF) and Carry (CF) flags will always be cleared. Any other flags are undefined.
+    #[inline(always)]
+    fn perform_bitwise_and_u32(&mut self, value_1: u32, value_2: u32) -> u32 {
+        let new_value = value_1 & value_2;
+
+        self.set_flag_state(CpuFlag::SF, utils::is_bit_set(new_value, 31));
+        self.set_flag_state(CpuFlag::ZF, new_value == 0);
+        self.set_flag_state(CpuFlag::OF, false);
+        self.set_flag_state(CpuFlag::PF, Cpu::calculate_lowest_byte_parity(new_value));
+        self.set_flag_state(CpuFlag::CF, false);
+
+        new_value
+    }
+
     /// Perform a checked left-shift of two u32 values.
     ///
     /// # Arguments
@@ -711,6 +740,12 @@ impl Cpu {
                 let new_value = self.perform_checked_subtract_u32(value, 1);
 
                 self.write_reg_u32(reg, new_value, privilege);
+            }
+            Instruction::AndU32ImmU32Reg(imm, reg) => {
+                let value = self.read_reg_u32(reg, privilege);
+                let new_value = self.perform_bitwise_and_u32(*imm, value);
+
+                self.update_u32_accumulator(new_value);
             }
 
             /******** [Bit Operation Instructions] ********/
@@ -2493,6 +2528,121 @@ mod tests_cpu {
                 vec![0; 100],
                 false,
                 "DEC - CPU signed flag not correctly cleared",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the decrement u32 register instruction.
+    #[test]
+    fn test_bitwise_and_u32_imm_u32_reg() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmU32Reg(0x3, RegisterId::R1),
+                    AndU32ImmU32Reg(0x2, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0x3), (RegisterId::AC, 0x2)],
+                vec![0; 100],
+                false,
+                "AND - incorrect result value produced",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    AndU32ImmU32Reg(0x3, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0x2), (RegisterId::AC, 0x2)],
+                vec![0; 100],
+                false,
+                "AND - incorrect result value produced",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmU32Reg(0x0, RegisterId::R1),
+                    AndU32ImmU32Reg(0x3, RegisterId::R1),
+                ],
+                &[(
+                    RegisterId::FL,
+                    CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
+                )],
+                vec![0; 100],
+                false,
+                "AND - CPU flags not correctly set",
+            ),
+            // Test the parity flag gets set.
+            TestEntryU32Standard::new(
+                &[
+                    // Clear any set flags.
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x3, RegisterId::R1),
+                    AndU32ImmU32Reg(0x3, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0x3),
+                    (RegisterId::AC, 0x3),
+                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::PF])),
+                ],
+                vec![0; 100],
+                false,
+                "AND - CPU parity flag not correctly set",
+            ),
+            // Test the parity flag gets cleared.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the parity flag.
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::PF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x3, RegisterId::R1),
+                    AndU32ImmU32Reg(0x2, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0x3),
+                    (RegisterId::AC, 0x2),
+                    (RegisterId::FL, 0x0),
+                ],
+                vec![0; 100],
+                false,
+                "AND - CPU parity flag not correctly cleared",
+            ),
+            // Test the signed flag gets set.
+            TestEntryU32Standard::new(
+                &[
+                    // Clear every flag.
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    AndU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::AC, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::PF]),
+                    ),
+                ],
+                vec![0; 100],
+                false,
+                "AND - CPU signed flag not correctly set",
+            ),
+            // Test the signed flag gets cleared.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the signed flag.
+                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    AndU32ImmU32Reg(0x2, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0x2),
+                    (RegisterId::AC, 0x2),
+                    (RegisterId::FL, 0x0),
+                ],
+                vec![0; 100],
+                false,
+                "AND - CPU signed flag not correctly cleared",
             ),
         ];
 

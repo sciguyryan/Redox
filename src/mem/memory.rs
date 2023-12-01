@@ -162,6 +162,12 @@ impl Memory {
 
                 Instruction::DecU32Reg(reg)
             }
+            OpCode::AndU32ImmU32Reg => {
+                let imm = block.read_u32();
+                let reg = block.read_register_id();
+
+                Instruction::AndU32ImmU32Reg(imm, reg)
+            }
 
             /******** [Bit Operation Instructions] ********/
             OpCode::LeftShiftU32ImmU32Reg => {
