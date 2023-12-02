@@ -21,7 +21,7 @@ num-derive = "0.4.1"
 prettytable = "0.10.0"
 rand = "0.8.5"
 strum = "0.25.0"
-strum_macros = "0.25"
+strum_macros = "0.25.3"
 
 [target.'cfg(windows)'.build-dependencies]
 winres = "0.1.5"

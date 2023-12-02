@@ -2562,6 +2562,23 @@ mod tests_cpu {
             ),
             TestEntryU32Standard::new(
                 &[
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    AndU32ImmU32Reg(0x0, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0x2),
+                    (RegisterId::AC, 0x0),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
+                    ),
+                ],
+                vec![0; 100],
+                false,
+                "AND - incorrect result value produced",
+            ),
+            TestEntryU32Standard::new(
+                &[
                     MovU32ImmU32Reg(0x0, RegisterId::R1),
                     AndU32ImmU32Reg(0x3, RegisterId::R1),
                 ],
