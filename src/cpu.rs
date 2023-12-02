@@ -2536,7 +2536,7 @@ mod tests_cpu {
         }
     }
 
-    /// Test the decrement u32 register instruction.
+    /// Test the bitwise and of a u32 immediate and a u32 register instruction.
     #[test]
     fn test_bitwise_and_u32_imm_u32_reg() {
         let tests = [
