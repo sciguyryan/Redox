@@ -64,6 +64,9 @@ pub enum OpCode {
     /// Arithmetic right-shift a u32 register (B) by a u32 register (A). The result remains in register A.
     ArithRightShiftU32RegU32Reg,
 
+    /******** [Branching Instructions] ********/
+
+
     /******** [Data Instructions] ********/
     /// Swap the values of the two registers.
     SwapU32RegU32Reg,

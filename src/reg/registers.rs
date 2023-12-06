@@ -67,8 +67,8 @@ pub enum RegisterId {
     FL,
     /// Program counter register.
     PC,
-    /// A debug testing register.
-    DG,
+    /// Interrupt mask register.
+    IM,
 
     // [Test Registers] //
     #[cfg(test)]
@@ -93,7 +93,7 @@ impl Display for RegisterId {
             RegisterId::SP => "SP",
             RegisterId::FP => "FP",
             RegisterId::PC => "PC",
-            RegisterId::DG => "DG",
+            RegisterId::IM => "IM",
 
             #[cfg(test)]
             RegisterId::TEST0 => "TEST0",
