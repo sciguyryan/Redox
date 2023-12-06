@@ -106,9 +106,9 @@ impl Compiler {
                 self.write_u32(imm);
             }
 
-            /******** [u16 immediate] ********/
+            /******** [u32 immediate] ********/
             Instruction::Int(imm) => {
-                self.write_u16(imm);
+                self.write_u32(imm);
             }
 
             /******** [u8 immediate and u32 register] ********/
@@ -173,15 +173,6 @@ impl Compiler {
     /// * `reg_id` - The [`RegisterId`] to be written.
     fn write_register_id(&mut self, reg_id: &RegisterId) {
         self.bytes.push((*reg_id).into());
-    }
-
-    /// Write a u16 into the byte sequence.
-    ///
-    /// # Arguments
-    ///
-    /// * `value` - The value to be written.
-    fn write_u16(&mut self, value: u16) {
-        self.bytes.extend_from_slice(&value.to_le_bytes());
     }
 
     /// Write a u32 into the byte sequence.
@@ -260,7 +251,7 @@ mod tests_compiler {
                 OpCode::ArithRightShiftU32RegU32Reg => {
                     Instruction::ArithRightShiftU32RegU32Reg(R2, R3)
                 }
-                OpCode::Int => Instruction::Int(0xffff),
+                OpCode::Int => Instruction::Int(0xdeadbeef),
                 OpCode::IntRet => Instruction::IntRet,
                 OpCode::SwapU32RegU32Reg => Instruction::SwapU32RegU32Reg(R2, R3),
                 OpCode::MovU32ImmU32Reg => Instruction::MovU32ImmU32Reg(0x123, R2),

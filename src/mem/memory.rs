@@ -221,7 +221,7 @@ impl Memory {
 
             /******** [Branching Instructions] ********/
             OpCode::Int => {
-                let addr = block.read_u16();
+                let addr = block.read_u32();
 
                 Instruction::Int(addr)
             }

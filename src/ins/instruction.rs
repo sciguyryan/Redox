@@ -9,8 +9,6 @@ use super::op_codes::OpCode;
 
 /// The size of the instruction, in bytes.
 const INSTRUCTION_SIZE: u32 = 4;
-/// The size of a u16 argument, in bytes.
-const ARG_U16_IMM_SIZE: u32 = 2;
 /// The size of a u32 argument, in bytes.
 const ARG_U32_IMM_SIZE: u32 = 4;
 /// The size of a u8 argument, in bytes.
@@ -79,7 +77,7 @@ pub enum Instruction {
     ArithRightShiftU32RegU32Reg(RegisterId, RegisterId),
 
     /******** [Branching Instructions] ********/
-    Int(u16),
+    Int(u32),
     IntRet,
 
     /******** [Data Instructions] ********/
@@ -236,7 +234,7 @@ impl Display for Instruction {
                 format!("int ${addr:04X}")
             }
             Instruction::IntRet => {
-                format!("intret")
+                String::from("intret")
             }
 
             /******** [Data Instructions] ********/
@@ -382,7 +380,7 @@ impl Instruction {
             OpCode::ArithRightShiftU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Branching Instructions] ********/
-            OpCode::Int => ARG_U16_IMM_SIZE,
+            OpCode::Int => ARG_U32_IMM_SIZE,
             OpCode::IntRet => 0,
 
             /******** [Data Instructions] ********/

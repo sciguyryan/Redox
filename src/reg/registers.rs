@@ -93,7 +93,7 @@ impl Display for RegisterId {
             RegisterId::SP => "SP",
             RegisterId::FP => "FP",
             RegisterId::PC => "PC",
-            RegisterId::IM => "IM",
+            RegisterId::IM => "DG",
 
             #[cfg(test)]
             RegisterId::TEST0 => "TEST0",
@@ -180,6 +180,7 @@ impl Registers {
                 register_u32!(RegisterId::FP, &prpw, 0),
                 register_u32!(RegisterId::FL, &rpw, 0),
                 register_u32!(RegisterId::PC, &rpw, 0),
+                register_u32!(RegisterId::IM, &rpw, 0xffffffff),
                 // [ Test Registers ] //
                 #[cfg(test)]
                 register_u32!(RegisterId::TEST0, &prpw, 0),
