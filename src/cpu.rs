@@ -802,6 +802,14 @@ impl Cpu {
                 self.write_reg_u32(reg, shifted, privilege);
             }
 
+            /******** [Branching Instructions] ********/
+            Instruction::Int(addr) => {
+                todo!();
+            }
+            Instruction::IntRet => {
+                todo!();
+            }
+
             /******** [Data Instructions] ********/
             Instruction::SwapU32RegU32Reg(reg_1, reg_2) => {
                 let reg_1_val = self.read_reg_u32(reg_1, privilege);

@@ -27,6 +27,16 @@ impl<'a> MemoryBlockReader<'a> {
         *self.read_u8_internal()
     }
 
+    pub fn read_u16(&mut self) -> u16 {
+        // This will assert if the value is out of range anyway.
+        let bytes: [u8; 2] = self.data[self.cursor..self.cursor + 2]
+            .try_into()
+            .expect("failed to read u16 value from memory");
+        self.cursor += 2;
+
+        u16::from_le_bytes(bytes)
+    }
+
     pub fn read_u32(&mut self) -> u32 {
         // This will assert if the value is out of range anyway.
         let bytes: [u8; 4] = self.data[self.cursor..self.cursor + 4]

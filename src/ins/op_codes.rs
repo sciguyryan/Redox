@@ -65,7 +65,8 @@ pub enum OpCode {
     ArithRightShiftU32RegU32Reg,
 
     /******** [Branching Instructions] ********/
-
+    Int,
+    IntRet,
 
     /******** [Data Instructions] ********/
     /// Swap the values of the two registers.
@@ -170,6 +171,10 @@ impl From<Instruction> for OpCode {
             Instruction::RightShiftU32RegU32Reg(_, _) => OpCode::RightShiftU32RegU32Reg,
             Instruction::ArithRightShiftU32ImmU32Reg(_, _) => OpCode::ArithRightShiftU32ImmU32Reg,
             Instruction::ArithRightShiftU32RegU32Reg(_, _) => OpCode::ArithRightShiftU32RegU32Reg,
+
+            /******** [Branching Instructions] ********/
+            Instruction::Int(_) => OpCode::Int,
+            Instruction::IntRet => OpCode::IntRet,
 
             /******** [Data Instructions] ********/
             Instruction::SwapU32RegU32Reg(_, _) => OpCode::SwapU32RegU32Reg,

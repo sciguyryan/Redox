@@ -9,6 +9,8 @@ use super::op_codes::OpCode;
 
 /// The size of the instruction, in bytes.
 const INSTRUCTION_SIZE: u32 = 4;
+/// The size of a u16 argument, in bytes.
+const ARG_U16_IMM_SIZE: u32 = 2;
 /// The size of a u32 argument, in bytes.
 const ARG_U32_IMM_SIZE: u32 = 4;
 /// The size of a u8 argument, in bytes.
@@ -75,6 +77,10 @@ pub enum Instruction {
     ArithRightShiftU32ImmU32Reg(u32, RegisterId),
     /// Arithmetic right-shift a u32 register (B) by a u32 register (A). The result remains in register A.
     ArithRightShiftU32RegU32Reg(RegisterId, RegisterId),
+
+    /******** [Branching Instructions] ********/
+    Int(u16),
+    IntRet,
 
     /******** [Data Instructions] ********/
     /// Swap the values of the two registers.
@@ -225,6 +231,14 @@ impl Display for Instruction {
                 format!("sar {shift_reg}, {reg}")
             }
 
+            /******** [Branching Instructions] ********/
+            Instruction::Int(addr) => {
+                format!("int ${addr:04X}")
+            }
+            Instruction::IntRet => {
+                format!("intret")
+            }
+
             /******** [Data Instructions] ********/
             Instruction::SwapU32RegU32Reg(reg_1, reg_2) => {
                 format!("swap {reg_1}, {reg_2}")
@@ -368,7 +382,8 @@ impl Instruction {
             OpCode::ArithRightShiftU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Branching Instructions] ********/
-
+            OpCode::Int => ARG_U16_IMM_SIZE,
+            OpCode::IntRet => 0,
 
             /******** [Data Instructions] ********/
             OpCode::SwapU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,

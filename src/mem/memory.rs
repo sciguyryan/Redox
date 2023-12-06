@@ -219,6 +219,14 @@ impl Memory {
                 Instruction::ArithRightShiftU32RegU32Reg(shift_reg, reg)
             }
 
+            /******** [Branching Instructions] ********/
+            OpCode::Int => {
+                let addr = block.read_u16();
+
+                Instruction::Int(addr)
+            }
+            OpCode::IntRet => Instruction::IntRet,
+
             /******** [Data Instructions] ********/
             OpCode::SwapU32RegU32Reg => {
                 let reg1 = block.read_register_id();
