@@ -7,7 +7,7 @@ pub struct VirtualMachine {
 
 impl VirtualMachine {
     pub fn new(memory_size: usize) -> Self {
-        assert!(memory_size >= 1024*1024*32);
+        assert!(memory_size >= 1024 * 1024 * 32);
 
         Self {
             ram: Memory::new(memory_size),
