@@ -75,8 +75,8 @@ impl MoveExpressionHandler {
         assert!(self.validate());
 
         // Layout:
-        // [BIT 0]   [BIT 1]   [BIT 2 - 5] [BIT 6 - 7] [BIT 8 - 11]
-        // [TYPE_1]  [TYPE_2]  [TYPE 1]    [OPERATOR]  [TYPE 2]
+        // [BIT 0]   [BIT 1]   [BIT 2 - 10]  [BIT 11]    [BIT 12 - 21]
+        // [TYPE_1]  [TYPE_2]  [TYPE 1]      [OPERATOR]  [TYPE 2]
         let mut encoded_value = 0u32;
 
         // If the first two bits are unset, the values will be assumed to be register IDs.
