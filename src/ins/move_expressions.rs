@@ -74,6 +74,8 @@ impl MoveExpressionHandler {
         self.args = args.to_vec();
         assert!(self.validate());
 
+        // TODO - change this to allow three arguments, making better use of the 32-bit values.
+
         // Layout:
         // [BIT 0]   [BIT 1]   [BIT 2 - 10]  [BIT 11]    [BIT 12 - 21]
         // [TYPE_1]  [TYPE_2]  [TYPE 1]      [OPERATOR]  [TYPE 2]
