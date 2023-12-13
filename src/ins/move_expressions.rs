@@ -147,7 +147,6 @@ pub enum ExpressionOperator {
     Add,
     Subtract,
     Multiply,
-    Divide,
 }
 
 impl Display for ExpressionOperator {
@@ -156,7 +155,6 @@ impl Display for ExpressionOperator {
             ExpressionOperator::Add => "+",
             ExpressionOperator::Subtract => "-",
             ExpressionOperator::Multiply => "*",
-            ExpressionOperator::Divide => "/",
         };
         write!(f, "{printable}")
     }
