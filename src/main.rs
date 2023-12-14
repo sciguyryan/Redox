@@ -90,12 +90,12 @@ fn main() {
         ExpressionArgs::Register(RegisterId::R8),
     ];
     let expr_args_2 = [
-        ExpressionArgs::Constant(123),
+        ExpressionArgs::Immediate(123),
         ExpressionArgs::Operator(ExpressionOperator::Subtract),
-        ExpressionArgs::Constant(65),
+        ExpressionArgs::Immediate(65),
     ];
-    let mut expression_encoder = MoveExpressionHandler::new();
-    let expr = expression_encoder.encode(&expr_args_1);
+
+    let expr = MoveExpressionHandler::from(&expr_args_1[..]).encode();
 
     let instructions = &[
         /*Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
@@ -108,22 +108,22 @@ fn main() {
 
         /*Instruction::MovU32ImmMemRelSimple(0x123, 150),
         Instruction::MovMemExprU32RegRel(
-            expression_encoder.encode(&[
+            MoveExpressionHandler::from(&[
                 ExpressionArgs::Constant(25),
                 ExpressionArgs::Operator(ExpressionOperator::Add),
                 ExpressionArgs::Constant(25),
-            ]),
+            ][..]).encode(),
             RegisterId::R1,
         ),*/
 
         /*Instruction::MovU32ImmMemRelSimple(0x123, 150),
         Instruction::MovU32RegMemExprRel(
             RegisterId::R1,
-            expression_encoder.encode(&[
+            MoveExpressionHandler::from(&[
                 ExpressionArgs::Constant(25),
                 ExpressionArgs::Operator(ExpressionOperator::Add),
                 ExpressionArgs::Constant(25),
-            ]),
+            ][..]).encode(),
         ),*/
         Instruction::Hlt,
     ];

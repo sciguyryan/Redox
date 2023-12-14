@@ -4,7 +4,7 @@ use std::{collections::BTreeMap, panic, slice::Iter};
 use crate::{
     ins::{
         instruction::Instruction,
-        move_expressions::{ExpressionArgs, ExpressionOperator, MoveExpressionHandler},
+        move_expressions::{ExpressionArgs, MoveExpressionHandler},
     },
     mem::memory::Memory,
     privilege_level::PrivilegeLevel,
@@ -25,7 +25,7 @@ pub struct Cpu {
     interrupt_vector_address: u32,
     pub is_in_interrupt_handler: bool,
 
-    move_expression_cache: BTreeMap<u32, [ExpressionArgs; 3]>,
+    move_expression_cache: BTreeMap<u32, MoveExpressionHandler>,
 }
 
 impl Cpu {
@@ -41,6 +41,54 @@ impl Cpu {
         }
     }
 
+    /// Decode, cache and execute a move instruction expression.
+    ///
+    /// # Arguments
+    ///
+    /// * `expr` - The a encoded move expression.
+    /// * `privilege` - The [`PrivilegeLevel`] in which this expression should be executed.
+    ///
+    /// # Returns
+    ///
+    /// A u32 that is the calculated result of the expression.
+    fn cache_execute_u32_move_expression(&mut self, expr: &u32, privilege: &PrivilegeLevel) -> u32 {
+        if !self.move_expression_cache.contains_key(expr) {
+            // Cache the decoding result to speed up processing slightly.
+            let mut decoder = MoveExpressionHandler::new();
+            decoder.decode(*expr);
+
+            self.move_expression_cache.insert(*expr, decoder);
+        }
+
+        // Get the copy of the decoder. It seems a bit silly to have to extract
+        // this given that we might gave just stored it... but for the sake of code clarity
+        // this is the simplest option.
+        let handler = self.move_expression_cache.get(expr).unwrap();
+
+        // Determine the first and second operands.
+        let value_1 = match handler.argument_1 {
+            ExpressionArgs::Register(rid) => self.read_reg_u32(&rid, privilege),
+            ExpressionArgs::Immediate(val) => val as u32,
+            _ => panic!(),
+        };
+        let value_2 = match handler.argument_2 {
+            ExpressionArgs::Register(rid) => self.read_reg_u32(&rid, privilege),
+            ExpressionArgs::Immediate(val) => val as u32,
+            _ => panic!(),
+        };
+        let value_3 = if handler.is_extended {
+            match handler.argument_3 {
+                ExpressionArgs::Register(rid) => self.read_reg_u32(&rid, privilege),
+                ExpressionArgs::Immediate(val) => val as u32,
+                _ => panic!(),
+            }
+        } else {
+            0
+        };
+
+        handler.evaluate(value_1, value_2, value_3)
+    }
+
     /// Calculate the parity of the lowest byte of a u32 value.
     ///
     /// # Arguments
@@ -53,47 +101,6 @@ impl Cpu {
     #[inline(always)]
     fn calculate_lowest_byte_parity(value: u32) -> bool {
         (value & U32_LOW_BYTE_MASK).count_ones() % 2 == 0
-    }
-
-    /// Execute a move instruction expression.
-    ///
-    /// # Arguments
-    ///
-    /// * `operators` - The operators that form the expression.
-    /// * `privilege` - The [`PrivilegeLevel`] in which this expression should be executed.
-    ///
-    /// # Returns
-    ///
-    /// A u32 that is the calculated result of the expression.
-    fn execute_u32_move_expression(
-        &self,
-        operators: &[ExpressionArgs; 3],
-        privilege: &PrivilegeLevel,
-    ) -> u32 {
-        // Determine the first operand.
-        let val_1 = match operators[0] {
-            ExpressionArgs::Register(rid) => self.read_reg_u32(&rid, privilege),
-            ExpressionArgs::Constant(val) => val as u32,
-            _ => panic!(),
-        };
-
-        // Determine the second operand.
-        let val_2 = match operators[2] {
-            ExpressionArgs::Register(rid) => self.read_reg_u32(&rid, privilege),
-            ExpressionArgs::Constant(val) => val as u32,
-            _ => panic!(),
-        };
-
-        // Calculate the destination address by evaluating the expression.
-        if let ExpressionArgs::Operator(op) = operators[1] {
-            match op {
-                ExpressionOperator::Add => val_1 + val_2,
-                ExpressionOperator::Subtract => val_1 - val_2,
-                ExpressionOperator::Multiply => val_1 * val_2,
-            }
-        } else {
-            panic!();
-        }
     }
 
     /// Get the current privilege level of the processor.
@@ -128,31 +135,6 @@ impl Cpu {
 
         // Update the program counter register.
         mem.get_instruction(ip as usize)
-    }
-
-    /// Get a cached move expression decode result, or compute and cache it if not present.
-    ///
-    /// # Arguments
-    ///
-    /// * `expr` - The encoded expression to be decoded.
-    ///
-    /// # Returns
-    ///
-    /// An array containing the three decoded [`ExpressionArgs`] objects.
-    #[inline(always)]
-    fn get_cache_move_expression_decode(&mut self, expr: &u32) -> [ExpressionArgs; 3] {
-        if !self.move_expression_cache.contains_key(expr) {
-            // Cache the decoding result to speed up processing slightly.
-            let mut expression_decoder = MoveExpressionHandler::new();
-            expression_decoder.decode(*expr);
-
-            let result = expression_decoder.into_array();
-            self.move_expression_cache.insert(*expr, result);
-
-            result
-        } else {
-            *self.move_expression_cache.get(expr).unwrap()
-        }
     }
 
     /// Get the state of a given CPU flag.
@@ -853,23 +835,20 @@ impl Cpu {
             }
             Instruction::MovU32ImmMemExprRel(imm, expr) => {
                 // mov imm, [addr] - move immediate to address.
-                let args = self.get_cache_move_expression_decode(expr);
-                let addr = self.execute_u32_move_expression(&args, privilege);
+                let addr = self.cache_execute_u32_move_expression(expr, privilege);
 
                 mem.set_u32(addr as usize, *imm);
             }
             Instruction::MovMemExprU32RegRel(expr, reg) => {
                 // mov [addr], register - move value at address to register.
-                let args = self.get_cache_move_expression_decode(expr);
-                let addr = self.execute_u32_move_expression(&args, privilege);
+                let addr = self.cache_execute_u32_move_expression(expr, privilege);
                 let value = mem.get_u32(addr as usize);
 
                 self.write_reg_u32(reg, value, privilege);
             }
             Instruction::MovU32RegMemExprRel(reg, expr) => {
                 // mov reg, [addr] - move value of a register to an address.
-                let args = self.get_cache_move_expression_decode(expr);
-                let addr = self.execute_u32_move_expression(&args, privilege);
+                let addr = self.cache_execute_u32_move_expression(expr, privilege);
                 let value = self.read_reg_u32(reg, privilege);
 
                 mem.set_u32(addr as usize, value);
@@ -3814,15 +3793,16 @@ mod tests_cpu {
     /// Test the complex move value to expression-derived memory address.
     #[test]
     fn test_move_u32_imm_expr() {
-        let mut handler = MoveExpressionHandler::new();
-
         let test_1_args = [MovU32ImmMemExprRel(
             0x123,
-            handler.encode(&[
-                ExpressionArgs::Constant(0x8),
-                ExpressionArgs::Operator(ExpressionOperator::Add),
-                ExpressionArgs::Constant(0x8),
-            ]),
+            MoveExpressionHandler::from(
+                &[
+                    ExpressionArgs::Immediate(0x8),
+                    ExpressionArgs::Operator(ExpressionOperator::Add),
+                    ExpressionArgs::Immediate(0x8),
+                ][..],
+            )
+            .encode(),
         )];
 
         let test_2_args = [
@@ -3830,11 +3810,14 @@ mod tests_cpu {
             MovU32ImmU32Reg(0x8, RegisterId::R2),
             MovU32ImmMemExprRel(
                 0x123,
-                handler.encode(&[
-                    ExpressionArgs::Register(RegisterId::R1),
-                    ExpressionArgs::Operator(ExpressionOperator::Add),
-                    ExpressionArgs::Register(RegisterId::R2),
-                ]),
+                MoveExpressionHandler::from(
+                    &[
+                        ExpressionArgs::Register(RegisterId::R1),
+                        ExpressionArgs::Operator(ExpressionOperator::Add),
+                        ExpressionArgs::Register(RegisterId::R2),
+                    ][..],
+                )
+                .encode(),
             ),
         ];
 
@@ -3842,11 +3825,14 @@ mod tests_cpu {
             MovU32ImmU32Reg(0x8, RegisterId::R1),
             MovU32ImmMemExprRel(
                 0x123,
-                handler.encode(&[
-                    ExpressionArgs::Register(RegisterId::R1),
-                    ExpressionArgs::Operator(ExpressionOperator::Add),
-                    ExpressionArgs::Constant(0x8),
-                ]),
+                MoveExpressionHandler::from(
+                    &[
+                        ExpressionArgs::Register(RegisterId::R1),
+                        ExpressionArgs::Operator(ExpressionOperator::Add),
+                        ExpressionArgs::Immediate(0x8),
+                    ][..],
+                )
+                .encode(),
             ),
         ];
 
@@ -3855,11 +3841,14 @@ mod tests_cpu {
             MovU32ImmU32Reg(0x8, RegisterId::R2),
             MovU32ImmMemExprRel(
                 0x123,
-                handler.encode(&[
-                    ExpressionArgs::Register(RegisterId::R1),
-                    ExpressionArgs::Operator(ExpressionOperator::Multiply),
-                    ExpressionArgs::Register(RegisterId::R2),
-                ]),
+                MoveExpressionHandler::from(
+                    &[
+                        ExpressionArgs::Register(RegisterId::R1),
+                        ExpressionArgs::Operator(ExpressionOperator::Multiply),
+                        ExpressionArgs::Register(RegisterId::R2),
+                    ][..],
+                )
+                .encode(),
             ),
         ];
 
@@ -3868,11 +3857,14 @@ mod tests_cpu {
             MovU32ImmU32Reg(0x4, RegisterId::R2),
             MovU32ImmMemExprRel(
                 0x123,
-                handler.encode(&[
-                    ExpressionArgs::Register(RegisterId::R1),
-                    ExpressionArgs::Operator(ExpressionOperator::Subtract),
-                    ExpressionArgs::Register(RegisterId::R2),
-                ]),
+                MoveExpressionHandler::from(
+                    &[
+                        ExpressionArgs::Register(RegisterId::R1),
+                        ExpressionArgs::Operator(ExpressionOperator::Subtract),
+                        ExpressionArgs::Register(RegisterId::R2),
+                    ][..],
+                )
+                .encode(),
             ),
         ];
 
@@ -3947,16 +3939,17 @@ mod tests_cpu {
     /// Test the complex move from an expression-derived memory address to a register.
     #[test]
     fn test_move_mem_expr_u32_reg() {
-        let mut handler = MoveExpressionHandler::new();
-
         let test_1_args = [
             MovU32ImmMemRelSimple(0x123, 0x10),
             MovMemExprU32RegRel(
-                handler.encode(&[
-                    ExpressionArgs::Constant(0x8),
-                    ExpressionArgs::Operator(ExpressionOperator::Add),
-                    ExpressionArgs::Constant(0x8),
-                ]),
+                MoveExpressionHandler::from(
+                    &[
+                        ExpressionArgs::Immediate(0x8),
+                        ExpressionArgs::Operator(ExpressionOperator::Add),
+                        ExpressionArgs::Immediate(0x8),
+                    ][..],
+                )
+                .encode(),
                 RegisterId::R8,
             ),
         ];
@@ -3966,11 +3959,14 @@ mod tests_cpu {
             MovU32ImmU32Reg(0x8, RegisterId::R1),
             MovU32ImmU32Reg(0x8, RegisterId::R2),
             MovMemExprU32RegRel(
-                handler.encode(&[
-                    ExpressionArgs::Register(RegisterId::R1),
-                    ExpressionArgs::Operator(ExpressionOperator::Add),
-                    ExpressionArgs::Register(RegisterId::R2),
-                ]),
+                MoveExpressionHandler::from(
+                    &[
+                        ExpressionArgs::Register(RegisterId::R1),
+                        ExpressionArgs::Operator(ExpressionOperator::Add),
+                        ExpressionArgs::Register(RegisterId::R2),
+                    ][..],
+                )
+                .encode(),
                 RegisterId::R8,
             ),
         ];
@@ -3979,11 +3975,14 @@ mod tests_cpu {
             MovU32ImmMemRelSimple(0x123, 0x10),
             MovU32ImmU32Reg(0x8, RegisterId::R1),
             MovMemExprU32RegRel(
-                handler.encode(&[
-                    ExpressionArgs::Register(RegisterId::R1),
-                    ExpressionArgs::Operator(ExpressionOperator::Add),
-                    ExpressionArgs::Constant(0x8),
-                ]),
+                MoveExpressionHandler::from(
+                    &[
+                        ExpressionArgs::Register(RegisterId::R1),
+                        ExpressionArgs::Operator(ExpressionOperator::Add),
+                        ExpressionArgs::Immediate(0x8),
+                    ][..],
+                )
+                .encode(),
                 RegisterId::R8,
             ),
         ];
@@ -3993,11 +3992,14 @@ mod tests_cpu {
             MovU32ImmU32Reg(0x2, RegisterId::R1),
             MovU32ImmU32Reg(0x8, RegisterId::R2),
             MovMemExprU32RegRel(
-                handler.encode(&[
-                    ExpressionArgs::Register(RegisterId::R1),
-                    ExpressionArgs::Operator(ExpressionOperator::Multiply),
-                    ExpressionArgs::Register(RegisterId::R2),
-                ]),
+                MoveExpressionHandler::from(
+                    &[
+                        ExpressionArgs::Register(RegisterId::R1),
+                        ExpressionArgs::Operator(ExpressionOperator::Multiply),
+                        ExpressionArgs::Register(RegisterId::R2),
+                    ][..],
+                )
+                .encode(),
                 RegisterId::R8,
             ),
         ];
@@ -4007,11 +4009,14 @@ mod tests_cpu {
             MovU32ImmU32Reg(0x1A, RegisterId::R1),
             MovU32ImmU32Reg(0x4, RegisterId::R2),
             MovMemExprU32RegRel(
-                handler.encode(&[
-                    ExpressionArgs::Register(RegisterId::R1),
-                    ExpressionArgs::Operator(ExpressionOperator::Subtract),
-                    ExpressionArgs::Register(RegisterId::R2),
-                ]),
+                MoveExpressionHandler::from(
+                    &[
+                        ExpressionArgs::Register(RegisterId::R1),
+                        ExpressionArgs::Operator(ExpressionOperator::Subtract),
+                        ExpressionArgs::Register(RegisterId::R2),
+                    ][..],
+                )
+                .encode(),
                 RegisterId::R8,
             ),
         ];
@@ -4099,17 +4104,18 @@ mod tests_cpu {
     /// Test the complex move from a register to an expression-derived memory address.
     #[test]
     fn test_move_u32_reg_mem_expr() {
-        let mut handler = MoveExpressionHandler::new();
-
         let test_1_args = [
             MovU32ImmU32Reg(0x123, RegisterId::R8),
             MovU32RegMemExprRel(
                 RegisterId::R8,
-                handler.encode(&[
-                    ExpressionArgs::Constant(0x8),
-                    ExpressionArgs::Operator(ExpressionOperator::Add),
-                    ExpressionArgs::Constant(0x8),
-                ]),
+                MoveExpressionHandler::from(
+                    &[
+                        ExpressionArgs::Immediate(0x8),
+                        ExpressionArgs::Operator(ExpressionOperator::Add),
+                        ExpressionArgs::Immediate(0x8),
+                    ][..],
+                )
+                .encode(),
             ),
         ];
 
@@ -4119,11 +4125,14 @@ mod tests_cpu {
             MovU32ImmU32Reg(0x123, RegisterId::R8),
             MovU32RegMemExprRel(
                 RegisterId::R8,
-                handler.encode(&[
-                    ExpressionArgs::Register(RegisterId::R1),
-                    ExpressionArgs::Operator(ExpressionOperator::Add),
-                    ExpressionArgs::Register(RegisterId::R2),
-                ]),
+                MoveExpressionHandler::from(
+                    &[
+                        ExpressionArgs::Register(RegisterId::R1),
+                        ExpressionArgs::Operator(ExpressionOperator::Add),
+                        ExpressionArgs::Register(RegisterId::R2),
+                    ][..],
+                )
+                .encode(),
             ),
         ];
 
@@ -4132,11 +4141,14 @@ mod tests_cpu {
             MovU32ImmU32Reg(0x123, RegisterId::R8),
             MovU32RegMemExprRel(
                 RegisterId::R8,
-                handler.encode(&[
-                    ExpressionArgs::Register(RegisterId::R1),
-                    ExpressionArgs::Operator(ExpressionOperator::Add),
-                    ExpressionArgs::Constant(0x8),
-                ]),
+                MoveExpressionHandler::from(
+                    &[
+                        ExpressionArgs::Register(RegisterId::R1),
+                        ExpressionArgs::Operator(ExpressionOperator::Add),
+                        ExpressionArgs::Immediate(0x8),
+                    ][..],
+                )
+                .encode(),
             ),
         ];
 
@@ -4146,11 +4158,14 @@ mod tests_cpu {
             MovU32ImmU32Reg(0x123, RegisterId::R8),
             MovU32RegMemExprRel(
                 RegisterId::R8,
-                handler.encode(&[
-                    ExpressionArgs::Register(RegisterId::R1),
-                    ExpressionArgs::Operator(ExpressionOperator::Multiply),
-                    ExpressionArgs::Register(RegisterId::R2),
-                ]),
+                MoveExpressionHandler::from(
+                    &[
+                        ExpressionArgs::Register(RegisterId::R1),
+                        ExpressionArgs::Operator(ExpressionOperator::Multiply),
+                        ExpressionArgs::Register(RegisterId::R2),
+                    ][..],
+                )
+                .encode(),
             ),
         ];
 
@@ -4160,11 +4175,14 @@ mod tests_cpu {
             MovU32ImmU32Reg(0x123, RegisterId::R8),
             MovU32RegMemExprRel(
                 RegisterId::R8,
-                handler.encode(&[
-                    ExpressionArgs::Register(RegisterId::R1),
-                    ExpressionArgs::Operator(ExpressionOperator::Subtract),
-                    ExpressionArgs::Register(RegisterId::R2),
-                ]),
+                MoveExpressionHandler::from(
+                    &[
+                        ExpressionArgs::Register(RegisterId::R1),
+                        ExpressionArgs::Operator(ExpressionOperator::Subtract),
+                        ExpressionArgs::Register(RegisterId::R2),
+                    ][..],
+                )
+                .encode(),
             ),
         ];
 
