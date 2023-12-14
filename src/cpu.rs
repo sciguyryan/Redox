@@ -45,7 +45,7 @@ impl Cpu {
     ///
     /// # Arguments
     ///
-    /// * `expr` - The a encoded move expression.
+    /// * `expr` - The encoded move expression.
     /// * `privilege` - The [`PrivilegeLevel`] in which this expression should be executed.
     ///
     /// # Returns
@@ -67,18 +67,18 @@ impl Cpu {
 
         // Determine the first and second operands.
         let value_1 = match handler.argument_1 {
-            ExpressionArgs::Register(rid) => self.read_reg_u32(&rid, privilege),
+            ExpressionArgs::Register(id) => self.read_reg_u32(&id, privilege),
             ExpressionArgs::Immediate(val) => val as u32,
             _ => panic!(),
         };
         let value_2 = match handler.argument_2 {
-            ExpressionArgs::Register(rid) => self.read_reg_u32(&rid, privilege),
+            ExpressionArgs::Register(id) => self.read_reg_u32(&id, privilege),
             ExpressionArgs::Immediate(val) => val as u32,
             _ => panic!(),
         };
         let value_3 = if handler.is_extended {
             match handler.argument_3 {
-                ExpressionArgs::Register(rid) => self.read_reg_u32(&rid, privilege),
+                ExpressionArgs::Register(id) => self.read_reg_u32(&id, privilege),
                 ExpressionArgs::Immediate(val) => val as u32,
                 _ => panic!(),
             }

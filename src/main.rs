@@ -79,7 +79,7 @@ fn main() {
         panic!("currently unsupported");
     }
 
-    let mut vm = VirtualMachine::new(64_000);
+    let mut vm = VirtualMachine::new(vm::MIN_MEMORY_SIZE);
 
     //vm.ram.set(0, 0x12, &SecurityContext::Machine);
     //vm.ram.print_range(0, 10);
@@ -109,9 +109,9 @@ fn main() {
         /*Instruction::MovU32ImmMemRelSimple(0x123, 150),
         Instruction::MovMemExprU32RegRel(
             MoveExpressionHandler::from(&[
-                ExpressionArgs::Constant(25),
+                ExpressionArgs::Immediate(25),
                 ExpressionArgs::Operator(ExpressionOperator::Add),
-                ExpressionArgs::Constant(25),
+                ExpressionArgs::Immediate(25),
             ][..]).encode(),
             RegisterId::R1,
         ),*/
@@ -120,9 +120,11 @@ fn main() {
         Instruction::MovU32RegMemExprRel(
             RegisterId::R1,
             MoveExpressionHandler::from(&[
-                ExpressionArgs::Constant(25),
+                ExpressionArgs::Immediate(25),
                 ExpressionArgs::Operator(ExpressionOperator::Add),
-                ExpressionArgs::Constant(25),
+                ExpressionArgs::Immediate(25),
+                ExpressionArgs::Operator(ExpressionOperator::Add),
+                ExpressionArgs::Register(RegisterId::R1),
             ][..]).encode(),
         ),*/
         Instruction::Hlt,

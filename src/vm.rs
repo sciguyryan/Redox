@@ -1,5 +1,7 @@
 use crate::{cpu::Cpu, ins::instruction::Instruction, mem::memory::Memory};
 
+pub const MIN_MEMORY_SIZE: usize = 1024 * 1024 * 32;
+
 pub struct VirtualMachine {
     pub ram: Memory,
     pub cpu: Cpu,
@@ -7,7 +9,7 @@ pub struct VirtualMachine {
 
 impl VirtualMachine {
     pub fn new(memory_size: usize) -> Self {
-        assert!(memory_size >= 1024 * 1024 * 32);
+        assert!(memory_size >= MIN_MEMORY_SIZE);
 
         Self {
             ram: Memory::new(memory_size),

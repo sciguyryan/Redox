@@ -20,13 +20,19 @@ const VALUE_MASK: u32 = 0b11111111;
 
 #[derive(Clone, Debug)]
 pub struct MoveExpressionHandler {
+    /// Is the expression a simple expression or an extended one?
     pub is_extended: bool,
 
+    /// The first operator, must always be included.
     operator_1: ExpressionArgs,
+    /// The second operator, only applicable when dealing with an extended expression.
     operator_2: ExpressionArgs,
 
+    /// The first operand, must always be included.
     pub argument_1: ExpressionArgs,
+    /// The second operand, must always be included.
     pub argument_2: ExpressionArgs,
+    /// The third operand, only applicable when dealing with an extended expression.
     pub argument_3: ExpressionArgs,
 }
 
@@ -42,7 +48,12 @@ impl MoveExpressionHandler {
         }
     }
 
-    pub fn as_vector(&self) -> Vec<ExpressionArgs> {
+    /// Return this expression object as a vector of [`ExpressionArgs`] objects.
+    ///
+    /// # Returns
+    ///
+    /// A vector containing the resulting [`ExpressionArgs`] objects in the correct order.
+    fn as_vector(&self) -> Vec<ExpressionArgs> {
         let mut result = vec![self.argument_1, self.operator_1, self.argument_2];
 
         if self.is_extended {
@@ -53,6 +64,11 @@ impl MoveExpressionHandler {
         result
     }
 
+    /// Decode an encoded move expression.
+    ///
+    /// # Arguments
+    ///
+    /// * `encoded` - The encoded move expression.
     pub fn decode(&mut self, encoded: u32) {
         self.is_extended = (encoded & IS_EXTENDED_MASK) != 0;
 
@@ -97,6 +113,7 @@ impl MoveExpressionHandler {
         };
     }
 
+    /// Encode this move expression object into its encoded format.
     pub fn encode(&self) -> u32 {
         // Layout:
         // [BIT 0]      [BIT 1]      [BIT 2]      [BIT 3]       [BIT 4-5]  [BIT 6-7]  [BIT 8-15]  [BIT 16-23]  [BIT 24-31]
@@ -132,6 +149,17 @@ impl MoveExpressionHandler {
         encoded_value
     }
 
+    /// Evaluate this move expression based on the supplied arguments.
+    ///
+    /// # Arguments
+    ///
+    /// * `value_1` - The value of the first operand.
+    /// * `value_2` - The value of the second operand.
+    /// * `value_3` - The value of the third operand, only used with an extended expression.
+    ///
+    /// # Returns
+    ///
+    /// A u32 that is the calculated result of the expression.
     pub fn evaluate(&self, value_1: u32, value_2: u32, value_3: u32) -> u32 {
         let op_1 = match self.operator_1 {
             ExpressionArgs::Operator(op) => op,
@@ -235,7 +263,7 @@ impl Display for MoveExpressionHandler {
             let part = match arg {
                 ExpressionArgs::Register(id) => format!("%{id}"),
                 ExpressionArgs::Operator(id) => format!("{id}"),
-                ExpressionArgs::Immediate(imm) => format!("%{imm:04x}"),
+                ExpressionArgs::Immediate(imm) => format!("${imm:02x}"),
             };
 
             parts.push(part);
