@@ -95,7 +95,7 @@ fn main() {
         ExpressionArgs::Immediate(65),
     ];
 
-    let expr = MoveExpressionHandler::from(&expr_args_1[..]).encode();
+    let expr = MoveExpressionHandler::from(&expr_args_1[..]).pack();
 
     let instructions = &[
         /*Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),

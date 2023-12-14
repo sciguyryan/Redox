@@ -55,7 +55,7 @@ impl Cpu {
         if !self.move_expression_cache.contains_key(expr) {
             // Cache the decoding result to speed up processing slightly.
             let mut decoder = MoveExpressionHandler::new();
-            decoder.decode(*expr);
+            decoder.unpack(*expr);
 
             self.move_expression_cache.insert(*expr, decoder);
         }
@@ -66,18 +66,18 @@ impl Cpu {
         let handler = self.move_expression_cache.get(expr).unwrap();
 
         // Determine the first and second operands.
-        let value_1 = match handler.argument_1 {
+        let value_1 = match handler.operand_1 {
             ExpressionArgs::Register(id) => self.read_reg_u32(&id, privilege),
             ExpressionArgs::Immediate(val) => val as u32,
             _ => panic!(),
         };
-        let value_2 = match handler.argument_2 {
+        let value_2 = match handler.operand_2 {
             ExpressionArgs::Register(id) => self.read_reg_u32(&id, privilege),
             ExpressionArgs::Immediate(val) => val as u32,
             _ => panic!(),
         };
         let value_3 = if handler.is_extended {
-            match handler.argument_3 {
+            match handler.operand_3 {
                 ExpressionArgs::Register(id) => self.read_reg_u32(&id, privilege),
                 ExpressionArgs::Immediate(val) => val as u32,
                 _ => panic!(),
@@ -3802,7 +3802,7 @@ mod tests_cpu {
                     ExpressionArgs::Immediate(0x8),
                 ][..],
             )
-            .encode(),
+            .pack(),
         )];
 
         let test_2_args = [
@@ -3817,7 +3817,7 @@ mod tests_cpu {
                         ExpressionArgs::Register(RegisterId::R2),
                     ][..],
                 )
-                .encode(),
+                .pack(),
             ),
         ];
 
@@ -3832,7 +3832,7 @@ mod tests_cpu {
                         ExpressionArgs::Immediate(0x8),
                     ][..],
                 )
-                .encode(),
+                .pack(),
             ),
         ];
 
@@ -3848,7 +3848,7 @@ mod tests_cpu {
                         ExpressionArgs::Register(RegisterId::R2),
                     ][..],
                 )
-                .encode(),
+                .pack(),
             ),
         ];
 
@@ -3864,7 +3864,7 @@ mod tests_cpu {
                         ExpressionArgs::Register(RegisterId::R2),
                     ][..],
                 )
-                .encode(),
+                .pack(),
             ),
         ];
 
@@ -3949,7 +3949,7 @@ mod tests_cpu {
                         ExpressionArgs::Immediate(0x8),
                     ][..],
                 )
-                .encode(),
+                .pack(),
                 RegisterId::R8,
             ),
         ];
@@ -3966,7 +3966,7 @@ mod tests_cpu {
                         ExpressionArgs::Register(RegisterId::R2),
                     ][..],
                 )
-                .encode(),
+                .pack(),
                 RegisterId::R8,
             ),
         ];
@@ -3982,7 +3982,7 @@ mod tests_cpu {
                         ExpressionArgs::Immediate(0x8),
                     ][..],
                 )
-                .encode(),
+                .pack(),
                 RegisterId::R8,
             ),
         ];
@@ -3999,7 +3999,7 @@ mod tests_cpu {
                         ExpressionArgs::Register(RegisterId::R2),
                     ][..],
                 )
-                .encode(),
+                .pack(),
                 RegisterId::R8,
             ),
         ];
@@ -4016,7 +4016,7 @@ mod tests_cpu {
                         ExpressionArgs::Register(RegisterId::R2),
                     ][..],
                 )
-                .encode(),
+                .pack(),
                 RegisterId::R8,
             ),
         ];
@@ -4115,7 +4115,7 @@ mod tests_cpu {
                         ExpressionArgs::Immediate(0x8),
                     ][..],
                 )
-                .encode(),
+                .pack(),
             ),
         ];
 
@@ -4132,7 +4132,7 @@ mod tests_cpu {
                         ExpressionArgs::Register(RegisterId::R2),
                     ][..],
                 )
-                .encode(),
+                .pack(),
             ),
         ];
 
@@ -4148,7 +4148,7 @@ mod tests_cpu {
                         ExpressionArgs::Immediate(0x8),
                     ][..],
                 )
-                .encode(),
+                .pack(),
             ),
         ];
 
@@ -4165,7 +4165,7 @@ mod tests_cpu {
                         ExpressionArgs::Register(RegisterId::R2),
                     ][..],
                 )
-                .encode(),
+                .pack(),
             ),
         ];
 
@@ -4182,7 +4182,7 @@ mod tests_cpu {
                         ExpressionArgs::Register(RegisterId::R2),
                     ][..],
                 )
-                .encode(),
+                .pack(),
             ),
         ];
 

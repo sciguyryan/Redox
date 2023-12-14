@@ -259,19 +259,19 @@ impl Display for Instruction {
             }
             Instruction::MovU32ImmMemExprRel(imm, expr) => {
                 let mut decoder = MoveExpressionHandler::new();
-                decoder.decode(expr);
+                decoder.unpack(expr);
 
                 format!("mov.rc ${imm:04x}, [{decoder}]")
             }
             Instruction::MovMemExprU32RegRel(expr, reg) => {
                 let mut decoder = MoveExpressionHandler::new();
-                decoder.decode(expr);
+                decoder.unpack(expr);
 
                 format!("mov.rc [{decoder}], %{reg}")
             }
             Instruction::MovU32RegMemExprRel(reg, expr) => {
                 let mut decoder = MoveExpressionHandler::new();
-                decoder.decode(expr);
+                decoder.unpack(expr);
 
                 format!("mov.rc %{reg}, [{decoder}]")
             }

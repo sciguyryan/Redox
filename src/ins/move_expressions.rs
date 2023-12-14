@@ -29,11 +29,11 @@ pub struct MoveExpressionHandler {
     operator_2: ExpressionArgs,
 
     /// The first operand, must always be included.
-    pub argument_1: ExpressionArgs,
+    pub operand_1: ExpressionArgs,
     /// The second operand, must always be included.
-    pub argument_2: ExpressionArgs,
+    pub operand_2: ExpressionArgs,
     /// The third operand, only applicable when dealing with an extended expression.
-    pub argument_3: ExpressionArgs,
+    pub operand_3: ExpressionArgs,
 }
 
 impl MoveExpressionHandler {
@@ -42,9 +42,9 @@ impl MoveExpressionHandler {
             is_extended: false,
             operator_1: ExpressionArgs::Operator(ExpressionOperator::default()),
             operator_2: ExpressionArgs::Operator(ExpressionOperator::default()),
-            argument_1: ExpressionArgs::Immediate(0),
-            argument_2: ExpressionArgs::Immediate(0),
-            argument_3: ExpressionArgs::Immediate(0),
+            operand_1: ExpressionArgs::Immediate(0),
+            operand_2: ExpressionArgs::Immediate(0),
+            operand_3: ExpressionArgs::Immediate(0),
         }
     }
 
@@ -54,99 +54,14 @@ impl MoveExpressionHandler {
     ///
     /// A vector containing the resulting [`ExpressionArgs`] objects in the correct order.
     fn as_vector(&self) -> Vec<ExpressionArgs> {
-        let mut result = vec![self.argument_1, self.operator_1, self.argument_2];
+        let mut result = vec![self.operand_1, self.operator_1, self.operand_2];
 
         if self.is_extended {
             result.push(self.operator_2);
-            result.push(self.argument_3);
+            result.push(self.operand_3);
         }
 
         result
-    }
-
-    /// Decode an encoded move expression.
-    ///
-    /// # Arguments
-    ///
-    /// * `encoded` - The encoded move expression.
-    pub fn decode(&mut self, encoded: u32) {
-        self.is_extended = (encoded & IS_EXTENDED_MASK) != 0;
-
-        let is_argument_1_immediate = (encoded & IS_VALUE_1_IMM_MASK) != 0;
-        let is_argument_2_immediate = (encoded & IS_VALUE_2_IMM_MASK) != 0;
-        let is_argument_3_immediate = (encoded & IS_VALUE_3_IMM_MASK) != 0;
-
-        self.operator_1 = ExpressionArgs::Operator(
-            FromPrimitive::from_u32((encoded >> OPERATOR_1_SHIFT) & OPERATOR_MASK)
-                .expect("failed to get valid operator id"),
-        );
-        self.operator_2 = ExpressionArgs::Operator(
-            FromPrimitive::from_u32((encoded >> OPERATOR_2_SHIFT) & OPERATOR_MASK)
-                .expect("failed to get valid operator id"),
-        );
-
-        let value_1 = (encoded >> VALUE_1_SHIFT) & VALUE_MASK;
-        self.argument_1 = if is_argument_1_immediate {
-            ExpressionArgs::Immediate(value_1 as u8)
-        } else {
-            ExpressionArgs::Register(
-                FromPrimitive::from_u32(value_1).expect("failed to get valid register id"),
-            )
-        };
-
-        let value_2 = (encoded >> VALUE_2_SHIFT) & VALUE_MASK;
-        self.argument_2 = if is_argument_2_immediate {
-            ExpressionArgs::Immediate(value_2 as u8)
-        } else {
-            ExpressionArgs::Register(
-                FromPrimitive::from_u32(value_2).expect("failed to get valid register id"),
-            )
-        };
-
-        let value_3 = (encoded >> VALUE_3_SHIFT) & VALUE_MASK;
-        self.argument_3 = if is_argument_3_immediate {
-            ExpressionArgs::Immediate(value_3 as u8)
-        } else {
-            ExpressionArgs::Register(
-                FromPrimitive::from_u32(value_3).expect("failed to get valid register id"),
-            )
-        };
-    }
-
-    /// Encode this move expression object into its encoded format.
-    pub fn encode(&self) -> u32 {
-        // Layout:
-        // [BIT 0]      [BIT 1]      [BIT 2]      [BIT 3]       [BIT 4-5]  [BIT 6-7]  [BIT 8-15]  [BIT 16-23]  [BIT 24-31]
-        // [EXTENDED?]  [IS 1 IMM?]  [IS 2 IMM?]  [IS 2 IMM?*]  [OP 1]     [OP 2*]    [VALUE 1]   [VALUE 2]   [VALUE 3*]
-        // Note, any entry with an * is only applicable in the instances where we are dealing with an
-        // extended expression, otherwise the values should be ignored.
-        let mut encoded_value = 0u32;
-
-        // The first things we need to encode are the status flags. These are the simplest parts
-        // and they come first.
-        if self.is_extended {
-            encoded_value |= IS_EXTENDED_MASK;
-        }
-        if matches!(self.argument_1, ExpressionArgs::Immediate(_)) {
-            encoded_value |= IS_VALUE_1_IMM_MASK;
-        }
-        if matches!(self.argument_2, ExpressionArgs::Immediate(_)) {
-            encoded_value |= IS_VALUE_2_IMM_MASK;
-        }
-        if matches!(self.argument_3, ExpressionArgs::Immediate(_)) {
-            encoded_value |= IS_VALUE_3_IMM_MASK;
-        }
-
-        // Next, encode the operator IDs.
-        encoded_value |= self.operator_1.get_as_value() << OPERATOR_1_SHIFT;
-        encoded_value |= self.operator_2.get_as_value() << OPERATOR_2_SHIFT;
-
-        // Finally, encode the operands.
-        encoded_value |= self.argument_1.get_as_value() << VALUE_1_SHIFT;
-        encoded_value |= self.argument_2.get_as_value() << VALUE_2_SHIFT;
-        encoded_value |= self.argument_3.get_as_value() << VALUE_3_SHIFT;
-
-        encoded_value
     }
 
     /// Evaluate this move expression based on the supplied arguments.
@@ -208,6 +123,91 @@ impl MoveExpressionHandler {
             ExpressionOperator::Multiply => temp * value_3,
         }
     }
+
+    /// Pack this move expression into its encoded format.
+    pub fn pack(&self) -> u32 {
+        // Layout:
+        // [BIT 0]      [BIT 1]      [BIT 2]      [BIT 3]       [BIT 4-5]  [BIT 6-7]  [BIT 8-15]  [BIT 16-23]  [BIT 24-31]
+        // [EXTENDED?]  [IS 1 IMM?]  [IS 2 IMM?]  [IS 2 IMM?*]  [OP 1]     [OP 2*]    [VALUE 1]   [VALUE 2]   [VALUE 3*]
+        // Note, any entry with an * is only applicable in the instances where we are dealing with an
+        // extended expression, otherwise the values should be ignored.
+        let mut packed = 0u32;
+
+        // The first things we need to encode are the status flags. These are the simplest parts
+        // and they come first.
+        if self.is_extended {
+            packed |= IS_EXTENDED_MASK;
+        }
+        if matches!(self.operand_1, ExpressionArgs::Immediate(_)) {
+            packed |= IS_VALUE_1_IMM_MASK;
+        }
+        if matches!(self.operand_2, ExpressionArgs::Immediate(_)) {
+            packed |= IS_VALUE_2_IMM_MASK;
+        }
+        if matches!(self.operand_3, ExpressionArgs::Immediate(_)) {
+            packed |= IS_VALUE_3_IMM_MASK;
+        }
+
+        // Next, encode the operator IDs.
+        packed |= self.operator_1.get_as_value() << OPERATOR_1_SHIFT;
+        packed |= self.operator_2.get_as_value() << OPERATOR_2_SHIFT;
+
+        // Finally, encode the operands.
+        packed |= self.operand_1.get_as_value() << VALUE_1_SHIFT;
+        packed |= self.operand_2.get_as_value() << VALUE_2_SHIFT;
+        packed |= self.operand_3.get_as_value() << VALUE_3_SHIFT;
+
+        packed
+    }
+
+    /// Unpack a packed move expression.
+    ///
+    /// # Arguments
+    ///
+    /// * `packed` - The encoded move expression.
+    pub fn unpack(&mut self, packed: u32) {
+        self.is_extended = (packed & IS_EXTENDED_MASK) != 0;
+
+        let is_argument_1_immediate = (packed & IS_VALUE_1_IMM_MASK) != 0;
+        let is_argument_2_immediate = (packed & IS_VALUE_2_IMM_MASK) != 0;
+        let is_argument_3_immediate = (packed & IS_VALUE_3_IMM_MASK) != 0;
+
+        self.operator_1 = ExpressionArgs::Operator(
+            FromPrimitive::from_u32((packed >> OPERATOR_1_SHIFT) & OPERATOR_MASK)
+                .expect("failed to get valid operator id"),
+        );
+        self.operator_2 = ExpressionArgs::Operator(
+            FromPrimitive::from_u32((packed >> OPERATOR_2_SHIFT) & OPERATOR_MASK)
+                .expect("failed to get valid operator id"),
+        );
+
+        let value_1 = (packed >> VALUE_1_SHIFT) & VALUE_MASK;
+        self.operand_1 = if is_argument_1_immediate {
+            ExpressionArgs::Immediate(value_1 as u8)
+        } else {
+            ExpressionArgs::Register(
+                FromPrimitive::from_u32(value_1).expect("failed to get valid register id"),
+            )
+        };
+
+        let value_2 = (packed >> VALUE_2_SHIFT) & VALUE_MASK;
+        self.operand_2 = if is_argument_2_immediate {
+            ExpressionArgs::Immediate(value_2 as u8)
+        } else {
+            ExpressionArgs::Register(
+                FromPrimitive::from_u32(value_2).expect("failed to get valid register id"),
+            )
+        };
+
+        let value_3 = (packed >> VALUE_3_SHIFT) & VALUE_MASK;
+        self.operand_3 = if is_argument_3_immediate {
+            ExpressionArgs::Immediate(value_3 as u8)
+        } else {
+            ExpressionArgs::Register(
+                FromPrimitive::from_u32(value_3).expect("failed to get valid register id"),
+            )
+        };
+    }
 }
 
 impl From<&[ExpressionArgs]> for MoveExpressionHandler {
@@ -249,9 +249,9 @@ impl From<&[ExpressionArgs]> for MoveExpressionHandler {
             is_extended: len == 5,
             operator_1: args[1],
             operator_2,
-            argument_1: args[0],
-            argument_2: args[2],
-            argument_3,
+            operand_1: args[0],
+            operand_2: args[2],
+            operand_3: argument_3,
         }
     }
 }
@@ -341,10 +341,10 @@ mod tests_move_expressions {
         pub fn run_test(&self, id: usize) {
             let result = panic::catch_unwind(|| {
                 // Perform a roundtrip encode and decode.
-                let encoded = MoveExpressionHandler::from(&self.arguments.to_vec()[..]).encode();
+                let encoded = MoveExpressionHandler::from(&self.arguments.to_vec()[..]).pack();
 
                 let mut decoded = MoveExpressionHandler::new();
-                decoded.decode(encoded);
+                decoded.unpack(encoded);
 
                 // Yield the decoded arguments.
                 decoded.as_vector()
