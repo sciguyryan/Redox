@@ -24,8 +24,6 @@ pub struct Cpu {
     pub is_machine_mode: bool,
     interrupt_vector_address: u32,
     pub is_in_interrupt_handler: bool,
-
-    move_expression_cache: BTreeMap<u32, MoveExpressionHandler>,
 }
 
 impl Cpu {
@@ -36,57 +34,7 @@ impl Cpu {
             is_machine_mode: true,
             interrupt_vector_address,
             is_in_interrupt_handler: false,
-
-            move_expression_cache: BTreeMap::new(),
         }
-    }
-
-    /// Decode, cache and execute a move instruction expression.
-    ///
-    /// # Arguments
-    ///
-    /// * `expr` - The encoded move expression.
-    /// * `privilege` - The [`PrivilegeLevel`] in which this expression should be executed.
-    ///
-    /// # Returns
-    ///
-    /// A u32 that is the calculated result of the expression.
-    fn cache_execute_u32_move_expression(&mut self, expr: &u32, privilege: &PrivilegeLevel) -> u32 {
-        if !self.move_expression_cache.contains_key(expr) {
-            // Cache the decoding result to speed up processing slightly.
-            let mut decoder = MoveExpressionHandler::new();
-            decoder.unpack(*expr);
-
-            self.move_expression_cache.insert(*expr, decoder);
-        }
-
-        // Get the copy of the decoder. It seems a bit silly to have to extract
-        // this given that we might gave just stored it... but for the sake of code clarity
-        // this is the simplest option.
-        let handler = self.move_expression_cache.get(expr).unwrap();
-
-        // Determine the first and second operands.
-        let value_1 = match handler.operand_1 {
-            ExpressionArgs::Register(id) => self.read_reg_u32(&id, privilege),
-            ExpressionArgs::Immediate(val) => val as u32,
-            _ => panic!(),
-        };
-        let value_2 = match handler.operand_2 {
-            ExpressionArgs::Register(id) => self.read_reg_u32(&id, privilege),
-            ExpressionArgs::Immediate(val) => val as u32,
-            _ => panic!(),
-        };
-        let value_3 = if handler.is_extended {
-            match handler.operand_3 {
-                ExpressionArgs::Register(id) => self.read_reg_u32(&id, privilege),
-                ExpressionArgs::Immediate(val) => val as u32,
-                _ => panic!(),
-            }
-        } else {
-            0
-        };
-
-        handler.evaluate(value_1, value_2, value_3)
     }
 
     /// Calculate the parity of the lowest byte of a u32 value.
@@ -101,6 +49,48 @@ impl Cpu {
     #[inline(always)]
     fn calculate_lowest_byte_parity(value: u32) -> bool {
         (value & U32_LOW_BYTE_MASK).count_ones() % 2 == 0
+    }
+
+    /// Decode and evaluate a move instruction expression.
+    ///
+    /// # Arguments
+    ///
+    /// * `expr` - The encoded move expression.
+    /// * `privilege` - The [`PrivilegeLevel`] in which this expression should be executed.
+    ///
+    /// # Returns
+    ///
+    /// A u32 that is the calculated result of the expression.
+    fn decode_evaluate_u32_move_expression(
+        &mut self,
+        expr: &u32,
+        privilege: &PrivilegeLevel,
+    ) -> u32 {
+        let mut decoder = MoveExpressionHandler::new();
+        decoder.unpack(*expr);
+
+        // Determine the first and second operands.
+        let value_1 = match decoder.operand_1 {
+            ExpressionArgs::Register(id) => self.read_reg_u32(&id, privilege),
+            ExpressionArgs::Immediate(val) => val as u32,
+            _ => panic!(),
+        };
+        let value_2 = match decoder.operand_2 {
+            ExpressionArgs::Register(id) => self.read_reg_u32(&id, privilege),
+            ExpressionArgs::Immediate(val) => val as u32,
+            _ => panic!(),
+        };
+        let value_3 = if decoder.is_extended {
+            match decoder.operand_3 {
+                ExpressionArgs::Register(id) => self.read_reg_u32(&id, privilege),
+                ExpressionArgs::Immediate(val) => val as u32,
+                _ => panic!(),
+            }
+        } else {
+            0
+        };
+
+        decoder.evaluate(value_1, value_2, value_3)
     }
 
     /// Get the current privilege level of the processor.
@@ -835,20 +825,20 @@ impl Cpu {
             }
             Instruction::MovU32ImmMemExprRel(imm, expr) => {
                 // mov imm, [addr] - move immediate to address.
-                let addr = self.cache_execute_u32_move_expression(expr, privilege);
+                let addr = self.decode_evaluate_u32_move_expression(expr, privilege);
 
                 mem.set_u32(addr as usize, *imm);
             }
             Instruction::MovMemExprU32RegRel(expr, reg) => {
                 // mov [addr], register - move value at address to register.
-                let addr = self.cache_execute_u32_move_expression(expr, privilege);
+                let addr = self.decode_evaluate_u32_move_expression(expr, privilege);
                 let value = mem.get_u32(addr as usize);
 
                 self.write_reg_u32(reg, value, privilege);
             }
             Instruction::MovU32RegMemExprRel(reg, expr) => {
                 // mov reg, [addr] - move value of a register to an address.
-                let addr = self.cache_execute_u32_move_expression(expr, privilege);
+                let addr = self.decode_evaluate_u32_move_expression(expr, privilege);
                 let value = self.read_reg_u32(reg, privilege);
 
                 mem.set_u32(addr as usize, value);
