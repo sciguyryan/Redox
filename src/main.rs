@@ -81,7 +81,7 @@ fn main() {
 
     let stack_capacity = 100;
 
-    let mut vm = VirtualMachine::new(vm::MIN_MEMORY_SIZE, stack_capacity);
+    let mut vm = VirtualMachine::new(vm::MIN_MEMORY_SIZE);
 
     //vm.ram.set(0, 0x12, &SecurityContext::Machine);
     //vm.ram.print_range(0, 10);
@@ -143,7 +143,7 @@ fn main() {
     }
     println!();
 
-    vm.setup(0x10000, data, 100);
+    vm.setup(0x10000, data, stack_capacity);
     vm.run();
 
     //vm.run_instructions(&instructions[..]);

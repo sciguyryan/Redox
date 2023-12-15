@@ -5,20 +5,27 @@ use crate::ins::{instruction::Instruction, op_codes::OpCode};
 use super::memory_block_reader::MemoryBlockReader;
 
 enum StackTypeHint {
-    u32,
-    u8,
-    f32,
+    U32,
+    U8,
+    F32,
 }
 
 pub struct Memory {
     /// The raw byte storage of this memory module.
     storage: Vec<u8>,
 
+    /// A list of type hints for the items currently on the stack.
     stack_type_hints: Vec<StackTypeHint>,
+
+    /// The number of u32 values that can be stored on the stack.
     stack_capacity: usize,
+    /// The size of the stack, in bytes.
     stack_size: usize,
+    /// The position that represents the start of the stack memory region.
     stack_start: usize,
+    /// The position that represents the end of the stack memory region.
     stack_end: usize,
+    /// The current position of the stack within its memory region.
     stack_pointer: usize,
 }
 
@@ -85,7 +92,7 @@ impl Memory {
         stack_end
     }
 
-    /// Decompile instructions between a start and end memory location.
+    /// Attempt to decompile any instructions between a start and end memory location.
     ///
     /// # Arguments
     ///
@@ -109,18 +116,45 @@ impl Memory {
         instructions
     }
 
+    /// Attempt to get a pointer to a byte in memory.
+    ///
+    /// # Arguments
+    ///
+    /// * `pos` - The position of the byte in memory.
+    ///
+    /// # Returns
+    ///
+    /// A pointer to the specific byte in memory.
     pub fn get_byte_ptr(&self, pos: usize) -> &u8 {
         self.assert_point_in_bounds(pos);
 
         &self.storage[pos]
     }
 
+    /// Attempt to read and clone a byte from memory.
+    ///
+    /// # Arguments
+    ///
+    /// * `pos` - The position of the byte in memory.
+    ///
+    /// # Returns
+    ///
+    /// A clone of the specific byte from memory.
     pub fn get_byte_clone(&self, pos: usize) -> u8 {
         assert!(self.is_in_bounds(pos));
 
         self.storage[pos]
     }
 
+    /// Attempt to read an instruction from memory.
+    ///
+    /// # Arguments
+    ///
+    /// * `pos` - The starting position of the instruction in memory.
+    ///
+    /// # Returns
+    ///
+    /// An [`Instruction`] instance, if the memory address contains a valid instruction.
     pub fn get_instruction(&self, pos: usize) -> Instruction {
         let opcode_id = self.get_u32(pos);
 
@@ -467,6 +501,15 @@ impl Memory {
         }
     }
 
+    /// Attempt to read a u32 value from memory.
+    ///
+    /// # Arguments
+    ///
+    /// * `pos` - The starting position of the bytes in memory.
+    ///
+    /// # Returns
+    ///
+    /// A u32 from the specified memory address.
     pub fn get_u32(&self, pos: usize) -> u32 {
         let bytes: [u8; 4] = self
             .get_range_ptr(pos, 4)
@@ -476,6 +519,16 @@ impl Memory {
         u32::from_le_bytes(bytes)
     }
 
+    /// Attempt to get a pointer to a range of bytes within memory.
+    ///
+    /// # Arguments
+    ///
+    /// * `start` - The starting position of the bytes in memory.
+    /// * `len` - The number of bytes to read from memory.
+    ///
+    /// # Returns
+    ///
+    /// A reference to a u8 slice from memory.
     pub fn get_range_ptr(&self, start: usize, len: usize) -> &[u8] {
         let end = start + len;
         self.assert_point_in_bounds(start);
@@ -484,10 +537,25 @@ impl Memory {
         &self.storage[start..end]
     }
 
+    /// Attempt to clone a range of bytes from memory.
+    ///
+    /// # Arguments
+    ///
+    /// * `start` - The starting position of the bytes in memory.
+    /// * `len` - The number of bytes to read from memory.
+    ///
+    /// # Returns
+    ///
+    /// A vector containing the bytes cloned from memory.
     pub fn get_range_clone(&self, start: usize, len: usize) -> Vec<u8> {
         self.get_range_ptr(start, len).to_vec()
     }
 
+    /// Get a reference to a slice of the entire memory contents.
+    ///
+    /// # Returns
+    ///
+    /// A slice of u8 values, referencing every byte in memory.
     pub fn get_storage(&self) -> &[u8] {
         &self.storage
     }
@@ -511,16 +579,33 @@ impl Memory {
         pos <= self.len()
     }
 
+    /// Get the size of the currently allocated memory.
+    ///
+    /// # Returns
+    ///
+    /// The length of the memory, in bytes.
     pub fn len(&self) -> usize {
         self.storage.len()
     }
 
+    /// Set the value of a specific byte in memory.
+    ///
+    /// # Arguments
+    ///
+    /// * `pos` - The point in memory to be checked.
+    /// * `value` - The value to be written into memory.
     pub fn set(&mut self, pos: usize, value: u8) {
         self.assert_point_in_bounds(pos);
 
         self.storage[pos] = value;
     }
 
+    /// Set the value of a range of values in memory.
+    ///
+    /// # Arguments
+    ///
+    /// * `pos` - The position of the first byte to be written into memory.
+    /// * `values` - A slice of values that are to be written into memory.
     pub fn set_range(&mut self, start: usize, values: &[u8]) {
         let end = start + values.len();
         self.assert_point_in_bounds(start);
@@ -531,16 +616,24 @@ impl Memory {
         }
     }
 
+    /// Write a u32 value into memory.
+    ///
+    /// # Arguments
+    ///
+    /// * `pos` - The position of the first byte to be written into memory.
+    /// * `value` - The value to be written into memory.
     pub fn set_u32(&mut self, pos: usize, value: u32) {
         let bytes = u32::to_le_bytes(value);
 
         self.set_range(pos, &bytes);
     }
 
+    /// Print te entire contents of memory.
     pub fn print(&self) {
         println!("{:?}", self.storage);
     }
 
+    /// Print a specific range of bytes from memory.
     pub fn print_range(&self, start: usize, len: usize) {
         let end = start + len;
         self.assert_point_in_bounds(start);

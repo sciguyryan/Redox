@@ -40,9 +40,6 @@ impl VirtualMachine {
         let stack_end = self.ram.configure_stack(stack_start, stack_capacity) as u32;
 
         // Configure the CPU registers to account for the new stack pointer.
-        self.cpu
-            .registers
-            .get_register_u32_mut(RegisterId::SP)
-            .write_unchecked(stack_end);
+        self.cpu.update_stack_pointer(stack_end);
     }
 }

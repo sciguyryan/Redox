@@ -45,7 +45,7 @@ impl Cpu {
     ///
     /// # Returns
     ///
-    /// A boolean, true indicating that the parity bit should be 1, false indicating it should be 0,
+    /// A boolean, true indicating that the parity bit should be 1, false indicating it should be 0.
     #[inline(always)]
     fn calculate_lowest_byte_parity(value: u32) -> bool {
         (value & U32_LOW_BYTE_MASK).count_ones() % 2 == 0
@@ -1061,6 +1061,18 @@ impl Cpu {
         self.registers
             .get_register_u32_mut(RegisterId::PC)
             .increment_unchecked();
+    }
+
+    /// Update the stack pointer (SP) register.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The new value of the stack pointer register.
+    #[inline(always)]
+    pub fn update_stack_pointer(&mut self, value: u32) {
+        self.registers
+            .get_register_u32_mut(RegisterId::SP)
+            .write_unchecked(value);
     }
 
     /// Get the value of a specific u32 register.
