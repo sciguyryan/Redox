@@ -79,7 +79,9 @@ fn main() {
         panic!("currently unsupported");
     }
 
-    let mut vm = VirtualMachine::new(vm::MIN_MEMORY_SIZE);
+    let stack_capacity = 100;
+
+    let mut vm = VirtualMachine::new(vm::MIN_MEMORY_SIZE, stack_capacity);
 
     //vm.ram.set(0, 0x12, &SecurityContext::Machine);
     //vm.ram.print_range(0, 10);
@@ -141,7 +143,7 @@ fn main() {
     }
     println!();
 
-    vm.load_code_block(0, data);
+    vm.setup(0x10000, data, 100);
     vm.run();
 
     //vm.run_instructions(&instructions[..]);
@@ -155,6 +157,10 @@ fn main() {
     println!();
 
     println!("----------[RAM]----------");
-    let segment = &vm.ram.get_storage()[..150];
+    let segment = &vm.ram.get_storage()[0x10000..0x10096];
     println!("{segment:?}");
+    println!();
+
+    println!("----------[STACK]----------");
+    println!("WIP");
 }

@@ -4,15 +4,35 @@ use crate::ins::{instruction::Instruction, op_codes::OpCode};
 
 use super::memory_block_reader::MemoryBlockReader;
 
+enum StackTypeHint {
+    u32,
+    u8,
+    f32,
+}
+
 pub struct Memory {
     /// The raw byte storage of this memory module.
     storage: Vec<u8>,
+
+    stack_type_hints: Vec<StackTypeHint>,
+    stack_capacity: usize,
+    stack_size: usize,
+    stack_start: usize,
+    stack_end: usize,
+    stack_pointer: usize,
 }
 
 impl Memory {
     pub fn new(size: usize) -> Self {
         Self {
             storage: vec![0x0; size],
+
+            stack_type_hints: vec![],
+            stack_capacity: 0,
+            stack_size: 0,
+            stack_start: 0,
+            stack_end: 0,
+            stack_pointer: 0,
         }
     }
 
@@ -29,6 +49,52 @@ impl Memory {
         );
     }
 
+    /// Completely clear the memory.
+    pub fn clear(&mut self) {
+        self.storage = vec![0; self.storage.len()];
+    }
+
+    /// Configure the stack memory region.
+    ///
+    /// # Arguments
+    ///
+    /// * `stack_start` - The starting point for the stack memory region.
+    /// * `stack_capacity` - The number of items that can be stored in stack memory.
+    ///
+    /// # Returns
+    ///
+    /// A usize giving the end location of the stack in memory.
+    pub fn configure_stack(&mut self, stack_start: usize, stack_capacity: usize) -> usize {
+        // The size of the stack is calculated to contain enough space
+        // for a given number of u32 values (at 4 bytes each).
+        let stack_size = stack_capacity * std::mem::size_of::<u32>();
+        let stack_end = stack_start + stack_size;
+        assert!(stack_end < self.len());
+
+        // Initialize the fields to their correct values.
+        self.stack_type_hints = Vec::with_capacity(stack_capacity);
+        self.stack_capacity = stack_capacity;
+        self.stack_size = stack_size;
+        self.stack_start = stack_start;
+        self.stack_end = stack_start + stack_size;
+
+        // The stack pointer always points to the end of the stack and moves
+        // forward as elements are added.
+        self.stack_pointer = self.stack_end;
+
+        stack_end
+    }
+
+    /// Decompile instructions between a start and end memory location.
+    ///
+    /// # Arguments
+    ///
+    /// * `start` - The starting memory location.
+    /// * `end` - The ending memory location.
+    ///
+    /// # Returns
+    ///
+    /// A vector containing the decompiled instructions.
     pub fn decompile_instructions(&self, start: usize, end: usize) -> Vec<Instruction> {
         let mut instructions = vec![];
 
@@ -447,10 +513,6 @@ impl Memory {
 
     pub fn len(&self) -> usize {
         self.storage.len()
-    }
-
-    pub fn clear(&mut self) {
-        self.storage = vec![0; self.storage.len()];
     }
 
     pub fn set(&mut self, pos: usize, value: u8) {

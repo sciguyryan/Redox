@@ -1,5 +1,5 @@
 use core::fmt;
-use std::{collections::BTreeMap, panic, slice::Iter};
+use std::{panic, slice::Iter};
 
 use crate::{
     ins::{
