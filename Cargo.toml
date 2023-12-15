@@ -24,7 +24,7 @@ strum = "0.25.0"
 strum_macros = "0.25.3"
 
 [target.'cfg(windows)'.build-dependencies]
-winres = "0.1.5"
+winres = "0.1.12"
 
 [profile.dev]
 opt-level = 0
