@@ -34,8 +34,8 @@ impl VirtualMachine {
         // Load the bytecode raw data into RAM.
         self.ram.set_range(binary_start, bytes);
 
-        // Now we can set up the stack, which will fall directly after
-        // the binary data.
+        // Now we can set up the stack.
+        // The stack area will fall directly after the binary data.
         let stack_start = binary_start + binary_len;
         let stack_end = self.ram.configure_stack(stack_start, stack_capacity) as u32;
 

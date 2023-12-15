@@ -1,13 +1,14 @@
 use num_traits::FromPrimitive;
+use prettytable::{row, Table};
 
 use crate::ins::{instruction::Instruction, op_codes::OpCode};
 
 use super::memory_block_reader::MemoryBlockReader;
 
 enum StackTypeHint {
+    F32,
     U32,
     U8,
-    F32,
 }
 
 pub struct Memory {
@@ -16,8 +17,7 @@ pub struct Memory {
 
     /// A list of type hints for the items currently on the stack.
     stack_type_hints: Vec<StackTypeHint>,
-
-    /// The number of u32 values that can be stored on the stack.
+    /// The number of u32 items that the stack can hold.
     stack_capacity: usize,
     /// The size of the stack, in bytes.
     stack_size: usize,
@@ -25,8 +25,6 @@ pub struct Memory {
     stack_start: usize,
     /// The position that represents the end of the stack memory region.
     stack_end: usize,
-    /// The current position of the stack within its memory region.
-    stack_pointer: usize,
 }
 
 impl Memory {
@@ -39,7 +37,6 @@ impl Memory {
             stack_size: 0,
             stack_start: 0,
             stack_end: 0,
-            stack_pointer: 0,
         }
     }
 
@@ -70,24 +67,20 @@ impl Memory {
     ///
     /// # Returns
     ///
-    /// A usize giving the end location of the stack in memory.
-    pub fn configure_stack(&mut self, stack_start: usize, stack_capacity: usize) -> usize {
+    /// A usize giving the end location of the stack memory region.
+    pub fn configure_stack(&mut self, stack_start_pos: usize, stack_capacity: usize) -> usize {
         // The size of the stack is calculated to contain enough space
         // for a given number of u32 values (at 4 bytes each).
         let stack_size = stack_capacity * std::mem::size_of::<u32>();
-        let stack_end = stack_start + stack_size;
+        let stack_end = stack_start_pos + stack_size;
         assert!(stack_end < self.len());
 
-        // Initialize the fields to their correct values.
+        // Initialize the relevant stack fields.
         self.stack_type_hints = Vec::with_capacity(stack_capacity);
         self.stack_capacity = stack_capacity;
         self.stack_size = stack_size;
-        self.stack_start = stack_start;
-        self.stack_end = stack_start + stack_size;
-
-        // The stack pointer always points to the end of the stack and moves
-        // forward as elements are added.
-        self.stack_pointer = self.stack_end;
+        self.stack_start = stack_start_pos;
+        self.stack_end = stack_end;
 
         stack_end
     }
@@ -588,6 +581,34 @@ impl Memory {
         self.storage.len()
     }
 
+    /// Attempt to pop a u32 value from the stack.
+    pub fn pop_u32(&mut self) -> u32 {
+        0
+    }
+
+    /// Attempt to push a u32 value onto the stack.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The u32 value to be pushed onto the stack.
+    pub fn push_u32(&mut self, value: u32, stack_pointer: usize) {
+        let value_start_pos = stack_pointer - 4;
+        assert!(value_start_pos <= self.stack_end);
+
+        self.set_u32(value_start_pos, value);
+        self.pop_type_hint(StackTypeHint::U32);
+
+        println!("WARNING: be sure to update the stack pointer and stack frame size registers!");
+    }
+
+    #[cfg(feature = "stack-type-hints")]
+    fn pop_type_hint(&mut self, hint: StackTypeHint) {
+        self.stack_type_hints.push(hint);
+    }
+
+    #[cfg(not(feature = "stack-type-hints"))]
+    fn pop_type_hint(&mut self, _hint: StackTypeHint) {}
+
     /// Set the value of a specific byte in memory.
     ///
     /// # Arguments
@@ -640,6 +661,53 @@ impl Memory {
         self.assert_point_in_bounds(end);
 
         println!("{:?}", self.storage[start..end].to_vec());
+    }
+
+    /// Print the contents of the stack.
+    pub fn print_stack(&self) {
+        let mut table = Table::new();
+
+        if cfg!(feature = "stack-type-hints") {
+            table.add_row(row!["Index", "Value", "Type"]);
+
+            let mut stack_pos = self.stack_end;
+            //println!("stack_start = {}", stack_pos);
+            //println!("AAAAAAAAAAA {}", self.get_u32(stack_pos - 4));
+
+            for (id, hint) in self.stack_type_hints.iter().enumerate() {
+                match *hint {
+                    StackTypeHint::F32 => todo!(),
+                    StackTypeHint::U32 => {
+                        let value = self.get_u32(stack_pos - 4);
+                        table.add_row(row![id, format!("{value}"), "u32"]);
+                        stack_pos -= 4;
+                    }
+                    StackTypeHint::U8 => todo!(),
+                }
+            }
+        } else {
+            println!("WARNING: stack type hints are disabled, all outputs will be assumed to be u32 values.");
+
+            table.add_row(row!["Index", "Value"]);
+        }
+
+        /*for (id, reg) in &self.registers_u32 {
+            let reg_value = *reg.read_unchecked();
+            let formatted_value = format!("{reg_value:0>8X}");
+            let mut notes = String::new();
+
+            if *id == RegisterId::FL {
+                notes = reg.get_flags_register_string();
+            }
+
+            table.add_row(row![id, formatted_value, "u32", notes]);
+        }
+
+        for (id, reg) in &self.registers_f32 {
+            table.add_row(row![id, format!("{}", reg.read_unchecked()), "f32", ""]);
+        }*/
+
+        table.printstd();
     }
 }
 

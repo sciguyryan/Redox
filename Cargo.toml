@@ -36,4 +36,5 @@ strip = true
 #panic = "abort"
 
 [features]
-stack_type_hints = []
+default = ["stack-type-hints"]
+stack-type-hints = []

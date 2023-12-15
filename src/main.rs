@@ -146,6 +146,11 @@ fn main() {
     vm.setup(0x10000, data, stack_capacity);
     vm.run();
 
+    let mut sp = vm.cpu.get_stack_pointer() as usize;
+    vm.ram.push_u32(1234, sp);
+    sp -= 4;
+    vm.ram.push_u32(4321, sp);
+
     //vm.run_instructions(&instructions[..]);
 
     println!("----------[CPU]----------");
@@ -162,5 +167,5 @@ fn main() {
     println!();
 
     println!("----------[STACK]----------");
-    println!("WIP");
+    vm.ram.print_stack();
 }

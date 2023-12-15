@@ -141,6 +141,15 @@ impl Cpu {
         utils::is_bit_set(*value, flag.into())
     }
 
+    /// Get the value of the stack pointer (SP) register.
+    #[inline(always)]
+    pub fn get_stack_pointer(&self) -> u32 {
+        *self
+            .registers
+            .get_register_u32(RegisterId::SP)
+            .read_unchecked()
+    }
+
     /// Get the current value of the program counter (PC) register.
     #[inline(always)]
     fn get_program_counter(&mut self) {
