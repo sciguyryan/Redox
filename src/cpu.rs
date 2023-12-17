@@ -1305,7 +1305,7 @@ mod tests_cpu {
 
             // Check the user memory segment.
             assert_eq!(
-                mem.get_code_segment_storage(),
+                mem.get_user_segment_storage(),
                 self.expected_memory,
                 "{}",
                 self.fail_message(id, false)
@@ -1363,13 +1363,15 @@ mod tests_cpu {
     /// Test the NOP instruction.
     #[test]
     fn test_nop() {
-        let tests = [TestEntryU32Standard::new(
-            &[Nop],
-            &[],
-            vec![0; 100],
-            false,
-            "failed to execute NOP instruction",
-        )];
+        let tests = [
+            TestEntryU32Standard::new(
+                &[Nop],
+                &[],
+                vec![0; 100],
+                false,
+                "failed to execute NOP instruction",
+            )
+        ];
 
         for (id, test) in tests.iter().enumerate() {
             test.run_test(id);
