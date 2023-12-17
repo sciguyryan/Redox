@@ -772,7 +772,7 @@ mod tests_memory {
         ram
     }
 
-    /// Test reading above RAM bounds.
+    /// Test reading beyond RAM bounds.
     #[test]
     #[should_panic]
     fn test_overread_ram() {
@@ -783,7 +783,7 @@ mod tests_memory {
 
     /// Test the basic aspects of creating a RAM module.
     #[test]
-    fn test_ram_creation() {
+    fn test_ram_creation_simple() {
         let size = 100;
         let ram = Memory::new(size, &[], &[], 0);
 
@@ -798,6 +798,63 @@ mod tests_memory {
             vec![0x0; 100 - 1],
             "failed to correctly initialize RAM"
         );
+    }
+
+    /// Test the complex aspects of creating a RAM module.
+    #[test]
+    fn test_ram_creation_complex() {
+        let size = 0x500;
+        let stack_entries = 50;
+        let code = [0x1; 100];
+        let data = [0x2; 100];
+        let ram = Memory::new(size, &code, &data, stack_entries);
+
+        assert_eq!(
+            ram.len(),
+            size,
+            "failed to create a RAM module of the specified size"
+        );
+
+        // Check the stack segment is correct.
+        let stack_end = size;
+        let stack_start = stack_end - stack_entries * 4;
+        assert_eq!(stack_end, ram.stack_segment_end);
+        assert_eq!(stack_start, ram.stack_segment_start);
+
+        // Check the data segment is correct.
+        let data_end = stack_start;
+        let data_start = data_end - data.len();
+        assert_eq!(data_end, ram.data_segment_end);
+        assert_eq!(data_start, ram.data_segment_start);
+        assert_eq!(data, ram.get_range_ptr(data_start, data.len()));
+
+        // Check the code segment is correct.
+        let code_end = data_start;
+        let code_start = code_end - code.len();
+        assert_eq!(code_end, ram.code_segment_end);
+        assert_eq!(code_start, ram.code_segment_start);
+        assert_eq!(code, ram.get_range_ptr(code_start, code.len()));
+    }
+
+    /// Test creating a memory instance with insufficient space for code.
+    #[test]
+    #[should_panic]
+    fn test_ram_insufficient_space_for_code() {
+        _ = Memory::new(100, &vec![0; 1000], &[], 0);
+    }
+
+    /// Test creating a memory instance with insufficient space for data.
+    #[test]
+    #[should_panic]
+    fn test_ram_insufficient_space_for_data() {
+        _ = Memory::new(100, &[], &vec![0; 1000], 0);
+    }
+
+    /// Test creating a memory instance with insufficient space for the stack.
+    #[test]
+    #[should_panic]
+    fn test_ram_insufficient_space_for_stack() {
+        _ = Memory::new(100, &[], &[], 1000);
     }
 
     /// Test basic reading and writing.

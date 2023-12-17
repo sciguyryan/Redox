@@ -1303,14 +1303,7 @@ mod tests_cpu {
                 panic!("{}", self.fail_message(id, false));
             }
 
-            eprintln!(
-                "AAAAAAAAAAAAAAAAAA ACTUAL {} EXPECTED {}",
-                mem.get_user_storage().len(),
-                self.expected_memory.len()
-            );
-
-            // Check the VM memory.
-            // TODO Swap to using registers to check the memory via read instead!
+            // Check the user memory segment.
             assert_eq!(
                 mem.get_user_storage(),
                 self.expected_memory,
