@@ -3951,7 +3951,31 @@ mod tests_cpu {
                 false,
                 "MOV - value not correctly moved from memory to register - using subtraction",
             ),
-            // TODO - add tests to check correct evaluation ordering of three-member expressions.
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmMemExprRel(
+                    0x123,
+                    MoveExpressionHandler::from(
+                        &[
+                            ExpressionArgs::Immediate(0x8),
+                            ExpressionArgs::Operator(ExpressionOperator::Add),
+                            ExpressionArgs::Immediate(0x4),
+                            ExpressionArgs::Operator(ExpressionOperator::Multiply),
+                            ExpressionArgs::Immediate(0x2),
+                        ][..],
+                    )
+                    .pack(),
+                )],
+                &[],
+                vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                ],
+                false,
+                "MOV - value not correctly moved from memory to register with expression - three constants",
+            ),
         ];
 
         for (id, test) in tests.iter().enumerate() {
@@ -4106,6 +4130,33 @@ mod tests_cpu {
                 ],
                 false,
                 "MOV - value not correctly moved from memory to register - using subtraction",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmMemRelSimple(0x123, 0x10),
+                    MovMemExprU32RegRel(
+                        MoveExpressionHandler::from(
+                            &[
+                                ExpressionArgs::Immediate(0x8),
+                                ExpressionArgs::Operator(ExpressionOperator::Add),
+                                ExpressionArgs::Immediate(0x4),
+                                ExpressionArgs::Operator(ExpressionOperator::Multiply),
+                                ExpressionArgs::Immediate(0x2),
+                            ][..],
+                        )
+                        .pack(),
+                        RegisterId::R8,
+                    ),
+                ],
+                &[(RegisterId::R8, 0x123)],
+                vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                ],
+                false,
+                "MOV - value not correctly moved from memory to register with expression - two constants",
             ),
         ];
 
@@ -4265,6 +4316,33 @@ mod tests_cpu {
                 ],
                 false,
                 "MOV - value not correctly moved from memory to register - using subtraction",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmU32Reg(0x123, RegisterId::R8),
+                    MovU32RegMemExprRel(
+                        RegisterId::R8,
+                        MoveExpressionHandler::from(
+                            &[
+                                ExpressionArgs::Immediate(0x8),
+                                ExpressionArgs::Operator(ExpressionOperator::Add),
+                                ExpressionArgs::Immediate(0x4),
+                                ExpressionArgs::Operator(ExpressionOperator::Multiply),
+                                ExpressionArgs::Immediate(0x2),
+                            ][..],
+                        )
+                        .pack(),
+                    ),
+                ],
+                &[(RegisterId::R8, 0x123)],
+                vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                ],
+                false,
+                "MOV - value not correctly moved from memory to register with expression - two constants",
             ),
         ];
 
