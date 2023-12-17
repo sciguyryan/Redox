@@ -3824,84 +3824,20 @@ mod tests_cpu {
     /// Test the complex move value to expression-derived memory address.
     #[test]
     fn test_move_u32_imm_expr() {
-        let test_1_args = [MovU32ImmMemExprRel(
-            0x123,
-            MoveExpressionHandler::from(
-                &[
-                    ExpressionArgs::Immediate(0x8),
-                    ExpressionArgs::Operator(ExpressionOperator::Add),
-                    ExpressionArgs::Immediate(0x8),
-                ][..],
-            )
-            .pack(),
-        )];
-
-        let test_2_args = [
-            MovU32ImmU32Reg(0x8, RegisterId::R1),
-            MovU32ImmU32Reg(0x8, RegisterId::R2),
-            MovU32ImmMemExprRel(
-                0x123,
-                MoveExpressionHandler::from(
-                    &[
-                        ExpressionArgs::Register(RegisterId::R1),
-                        ExpressionArgs::Operator(ExpressionOperator::Add),
-                        ExpressionArgs::Register(RegisterId::R2),
-                    ][..],
-                )
-                .pack(),
-            ),
-        ];
-
-        let test_3_args = [
-            MovU32ImmU32Reg(0x8, RegisterId::R1),
-            MovU32ImmMemExprRel(
-                0x123,
-                MoveExpressionHandler::from(
-                    &[
-                        ExpressionArgs::Register(RegisterId::R1),
-                        ExpressionArgs::Operator(ExpressionOperator::Add),
-                        ExpressionArgs::Immediate(0x8),
-                    ][..],
-                )
-                .pack(),
-            ),
-        ];
-
-        let test_4_args = [
-            MovU32ImmU32Reg(0x2, RegisterId::R1),
-            MovU32ImmU32Reg(0x8, RegisterId::R2),
-            MovU32ImmMemExprRel(
-                0x123,
-                MoveExpressionHandler::from(
-                    &[
-                        ExpressionArgs::Register(RegisterId::R1),
-                        ExpressionArgs::Operator(ExpressionOperator::Multiply),
-                        ExpressionArgs::Register(RegisterId::R2),
-                    ][..],
-                )
-                .pack(),
-            ),
-        ];
-
-        let test_5_args = [
-            MovU32ImmU32Reg(0x1a, RegisterId::R1),
-            MovU32ImmU32Reg(0x4, RegisterId::R2),
-            MovU32ImmMemExprRel(
-                0x123,
-                MoveExpressionHandler::from(
-                    &[
-                        ExpressionArgs::Register(RegisterId::R1),
-                        ExpressionArgs::Operator(ExpressionOperator::Subtract),
-                        ExpressionArgs::Register(RegisterId::R2),
-                    ][..],
-                )
-                .pack(),
-            ),
-        ];
-
         let tests = [
             TestEntryU32Standard::new(
-                &test_1_args,
+                &[
+                    MovU32ImmMemExprRel(
+                    0x123,
+                    MoveExpressionHandler::from(
+                        &[
+                            ExpressionArgs::Immediate(0x8),
+                            ExpressionArgs::Operator(ExpressionOperator::Add),
+                            ExpressionArgs::Immediate(0x8),
+                        ][..],
+                    )
+                    .pack(),
+                )],
                 &[],
                 vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3913,7 +3849,21 @@ mod tests_cpu {
                 "MOV - value not correctly moved from memory to register with expression - two constants",
             ),
             TestEntryU32Standard::new(
-                &test_2_args,
+                &[
+                    MovU32ImmU32Reg(0x8, RegisterId::R1),
+                    MovU32ImmU32Reg(0x8, RegisterId::R2),
+                    MovU32ImmMemExprRel(
+                        0x123,
+                        MoveExpressionHandler::from(
+                            &[
+                                ExpressionArgs::Register(RegisterId::R1),
+                                ExpressionArgs::Operator(ExpressionOperator::Add),
+                                ExpressionArgs::Register(RegisterId::R2),
+                            ][..],
+                        )
+                        .pack(),
+                    ),
+                ],
                 &[(RegisterId::R1, 0x8), (RegisterId::R2, 0x8)],
                 vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3925,7 +3875,20 @@ mod tests_cpu {
                 "MOV - value not correctly moved from memory to register with expression - two registers",
             ),
             TestEntryU32Standard::new(
-                &test_3_args,
+                &[
+                    MovU32ImmU32Reg(0x8, RegisterId::R1),
+                    MovU32ImmMemExprRel(
+                        0x123,
+                        MoveExpressionHandler::from(
+                            &[
+                                ExpressionArgs::Register(RegisterId::R1),
+                                ExpressionArgs::Operator(ExpressionOperator::Add),
+                                ExpressionArgs::Immediate(0x8),
+                            ][..],
+                        )
+                        .pack(),
+                    ),
+                ],
                 &[(RegisterId::R1, 0x8)],
                 vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3937,7 +3900,21 @@ mod tests_cpu {
                 "MOV - value not correctly moved from memory to register with expression - one constant and one register",
             ),
             TestEntryU32Standard::new(
-                &test_4_args,
+                &[
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    MovU32ImmU32Reg(0x8, RegisterId::R2),
+                    MovU32ImmMemExprRel(
+                        0x123,
+                        MoveExpressionHandler::from(
+                            &[
+                                ExpressionArgs::Register(RegisterId::R1),
+                                ExpressionArgs::Operator(ExpressionOperator::Multiply),
+                                ExpressionArgs::Register(RegisterId::R2),
+                            ][..],
+                        )
+                        .pack(),
+                    ),
+                ],
                 &[(RegisterId::R1, 0x2), (RegisterId::R2, 0x8)],
                 vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3949,7 +3926,21 @@ mod tests_cpu {
                 "MOV - value not correctly moved from memory to register - using multiplication",
             ),
             TestEntryU32Standard::new(
-                &test_5_args,
+                &[
+                    MovU32ImmU32Reg(0x1a, RegisterId::R1),
+                    MovU32ImmU32Reg(0x4, RegisterId::R2),
+                    MovU32ImmMemExprRel(
+                        0x123,
+                        MoveExpressionHandler::from(
+                            &[
+                                ExpressionArgs::Register(RegisterId::R1),
+                                ExpressionArgs::Operator(ExpressionOperator::Subtract),
+                                ExpressionArgs::Register(RegisterId::R2),
+                            ][..],
+                        )
+                        .pack(),
+                    ),
+                ],
                 &[(RegisterId::R1, 0x1A), (RegisterId::R2, 0x4)],
                 vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0,
@@ -3960,6 +3951,7 @@ mod tests_cpu {
                 false,
                 "MOV - value not correctly moved from memory to register - using subtraction",
             ),
+            // TODO - add tests to check correct evaluation ordering of three-member expressions.
         ];
 
         for (id, test) in tests.iter().enumerate() {
@@ -3970,91 +3962,22 @@ mod tests_cpu {
     /// Test the complex move from an expression-derived memory address to a register.
     #[test]
     fn test_move_mem_expr_u32_reg() {
-        let test_1_args = [
-            MovU32ImmMemRelSimple(0x123, 0x10),
-            MovMemExprU32RegRel(
-                MoveExpressionHandler::from(
-                    &[
-                        ExpressionArgs::Immediate(0x8),
-                        ExpressionArgs::Operator(ExpressionOperator::Add),
-                        ExpressionArgs::Immediate(0x8),
-                    ][..],
-                )
-                .pack(),
-                RegisterId::R8,
-            ),
-        ];
-
-        let test_2_args = [
-            MovU32ImmMemRelSimple(0x123, 0x10),
-            MovU32ImmU32Reg(0x8, RegisterId::R1),
-            MovU32ImmU32Reg(0x8, RegisterId::R2),
-            MovMemExprU32RegRel(
-                MoveExpressionHandler::from(
-                    &[
-                        ExpressionArgs::Register(RegisterId::R1),
-                        ExpressionArgs::Operator(ExpressionOperator::Add),
-                        ExpressionArgs::Register(RegisterId::R2),
-                    ][..],
-                )
-                .pack(),
-                RegisterId::R8,
-            ),
-        ];
-
-        let test_3_args = [
-            MovU32ImmMemRelSimple(0x123, 0x10),
-            MovU32ImmU32Reg(0x8, RegisterId::R1),
-            MovMemExprU32RegRel(
-                MoveExpressionHandler::from(
-                    &[
-                        ExpressionArgs::Register(RegisterId::R1),
-                        ExpressionArgs::Operator(ExpressionOperator::Add),
-                        ExpressionArgs::Immediate(0x8),
-                    ][..],
-                )
-                .pack(),
-                RegisterId::R8,
-            ),
-        ];
-
-        let test_4_args = [
-            MovU32ImmMemRelSimple(0x123, 0x10),
-            MovU32ImmU32Reg(0x2, RegisterId::R1),
-            MovU32ImmU32Reg(0x8, RegisterId::R2),
-            MovMemExprU32RegRel(
-                MoveExpressionHandler::from(
-                    &[
-                        ExpressionArgs::Register(RegisterId::R1),
-                        ExpressionArgs::Operator(ExpressionOperator::Multiply),
-                        ExpressionArgs::Register(RegisterId::R2),
-                    ][..],
-                )
-                .pack(),
-                RegisterId::R8,
-            ),
-        ];
-
-        let test_5_args = [
-            MovU32ImmMemRelSimple(0x123, 0x16),
-            MovU32ImmU32Reg(0x1A, RegisterId::R1),
-            MovU32ImmU32Reg(0x4, RegisterId::R2),
-            MovMemExprU32RegRel(
-                MoveExpressionHandler::from(
-                    &[
-                        ExpressionArgs::Register(RegisterId::R1),
-                        ExpressionArgs::Operator(ExpressionOperator::Subtract),
-                        ExpressionArgs::Register(RegisterId::R2),
-                    ][..],
-                )
-                .pack(),
-                RegisterId::R8,
-            ),
-        ];
-
         let tests = [
             TestEntryU32Standard::new(
-                &test_1_args,
+                &[
+                    MovU32ImmMemRelSimple(0x123, 0x10),
+                    MovMemExprU32RegRel(
+                        MoveExpressionHandler::from(
+                            &[
+                                ExpressionArgs::Immediate(0x8),
+                                ExpressionArgs::Operator(ExpressionOperator::Add),
+                                ExpressionArgs::Immediate(0x8),
+                            ][..],
+                        )
+                        .pack(),
+                        RegisterId::R8,
+                    ),
+                ],
                 &[(RegisterId::R8, 0x123)],
                 vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4066,7 +3989,22 @@ mod tests_cpu {
                 "MOV - value not correctly moved from memory to register with expression - two constants",
             ),
             TestEntryU32Standard::new(
-                &test_2_args,
+                &[
+                    MovU32ImmMemRelSimple(0x123, 0x10),
+                    MovU32ImmU32Reg(0x8, RegisterId::R1),
+                    MovU32ImmU32Reg(0x8, RegisterId::R2),
+                    MovMemExprU32RegRel(
+                        MoveExpressionHandler::from(
+                            &[
+                                ExpressionArgs::Register(RegisterId::R1),
+                                ExpressionArgs::Operator(ExpressionOperator::Add),
+                                ExpressionArgs::Register(RegisterId::R2),
+                            ][..],
+                        )
+                        .pack(),
+                        RegisterId::R8,
+                    ),
+                ],
                 &[
                     (RegisterId::R1, 0x8),
                     (RegisterId::R2, 0x8),
@@ -4082,7 +4020,21 @@ mod tests_cpu {
                 "MOV - value not correctly moved from memory to register with expression - two registers",
             ),
             TestEntryU32Standard::new(
-                &test_3_args,
+                &[
+                    MovU32ImmMemRelSimple(0x123, 0x10),
+                    MovU32ImmU32Reg(0x8, RegisterId::R1),
+                    MovMemExprU32RegRel(
+                        MoveExpressionHandler::from(
+                            &[
+                                ExpressionArgs::Register(RegisterId::R1),
+                                ExpressionArgs::Operator(ExpressionOperator::Add),
+                                ExpressionArgs::Immediate(0x8),
+                            ][..],
+                        )
+                        .pack(),
+                        RegisterId::R8,
+                    ),
+                ],
                 &[(RegisterId::R1, 0x8), (RegisterId::R8, 0x123)],
                 vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4094,7 +4046,22 @@ mod tests_cpu {
                 "MOV - value not correctly moved from memory to register with expression - one constant and one register",
             ),
             TestEntryU32Standard::new(
-                &test_4_args,
+                &[
+                    MovU32ImmMemRelSimple(0x123, 0x10),
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    MovU32ImmU32Reg(0x8, RegisterId::R2),
+                    MovMemExprU32RegRel(
+                        MoveExpressionHandler::from(
+                            &[
+                                ExpressionArgs::Register(RegisterId::R1),
+                                ExpressionArgs::Operator(ExpressionOperator::Multiply),
+                                ExpressionArgs::Register(RegisterId::R2),
+                            ][..],
+                        )
+                        .pack(),
+                        RegisterId::R8,
+                    ),
+                ],
                 &[
                     (RegisterId::R1, 0x2),
                     (RegisterId::R2, 0x8),
@@ -4110,7 +4077,22 @@ mod tests_cpu {
                 "MOV - value not correctly moved from memory to register - using multiplication",
             ),
             TestEntryU32Standard::new(
-                &test_5_args,
+                &[
+                    MovU32ImmMemRelSimple(0x123, 0x16),
+                    MovU32ImmU32Reg(0x1A, RegisterId::R1),
+                    MovU32ImmU32Reg(0x4, RegisterId::R2),
+                    MovMemExprU32RegRel(
+                        MoveExpressionHandler::from(
+                            &[
+                                ExpressionArgs::Register(RegisterId::R1),
+                                ExpressionArgs::Operator(ExpressionOperator::Subtract),
+                                ExpressionArgs::Register(RegisterId::R2),
+                            ][..],
+                        )
+                        .pack(),
+                        RegisterId::R8,
+                    ),
+                ],
                 &[
                     (RegisterId::R1, 0x1a),
                     (RegisterId::R2, 0x4),
@@ -4135,91 +4117,22 @@ mod tests_cpu {
     /// Test the complex move from a register to an expression-derived memory address.
     #[test]
     fn test_move_u32_reg_mem_expr() {
-        let test_1_args = [
-            MovU32ImmU32Reg(0x123, RegisterId::R8),
-            MovU32RegMemExprRel(
-                RegisterId::R8,
-                MoveExpressionHandler::from(
-                    &[
-                        ExpressionArgs::Immediate(0x8),
-                        ExpressionArgs::Operator(ExpressionOperator::Add),
-                        ExpressionArgs::Immediate(0x8),
-                    ][..],
-                )
-                .pack(),
-            ),
-        ];
-
-        let test_2_args = [
-            MovU32ImmU32Reg(0x8, RegisterId::R1),
-            MovU32ImmU32Reg(0x8, RegisterId::R2),
-            MovU32ImmU32Reg(0x123, RegisterId::R8),
-            MovU32RegMemExprRel(
-                RegisterId::R8,
-                MoveExpressionHandler::from(
-                    &[
-                        ExpressionArgs::Register(RegisterId::R1),
-                        ExpressionArgs::Operator(ExpressionOperator::Add),
-                        ExpressionArgs::Register(RegisterId::R2),
-                    ][..],
-                )
-                .pack(),
-            ),
-        ];
-
-        let test_3_args = [
-            MovU32ImmU32Reg(0x8, RegisterId::R1),
-            MovU32ImmU32Reg(0x123, RegisterId::R8),
-            MovU32RegMemExprRel(
-                RegisterId::R8,
-                MoveExpressionHandler::from(
-                    &[
-                        ExpressionArgs::Register(RegisterId::R1),
-                        ExpressionArgs::Operator(ExpressionOperator::Add),
-                        ExpressionArgs::Immediate(0x8),
-                    ][..],
-                )
-                .pack(),
-            ),
-        ];
-
-        let test_4_args = [
-            MovU32ImmU32Reg(0x2, RegisterId::R1),
-            MovU32ImmU32Reg(0x8, RegisterId::R2),
-            MovU32ImmU32Reg(0x123, RegisterId::R8),
-            MovU32RegMemExprRel(
-                RegisterId::R8,
-                MoveExpressionHandler::from(
-                    &[
-                        ExpressionArgs::Register(RegisterId::R1),
-                        ExpressionArgs::Operator(ExpressionOperator::Multiply),
-                        ExpressionArgs::Register(RegisterId::R2),
-                    ][..],
-                )
-                .pack(),
-            ),
-        ];
-
-        let test_5_args = [
-            MovU32ImmU32Reg(0x1A, RegisterId::R1),
-            MovU32ImmU32Reg(0x4, RegisterId::R2),
-            MovU32ImmU32Reg(0x123, RegisterId::R8),
-            MovU32RegMemExprRel(
-                RegisterId::R8,
-                MoveExpressionHandler::from(
-                    &[
-                        ExpressionArgs::Register(RegisterId::R1),
-                        ExpressionArgs::Operator(ExpressionOperator::Subtract),
-                        ExpressionArgs::Register(RegisterId::R2),
-                    ][..],
-                )
-                .pack(),
-            ),
-        ];
-
         let tests = [
             TestEntryU32Standard::new(
-                &test_1_args,
+                &[
+                    MovU32ImmU32Reg(0x123, RegisterId::R8),
+                    MovU32RegMemExprRel(
+                        RegisterId::R8,
+                        MoveExpressionHandler::from(
+                            &[
+                                ExpressionArgs::Immediate(0x8),
+                                ExpressionArgs::Operator(ExpressionOperator::Add),
+                                ExpressionArgs::Immediate(0x8),
+                            ][..],
+                        )
+                        .pack(),
+                    ),
+                ],
                 &[(RegisterId::R8, 0x123)],
                 vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4232,7 +4145,22 @@ mod tests_cpu {
             ),
             // Test with two register values.
             TestEntryU32Standard::new(
-                &test_2_args,
+                &[
+                    MovU32ImmU32Reg(0x8, RegisterId::R1),
+                    MovU32ImmU32Reg(0x8, RegisterId::R2),
+                    MovU32ImmU32Reg(0x123, RegisterId::R8),
+                    MovU32RegMemExprRel(
+                        RegisterId::R8,
+                        MoveExpressionHandler::from(
+                            &[
+                                ExpressionArgs::Register(RegisterId::R1),
+                                ExpressionArgs::Operator(ExpressionOperator::Add),
+                                ExpressionArgs::Register(RegisterId::R2),
+                            ][..],
+                        )
+                        .pack(),
+                    ),
+                ],
                 &[
                     (RegisterId::R1, 0x8),
                     (RegisterId::R2, 0x8),
@@ -4249,7 +4177,21 @@ mod tests_cpu {
             ),
             // Test with a constant and a register.
             TestEntryU32Standard::new(
-                &test_3_args,
+                &[
+                    MovU32ImmU32Reg(0x8, RegisterId::R1),
+                    MovU32ImmU32Reg(0x123, RegisterId::R8),
+                    MovU32RegMemExprRel(
+                        RegisterId::R8,
+                        MoveExpressionHandler::from(
+                            &[
+                                ExpressionArgs::Register(RegisterId::R1),
+                                ExpressionArgs::Operator(ExpressionOperator::Add),
+                                ExpressionArgs::Immediate(0x8),
+                            ][..],
+                        )
+                        .pack(),
+                    ),
+                ],
                 &[(RegisterId::R1, 0x8), (RegisterId::R8, 0x123)],
                 vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4262,7 +4204,22 @@ mod tests_cpu {
             ),
             // Test with multiplication.
             TestEntryU32Standard::new(
-                &test_4_args,
+                &[
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    MovU32ImmU32Reg(0x8, RegisterId::R2),
+                    MovU32ImmU32Reg(0x123, RegisterId::R8),
+                    MovU32RegMemExprRel(
+                        RegisterId::R8,
+                        MoveExpressionHandler::from(
+                            &[
+                                ExpressionArgs::Register(RegisterId::R1),
+                                ExpressionArgs::Operator(ExpressionOperator::Multiply),
+                                ExpressionArgs::Register(RegisterId::R2),
+                            ][..],
+                        )
+                        .pack(),
+                    ),
+                ],
                 &[
                     (RegisterId::R1, 0x2),
                     (RegisterId::R2, 0x8),
@@ -4279,7 +4236,22 @@ mod tests_cpu {
             ),
             // Test with subtraction.
             TestEntryU32Standard::new(
-                &test_5_args,
+                &[
+                    MovU32ImmU32Reg(0x1A, RegisterId::R1),
+                    MovU32ImmU32Reg(0x4, RegisterId::R2),
+                    MovU32ImmU32Reg(0x123, RegisterId::R8),
+                    MovU32RegMemExprRel(
+                        RegisterId::R8,
+                        MoveExpressionHandler::from(
+                            &[
+                                ExpressionArgs::Register(RegisterId::R1),
+                                ExpressionArgs::Operator(ExpressionOperator::Subtract),
+                                ExpressionArgs::Register(RegisterId::R2),
+                            ][..],
+                        )
+                        .pack(),
+                    ),
+                ],
                 &[
                     (RegisterId::R1, 0x1a),
                     (RegisterId::R2, 0x4),
