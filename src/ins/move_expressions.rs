@@ -320,14 +320,24 @@ mod tests_move_expressions {
 
     struct TestEntry<'a> {
         pub arguments: &'a [ExpressionArgs],
+        pub evaluation_arguments: &'a [u32],
+        pub evaluation_results: u32,
         pub should_panic: bool,
         pub fail_message: String,
     }
 
     impl<'a> TestEntry<'a> {
-        fn new(arguments: &'a [ExpressionArgs], should_panic: bool, fail_message: &str) -> Self {
+        fn new(
+            arguments: &'a [ExpressionArgs],
+            evaluation_arguments: &'a [u32],
+            evaluation_results: u32,
+            should_panic: bool,
+            fail_message: &str,
+        ) -> Self {
             Self {
                 arguments,
+                evaluation_arguments,
+                evaluation_results,
                 should_panic,
                 fail_message: fail_message.to_string(),
             }
@@ -363,6 +373,36 @@ mod tests_move_expressions {
             }
         }
 
+        /// Run this specific test entry by evaluation.
+        ///
+        /// # Arguments
+        ///
+        /// * `id` - The ID of this test.
+        pub fn run_test_valuation(&self, id: usize) {
+            let handler = MoveExpressionHandler::from(&self.arguments.to_vec()[..]);
+
+            let evaluation_result = if self.arguments.len() == 3 {
+                handler.evaluate(
+                    self.evaluation_arguments[0],
+                    self.evaluation_arguments[1],
+                    0,
+                )
+            } else {
+                handler.evaluate(
+                    self.evaluation_arguments[0],
+                    self.evaluation_arguments[1],
+                    self.evaluation_arguments[2],
+                )
+            };
+
+            assert_eq!(
+                evaluation_result,
+                self.evaluation_results,
+                "{}",
+                self.fail_message(id, false)
+            );
+        }
+
         /// Generate a fail message for a given test.
         ///
         /// # Arguments
@@ -387,6 +427,8 @@ mod tests_move_expressions {
                     ExpressionArgs::Operator(ExpressionOperator::Multiply),
                     ExpressionArgs::Register(RegisterId::R8),
                 ],
+                &[],
+                0,
                 false,
                 "failed to create register-register roundtrip",
             ),
@@ -396,6 +438,8 @@ mod tests_move_expressions {
                     ExpressionArgs::Operator(ExpressionOperator::Add),
                     ExpressionArgs::Immediate(111),
                 ],
+                &[],
+                0,
                 false,
                 "failed to create constant-constant roundtrip",
             ),
@@ -405,6 +449,8 @@ mod tests_move_expressions {
                     ExpressionArgs::Operator(ExpressionOperator::Subtract),
                     ExpressionArgs::Register(RegisterId::R1),
                 ],
+                &[],
+                0,
                 false,
                 "failed to create constant-register roundtrip",
             ),
@@ -414,6 +460,8 @@ mod tests_move_expressions {
                     ExpressionArgs::Operator(ExpressionOperator::Multiply),
                     ExpressionArgs::Immediate(123),
                 ],
+                &[],
+                0,
                 false,
                 "failed to create register-constant roundtrip",
             ),
@@ -422,6 +470,8 @@ mod tests_move_expressions {
                     ExpressionArgs::Register(RegisterId::R1),
                     ExpressionArgs::Operator(ExpressionOperator::Multiply),
                 ],
+                &[],
+                0,
                 true,
                 "unexpected successful roundtrip with too few arguments",
             ),
@@ -432,6 +482,8 @@ mod tests_move_expressions {
                     ExpressionArgs::Register(RegisterId::R1),
                     ExpressionArgs::Register(RegisterId::R1),
                 ],
+                &[],
+                0,
                 true,
                 "unexpected successful roundtrip with too many arguments",
             ),
@@ -441,6 +493,8 @@ mod tests_move_expressions {
                     ExpressionArgs::Register(RegisterId::R1),
                     ExpressionArgs::Register(RegisterId::R1),
                 ],
+                &[],
+                0,
                 true,
                 "unexpected successful roundtrip with no operator",
             ),
@@ -450,6 +504,8 @@ mod tests_move_expressions {
                     ExpressionArgs::Register(RegisterId::R1),
                     ExpressionArgs::Register(RegisterId::R1),
                 ],
+                &[],
+                0,
                 true,
                 "unexpected successful roundtrip with operator in first place",
             ),
@@ -459,6 +515,8 @@ mod tests_move_expressions {
                     ExpressionArgs::Register(RegisterId::R1),
                     ExpressionArgs::Operator(ExpressionOperator::Multiply),
                 ],
+                &[],
+                0,
                 true,
                 "unexpected successful in roundtrip with operator in last place",
             ),
@@ -470,6 +528,8 @@ mod tests_move_expressions {
                     ExpressionArgs::Operator(ExpressionOperator::Multiply),
                     ExpressionArgs::Register(RegisterId::R6),
                 ],
+                &[],
+                0,
                 false,
                 "failed to create register-register-register roundtrip",
             ),
@@ -481,6 +541,8 @@ mod tests_move_expressions {
                     ExpressionArgs::Operator(ExpressionOperator::Add),
                     ExpressionArgs::Immediate(64),
                 ],
+                &[],
+                0,
                 false,
                 "failed to create constant-constant-constant roundtrip",
             ),
@@ -492,6 +554,8 @@ mod tests_move_expressions {
                     ExpressionArgs::Register(RegisterId::R6),
                     ExpressionArgs::Operator(ExpressionOperator::Multiply),
                 ],
+                &[],
+                0,
                 true,
                 "unexpected successful in roundtrip with operator in invalid position",
             ),
@@ -499,6 +563,76 @@ mod tests_move_expressions {
 
         for (id, test) in tests.iter().enumerate() {
             test.run_test(id);
+        }
+    }
+
+    /// Test the expression evaluator.
+    #[test]
+    fn test_evaluation() {
+        let tests = [
+            TestEntry::new(
+                &[
+                    ExpressionArgs::Immediate(2),
+                    ExpressionArgs::Operator(ExpressionOperator::Multiply),
+                    ExpressionArgs::Immediate(100),
+                ],
+                &[2, 100],
+                200,
+                false,
+                "failed to correctly evaluate expression result",
+            ),
+            TestEntry::new(
+                &[
+                    ExpressionArgs::Immediate(2),
+                    ExpressionArgs::Operator(ExpressionOperator::Add),
+                    ExpressionArgs::Immediate(100),
+                ],
+                &[2, 100],
+                102,
+                false,
+                "failed to correctly evaluate expression result",
+            ),
+            TestEntry::new(
+                &[
+                    ExpressionArgs::Immediate(100),
+                    ExpressionArgs::Operator(ExpressionOperator::Subtract),
+                    ExpressionArgs::Immediate(2),
+                ],
+                &[100, 2],
+                98,
+                false,
+                "failed to correctly evaluate expression result",
+            ),
+            TestEntry::new(
+                &[
+                    ExpressionArgs::Immediate(100),
+                    ExpressionArgs::Operator(ExpressionOperator::Subtract),
+                    ExpressionArgs::Immediate(2),
+                    ExpressionArgs::Operator(ExpressionOperator::Multiply),
+                    ExpressionArgs::Immediate(8),
+                ],
+                &[100, 2, 8],
+                84,
+                false,
+                "failed to correctly evaluate expression result",
+            ),
+            TestEntry::new(
+                &[
+                    ExpressionArgs::Immediate(100),
+                    ExpressionArgs::Operator(ExpressionOperator::Multiply),
+                    ExpressionArgs::Immediate(2),
+                    ExpressionArgs::Operator(ExpressionOperator::Subtract),
+                    ExpressionArgs::Immediate(8),
+                ],
+                &[100, 2, 8],
+                192,
+                false,
+                "failed to correctly evaluate expression result",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test_valuation(id);
         }
     }
 }
