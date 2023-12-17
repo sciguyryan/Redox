@@ -54,7 +54,7 @@ pub enum RegisterId {
     /// Float data register 1.
     F1,
 
-    // [System Registers] //
+    // [ System Registers ] //
     /// Accumulator register.
     AC,
     /// Instruction pointer register.
@@ -70,7 +70,15 @@ pub enum RegisterId {
     /// Interrupt mask register.
     IM,
 
-    // [Test Registers] //
+    // [ Segment Registers ] //
+    /// Stack segment register.
+    SS,
+    /// Code segment register.
+    CS,
+    /// Data segment register.
+    DS,
+
+    // [ Test Registers ] //
     #[cfg(test)]
     TEST0,
 }
@@ -94,6 +102,9 @@ impl Display for RegisterId {
             RegisterId::FP => "FP",
             RegisterId::PC => "PC",
             RegisterId::IM => "DG",
+            RegisterId::SS => "SS",
+            RegisterId::CS => "CS",
+            RegisterId::DS => "DS",
 
             #[cfg(test)]
             RegisterId::TEST0 => "TEST0",
@@ -181,6 +192,10 @@ impl Registers {
                 register_u32!(RegisterId::FL, &rpw, 0),
                 register_u32!(RegisterId::PC, &rpw, 0),
                 register_u32!(RegisterId::IM, &rpw, 0xffffffff),
+                // [ Segment Registers ] //
+                register_u32!(RegisterId::SS, &rpw, 0),
+                register_u32!(RegisterId::CS, &rpw, 0),
+                register_u32!(RegisterId::DS, &rpw, 0),
                 // [ Test Registers ] //
                 #[cfg(test)]
                 register_u32!(RegisterId::TEST0, &prpw, 0),

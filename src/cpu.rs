@@ -1072,6 +1072,26 @@ impl Cpu {
             .increment_unchecked();
     }
 
+    /// Update the various segment registers in the CPU.
+    ///
+    /// # Arguments
+    ///
+    /// * `mem` - A reference to the VM [`Memory`] instance.
+    #[inline(always)]
+    pub fn update_segment_registers(&mut self, mem: &Memory) {
+        self.registers
+            .get_register_u32_mut(RegisterId::SS)
+            .write_unchecked(mem.stack_segment_start as u32);
+
+        self.registers
+            .get_register_u32_mut(RegisterId::CS)
+            .write_unchecked(mem.code_segment_start as u32);
+
+        self.registers
+            .get_register_u32_mut(RegisterId::DS)
+            .write_unchecked(mem.data_segment_start as u32);
+    }
+
     /// Update the stack pointer (SP) register.
     ///
     /// # Arguments
@@ -1283,9 +1303,16 @@ mod tests_cpu {
                 panic!("{}", self.fail_message(id, false));
             }
 
+            eprintln!(
+                "AAAAAAAAAAAAAAAAAA ACTUAL {} EXPECTED {}",
+                mem.get_user_storage().len(),
+                self.expected_memory.len()
+            );
+
             // Check the VM memory.
+            // TODO Swap to using registers to check the memory via read instead!
             assert_eq!(
-                mem.get_storage(),
+                mem.get_user_storage(),
                 self.expected_memory,
                 "{}",
                 self.fail_message(id, false)
@@ -1314,7 +1341,7 @@ mod tests_cpu {
     ///
     /// A tuple containing a [`Memory`] instance and a [`Cpu`] instance.
     fn create_instance() -> (Memory, Cpu) {
-        (Memory::new(100), Cpu::default())
+        (Memory::new(100, 100, 0, &[], &[], 0), Cpu::default())
     }
 
     /// Test the parity checking.

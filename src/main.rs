@@ -25,6 +25,7 @@ use crate::{
 // https://onlinedocs.microchip.com/pr/GUID-0E320577-28E6-4365-9BB8-9E1416A0A6E4-en-US-6/index.html?GUID-4983CB0C-7FEB-40F1-99D3-0608805404F3
 // https://www.youtube.com/watch?v=KkenLT8S9Hs&list=WL&index=17
 // https://stackoverflow.com/questions/71621573/how-does-the-processor-know-where-to-go-when-an-exception-is-thrown
+// Stack stuff - https://www.youtube.com/watch?v=CRTR5ljBjPM
 
 /*fn run_test_2() {
     use std::time::Instant;
@@ -78,10 +79,6 @@ fn main() {
     if cfg!(target_endian = "big") {
         panic!("currently unsupported");
     }
-
-    let stack_capacity = 100;
-
-    let mut vm = VirtualMachine::new(vm::MIN_MEMORY_SIZE);
 
     //vm.ram.set(0, 0x12, &SecurityContext::Machine);
     //vm.ram.print_range(0, 10);
@@ -137,13 +134,20 @@ fn main() {
     //println!("compiled data = {data:?}");
     //println!("compiled data len = {}", data.len());
 
+    let mut vm = VirtualMachine::new(
+        vm::MIN_MEMORY_SIZE,
+        vm::MIN_BINARY_LOAD_ADDRESS,
+        vm::MIN_BINARY_LOAD_ADDRESS,
+        data,
+        &[],
+    );
+
     println!("----------[Instructions]----------");
     for ins in instructions {
         println!("{ins}");
     }
     println!();
 
-    vm.setup(0x10000, data, stack_capacity);
     vm.run();
 
     let mut sp = vm.cpu.get_stack_pointer() as usize;

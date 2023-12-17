@@ -11,9 +11,33 @@ enum StackTypeHint {
     U8,
 }
 
+/*
+ * The memory layout is currently as follows:
+ * [USER SEGMENT]
+ * [CODE SEGMENT]
+ * [DATA SEGMENT]
+ * [STACK SEGMENT]
+ *
+ * User memory represents anything prior to the code segment. The start of the user memory segment
+ * contains the interrupt address table.
+ *
+ * Since the system does not have memory write enforcement, technically the entire thing is writable,
+ * meaning that self-modifying code is technically also possible too.
+ */
+
 pub struct Memory {
     /// The raw byte storage of this memory module.
     storage: Vec<u8>,
+
+    /// The position that represents the start of the code segment.
+    pub code_segment_start: usize,
+    /// The position that represents the end of the code segment.
+    pub code_segment_end: usize,
+
+    /// The position that represents the start of the data segment.
+    pub data_segment_start: usize,
+    /// The position that represents the end of the data segment.
+    pub data_segment_end: usize,
 
     /// A list of type hints for the items currently on the stack.
     stack_type_hints: Vec<StackTypeHint>,
@@ -21,23 +45,72 @@ pub struct Memory {
     stack_capacity: usize,
     /// The size of the stack, in bytes.
     stack_size: usize,
-    /// The position that represents the start of the stack memory region.
-    stack_start: usize,
-    /// The position that represents the end of the stack memory region.
-    stack_end: usize,
+    /// The position that represents the start of the stack segment.
+    pub stack_segment_start: usize,
+    /// The position that represents the end of the stack segment.
+    pub stack_segment_end: usize,
 }
 
 impl Memory {
-    pub fn new(size: usize) -> Self {
-        Self {
-            storage: vec![0x0; size],
+    pub fn new(
+        system_memory_size: usize,
+        user_segment_size: usize,
+        code_segment_start: usize,
+        code_segment_bytes: &[u8],
+        data_segment_bytes: &[u8],
+        stack_capacity: usize,
+    ) -> Self {
+        // The user memory segment is the first memory segment and runs from 0
+        // to the number of bytes specified.
+        let user_memory_end = user_segment_size;
+
+        // The code segment -usually- begins directly after the user memory segment,
+        // though a program can request a different one.
+        let code_segment_end = code_segment_start + code_segment_bytes.len();
+
+        // The data segment begins directly after the code segment.
+        let data_segment_start = code_segment_end;
+        let data_segment_end = data_segment_start + data_segment_bytes.len();
+
+        // The size of the stack is calculated to contain enough space
+        // for a given number of u32 values (at 4 bytes each).
+        let stack_size = stack_capacity * 4;
+
+        // The stack segment begins directly after the data segment and runs until
+        // the end of memory.
+        let stack_segment_start = data_segment_end;
+        let stack_segment_end = stack_segment_start + stack_size;
+
+        // We need to ensure that there is enough space for all of the structures
+        // within system memory.
+        assert!(stack_segment_end <= system_memory_size);
+
+        let mut mem = Self {
+            storage: vec![0x0; system_memory_size],
+
+            code_segment_start,
+            code_segment_end,
+            data_segment_start,
+            data_segment_end,
 
             stack_type_hints: vec![],
-            stack_capacity: 0,
-            stack_size: 0,
-            stack_start: 0,
-            stack_end: 0,
+            stack_capacity,
+            stack_size,
+            stack_segment_start,
+            stack_segment_end,
+        };
+
+        // Load the code segment bytes into RAM, if it has been provided.
+        if !code_segment_bytes.is_empty() {
+            mem.set_range(code_segment_start, code_segment_bytes);
         }
+
+        // Load the data segment bytes into RAM, if it has been provided.
+        if !data_segment_bytes.is_empty() {
+            mem.set_range(data_segment_start, data_segment_bytes);
+        }
+
+        mem
     }
 
     /// Assert that a specific memory position is within the valid memory region.
@@ -56,33 +129,6 @@ impl Memory {
     /// Completely clear the memory.
     pub fn clear(&mut self) {
         self.storage = vec![0; self.storage.len()];
-    }
-
-    /// Configure the stack memory region.
-    ///
-    /// # Arguments
-    ///
-    /// * `stack_start` - The starting point for the stack memory region.
-    /// * `stack_capacity` - The number of items that can be stored in stack memory.
-    ///
-    /// # Returns
-    ///
-    /// A usize giving the end location of the stack memory region.
-    pub fn configure_stack(&mut self, stack_start_pos: usize, stack_capacity: usize) -> usize {
-        // The size of the stack is calculated to contain enough space
-        // for a given number of u32 values (at 4 bytes each).
-        let stack_size = stack_capacity * std::mem::size_of::<u32>();
-        let stack_end = stack_start_pos + stack_size;
-        assert!(stack_end < self.len());
-
-        // Initialize the relevant stack fields.
-        self.stack_type_hints = Vec::with_capacity(stack_capacity);
-        self.stack_capacity = stack_capacity;
-        self.stack_size = stack_size;
-        self.stack_start = stack_start_pos;
-        self.stack_end = stack_end;
-
-        stack_end
     }
 
     /// Attempt to decompile any instructions between a start and end memory location.
@@ -544,13 +590,22 @@ impl Memory {
         self.get_range_ptr(start, len).to_vec()
     }
 
-    /// Get a reference to a slice of the entire memory contents.
+    /// Get a slice of the entire memory contents.
     ///
     /// # Returns
     ///
     /// A slice of u8 values, referencing every byte in memory.
     pub fn get_storage(&self) -> &[u8] {
         &self.storage
+    }
+
+    /// Get a slice of the user memory contents.
+    ///
+    /// # Returns
+    ///
+    /// A slice of u8 values, referencing every byte in memory.
+    pub fn get_user_storage(&self) -> &[u8] {
+        &self.storage[..self.code_segment_start]
     }
 
     /// Checks whether the allocated memory region has a size greater than 0.
@@ -593,7 +648,7 @@ impl Memory {
     /// * `value` - The u32 value to be pushed onto the stack.
     pub fn push_u32(&mut self, value: u32, stack_pointer: usize) {
         let value_start_pos = stack_pointer - 4;
-        assert!(value_start_pos <= self.stack_end);
+        assert!(value_start_pos <= self.stack_segment_end);
 
         self.set_u32(value_start_pos, value);
         self.pop_type_hint(StackTypeHint::U32);
@@ -668,9 +723,15 @@ impl Memory {
         let mut table = Table::new();
 
         if cfg!(feature = "stack-type-hints") {
+            if self.stack_type_hints.is_empty() {
+                println!("The stack is currently empty.");
+                return;
+            }
+
             table.add_row(row!["Index", "Value", "Type"]);
 
-            let mut stack_pos = self.stack_end;
+            // We will walk backwards up the stack. Higher indices are further up the stack.
+            let mut current_pos = self.stack_segment_end;
             //println!("stack_start = {}", stack_pos);
             //println!("AAAAAAAAAAA {}", self.get_u32(stack_pos - 4));
 
@@ -678,34 +739,17 @@ impl Memory {
                 match *hint {
                     StackTypeHint::F32 => todo!(),
                     StackTypeHint::U32 => {
-                        let value = self.get_u32(stack_pos - 4);
+                        let value = self.get_u32(current_pos - 4);
                         table.add_row(row![id, format!("{value}"), "u32"]);
-                        stack_pos -= 4;
+                        current_pos -= 4;
                     }
                     StackTypeHint::U8 => todo!(),
                 }
             }
         } else {
-            println!("WARNING: stack type hints are disabled, all outputs will be assumed to be u32 values.");
-
+            println!("WARNING: stack type hints are disabled. All outputs will be assumed to be u32 values and may not represent the current state of the stack.");
             table.add_row(row!["Index", "Value"]);
         }
-
-        /*for (id, reg) in &self.registers_u32 {
-            let reg_value = *reg.read_unchecked();
-            let formatted_value = format!("{reg_value:0>8X}");
-            let mut notes = String::new();
-
-            if *id == RegisterId::FL {
-                notes = reg.get_flags_register_string();
-            }
-
-            table.add_row(row![id, formatted_value, "u32", notes]);
-        }
-
-        for (id, reg) in &self.registers_f32 {
-            table.add_row(row![id, format!("{}", reg.read_unchecked()), "f32", ""]);
-        }*/
 
         table.printstd();
     }
@@ -713,7 +757,7 @@ impl Memory {
 
 impl From<&[u8]> for Memory {
     fn from(values: &[u8]) -> Self {
-        let mut mem = Memory::new(values.len());
+        let mut mem = Memory::new(values.len(), 0, 0, &[], &[], 0);
         mem.storage = values.to_vec();
 
         mem
@@ -722,6 +766,8 @@ impl From<&[u8]> for Memory {
 
 #[cfg(test)]
 mod tests_memory {
+    use crate::vm;
+
     use super::Memory;
 
     fn fill_memory_sequential(mem: &mut Memory) {
@@ -731,7 +777,7 @@ mod tests_memory {
     }
 
     fn get_test_ram_instance() -> Memory {
-        let mut ram = Memory::new(100);
+        let mut ram = Memory::new(100, 100, 0, &[], &[], 0);
 
         // Fill the memory with debug data.
         fill_memory_sequential(&mut ram);
@@ -744,26 +790,27 @@ mod tests_memory {
     #[should_panic]
     fn test_overread_ram() {
         let size = 100;
-        let ram = Memory::new(size);
+        let ram = Memory::new(100, 100, 0, &[], &[], 0);
 
-        _ = ram.get_range_ptr(100, 1);
+        _ = ram.get_range_ptr(usize::MAX, 1);
     }
 
     /// Test the basic aspects of creating a RAM module.
     #[test]
     fn test_ram_creation() {
         let size = 100;
-        let ram = Memory::new(size);
+        let ram = Memory::new(100, 100, 0, &[], &[], 0);
 
+        let total_size = size + vm::MIN_BINARY_LOAD_ADDRESS;
         assert_eq!(
             ram.len(),
-            size,
+            total_size,
             "failed to create a RAM module of the specified size"
         );
 
         assert_eq!(
-            ram.get_range_ptr(0, size - 1),
-            vec![0x0; size - 1],
+            ram.get_range_ptr(0, total_size - 1),
+            vec![0x0; total_size - 1],
             "failed to correctly initialize RAM"
         );
     }
