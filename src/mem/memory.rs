@@ -579,6 +579,24 @@ impl Memory {
         self.get_range_ptr(start, len).to_vec()
     }
 
+    /// Get a slice of the code segment contents.
+    ///
+    /// # Returns
+    ///
+    /// A slice of u8 values.
+    pub fn get_code_segment_storage(&self) -> &[u8] {
+        &self.storage[self.code_segment_start..self.code_segment_end]
+    }
+
+    /// Get a slice of the raw stack segment contents.
+    ///
+    /// # Returns
+    ///
+    /// A slice of u8 values
+    pub fn get_stack_segment_storage(&self) -> &[u8] {
+        &self.storage[self.stack_segment_start..self.stack_segment_end]
+    }
+
     /// Get a slice of the entire memory contents.
     ///
     /// # Returns
@@ -588,12 +606,12 @@ impl Memory {
         &self.storage
     }
 
-    /// Get a slice of the user memory contents.
+    /// Get a slice of the user segment contents.
     ///
     /// # Returns
     ///
-    /// A slice of u8 values, referencing every byte in memory.
-    pub fn get_user_storage(&self) -> &[u8] {
+    /// A slice of u8 values
+    pub fn get_user_segment_storage(&self) -> &[u8] {
         &self.storage[..self.code_segment_start]
     }
 
@@ -719,10 +737,9 @@ impl Memory {
 
             table.add_row(row!["Index", "Value", "Type"]);
 
-            // We will walk backwards up the stack. Higher indices are further up the stack.
+            // We will walk backwards up the stack.
+            // In the stack a lower index represents a value that has been more recently added to the stack.
             let mut current_pos = self.stack_segment_end;
-            //println!("stack_start = {}", stack_pos);
-            //println!("AAAAAAAAAAA {}", self.get_u32(stack_pos - 4));
 
             for (id, hint) in self.stack_type_hints.iter().enumerate() {
                 match *hint {
@@ -735,12 +752,12 @@ impl Memory {
                     StackTypeHint::U8 => todo!(),
                 }
             }
-        } else {
-            println!("WARNING: stack type hints are disabled. All outputs will be assumed to be u32 values and may not represent the current state of the stack.");
-            table.add_row(row!["Index", "Value"]);
-        }
 
-        table.printstd();
+            table.printstd();
+        } else {
+            println!("WARNING: stack type hints are disabled. A raw view of stack memory will be displayed.");
+            println!("{:?}", self.get_stack_segment_storage());
+        }
     }
 }
 

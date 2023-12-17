@@ -80,18 +80,10 @@ fn main() {
         panic!("currently unsupported");
     }
 
-    //vm.ram.set(0, 0x12, &SecurityContext::Machine);
-    //vm.ram.print_range(0, 10);
-
     let expr_args_1 = [
         ExpressionArgs::Register(RegisterId::R7),
         ExpressionArgs::Operator(ExpressionOperator::Add),
         ExpressionArgs::Register(RegisterId::R8),
-    ];
-    let expr_args_2 = [
-        ExpressionArgs::Immediate(123),
-        ExpressionArgs::Operator(ExpressionOperator::Subtract),
-        ExpressionArgs::Immediate(65),
     ];
 
     let expr = MoveExpressionHandler::from(&expr_args_1[..]).pack();
@@ -136,6 +128,12 @@ fn main() {
 
     let mut vm = VirtualMachine::new(vm::MIN_MEMORY_SIZE, data, &[]);
 
+    // Add some debug entries to the stack.
+    let mut sp = vm.cpu.get_stack_pointer() as usize;
+    vm.ram.push_u32(1234, sp);
+    sp -= 4;
+    vm.ram.push_u32(4321, sp);
+
     println!("----------[Instructions]----------");
     for ins in instructions {
         println!("{ins}");
@@ -143,11 +141,6 @@ fn main() {
     println!();
 
     vm.run();
-
-    let mut sp = vm.cpu.get_stack_pointer() as usize;
-    vm.ram.push_u32(1234, sp);
-    sp -= 4;
-    vm.ram.push_u32(4321, sp);
 
     //vm.run_instructions(&instructions[..]);
 
@@ -159,11 +152,10 @@ fn main() {
     vm.cpu.registers.print_registers();
     println!();
 
-    println!("----------[RAM]----------");
-    let segment = &vm.ram.get_storage()[0x10000..0x10096];
-    println!("{segment:?}");
+    println!("----------[Program Segment]----------");
+    println!("{:?}", &vm.ram.get_code_segment_storage());
     println!();
 
-    println!("----------[STACK]----------");
+    println!("----------[Stack]----------");
     vm.ram.print_stack();
 }

@@ -1305,7 +1305,7 @@ mod tests_cpu {
 
             // Check the user memory segment.
             assert_eq!(
-                mem.get_user_storage(),
+                mem.get_code_segment_storage(),
                 self.expected_memory,
                 "{}",
                 self.fail_message(id, false)
