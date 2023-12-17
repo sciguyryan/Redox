@@ -1341,7 +1341,7 @@ mod tests_cpu {
     ///
     /// A tuple containing a [`Memory`] instance and a [`Cpu`] instance.
     fn create_instance() -> (Memory, Cpu) {
-        (Memory::new(100, 100, 0, &[], &[], 0), Cpu::default())
+        (Memory::new(100, &[], &[], 0), Cpu::default())
     }
 
     /// Test the parity checking.

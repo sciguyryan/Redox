@@ -134,13 +134,7 @@ fn main() {
     //println!("compiled data = {data:?}");
     //println!("compiled data len = {}", data.len());
 
-    let mut vm = VirtualMachine::new(
-        vm::MIN_MEMORY_SIZE,
-        vm::MIN_BINARY_LOAD_ADDRESS,
-        vm::MIN_BINARY_LOAD_ADDRESS,
-        data,
-        &[],
-    );
+    let mut vm = VirtualMachine::new(vm::MIN_MEMORY_SIZE, data, &[]);
 
     println!("----------[Instructions]----------");
     for ins in instructions {

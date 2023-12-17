@@ -12,8 +12,6 @@ pub struct VirtualMachine {
 impl VirtualMachine {
     pub fn new(
         total_memory_size: usize,
-        user_segment_size: usize,
-        code_load_address: usize,
         code_segment_bytes: &[u8],
         data_segment_bytes: &[u8],
     ) -> Self {
@@ -21,17 +19,10 @@ impl VirtualMachine {
         // around the placement of things in memory remain sound.
         assert!(total_memory_size >= MIN_MEMORY_SIZE);
 
-        // We enforce a minimum binary load address to ensure that there is enough space for
-        // important structures (such as the interrupt vector table) within memory.
-        assert!(code_load_address >= MIN_BINARY_LOAD_ADDRESS);
-        assert!(code_load_address < total_memory_size);
-
         // Construct out virtual machine.
         let mut vm = Self {
             ram: Memory::new(
                 total_memory_size,
-                user_segment_size,
-                code_load_address,
                 code_segment_bytes,
                 data_segment_bytes,
                 U32_STACK_CAPACITY,
