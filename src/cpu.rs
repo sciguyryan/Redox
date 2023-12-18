@@ -15,24 +15,19 @@ use crate::{
 /// The mask to get only the lowest 8 bits of a u32 value.
 const U32_LOW_BYTE_MASK: u32 = 0xff;
 
-/// The default address for the interrupt vector in memory.
-pub const DEFAULT_INT_VECTOR_ADDR: u32 = 0xffffff;
-
 pub struct Cpu {
     pub registers: Registers,
     pub is_halted: bool,
     pub is_machine_mode: bool,
-    interrupt_vector_address: u32,
     pub is_in_interrupt_handler: bool,
 }
 
 impl Cpu {
-    pub fn new(interrupt_vector_address: u32) -> Self {
+    pub fn new() -> Self {
         Self {
             registers: Registers::default(),
             is_halted: false,
             is_machine_mode: true,
-            interrupt_vector_address,
             is_in_interrupt_handler: false,
         }
     }
@@ -1121,7 +1116,7 @@ impl Cpu {
 
 impl Default for Cpu {
     fn default() -> Self {
-        Self::new(DEFAULT_INT_VECTOR_ADDR)
+        Self::new()
     }
 }
 

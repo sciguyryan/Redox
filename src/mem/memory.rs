@@ -646,6 +646,16 @@ impl Memory {
         self.storage.len()
     }
 
+    // Attempt to pop a [`StackTypeHint`] from the stack hint list.
+    #[cfg(feature = "stack-type-hints")]
+    fn pop_type_hint(&mut self) {
+        self.stack_type_hints.pop();
+    }
+
+    /// Attempt to pop a [`StackTypeHint`] from the stack hint list.
+    #[cfg(not(feature = "stack-type-hints"))]
+    fn pop_type_hint(&mut self) {}
+
     /// Attempt to pop a u32 value from the stack.
     pub fn pop_u32(&mut self) -> u32 {
         let value_start_pos = self.stack_pointer;
@@ -664,6 +674,20 @@ impl Memory {
 
         result
     }
+
+    /// Attempt to push a [`StackTypeHint`] onto the stack hint list.
+    ///
+    /// # Arguments
+    ///
+    /// * `hint` - The [`StackTypeHint`] to be added to the hit list.
+    #[cfg(feature = "stack-type-hints")]
+    fn push_type_hint(&mut self, hint: StackTypeHint) {
+        self.stack_type_hints.push(hint);
+    }
+
+    /// Attempt to push a [`StackTypeHint`] onto the stack hint list.
+    #[cfg(not(feature = "stack-type-hints"))]
+    fn push_type_hint(&mut self, _hint: StackTypeHint) {}
 
     /// Attempt to push a u32 value onto the stack.
     ///
@@ -685,30 +709,6 @@ impl Memory {
 
         println!("WARNING: be sure to update the stack pointer and stack frame size registers!");
     }
-
-    /// Attempt to pop a [`StackTypeHint`] from the stack hint list.
-    #[cfg(feature = "stack-type-hints")]
-    fn pop_type_hint(&mut self) {
-        self.stack_type_hints.pop();
-    }
-
-    /// Attempt to pop a [`StackTypeHint`] from the stack hint list.
-    #[cfg(not(feature = "stack-type-hints"))]
-    fn pop_type_hint(&mut self) {}
-
-    /// Attempt to push a [`StackTypeHint`] onto the stack hint list.
-    ///
-    /// # Arguments
-    ///
-    /// * `hint` - The [`StackTypeHint`] to be added to the hit list.
-    #[cfg(feature = "stack-type-hints")]
-    fn push_type_hint(&mut self, hint: StackTypeHint) {
-        self.stack_type_hints.push(hint);
-    }
-
-    /// Attempt to push a [`StackTypeHint`] onto the stack hint list.
-    #[cfg(not(feature = "stack-type-hints"))]
-    fn push_type_hint(&mut self, _hint: StackTypeHint) {}
 
     /// Set the value of a specific byte in memory.
     ///
