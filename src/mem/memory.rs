@@ -658,18 +658,18 @@ impl Memory {
         assert!(value_start_pos <= self.stack_segment_end);
 
         self.set_u32(value_start_pos, value);
-        self.pop_type_hint(StackTypeHint::U32);
+        self.push_type_hint(StackTypeHint::U32);
 
         println!("WARNING: be sure to update the stack pointer and stack frame size registers!");
     }
 
     #[cfg(feature = "stack-type-hints")]
-    fn pop_type_hint(&mut self, hint: StackTypeHint) {
+    fn push_type_hint(&mut self, hint: StackTypeHint) {
         self.stack_type_hints.push(hint);
     }
 
     #[cfg(not(feature = "stack-type-hints"))]
-    fn pop_type_hint(&mut self, _hint: StackTypeHint) {}
+    fn push_type_hint(&mut self, _hint: StackTypeHint) {}
 
     /// Set the value of a specific byte in memory.
     ///
