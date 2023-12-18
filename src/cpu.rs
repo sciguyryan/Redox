@@ -122,20 +122,6 @@ impl Cpu {
         mem.get_instruction(ip as usize)
     }
 
-    /// Get the state of a given CPU flag.
-    ///
-    /// # Arguments
-    ///
-    /// * `flag` - The [`CpuFlag`] to be checked.
-    #[inline(always)]
-    fn get_flag_state(&self, flag: CpuFlag) -> bool {
-        let value = self
-            .registers
-            .get_register_u32(RegisterId::FL)
-            .read_unchecked();
-        utils::is_bit_set(*value, flag.into())
-    }
-
     /// Get the size of the current stack frame.
     #[inline(always)]
     pub fn get_stack_frame_size(&self) -> u32 {
@@ -155,14 +141,6 @@ impl Cpu {
             .registers
             .get_register_u32(RegisterId::SP)
             .read_unchecked()
-    }
-
-    /// Get the current value of the program counter (PC) register.
-    #[inline(always)]
-    fn get_program_counter(&mut self) {
-        self.registers
-            .get_register_u32_mut(RegisterId::PC)
-            .read_unchecked();
     }
 
     /// Update the instruction pointer (IP) register.
