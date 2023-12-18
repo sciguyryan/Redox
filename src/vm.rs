@@ -32,10 +32,12 @@ impl VirtualMachine {
 
         // Update the segment registers, now that we know where the segments
         // are located in RAM.
-        vm.cpu.update_segment_registers(&vm.ram);
+        vm.cpu.set_segment_registers(&vm.ram);
 
         // Configure the CPU registers to account for the new stack pointer.
-        vm.cpu.update_stack_pointer(vm.ram.stack_segment_end as u32);
+        vm.cpu
+            .set_stack_frame_base_pointer(vm.ram.stack_segment_end as u32);
+        vm.cpu.set_stack_pointer(vm.ram.stack_segment_end as u32);
 
         vm
     }

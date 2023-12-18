@@ -99,6 +99,8 @@ pub enum OpCode {
     ///
     /// The carry and zero flags may be set depending on the result and the overflow flag will always be cleared.
     ZeroHighBitsByIndexU32RegU32Imm,
+    /// Push a u32 immediate value onto the stack.
+    PushU32Imm,
 
     /******** [Logic Instructions] ********/
     /// Test the state of a bit from a u32 register. The CF flag will be set to the state of the bit.
@@ -192,6 +194,7 @@ impl From<Instruction> for OpCode {
             Instruction::ZeroHighBitsByIndexU32RegU32Imm(_, _, _) => {
                 OpCode::ZeroHighBitsByIndexU32RegU32Imm
             }
+            Instruction::PushU32Imm(_) => OpCode::PushU32Imm,
 
             /******** [Logic Instructions] ********/
             Instruction::BitTestU32Reg(_, _) => OpCode::BitTestU32Reg,

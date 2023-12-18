@@ -136,6 +136,18 @@ impl Cpu {
         utils::is_bit_set(*value, flag.into())
     }
 
+    /// Get the size of the current stack frame.
+    #[inline(always)]
+    pub fn get_stack_frame_size(&self) -> u32 {
+        self.registers
+            .get_register_u32(RegisterId::BP)
+            .read_unchecked()
+            - self
+                .registers
+                .get_register_u32(RegisterId::SP)
+                .read_unchecked()
+    }
+
     /// Get the value of the stack pointer (SP) register.
     #[inline(always)]
     pub fn get_stack_pointer(&self) -> u32 {
@@ -151,6 +163,26 @@ impl Cpu {
         self.registers
             .get_register_u32_mut(RegisterId::PC)
             .read_unchecked();
+    }
+
+    /// Update the instruction pointer (IP) register.
+    ///
+    /// # Arguments
+    ///
+    /// * `size` - The size of the instruction, in bytes.
+    #[inline(always)]
+    fn increment_instruction_pointer(&mut self, size: u32) {
+        self.registers
+            .get_register_u32_mut(RegisterId::IP)
+            .add_unchecked(size);
+    }
+
+    /// Update the program counter (PC) register.
+    #[inline(always)]
+    fn increment_program_counter_register(&mut self) {
+        self.registers
+            .get_register_u32_mut(RegisterId::PC)
+            .increment_unchecked();
     }
 
     /// Perform a checked add of two u32 values.
@@ -632,84 +664,84 @@ impl Cpu {
                 let old_value = self.read_reg_u32(reg, privilege);
                 let new_value = self.perform_checked_add_u32(old_value, *imm);
 
-                self.update_u32_accumulator(new_value);
+                self.set_u32_accumulator(new_value);
             }
             Instruction::AddU32RegU32Reg(in_reg, out_reg) => {
                 let value1 = self.read_reg_u32(in_reg, privilege);
                 let value2 = self.read_reg_u32(out_reg, privilege);
                 let new_value = self.perform_checked_add_u32(value1, value2);
 
-                self.update_u32_accumulator(new_value);
+                self.set_u32_accumulator(new_value);
             }
             Instruction::SubU32ImmU32Reg(imm, reg) => {
                 let old_value = self.read_reg_u32(reg, privilege);
                 let new_value = self.perform_checked_subtract_u32(old_value, *imm);
 
-                self.update_u32_accumulator(new_value);
+                self.set_u32_accumulator(new_value);
             }
             Instruction::SubU32RegU32Imm(reg, imm) => {
                 let old_value = self.read_reg_u32(reg, privilege);
                 let new_value = self.perform_checked_subtract_u32(*imm, old_value);
 
-                self.update_u32_accumulator(new_value);
+                self.set_u32_accumulator(new_value);
             }
             Instruction::SubU32RegU32Reg(reg_1, reg_2) => {
                 let reg_1_val = self.read_reg_u32(reg_1, privilege);
                 let reg_2_val = self.read_reg_u32(reg_2, privilege);
                 let new_value = self.perform_checked_subtract_u32(reg_2_val, reg_1_val);
 
-                self.update_u32_accumulator(new_value);
+                self.set_u32_accumulator(new_value);
             }
             Instruction::MulU32ImmU32Reg(imm, reg) => {
                 let old_value = self.read_reg_u32(reg, privilege);
                 let new_value = self.perform_checked_mul_u32(old_value, *imm);
 
-                self.update_u32_accumulator(new_value);
+                self.set_u32_accumulator(new_value);
             }
             Instruction::MulU32RegU32Reg(reg_1, reg_2) => {
                 let reg_1_val = self.read_reg_u32(reg_1, privilege);
                 let reg_2_val = self.read_reg_u32(reg_2, privilege);
                 let new_value = self.perform_checked_mul_u32(reg_1_val, reg_2_val);
 
-                self.update_u32_accumulator(new_value);
+                self.set_u32_accumulator(new_value);
             }
             Instruction::DivU32ImmU32Reg(imm, reg) => {
                 let old_value = self.read_reg_u32(reg, privilege);
                 let new_value = self.perform_checked_div_u32(old_value, *imm);
 
-                self.update_u32_accumulator(new_value);
+                self.set_u32_accumulator(new_value);
             }
             Instruction::DivU32RegU32Imm(reg, imm) => {
                 let old_value = self.read_reg_u32(reg, privilege);
                 let new_value = self.perform_checked_div_u32(*imm, old_value);
 
-                self.update_u32_accumulator(new_value);
+                self.set_u32_accumulator(new_value);
             }
             Instruction::DivU32RegU32Reg(reg_1, reg_2) => {
                 let reg_1_val = self.read_reg_u32(reg_1, privilege);
                 let reg_2_val = self.read_reg_u32(reg_2, privilege);
                 let new_value = self.perform_checked_div_u32(reg_2_val, reg_1_val);
 
-                self.update_u32_accumulator(new_value);
+                self.set_u32_accumulator(new_value);
             }
             Instruction::ModU32ImmU32Reg(imm, reg) => {
                 let reg_val = self.read_reg_u32(reg, privilege);
                 let new_value = self.perform_modulo_u32(reg_val, *imm);
 
-                self.update_u32_accumulator(new_value);
+                self.set_u32_accumulator(new_value);
             }
             Instruction::ModU32RegU32Imm(reg, imm) => {
                 let reg_val = self.read_reg_u32(reg, privilege);
                 let new_value = self.perform_modulo_u32(*imm, reg_val);
 
-                self.update_u32_accumulator(new_value);
+                self.set_u32_accumulator(new_value);
             }
             Instruction::ModU32RegU32Reg(reg_1, reg_2) => {
                 let reg_1_val = self.read_reg_u32(reg_1, privilege);
                 let reg_2_val = self.read_reg_u32(reg_2, privilege);
                 let new_value = self.perform_modulo_u32(reg_2_val, reg_1_val);
 
-                self.update_u32_accumulator(new_value);
+                self.set_u32_accumulator(new_value);
             }
             Instruction::IncU32Reg(reg) => {
                 let value = self.read_reg_u32(reg, privilege);
@@ -727,7 +759,7 @@ impl Cpu {
                 let value = self.read_reg_u32(reg, privilege);
                 let new_value = self.perform_bitwise_and_u32(*imm, value);
 
-                self.update_u32_accumulator(new_value);
+                self.set_u32_accumulator(new_value);
             }
 
             /******** [Bit Operation Instructions] ********/
@@ -856,6 +888,15 @@ impl Cpu {
                 // zhbi source_reg, index, out_reg
                 self.perform_zero_high_bit_u32_reg(source_reg, *index, out_reg, privilege);
             }
+            Instruction::PushU32Imm(imm) => {
+                // push imm
+                mem.push_u32(*imm);
+
+                // Update the stack pointer register. The
+                self.registers
+                    .get_register_u32_mut(RegisterId::SP)
+                    .subtract_unchecked(4);
+            }
 
             /******** [Logic Instructions] ********/
             Instruction::BitTestU32Reg(bit, reg) => {
@@ -977,11 +1018,11 @@ impl Cpu {
             }
         };
 
-        self.update_program_counter_register();
+        self.increment_program_counter_register();
 
         // Move the instruction pointer register forward by the number of
         // bytes used to build the instruction.
-        self.update_instruction_pointer(instruction.get_total_instruction_size());
+        self.increment_instruction_pointer(instruction.get_total_instruction_size());
     }
 
     /// Set the state of the specified CPU flag.
@@ -1035,36 +1076,16 @@ impl Cpu {
         self.set_flag_state(CpuFlag::PF, Cpu::calculate_lowest_byte_parity(value));
     }
 
-    /// Update the u32 accumulator (AC) register.
+    /// Update the (stack frame) base pointer (BP) register.
     ///
     /// # Arguments
     ///
-    /// * `value` - The new value of the accumulator register.
+    /// * `value` - The new value of the base pointer register.
     #[inline(always)]
-    fn update_u32_accumulator(&mut self, value: u32) {
+    pub fn set_stack_frame_base_pointer(&mut self, value: u32) {
         self.registers
-            .get_register_u32_mut(RegisterId::AC)
+            .get_register_u32_mut(RegisterId::BP)
             .write_unchecked(value);
-    }
-
-    /// Update the instruction pointer (IP) register.
-    ///
-    /// # Arguments
-    ///
-    /// * `size` - The size of the instruction, in bytes.
-    #[inline(always)]
-    fn update_instruction_pointer(&mut self, size: u32) {
-        self.registers
-            .get_register_u32_mut(RegisterId::IP)
-            .add_unchecked(size);
-    }
-
-    /// Update the program counter (PC) register.
-    #[inline(always)]
-    fn update_program_counter_register(&mut self) {
-        self.registers
-            .get_register_u32_mut(RegisterId::PC)
-            .increment_unchecked();
     }
 
     /// Update the various segment registers in the CPU.
@@ -1073,7 +1094,7 @@ impl Cpu {
     ///
     /// * `mem` - A reference to the VM [`Memory`] instance.
     #[inline(always)]
-    pub fn update_segment_registers(&mut self, mem: &Memory) {
+    pub fn set_segment_registers(&mut self, mem: &Memory) {
         self.registers
             .get_register_u32_mut(RegisterId::SS)
             .write_unchecked(mem.stack_segment_start as u32);
@@ -1087,15 +1108,27 @@ impl Cpu {
             .write_unchecked(mem.data_segment_start as u32);
     }
 
-    /// Update the stack pointer (SP) register.
+    // Update the stack pointer (SP) register.
     ///
     /// # Arguments
     ///
     /// * `value` - The new value of the stack pointer register.
     #[inline(always)]
-    pub fn update_stack_pointer(&mut self, value: u32) {
+    pub fn set_stack_pointer(&mut self, value: u32) {
         self.registers
             .get_register_u32_mut(RegisterId::SP)
+            .write_unchecked(value);
+    }
+
+    /// Update the u32 accumulator (AC) register.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The new value of the accumulator register.
+    #[inline(always)]
+    fn set_u32_accumulator(&mut self, value: u32) {
+        self.registers
+            .get_register_u32_mut(RegisterId::AC)
             .write_unchecked(value);
     }
 

@@ -118,6 +118,8 @@ fn main() {
                 ExpressionArgs::Register(RegisterId::R1),
             ][..]).encode(),
         ),*/
+        Instruction::PushU32Imm(1234),
+        Instruction::PushU32Imm(4321),
         Instruction::Hlt,
     ];
 
@@ -127,13 +129,6 @@ fn main() {
     //println!("compiled data len = {}", data.len());
 
     let mut vm = VirtualMachine::new(vm::MIN_MEMORY_SIZE, data, &[]);
-
-    // Add some debug entries to the stack.
-    vm.ram.push_u32(1234);
-    vm.ram.push_u32(4321);
-
-    //println!("{}", vm.ram.pop_u32());
-    //println!("{}", vm.ram.pop_u32());
 
     println!("----------[Instructions]----------");
     for ins in instructions {
@@ -147,6 +142,7 @@ fn main() {
 
     println!("----------[CPU]----------");
     println!("Machine Mode? {}", vm.cpu.is_machine_mode);
+    println!("Stack Frame Size: {}", vm.cpu.get_stack_frame_size());
     println!();
 
     println!("----------[Registers]----------");

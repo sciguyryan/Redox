@@ -59,10 +59,10 @@ pub enum RegisterId {
     AC,
     /// Instruction pointer register.
     IP,
+    /// The stack frame base pointer.
+    BP,
     /// Stack pointer register.
     SP,
-    /// Frame pointer register.
-    FP,
     /// CPU flags register.
     FL,
     /// Program counter register.
@@ -96,12 +96,15 @@ impl Display for RegisterId {
             RegisterId::R8 => "R8",
             RegisterId::F1 => "F1",
             RegisterId::AC => "AC",
-            RegisterId::FL => "FL",
+
             RegisterId::IP => "IP",
+            RegisterId::BP => "BP",
             RegisterId::SP => "SP",
-            RegisterId::FP => "FP",
+
+            RegisterId::FL => "FL",
+            RegisterId::IM => "IM",
             RegisterId::PC => "PC",
-            RegisterId::IM => "DG",
+
             RegisterId::SS => "SS",
             RegisterId::CS => "CS",
             RegisterId::DS => "DS",
@@ -187,8 +190,8 @@ impl Registers {
                 // [ System Registers ] //
                 register_u32!(RegisterId::AC, &rw, 0),
                 register_u32!(RegisterId::IP, &rw, 0),
+                register_u32!(RegisterId::BP, &prpw, 0),
                 register_u32!(RegisterId::SP, &prpw, 0),
-                register_u32!(RegisterId::FP, &prpw, 0),
                 register_u32!(RegisterId::FL, &rpw, 0),
                 register_u32!(RegisterId::PC, &rpw, 0),
                 register_u32!(RegisterId::IM, &rpw, 0xffffffff),

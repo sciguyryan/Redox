@@ -438,6 +438,11 @@ impl Memory {
 
                 Instruction::ZeroHighBitsByIndexU32RegU32Imm(index, in_reg, out_reg)
             }
+            OpCode::PushU32Imm => {
+                let imm = block.read_u32();
+
+                Instruction::PushU32Imm(imm)
+            }
 
             /******** [Logic Instructions] ********/
             OpCode::BitTestU32Reg => {
@@ -670,8 +675,6 @@ impl Memory {
         // Update the stack pointer.
         self.stack_pointer = value_start_pos + 4;
 
-        println!("WARNING: be sure to update the stack pointer and stack frame size registers!");
-
         result
     }
 
@@ -694,6 +697,12 @@ impl Memory {
     /// # Arguments
     ///
     /// * `value` - The u32 value to be pushed onto the stack.
+    ///
+    /// # Notes
+    ///
+    /// This method will automatically keep track of the stack pointer
+    /// as held within the memory object, but the CPU registers **must** be
+    /// updated separately or they will fall out of sync.
     pub fn push_u32(&mut self, value: u32) {
         let value_start_pos = self.stack_pointer - 4;
         assert!(
@@ -706,8 +715,6 @@ impl Memory {
 
         // Update the stack pointer.
         self.stack_pointer = value_start_pos;
-
-        println!("WARNING: be sure to update the stack pointer and stack frame size registers!");
     }
 
     /// Set the value of a specific byte in memory.

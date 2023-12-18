@@ -107,7 +107,7 @@ impl Compiler {
             }
 
             /******** [u32 immediate] ********/
-            Instruction::Int(imm) => {
+            Instruction::Int(imm) | Instruction::PushU32Imm(imm) => {
                 self.write_u32(imm);
             }
 
@@ -272,6 +272,7 @@ mod tests_compiler {
                 OpCode::ZeroHighBitsByIndexU32RegU32Imm => {
                     Instruction::ZeroHighBitsByIndexU32RegU32Imm(0x123, R2, R3)
                 }
+                OpCode::PushU32Imm => Instruction::PushU32Imm(0x123),
                 OpCode::BitTestU32Reg => Instruction::BitTestU32Reg(0x40, R2),
                 OpCode::BitTestU32Mem => Instruction::BitTestU32Mem(0x40, 0x123),
                 OpCode::BitTestResetU32Reg => Instruction::BitTestResetU32Reg(0x40, R2),

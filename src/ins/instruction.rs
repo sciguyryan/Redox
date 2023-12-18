@@ -107,6 +107,8 @@ pub enum Instruction {
     ZeroHighBitsByIndexU32Reg(RegisterId, RegisterId, RegisterId),
     /// Zero the high bits of the source value starting from a specified index.
     ZeroHighBitsByIndexU32RegU32Imm(u32, RegisterId, RegisterId),
+    /// Push a u32 immediate value onto the stack.
+    PushU32Imm(u32),
 
     /******** [Logic Instructions] ********/
     /// Test the state of a bit from a u32 register. The CF flag will be set to the state of the bit.
@@ -284,6 +286,9 @@ impl Display for Instruction {
             Instruction::ZeroHighBitsByIndexU32RegU32Imm(index, in_reg, out_reg) => {
                 format!("zhbi {index}, %{in_reg}, %{out_reg}")
             }
+            Instruction::PushU32Imm(index) => {
+                format!("push ${index:04x}")
+            }
 
             /******** [Logic Instructions] ********/
             Instruction::BitTestU32Reg(bit, reg) => {
@@ -399,6 +404,7 @@ impl Instruction {
             OpCode::ZeroHighBitsByIndexU32RegU32Imm => {
                 ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE + ARG_REG_ID_SIZE
             }
+            OpCode::PushU32Imm => ARG_U32_IMM_SIZE,
 
             /******** [Logic Instructions] ********/
             OpCode::BitTestU32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,

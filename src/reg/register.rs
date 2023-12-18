@@ -72,6 +72,16 @@ impl RegisterU32 {
         self.value += value;
     }
 
+    /// Subtract a specific value from this register without performing a permission check.
+    ///
+    /// # Arguments
+    ///
+    /// * `val` - The value to be subtracted.
+    #[inline(always)]
+    pub fn subtract_unchecked(&mut self, value: u32) {
+        self.value -= value;
+    }
+
     pub fn get_flags_register_string(&self) -> String {
         let mut flags = String::new();
 
