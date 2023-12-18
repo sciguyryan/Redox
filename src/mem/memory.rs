@@ -46,6 +46,8 @@ pub struct Memory {
     pub stack_segment_start: usize,
     /// The end address of the stack segment.
     pub stack_segment_end: usize,
+    /// The current stack pointer.
+    stack_pointer: usize,
 }
 
 impl Memory {
@@ -87,6 +89,7 @@ impl Memory {
             stack_type_hints: vec![],
             stack_segment_start,
             stack_segment_end,
+            stack_pointer: stack_segment_end,
         };
 
         // Load the code segment bytes into RAM, if it has been provided.
@@ -645,7 +648,21 @@ impl Memory {
 
     /// Attempt to pop a u32 value from the stack.
     pub fn pop_u32(&mut self) -> u32 {
-        0
+        let value_start_pos = self.stack_pointer;
+        assert!(
+            value_start_pos >= self.stack_segment_start && value_start_pos < self.stack_segment_end
+        );
+
+        // Read the value from the stack.
+        let result = self.get_u32(value_start_pos);
+        self.pop_type_hint();
+
+        // Update the stack pointer.
+        self.stack_pointer = value_start_pos + 4;
+
+        println!("WARNING: be sure to update the stack pointer and stack frame size registers!");
+
+        result
     }
 
     /// Attempt to push a u32 value onto the stack.
@@ -653,21 +670,43 @@ impl Memory {
     /// # Arguments
     ///
     /// * `value` - The u32 value to be pushed onto the stack.
-    pub fn push_u32(&mut self, value: u32, stack_pointer: usize) {
-        let value_start_pos = stack_pointer - 4;
-        assert!(value_start_pos <= self.stack_segment_end);
+    pub fn push_u32(&mut self, value: u32) {
+        let value_start_pos = self.stack_pointer - 4;
+        assert!(
+            value_start_pos >= self.stack_segment_start && value_start_pos < self.stack_segment_end
+        );
 
+        // Push the value to the stack.
         self.set_u32(value_start_pos, value);
         self.push_type_hint(StackTypeHint::U32);
+
+        // Update the stack pointer.
+        self.stack_pointer = value_start_pos;
 
         println!("WARNING: be sure to update the stack pointer and stack frame size registers!");
     }
 
+    /// Attempt to pop a [`StackTypeHint`] from the stack hint list.
+    #[cfg(feature = "stack-type-hints")]
+    fn pop_type_hint(&mut self) {
+        self.stack_type_hints.pop();
+    }
+
+    /// Attempt to pop a [`StackTypeHint`] from the stack hint list.
+    #[cfg(not(feature = "stack-type-hints"))]
+    fn pop_type_hint(&mut self) {}
+
+    /// Attempt to push a [`StackTypeHint`] onto the stack hint list.
+    ///
+    /// # Arguments
+    ///
+    /// * `hint` - The [`StackTypeHint`] to be added to the hit list.
     #[cfg(feature = "stack-type-hints")]
     fn push_type_hint(&mut self, hint: StackTypeHint) {
         self.stack_type_hints.push(hint);
     }
 
+    /// Attempt to push a [`StackTypeHint`] onto the stack hint list.
     #[cfg(not(feature = "stack-type-hints"))]
     fn push_type_hint(&mut self, _hint: StackTypeHint) {}
 
@@ -907,5 +946,36 @@ mod tests_memory {
         ram.set_u32(0, input);
 
         assert_eq!(input, ram.get_u32(0));
+    }
+
+    /// Test a stack push and pop round-trip.
+    #[test]
+    fn test_stack_u32_push_pop() {
+        let mut ram = Memory::new(100, &[], &[], 2);
+
+        ram.push_u32(0x123);
+        ram.push_u32(0x321);
+
+        assert_eq!(ram.pop_u32(), 0x321);
+        assert_eq!(ram.pop_u32(), 0x123);
+    }
+
+    /// Test for an assertion when popping an entry from an empty stack.
+    #[test]
+    #[should_panic]
+    fn test_stack_pop_with_empty_stack() {
+        let mut ram = Memory::new(100, &[], &[], 2);
+
+        _ = ram.pop_u32();
+    }
+
+    /// Test for an assertion when pushing too many entries to the stack.
+    #[test]
+    #[should_panic]
+    fn test_pushing_to_full_stack() {
+        let mut ram = Memory::new(100, &[], &[], 1);
+
+        ram.push_u32(0x123);
+        ram.push_u32(0x321);
     }
 }

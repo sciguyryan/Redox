@@ -129,10 +129,11 @@ fn main() {
     let mut vm = VirtualMachine::new(vm::MIN_MEMORY_SIZE, data, &[]);
 
     // Add some debug entries to the stack.
-    let mut sp = vm.cpu.get_stack_pointer() as usize;
-    vm.ram.push_u32(1234, sp);
-    sp -= 4;
-    vm.ram.push_u32(4321, sp);
+    vm.ram.push_u32(1234);
+    vm.ram.push_u32(4321);
+
+    //println!("{}", vm.ram.pop_u32());
+    //println!("{}", vm.ram.pop_u32());
 
     println!("----------[Instructions]----------");
     for ins in instructions {
