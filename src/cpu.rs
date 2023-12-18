@@ -1086,6 +1086,22 @@ impl Cpu {
             .write_unchecked(mem.data_segment_start as u32);
     }
 
+    /// Setup the registers that are required for running the CPU.
+    ///
+    /// # Arguments
+    ///
+    /// * `mem` - A reference to the VM [`Memory`] instance.
+    #[inline(always)]
+    pub fn setup_registers(&mut self, mem: &Memory) {
+        // Update the segment registers, now that we know where the segments
+        // are located in RAM.
+        self.set_segment_registers(mem);
+
+        // Configure the CPU registers to account for the new stack pointer.
+        self.set_stack_frame_base_pointer(mem.stack_segment_end as u32);
+        self.set_stack_pointer(mem.stack_segment_end as u32);
+    }
+
     // Update the stack pointer (SP) register.
     ///
     /// # Arguments
@@ -1144,6 +1160,8 @@ pub enum CpuFlag {
     CF,
     // The parity flag - set to true depending on the parity of the bits.
     PF,
+    /// The interrupt disabled flag - set to true if interrupts are disabled.
+    IF,
 }
 
 impl fmt::Display for CpuFlag {
@@ -1154,18 +1172,20 @@ impl fmt::Display for CpuFlag {
             CpuFlag::OF => write!(f, "OF"),
             CpuFlag::CF => write!(f, "CF"),
             CpuFlag::PF => write!(f, "PF"),
+            CpuFlag::IF => write!(f, "IF"),
         }
     }
 }
 
 impl CpuFlag {
     pub fn iterator() -> Iter<'static, CpuFlag> {
-        static FLAGS: [CpuFlag; 5] = [
+        static FLAGS: [CpuFlag; 6] = [
             CpuFlag::SF,
             CpuFlag::ZF,
             CpuFlag::OF,
             CpuFlag::CF,
             CpuFlag::PF,
+            CpuFlag::IF,
         ];
         FLAGS.iter()
     }
@@ -1309,6 +1329,8 @@ mod tests_cpu {
                 panic!("{}", self.fail_message(id, false));
             }
 
+            println!("{}", mem.get_user_segment_storage().len());
+
             // Check the user memory segment.
             assert_eq!(
                 mem.get_user_segment_storage(),
@@ -1340,7 +1362,12 @@ mod tests_cpu {
     ///
     /// A tuple containing a [`Memory`] instance and a [`Cpu`] instance.
     fn create_instance() -> (Memory, Cpu) {
-        (Memory::new(100, &[], &[], 0), Cpu::default())
+        let mem = Memory::new(100, &[], &[], 10);
+        let mut cpu = Cpu::default();
+
+
+
+        (mem, cpu)
     }
 
     /// Test the parity checking.
@@ -5375,4 +5402,46 @@ mod tests_cpu {
             test.run_test(id);
         }
     }
+
+    /*/// Test push u32 immediate instruction.
+    #[test]
+    fn test_push_u32_imm() {
+        /*let test_values = [
+            vec![0x123],
+            //vec![0x123, 0x321]
+        ];
+
+        let mut tests = vec![];
+
+        for test_inputs in test_values {
+            let mut input_bits = vec![];
+            for input in test_inputs {
+                input_bits.push(PushU32Imm(input));
+            }
+
+            tests.push(TestEntryU32Standard::new(
+                &input_bits,
+                &[],
+                vec![],
+                false,
+                "PUSH - incorrect result produced from the push",
+            ))
+        }*/
+
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    PushU32Imm(0b1111_1111_1111_1111_1111_1111_1111_1111),
+                ],
+                &[],
+                vec![],
+                false,
+                "PUSH - incorrect result produced from the push instruction",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            let (cpu, mem) = test.run_test(id);
+        }
+    }*/
 }

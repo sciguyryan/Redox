@@ -14,10 +14,11 @@ impl VirtualMachine {
         total_memory_size: usize,
         code_segment_bytes: &[u8],
         data_segment_bytes: &[u8],
+        stack_capacity: usize,
     ) -> Self {
         // We have a minimum memory condition for this VM to ensure that certain assumptions
         // around the placement of things in memory remain sound.
-        assert!(total_memory_size >= MIN_MEMORY_SIZE);
+        //assert!(total_memory_size >= MIN_MEMORY_SIZE);
 
         // Construct out virtual machine.
         let mut vm = Self {
@@ -25,19 +26,13 @@ impl VirtualMachine {
                 total_memory_size,
                 code_segment_bytes,
                 data_segment_bytes,
-                U32_STACK_CAPACITY,
+                stack_capacity,
             ),
             cpu: Cpu::default(),
         };
 
-        // Update the segment registers, now that we know where the segments
-        // are located in RAM.
-        vm.cpu.set_segment_registers(&vm.ram);
-
-        // Configure the CPU registers to account for the new stack pointer.
-        vm.cpu
-            .set_stack_frame_base_pointer(vm.ram.stack_segment_end as u32);
-        vm.cpu.set_stack_pointer(vm.ram.stack_segment_end as u32);
+        // Setup the default registers.
+        vm.cpu.setup_registers(&vm.ram);
 
         vm
     }

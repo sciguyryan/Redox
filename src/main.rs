@@ -80,6 +80,10 @@ fn main() {
         panic!("currently unsupported");
     }
 
+    /*let mut vm_1 = VirtualMachine::new(10, &vec![1, 2, 3, 4, 5, 6, 7, 8, 9], &vec![1, 2, 3, 4, 5, 6, 7, 8, 9], 1);
+    println!("{:?}", vm_1.ram.get_stack_segment_storage());
+    return;*/
+
     let expr_args_1 = [
         ExpressionArgs::Register(RegisterId::R7),
         ExpressionArgs::Operator(ExpressionOperator::Add),
@@ -128,7 +132,7 @@ fn main() {
     //println!("compiled data = {data:?}");
     //println!("compiled data len = {}", data.len());
 
-    let mut vm = VirtualMachine::new(vm::MIN_MEMORY_SIZE, data, &[]);
+    let mut vm = VirtualMachine::new(vm::MIN_MEMORY_SIZE, data, &[], vm::U32_STACK_CAPACITY);
 
     println!("----------[Instructions]----------");
     for ins in instructions {

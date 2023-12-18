@@ -30,6 +30,11 @@ pub struct Memory {
     /// The raw byte storage of this memory module.
     storage: Vec<u8>,
 
+    /// The start address of the user segment.
+    pub user_segment_start: usize,
+    /// The end address of the user segment.
+    pub user_segment_end: usize,
+
     /// The start address of the code segment.
     pub code_segment_start: usize,
     /// The end address of the code segment.
@@ -52,36 +57,59 @@ pub struct Memory {
 
 impl Memory {
     pub fn new(
-        system_memory_size: usize,
+        user_memory_size: usize,
         code_segment_bytes: &[u8],
         data_segment_bytes: &[u8],
         stack_capacity: usize,
     ) -> Self {
-        // We will calculate the start and end positions of the various code segments in reverse order.
+        // The user segment is always the first in memory.
+        let user_segment_start = 0;
+        let user_segment_end = user_memory_size;
 
-        // The size of the stack is calculated to contain enough space
-        // for a given number of u32 values (at 4 bytes each).
+        // Next, if specified, will be the code segment.
+        let code_segment_start: usize;
+        let code_segment_end: usize;
+        if !code_segment_bytes.is_empty() {
+            code_segment_start = user_segment_end;
+            code_segment_end = code_segment_start + code_segment_bytes.len();
+        } else {
+            code_segment_start = user_segment_end;
+            code_segment_end = code_segment_start;
+        }
+
+        // Next, if specified, will be the data segment.
+        let data_segment_start: usize;
+        let data_segment_end: usize;
+        if !data_segment_bytes.is_empty() {
+            data_segment_start = code_segment_end;
+            data_segment_end = data_segment_start + data_segment_bytes.len();
+        } else {
+            data_segment_start = code_segment_end;
+            data_segment_end = data_segment_start;
+        }
+
+        // Next, if specified, will be the stack segment.
         let stack_size = stack_capacity * 4;
-        let stack_segment_end = system_memory_size;
-        let stack_segment_start = stack_segment_end - stack_size;
+        let stack_segment_start: usize;
+        let stack_segment_end: usize;
+        if stack_size > 0 {
+            stack_segment_start = data_segment_end;
+            stack_segment_end = stack_segment_start + stack_size;
+        } else {
+            stack_segment_start = data_segment_end;
+            stack_segment_end = stack_segment_start;
+        }
 
-        // Ensure we have sufficient space to allocate everything with the specified
-        // memory configuration. This shouldn't trigger in practice, but if the memory
-        // is set to be sufficiently small then it might.
-        assert!(
-            code_segment_bytes.len() + data_segment_bytes.len() + stack_size < system_memory_size
-        );
+        /*println!("user_segment_start = {user_segment_start}, user_segment_end = {user_segment_end}, length = {}", user_segment_end - user_segment_start);
+        println!("code_segment_start = {code_segment_start}, code_segment_end = {code_segment_end}, length = {}", code_segment_end - code_segment_start);
+        println!("data_segment_start = {data_segment_start}, data_segment_end = {data_segment_end}, length = {}", data_segment_end - data_segment_start);
+        println!("stack_segment_start = {stack_segment_start}, stack_segment_end = {stack_segment_end}, length = {}", stack_segment_end - stack_segment_start);*/
 
-        // The data segment begins directly before the stack segment.
-        let data_segment_end = stack_segment_start;
-        let data_segment_start = data_segment_end - data_segment_bytes.len();
-
-        // The code segment begins directly before the data segment.
-        let code_segment_end = data_segment_start;
-        let code_segment_start = code_segment_end - code_segment_bytes.len();
-
+        // Now we have the locations of the memory segments, we can create the memory
         let mut mem = Self {
-            storage: vec![0x0; system_memory_size],
+            storage: vec![0x0; stack_segment_end],
+            user_segment_start,
+            user_segment_end,
             code_segment_start,
             code_segment_end,
             data_segment_start,
@@ -596,6 +624,15 @@ impl Memory {
         &self.storage[self.code_segment_start..self.code_segment_end]
     }
 
+    /// Get a slice of the data segment contents.
+    ///
+    /// # Returns
+    ///
+    /// A slice of u8 values.
+    pub fn get_data_segment_storage(&self) -> &[u8] {
+        &self.storage[self.data_segment_start..self.data_segment_end]
+    }
+
     /// Get a slice of the raw stack segment contents.
     ///
     /// # Returns
@@ -704,6 +741,8 @@ impl Memory {
     /// as held within the memory object, but the CPU registers **must** be
     /// updated separately or they will fall out of sync.
     pub fn push_u32(&mut self, value: u32) {
+        // This needs to be 3 (not 4) since we are working from the basis that this
+        // will add a value to the last index. 0 to 3 is 4 positions.
         let value_start_pos = self.stack_pointer - 4;
         assert!(
             value_start_pos >= self.stack_segment_start && value_start_pos < self.stack_segment_end
@@ -866,58 +905,34 @@ mod tests_memory {
     /// Test the complex aspects of creating a RAM module.
     #[test]
     fn test_ram_creation_complex() {
-        let size = 0x500;
-        let stack_entries = 50;
-        let code = [0x1; 100];
-        let data = [0x2; 100];
-        let ram = Memory::new(size, &code, &data, stack_entries);
+        let user_size = 0x100;
+        let stack_entries = 2;
+        let code = [0x1; 10];
+        let data = [0x2; 10];
+        let mut ram = Memory::new(user_size, &code, &data, stack_entries);
+
+        // Add some stack entries.
+        let mut stack_bytes = vec![];
+        ram.push_u32(123);
+        ram.push_u32(321);
+
+        stack_bytes.extend_from_slice(&321u32.to_le_bytes());
+        stack_bytes.extend_from_slice(&123u32.to_le_bytes());
 
         assert_eq!(
             ram.len(),
-            size,
+            user_size + stack_entries * 4 + code.len() + data.len(),
             "failed to create a RAM module of the specified size"
         );
 
-        // Check the stack segment is correct.
-        let stack_end = size;
-        let stack_start = stack_end - stack_entries * 4;
-        assert_eq!(stack_end, ram.stack_segment_end);
-        assert_eq!(stack_start, ram.stack_segment_start);
+        // Check the code segment is correct.
+        assert_eq!(code, ram.get_code_segment_storage());
 
         // Check the data segment is correct.
-        let data_end = stack_start;
-        let data_start = data_end - data.len();
-        assert_eq!(data_end, ram.data_segment_end);
-        assert_eq!(data_start, ram.data_segment_start);
-        assert_eq!(data, ram.get_range_ptr(data_start, data.len()));
+        assert_eq!(data, ram.get_data_segment_storage());
 
-        // Check the code segment is correct.
-        let code_end = data_start;
-        let code_start = code_end - code.len();
-        assert_eq!(code_end, ram.code_segment_end);
-        assert_eq!(code_start, ram.code_segment_start);
-        assert_eq!(code, ram.get_range_ptr(code_start, code.len()));
-    }
-
-    /// Test creating a memory instance with insufficient space for code.
-    #[test]
-    #[should_panic]
-    fn test_ram_insufficient_space_for_code() {
-        _ = Memory::new(100, &vec![0; 1000], &[], 0);
-    }
-
-    /// Test creating a memory instance with insufficient space for data.
-    #[test]
-    #[should_panic]
-    fn test_ram_insufficient_space_for_data() {
-        _ = Memory::new(100, &[], &vec![0; 1000], 0);
-    }
-
-    /// Test creating a memory instance with insufficient space for the stack.
-    #[test]
-    #[should_panic]
-    fn test_ram_insufficient_space_for_stack() {
-        _ = Memory::new(100, &[], &[], 1000);
+        // Check the stack segment is correct.
+        assert_eq!(stack_bytes, ram.get_stack_segment_storage());
     }
 
     /// Test basic reading and writing.
@@ -958,11 +973,10 @@ mod tests_memory {
     /// Test a stack push and pop round-trip.
     #[test]
     fn test_stack_u32_push_pop() {
-        let mut ram = Memory::new(100, &[], &[], 2);
+        let mut ram = Memory::new(10, &[1, 2, 3, 4], &[9, 8, 7, 6, 5], 2);
 
         ram.push_u32(0x123);
         ram.push_u32(0x321);
-
         assert_eq!(ram.pop_u32(), 0x321);
         assert_eq!(ram.pop_u32(), 0x123);
     }
