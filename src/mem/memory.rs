@@ -57,14 +57,14 @@ pub struct Memory {
 
 impl Memory {
     pub fn new(
-        user_memory_size: usize,
+        user_segment_capacity: usize,
         code_segment_bytes: &[u8],
         data_segment_bytes: &[u8],
-        stack_capacity: usize,
+        stack_segment_capacity: usize,
     ) -> Self {
         // The user segment is always the first in memory.
         let user_segment_start = 0;
-        let user_segment_end = user_memory_size;
+        let user_segment_end = user_segment_capacity;
 
         // Next, if specified, will be the code segment.
         let code_segment_start: usize;
@@ -89,12 +89,11 @@ impl Memory {
         }
 
         // Next, if specified, will be the stack segment.
-        let stack_size = stack_capacity * 4;
         let stack_segment_start: usize;
         let stack_segment_end: usize;
-        if stack_size > 0 {
+        if stack_segment_capacity > 0 {
             stack_segment_start = data_segment_end;
-            stack_segment_end = stack_segment_start + stack_size;
+            stack_segment_end = stack_segment_start + stack_segment_capacity;
         } else {
             stack_segment_start = data_segment_end;
             stack_segment_end = stack_segment_start;
@@ -906,10 +905,10 @@ mod tests_memory {
     #[test]
     fn test_ram_creation_complex() {
         let user_size = 0x100;
-        let stack_entries = 2;
+        let stack_capacity_bytes = 2 * 4;
         let code = [0x1; 10];
         let data = [0x2; 10];
-        let mut ram = Memory::new(user_size, &code, &data, stack_entries);
+        let mut ram = Memory::new(user_size, &code, &data, stack_capacity_bytes);
 
         // Add some stack entries.
         let mut stack_bytes = vec![];
@@ -921,7 +920,7 @@ mod tests_memory {
 
         assert_eq!(
             ram.len(),
-            user_size + stack_entries * 4 + code.len() + data.len(),
+            user_size + stack_capacity_bytes + code.len() + data.len(),
             "failed to create a RAM module of the specified size"
         );
 
@@ -973,7 +972,7 @@ mod tests_memory {
     /// Test a stack push and pop round-trip.
     #[test]
     fn test_stack_u32_push_pop() {
-        let mut ram = Memory::new(10, &[1, 2, 3, 4], &[9, 8, 7, 6, 5], 2);
+        let mut ram = Memory::new(10, &[1, 2, 3, 4], &[9, 8, 7, 6, 5], 2 * 4);
 
         ram.push_u32(0x123);
         ram.push_u32(0x321);

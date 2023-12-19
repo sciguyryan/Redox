@@ -132,7 +132,12 @@ fn main() {
     //println!("compiled data = {data:?}");
     //println!("compiled data len = {}", data.len());
 
-    let mut vm = VirtualMachine::new(vm::MIN_MEMORY_SIZE, data, &[], vm::U32_STACK_CAPACITY);
+    let mut vm = VirtualMachine::new(
+        vm::MIN_USER_SEGMENT_SIZE,
+        data,
+        &[],
+        vm::U32_STACK_CAPACITY * 4,
+    );
 
     println!("----------[Instructions]----------");
     for ins in instructions {

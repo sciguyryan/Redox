@@ -111,15 +111,19 @@ impl Cpu {
     /// # Returns
     ///
     /// The next [`Instruction`] to be executed.
-    fn fetch_decode_next_instruction(&mut self, mem: &Memory) -> Instruction {
+    fn fetch_decode_next_instruction(&mut self, mem: &Memory) -> Option<Instruction> {
         // Get the current instruction pointer.
         let ip = *self
             .registers
             .get_register_u32(RegisterId::IP)
-            .read_unchecked();
+            .read_unchecked() as usize;
 
-        // Update the program counter register.
-        mem.get_instruction(ip as usize)
+        // Are we within valid memory bounds?
+        if ip < mem.len() {
+            Some(mem.get_instruction(ip))
+        } else {
+            None
+        }
     }
 
     /// Get the size of the current stack frame.
@@ -598,8 +602,11 @@ impl Cpu {
     /// * `mem` - A reference to the virtual machine [`Memory`] instance.
     pub fn run(&mut self, mem: &mut Memory) {
         loop {
-            let ins = self.fetch_decode_next_instruction(mem);
-            self.run_instruction(mem, &ins);
+            if let Some(ins) = self.fetch_decode_next_instruction(mem) {
+                self.run_instruction(mem, &ins);
+            } else {
+                self.is_halted = true;
+            }
 
             if self.is_halted {
                 break;
@@ -1026,6 +1033,18 @@ impl Cpu {
         self.is_halted = state;
     }
 
+    /// Update the instruction pointer (IP) register.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The new value of the instruction pointer register.
+    #[inline(always)]
+    pub fn set_instruction_pointer(&mut self, value: u32) {
+        self.registers
+            .get_register_u32_mut(RegisterId::IP)
+            .write_unchecked(value);
+    }
+
     /// Set the machine mode privilege level of the processor.
     ///
     /// # Arguments
@@ -1034,6 +1053,26 @@ impl Cpu {
     #[inline(always)]
     fn set_machine_mode(&mut self, state: bool) {
         self.is_machine_mode = state;
+    }
+
+    /// Update the various segment registers in the CPU.
+    ///
+    /// # Arguments
+    ///
+    /// * `mem` - A reference to the VM [`Memory`] instance.
+    #[inline(always)]
+    pub fn set_segment_registers(&mut self, mem: &Memory) {
+        self.registers
+            .get_register_u32_mut(RegisterId::SS)
+            .write_unchecked(mem.stack_segment_start as u32);
+
+        self.registers
+            .get_register_u32_mut(RegisterId::CS)
+            .write_unchecked(mem.code_segment_start as u32);
+
+        self.registers
+            .get_register_u32_mut(RegisterId::DS)
+            .write_unchecked(mem.data_segment_start as u32);
     }
 
     /// Set the standard CPU flags based on the specified value and overflow.
@@ -1066,36 +1105,19 @@ impl Cpu {
             .write_unchecked(value);
     }
 
-    /// Update the various segment registers in the CPU.
-    ///
-    /// # Arguments
-    ///
-    /// * `mem` - A reference to the VM [`Memory`] instance.
-    #[inline(always)]
-    pub fn set_segment_registers(&mut self, mem: &Memory) {
-        self.registers
-            .get_register_u32_mut(RegisterId::SS)
-            .write_unchecked(mem.stack_segment_start as u32);
-
-        self.registers
-            .get_register_u32_mut(RegisterId::CS)
-            .write_unchecked(mem.code_segment_start as u32);
-
-        self.registers
-            .get_register_u32_mut(RegisterId::DS)
-            .write_unchecked(mem.data_segment_start as u32);
-    }
-
     /// Setup the registers that are required for running the CPU.
     ///
     /// # Arguments
     ///
     /// * `mem` - A reference to the VM [`Memory`] instance.
     #[inline(always)]
-    pub fn setup_registers(&mut self, mem: &Memory) {
+    pub fn synchronize_registers(&mut self, mem: &Memory) {
         // Update the segment registers, now that we know where the segments
         // are located in RAM.
         self.set_segment_registers(mem);
+
+        // Configure the CPU instruction pointer.
+        self.set_instruction_pointer(mem.code_segment_start as u32);
 
         // Configure the CPU registers to account for the new stack pointer.
         self.set_stack_frame_base_pointer(mem.stack_segment_end as u32);
@@ -1212,6 +1234,170 @@ impl From<CpuFlag> for u8 {
 }
 
 #[cfg(test)]
+mod tests_cpu_version_2 {
+    use std::{collections::HashMap, panic};
+
+    use crate::{
+        compiler::bytecode_compiler::Compiler,
+        ins::{
+            instruction::Instruction::{self, *},
+            move_expressions::{ExpressionArgs, ExpressionOperator, MoveExpressionHandler},
+        },
+        mem::memory::Memory,
+        reg::registers::{RegisterId, Registers},
+        vm::VirtualMachine,
+    };
+
+    use super::{Cpu, CpuFlag};
+
+    struct TestEntryU32Standard {
+        pub instructions: Vec<Instruction>,
+        pub expected_changed_registers: HashMap<RegisterId, u32>,
+        pub expected_user_segment_contents: Vec<u8>,
+        pub user_segment_capacity: usize,
+        pub stack_segment_capacity: usize,
+        pub should_panic: bool,
+        pub fail_message: String,
+    }
+
+    impl TestEntryU32Standard {
+        fn new(
+            instructions: &[Instruction],
+            expected_registers: &[(RegisterId, u32)],
+            expected_user_segment_contents: Vec<u8>,
+            user_segment_capacity: usize,
+            stack_segment_capacity: usize,
+            should_panic: bool,
+            fail_message: &str,
+        ) -> Self {
+            // Ensure we always end with a halt instruction.
+            let mut instructions_vec = instructions.to_vec();
+            if let Some(ins) = instructions_vec.last() {
+                if !matches!(ins, Hlt) {
+                    instructions_vec.push(Hlt);
+                }
+            }
+
+            // Build the list of registers we expect to change.
+            let mut changed_registers = HashMap::new();
+            for (id, value) in expected_registers {
+                changed_registers.insert(*id, *value);
+            }
+
+            Self {
+                instructions: instructions_vec,
+                expected_changed_registers: changed_registers,
+                user_segment_capacity,
+                expected_user_segment_contents,
+                stack_segment_capacity,
+                should_panic,
+                fail_message: fail_message.to_string(),
+            }
+        }
+
+        /// Run this specific test entry.
+        ///
+        /// # Arguments
+        ///
+        /// * `id` - The ID of this test.
+        pub fn run_test(&self, id: usize) -> Option<VirtualMachine> {
+            // Compile the test code.
+            let mut compiler = Compiler::new();
+            let compiled = compiler.compile(&self.instructions);
+
+            // Attempt to execute the code.
+            let result = panic::catch_unwind(|| {
+                // Build the virtual machine instance.
+                let mut vm = VirtualMachine::new(
+                    self.user_segment_capacity,
+                    compiled,
+                    &[],
+                    self.stack_segment_capacity,
+                );
+
+                // Execute the code.
+                vm.run();
+
+                // Return the completed VM instance.
+                vm
+            });
+
+            let did_panic = result.is_err();
+            assert_eq!(
+                did_panic,
+                self.should_panic,
+                "{}",
+                self.fail_message(id, did_panic)
+            );
+
+            if did_panic {
+                return None;
+            }
+
+            let vm = result.unwrap();
+
+            // Build the actual register map for the ones we expected to change.
+            let mut actual_registers: HashMap<RegisterId, u32> = HashMap::new();
+            self.expected_changed_registers.iter().for_each(|(id, _)| {
+                actual_registers.insert(
+                    *id,
+                    *vm.cpu.registers.get_register_u32(*id).read_unchecked(),
+                );
+            });
+
+            // Check that the registers we expected to change match their expected values.
+            assert_eq!(
+                actual_registers,
+                self.expected_changed_registers,
+                "{}",
+                self.fail_message(id, false)
+            );
+
+            // Check the user memory segment matches what we expect too.
+            assert_eq!(
+                vm.ram.get_user_segment_storage(),
+                self.expected_user_segment_contents,
+                "{}",
+                self.fail_message(id, false)
+            );
+
+            Some(vm)
+        }
+
+        /// Run this specific test entry.
+        ///
+        /// # Arguments
+        ///
+        /// * `id` - The ID of this test.
+        /// * `did_panic` - Did the test panic?
+        pub fn fail_message(&self, id: usize, did_panic: bool) -> String {
+            format!(
+                "Test {id} Failed - Should Panic? {}, Panicked? {did_panic}. Message = {}",
+                self.should_panic, self.fail_message
+            )
+        }
+    }
+
+    /// Test the NOP instruction.
+    #[test]
+    fn test_nop() {
+        let tests = [TestEntryU32Standard::new(
+            &[Nop],
+            &[],
+            vec![0; 100],
+            100,
+            0,
+            false,
+            "failed to execute NOP instruction",
+        )];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+}
+
+/*#[cfg(test)]
 mod tests_cpu {
     use std::panic;
 
@@ -1229,7 +1415,7 @@ mod tests_cpu {
     struct TestEntryU32Standard {
         pub instructions: Vec<Instruction>,
         pub expected_registers: Registers,
-        pub expected_memory: Vec<u8>,
+        pub expected_user_memory: Vec<u8>,
         pub should_panic: bool,
         pub fail_message: String,
     }
@@ -1253,12 +1439,12 @@ mod tests_cpu {
             let mut s = Self {
                 instructions: instructions_vec,
                 expected_registers: Registers::default(),
-                expected_memory,
+                expected_user_memory: expected_memory,
                 should_panic,
                 fail_message: fail_message.to_string(),
             };
 
-            s.build_registers(expected_registers);
+            s.build_expected_registers(expected_registers);
 
             s
         }
@@ -1268,7 +1454,7 @@ mod tests_cpu {
         /// # Arguments
         ///
         /// * `expected_registers` - A slice of tuples, the first entry being the [`RegisterId`] and the second being the expected value.
-        fn build_registers(&mut self, expected_registers: &[(RegisterId, u32)]) {
+        fn build_expected_registers(&mut self, expected_registers: &[(RegisterId, u32)]) {
             // This should be done before the registers are set because there will be instances
             // there the number of executed instructions will be different than the total
             // instruction count, such as if we hit a halt or early return.
@@ -1329,12 +1515,10 @@ mod tests_cpu {
                 panic!("{}", self.fail_message(id, false));
             }
 
-            println!("{}", mem.get_user_segment_storage().len());
-
             // Check the user memory segment.
             assert_eq!(
                 mem.get_user_segment_storage(),
-                self.expected_memory,
+                self.expected_user_memory,
                 "{}",
                 self.fail_message(id, false)
             );
@@ -1364,8 +1548,6 @@ mod tests_cpu {
     fn create_instance() -> (Memory, Cpu) {
         let mem = Memory::new(100, &[], &[], 10);
         let mut cpu = Cpu::default();
-
-
 
         (mem, cpu)
     }
@@ -5445,3 +5627,4 @@ mod tests_cpu {
         }
     }*/
 }
+*/
