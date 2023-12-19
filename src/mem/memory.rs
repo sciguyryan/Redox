@@ -99,11 +99,6 @@ impl Memory {
             stack_segment_end = stack_segment_start;
         }
 
-        /*println!("user_segment_start = {user_segment_start}, user_segment_end = {user_segment_end}, length = {}", user_segment_end - user_segment_start);
-        println!("code_segment_start = {code_segment_start}, code_segment_end = {code_segment_end}, length = {}", code_segment_end - code_segment_start);
-        println!("data_segment_start = {data_segment_start}, data_segment_end = {data_segment_end}, length = {}", data_segment_end - data_segment_start);
-        println!("stack_segment_start = {stack_segment_start}, stack_segment_end = {stack_segment_end}, length = {}", stack_segment_end - stack_segment_start);*/
-
         // Now we have the locations of the memory segments, we can create the memory
         let mut mem = Self {
             storage: vec![0x0; stack_segment_end],
@@ -143,6 +138,20 @@ impl Memory {
             self.is_in_bounds(pos),
             "The memory location is outside of the valid memory bounds. Point = {pos}"
         );
+    }
+
+    /// Can we pop a u32 value from the stack?
+    #[inline(always)]
+    pub fn can_pop_u32(&self) -> bool {
+        self.stack_pointer >= self.stack_segment_start
+            && self.stack_pointer + 4 <= self.stack_segment_end
+    }
+
+    /// Can we push a u32 value onto the stack?
+    #[inline(always)]
+    pub fn can_push_u32(&self) -> bool {
+        self.stack_pointer - 4 >= self.stack_segment_start
+            && self.stack_pointer <= self.stack_segment_end
     }
 
     /// Completely clear the memory.
@@ -701,8 +710,12 @@ impl Memory {
     pub fn pop_u32(&mut self) -> u32 {
         let value_start_pos = self.stack_pointer;
         assert!(
-            value_start_pos >= self.stack_segment_start && value_start_pos < self.stack_segment_end
+            self.can_pop_u32(),
+            "insufficient space on the stack to pop a u32 value"
         );
+        //assert!(
+        //    value_start_pos >= self.stack_segment_start && value_start_pos < self.stack_segment_end
+        //);
 
         // Read the value from the stack.
         let result = self.get_u32(value_start_pos);
@@ -740,12 +753,14 @@ impl Memory {
     /// as held within the memory object, but the CPU registers **must** be
     /// updated separately or they will fall out of sync.
     pub fn push_u32(&mut self, value: u32) {
+        assert!(
+            self.can_push_u32(),
+            "insufficient space on the stack to push a onto u32 value"
+        );
+
         // This needs to be 3 (not 4) since we are working from the basis that this
         // will add a value to the last index. 0 to 3 is 4 positions.
         let value_start_pos = self.stack_pointer - 4;
-        assert!(
-            value_start_pos >= self.stack_segment_start && value_start_pos < self.stack_segment_end
-        );
 
         // Push the value to the stack.
         self.set_u32(value_start_pos, value);

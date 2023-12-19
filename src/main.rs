@@ -136,7 +136,7 @@ fn main() {
         vm::MIN_USER_SEGMENT_SIZE,
         data,
         &[],
-        vm::U32_STACK_CAPACITY * 4,
+        vm::U32_STACK_CAPACITY * vm::BYTES_IN_U32,
     );
 
     println!("----------[Instructions]----------");

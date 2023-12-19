@@ -3,6 +3,7 @@ use crate::{cpu::Cpu, ins::instruction::Instruction, mem::memory::Memory};
 pub const MIN_USER_SEGMENT_SIZE: usize = 1024 * 1024 * 32;
 pub const MIN_BINARY_LOAD_ADDRESS: usize = 0x10000;
 pub const U32_STACK_CAPACITY: usize = 1000;
+pub const BYTES_IN_U32: usize = 4;
 
 pub struct VirtualMachine {
     pub ram: Memory,
@@ -26,7 +27,7 @@ impl VirtualMachine {
     ) -> Self {
         // We have a minimum memory condition for this VM to ensure that certain assumptions
         // around the placement of things in memory remain sound.
-        if user_segment_size <= MIN_USER_SEGMENT_SIZE {
+        if cfg!(not(test)) && user_segment_size <= MIN_USER_SEGMENT_SIZE {
             println!("WARNING: attempting to create a virtual machine with a user memory segment size that is smaller than the suggested minimum. Some features may not work correctly.");
         }
 

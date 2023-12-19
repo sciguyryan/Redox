@@ -1237,6 +1237,8 @@ impl From<CpuFlag> for u8 {
 mod tests_cpu_version_2 {
     use std::{collections::HashMap, panic};
 
+    use num_traits::ToBytes;
+
     use crate::{
         compiler::bytecode_compiler::Compiler,
         ins::{
@@ -1245,7 +1247,7 @@ mod tests_cpu_version_2 {
         },
         mem::memory::Memory,
         reg::registers::{RegisterId, Registers},
-        vm::VirtualMachine,
+        vm::{self, VirtualMachine},
     };
 
     use super::{Cpu, CpuFlag};
@@ -1253,9 +1255,9 @@ mod tests_cpu_version_2 {
     struct TestEntryU32Standard {
         pub instructions: Vec<Instruction>,
         pub expected_changed_registers: HashMap<RegisterId, u32>,
-        pub expected_user_segment_contents: Vec<u8>,
-        pub user_segment_capacity: usize,
-        pub stack_segment_capacity: usize,
+        pub expected_user_seg_contents: Vec<u8>,
+        pub user_seg_capacity_bytes: usize,
+        pub stack_seg_capacity_u32: usize,
         pub should_panic: bool,
         pub fail_message: String,
     }
@@ -1264,9 +1266,9 @@ mod tests_cpu_version_2 {
         fn new(
             instructions: &[Instruction],
             expected_registers: &[(RegisterId, u32)],
-            expected_user_segment_contents: Vec<u8>,
-            user_segment_capacity: usize,
-            stack_segment_capacity: usize,
+            expected_user_seg_contents: Vec<u8>,
+            user_seg_capacity_bytes: usize,
+            stack_seg_capacity_u32: usize,
             should_panic: bool,
             fail_message: &str,
         ) -> Self {
@@ -1287,9 +1289,9 @@ mod tests_cpu_version_2 {
             Self {
                 instructions: instructions_vec,
                 expected_changed_registers: changed_registers,
-                user_segment_capacity,
-                expected_user_segment_contents,
-                stack_segment_capacity,
+                user_seg_capacity_bytes,
+                expected_user_seg_contents,
+                stack_seg_capacity_u32,
                 should_panic,
                 fail_message: fail_message.to_string(),
             }
@@ -1309,10 +1311,10 @@ mod tests_cpu_version_2 {
             let result = panic::catch_unwind(|| {
                 // Build the virtual machine instance.
                 let mut vm = VirtualMachine::new(
-                    self.user_segment_capacity,
+                    self.user_seg_capacity_bytes,
                     compiled,
                     &[],
-                    self.stack_segment_capacity,
+                    self.stack_seg_capacity_u32 * vm::BYTES_IN_U32,
                 );
 
                 // Execute the code.
@@ -1356,7 +1358,7 @@ mod tests_cpu_version_2 {
             // Check the user memory segment matches what we expect too.
             assert_eq!(
                 vm.ram.get_user_segment_storage(),
-                self.expected_user_segment_contents,
+                self.expected_user_seg_contents,
                 "{}",
                 self.fail_message(id, false)
             );
@@ -1364,7 +1366,7 @@ mod tests_cpu_version_2 {
             Some(vm)
         }
 
-        /// Run this specific test entry.
+        /// Generate a fail message for this test instance.
         ///
         /// # Arguments
         ///
@@ -1394,6 +1396,75 @@ mod tests_cpu_version_2 {
         for (id, test) in tests.iter().enumerate() {
             test.run_test(id);
         }
+    }
+
+    /// Test the push u32 immediate instruction.
+    #[test]
+    fn test_push_u32_imm_single() {
+        let test = TestEntryU32Standard::new(
+            &[PushU32Imm(0x123)],
+            &[],
+            vec![0; 100],
+            100,
+            1,
+            false,
+            "failed to execute PUSH instruction",
+        );
+
+        let vm = test.run_test(0);
+        if vm.is_none() {
+            panic!("{}", test.fail_message(0, true));
+        }
+
+        let mut vm = vm.unwrap();
+        assert_eq!(vm.ram.pop_u32(), 0x123);
+    }
+
+    /// Test the push u32 immediate instruction.
+    #[test]
+    fn test_push_u32_imm_multiple() {
+        let test = TestEntryU32Standard::new(
+            &[PushU32Imm(0x123), PushU32Imm(0x321)],
+            &[],
+            vec![0; 100],
+            100,
+            2,
+            false,
+            "failed to execute PUSH instruction",
+        );
+
+        let vm = test.run_test(0);
+        if vm.is_none() {
+            panic!("{}", test.fail_message(0, true));
+        }
+
+        let mut vm = vm.unwrap();
+        assert_eq!(vm.ram.pop_u32(), 0x321);
+        assert_eq!(vm.ram.pop_u32(), 0x123);
+    }
+
+    /// Test the push u32 immediate instruction.
+    #[test]
+    #[should_panic]
+    fn test_push_u32_imm_invalid_pop() {
+        let test = TestEntryU32Standard::new(
+            &[Nop],
+            &[],
+            vec![0; 100],
+            100,
+            2,
+            false,
+            "failed to execute PUSH instruction",
+        );
+
+        let vm = test.run_test(0);
+        if vm.is_none() {
+            panic!("{}", test.fail_message(0, true));
+        }
+
+        // There is nothing on the stack, this should assert.
+        let mut vm = vm.unwrap();
+        _ = vm.ram.pop_u32();
     }
 }
 
