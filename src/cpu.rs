@@ -1238,6 +1238,7 @@ mod tests_cpu_version_2 {
     use std::{collections::HashMap, panic};
 
     use num_traits::ToBytes;
+    use prettytable::{row, Table};
 
     use crate::{
         compiler::bytecode_compiler::Compiler,
@@ -1255,7 +1256,7 @@ mod tests_cpu_version_2 {
     struct TestEntryU32Standard {
         pub instructions: Vec<Instruction>,
         pub expected_changed_registers: HashMap<RegisterId, u32>,
-        pub expected_user_seg_contents: Vec<u8>,
+        pub expected_user_seg_contents: Option<Vec<u8>>,
         pub user_seg_capacity_bytes: usize,
         pub stack_seg_capacity_u32: usize,
         pub should_panic: bool,
@@ -1269,7 +1270,7 @@ mod tests_cpu_version_2 {
         ///
         /// * `instructions` - A slice of [`Instruction`]s to be executed.
         /// * `expected_registers` - A slice of a tuple containing the [`RegisterId`] and the expected value of the register after execution.
-        /// * `expected_user_seg_contents` - A vector of bytes representing the expected user segment memory contents after execution.
+        /// * `expected_user_seg_contents` - An option containing a vector of bytes representing the expected user segment memory contents after execution, if specified.
         /// * `user_seg_capacity_bytes` - The capacity of the user memory segment, in bytes.
         /// * `stack_seg_capacity_u32` - The capacity of the stack memory segment, in bytes.
         /// * `should_panic` - A boolean indicating whether the test should panic or not.
@@ -1277,7 +1278,7 @@ mod tests_cpu_version_2 {
         fn new(
             instructions: &[Instruction],
             expected_registers: &[(RegisterId, u32)],
-            expected_user_seg_contents: Vec<u8>,
+            expected_user_seg_contents: Option<Vec<u8>>,
             user_seg_capacity_bytes: usize,
             stack_seg_capacity_u32: usize,
             should_panic: bool,
@@ -1351,30 +1352,41 @@ mod tests_cpu_version_2 {
 
             let vm = result.unwrap();
 
-            // Build the actual register map for the ones we expected to change.
-            let mut actual_registers: HashMap<RegisterId, u32> = HashMap::new();
-            self.expected_changed_registers.iter().for_each(|(id, _)| {
-                actual_registers.insert(
-                    *id,
-                    *vm.cpu.registers.get_register_u32(*id).read_unchecked(),
-                );
-            });
+            // This will be used to pretty print an output table in the event we
+            // fail the test.
+            let mut table = Table::new();
+            table.add_row(row!["Register", "Expected Value", "Actual Value"]);
 
-            // Check that the registers we expected to change match their expected values.
-            assert_eq!(
-                actual_registers,
-                self.expected_changed_registers,
-                "{}",
-                self.fail_message(id, false)
-            );
+            // Did the test registers match their expected values?
+            self.expected_changed_registers
+                .iter()
+                .for_each(|(id, expected_value)| {
+                    let actual_value = *vm.cpu.registers.get_register_u32(*id).read_unchecked();
+                    if *expected_value != actual_value {
+                        table.add_row(row![
+                            id,
+                            format!("{expected_value}"),
+                            format!("{actual_value}")
+                        ]);
+                    }
+                });
+
+            if table.len() > 1 {
+                println!();
+                println!("The following registers did not match their expected values:");
+                println!("{table}");
+                panic!("{}", self.fail_message(id, false));
+            }
 
             // Check the user memory segment matches what we expect too.
-            assert_eq!(
-                vm.ram.get_user_segment_storage(),
-                self.expected_user_seg_contents,
-                "{}",
-                self.fail_message(id, false)
-            );
+            if let Some(contents) = &self.expected_user_seg_contents {
+                assert_eq!(
+                    vm.ram.get_user_segment_storage(),
+                    contents,
+                    "{}",
+                    self.fail_message(id, false)
+                );
+            }
 
             Some(vm)
         }
@@ -1393,13 +1405,36 @@ mod tests_cpu_version_2 {
         }
     }
 
+    /// Test the parity checking.
+    #[test]
+    fn test_parity() {
+        let value_1 = 0b0000_0000_0000_0000_0000_0000_1111_1111;
+        assert!(
+            Cpu::calculate_lowest_byte_parity(value_1),
+            "Test 1 - parity check failed: expected true, got false"
+        );
+
+        // We are only interested in the lowest byte, everything else should be ignored.
+        let value_2 = 0b0000_0000_0000_0000_0000_0001_1111_1111;
+        assert!(
+            Cpu::calculate_lowest_byte_parity(value_2),
+            "Test 2 - parity check failed: expected true, got false"
+        );
+
+        let value_3 = 0b0000_0000_0000_0000_0000_0000_0111_1111;
+        assert!(
+            !Cpu::calculate_lowest_byte_parity(value_3),
+            "Test 3 - parity check failed: expected false, got true"
+        );
+    }
+
     /// Test the NOP instruction.
     #[test]
     fn test_nop() {
         let tests = [TestEntryU32Standard::new(
             &[Nop],
             &[],
-            vec![0; 100],
+            None,
             100,
             0,
             false,
@@ -1411,26 +1446,35 @@ mod tests_cpu_version_2 {
         }
     }
 
-    /// Test the push u32 immediate instruction.
+    /// Test the HLT instruction.
     #[test]
-    fn test_push_u32_imm_single() {
-        let test = TestEntryU32Standard::new(
-            &[PushU32Imm(0x123)],
-            &[],
-            vec![0; 100],
-            100,
-            1,
-            false,
-            "failed to execute PUSH instruction",
-        );
+    fn test_hlt() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[Hlt],
+                &[],
+                None,
+                100,
+                0,
+                false,
+                "failed to execute HLT instruction",
+            ),
+            // The halt instruction should prevent any following instructions from executing, which
+            // means that the program counter should also not increase.
+            TestEntryU32Standard::new(
+                &[Hlt, Nop],
+                &[(RegisterId::IP, 104), (RegisterId::PC, 1)],
+                None,
+                100,
+                0,
+                false,
+                "failed to correctly stop execution after a HLT instruction",
+            ),
+        ];
 
-        let vm = test.run_test(0);
-        if vm.is_none() {
-            panic!("{}", test.fail_message(0, true));
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
         }
-
-        let mut vm = vm.unwrap();
-        assert_eq!(vm.ram.pop_u32(), 0x123);
     }
 
     /// Test the push u32 immediate instruction.
@@ -1439,7 +1483,7 @@ mod tests_cpu_version_2 {
         let test = TestEntryU32Standard::new(
             &[PushU32Imm(0x123), PushU32Imm(0x321)],
             &[],
-            vec![0; 100],
+            None,
             100,
             2,
             false,
@@ -1458,12 +1502,34 @@ mod tests_cpu_version_2 {
 
     /// Test the push u32 immediate instruction.
     #[test]
+    fn test_push_u32_imm_single() {
+        let test = TestEntryU32Standard::new(
+            &[PushU32Imm(0x123)],
+            &[],
+            None,
+            100,
+            1,
+            false,
+            "failed to execute PUSH instruction",
+        );
+
+        let vm = test.run_test(0);
+        if vm.is_none() {
+            panic!("{}", test.fail_message(0, true));
+        }
+
+        let mut vm = vm.unwrap();
+        assert_eq!(vm.ram.pop_u32(), 0x123);
+    }
+
+    /// Test the push u32 immediate instruction.
+    #[test]
     #[should_panic]
     fn test_push_u32_imm_invalid_pop() {
         let test = TestEntryU32Standard::new(
             &[Nop],
             &[],
-            vec![0; 100],
+            None,
             100,
             2,
             false,
@@ -1634,72 +1700,6 @@ mod tests_cpu {
         let mut cpu = Cpu::default();
 
         (mem, cpu)
-    }
-
-    /// Test the parity checking.
-    #[test]
-    fn test_parity() {
-        let value_1 = 0b0000_0000_0000_0000_0000_0000_1111_1111;
-        assert!(
-            Cpu::calculate_lowest_byte_parity(value_1),
-            "Test 1 - parity check failed: expected true, got false"
-        );
-
-        // We are only interested in the lowest byte, everything else should be ignored.
-        let value_2 = 0b0000_0000_0000_0000_0000_0001_1111_1111;
-        assert!(
-            Cpu::calculate_lowest_byte_parity(value_2),
-            "Test 2 - parity check failed: expected true, got false"
-        );
-
-        let value_3 = 0b0000_0000_0000_0000_0000_0000_0111_1111;
-        assert!(
-            !Cpu::calculate_lowest_byte_parity(value_3),
-            "Test 3 - parity check failed: expected false, got true"
-        );
-    }
-
-    /// Test the NOP instruction.
-    #[test]
-    fn test_nop() {
-        let tests = [TestEntryU32Standard::new(
-            &[Nop],
-            &[],
-            vec![0; 100],
-            false,
-            "failed to execute NOP instruction",
-        )];
-
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
-    }
-
-    /// Test the HLT instruction.
-    #[test]
-    fn test_hlt() {
-        let tests = [
-            TestEntryU32Standard::new(
-                &[Hlt],
-                &[],
-                vec![0; 100],
-                false,
-                "failed to execute HLT instruction",
-            ),
-            // The halt instruction should prevent any following instructions from executing, which
-            // means that the program counter should also not increase.
-            TestEntryU32Standard::new(
-                &[Hlt, Nop],
-                &[(RegisterId::IP, 4), (RegisterId::PC, 1)],
-                vec![0; 100],
-                false,
-                "failed to correctly stop execution after a HLT instruction",
-            ),
-        ];
-
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
     }
 
     /// Test the MRET instruction.
