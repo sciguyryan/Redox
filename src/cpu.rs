@@ -1218,7 +1218,7 @@ impl CpuFlag {
     ///
     /// * `flags` - A slice of [`CpuFlag`]s to be enabled.
     #[inline(always)]
-    pub fn compute_for(flags: &[CpuFlag]) -> u32 {
+    pub fn compute_from(flags: &[CpuFlag]) -> u32 {
         let mut value = 0;
         for flag in flags {
             utils::set_bit_state_inline(&mut value, *flag as u8, true);
@@ -1263,6 +1263,17 @@ mod tests_cpu_version_2 {
     }
 
     impl TestEntryU32Standard {
+        /// Create a new [`TestEntryU32Standard`] instance.
+        ///
+        /// # Arguments
+        ///
+        /// * `instructions` - A slice of [`Instruction`]s to be executed.
+        /// * `expected_registers` - A slice of a tuple containing the [`RegisterId`] and the expected value of the register after execution.
+        /// * `expected_user_seg_contents` - A vector of bytes representing the expected user segment memory contents after execution.
+        /// * `user_seg_capacity_bytes` - The capacity of the user memory segment, in bytes.
+        /// * `stack_seg_capacity_u32` - The capacity of the stack memory segment, in bytes.
+        /// * `should_panic` - A boolean indicating whether the test should panic or not.
+        /// * `fail_message` - A string slice that provides the message to be displayed if the test fails.
         fn new(
             instructions: &[Instruction],
             expected_registers: &[(RegisterId, u32)],
@@ -1324,6 +1335,7 @@ mod tests_cpu_version_2 {
                 vm
             });
 
+            // Confirm whether the test panicked, and whether that panic was expected or not.
             let did_panic = result.is_err();
             assert_eq!(
                 did_panic,
@@ -1332,6 +1344,7 @@ mod tests_cpu_version_2 {
                 self.fail_message(id, did_panic)
             );
 
+            // We don't have a viable virtual machine instance to return here.
             if did_panic {
                 return None;
             }
