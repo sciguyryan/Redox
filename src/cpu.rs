@@ -1288,12 +1288,19 @@ mod tests_cpu_version_2 {
 
     #[derive(Clone)]
     struct TestEntryU32Standard {
+        /// A vector of [`Instruction`]s to be executed.
         pub instructions: Vec<Instruction>,
+        /// A [`HashMap`] containing [`RegisterId`] and the expected value of the register after execution.
         pub expected_changed_registers: HashMap<RegisterId, u32>,
+        // An option containing a vector of bytes representing the expected user segment memory contents after execution, if specified.
         pub expected_user_seg_contents: Option<Vec<u8>>,
+        /// The capacity of the user memory segment, in bytes.
         pub user_seg_capacity_bytes: usize,
+        /// The capacity of the stack memory segment, in bytes.
         pub stack_seg_capacity_u32: usize,
+        /// A boolean indicating whether the test should panic or not.
         pub should_panic: bool,
+        /// A string slice that provides the message to be displayed if the test fails.
         pub fail_message: String,
     }
 
