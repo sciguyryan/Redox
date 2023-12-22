@@ -1378,7 +1378,8 @@ mod tests_cpu_version_2 {
                 panic!("{}", self.fail_message(id, false));
             }
 
-            // Check the user memory segment matches what we expect too.
+            // Check the user memory segment matches what we expect too, if
+            // it has been specified in the test parameters.
             if let Some(contents) = &self.expected_user_seg_contents {
                 assert_eq!(
                     vm.ram.get_user_segment_storage(),
@@ -1477,6 +1478,950 @@ mod tests_cpu_version_2 {
         }
     }
 
+    /// Test the MRET instruction.
+    #[test]
+    fn test_mret() {
+        let tests = [TestEntryU32Standard::new(
+            &[Mret],
+            &[],
+            None,
+            100,
+            0,
+            false,
+            "failed to execute MRET instruction",
+        )];
+
+        for (id, test) in tests.iter().enumerate() {
+            if let Some(vm) = test.run_test(id) {
+                assert!(
+                    !vm.cpu.is_machine_mode,
+                    "Test {id} Failed - machine is still in machine mode after executing mret instruction!"
+                );
+            } else {
+                // We can't do anything here. The test asserted and so we didn't
+                // yield a valid virtual machine instance to interrogate.
+            }
+        }
+    }
+
+    /// Test the add u32 immediate to u32 register instruction.
+    #[test]
+    fn test_add_u32_imm_u32_reg() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    AddU32ImmU32Reg(0x2, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0x1),
+                    (RegisterId::AC, 0x3),
+                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::PF])),
+                ],
+                None,
+                100,
+                0,
+                false,
+                "ADD - incorrect result value produced",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
+                    AddU32ImmU32Reg(0x2, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, u32::MAX),
+                    (RegisterId::AC, 0x1),
+                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::OF])),
+                ],
+                None,
+                100,
+                0,
+                false,
+                "ADD - CPU flags not correctly set",
+            ),
+            TestEntryU32Standard::new(
+                &[AddU32ImmU32Reg(0, RegisterId::R1)],
+                &[(
+                    RegisterId::FL,
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
+                )],
+                None,
+                100,
+                0,
+                false,
+                "ADD - CPU flags not correctly set",
+            ),
+            // Test the parity flag gets set.
+            TestEntryU32Standard::new(
+                &[
+                    // Clear any set flags.
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    AddU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0x2),
+                    (RegisterId::AC, 0x3),
+                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::PF])),
+                ],
+                None,
+                100,
+                0,
+                false,
+                "ADD - CPU parity flag not correctly set",
+            ),
+            // Test the parity flag gets cleared.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the parity flag.
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::PF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    AddU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0x1),
+                    (RegisterId::AC, 0x2),
+                    (RegisterId::FL, 0x0),
+                ],
+                None,
+                100,
+                0,
+                false,
+                "ADD - CPU parity flag not correctly cleared",
+            ),
+            // Test the signed flag gets set.
+            TestEntryU32Standard::new(
+                &[
+                    // Clear every flag.
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    AddU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0b0111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::AC, 0b1000_0000_0000_0000_0000_0000_0000_0000),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
+                    ),
+                ],
+                None,
+                100,
+                0,
+                false,
+                "ADD - CPU signed flag not correctly set",
+            ),
+            // Test the signed flag gets cleared.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the signed flag.
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    AddU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0x1),
+                    (RegisterId::AC, 0x2),
+                    (RegisterId::FL, 0x0),
+                ],
+                None,
+                100,
+                0,
+                false,
+                "ADD - CPU signed flag not correctly cleared",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the add u32 register to u32 register instruction.
+    #[test]
+    fn test_add_u32_reg_u32_reg() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmU32Reg(0xf, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    AddU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                ],
+                &[
+                    (RegisterId::R1, 0xf),
+                    (RegisterId::R2, 0x1),
+                    (RegisterId::AC, 0x10),
+                ],
+                None,
+                100,
+                0,
+                false,
+                "ADD - incorrect result value produced",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
+                    MovU32ImmU32Reg(0x2, RegisterId::R2),
+                    AddU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                ],
+                &[
+                    (RegisterId::R1, u32::MAX),
+                    (RegisterId::R2, 0x2),
+                    (RegisterId::AC, 0x1),
+                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::OF])),
+                ],
+                None,
+                100,
+                0,
+                false,
+                "ADD - CPU flags not correctly set",
+            ),
+            TestEntryU32Standard::new(
+                &[AddU32RegU32Reg(RegisterId::R1, RegisterId::R2)],
+                &[(
+                    RegisterId::FL,
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
+                )],
+                None,
+                100,
+                0,
+                false,
+                "ADD - CPU flags not correctly set",
+            ),
+            // Test the parity flag gets set.
+            TestEntryU32Standard::new(
+                &[
+                    // Clear every flag.
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    AddU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                ],
+                &[
+                    (RegisterId::R1, 0x2),
+                    (RegisterId::R2, 0x1),
+                    (RegisterId::AC, 0x3),
+                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::PF])),
+                ],
+                None,
+                100,
+                0,
+                false,
+                "ADD - CPU parity flag not correctly set",
+            ),
+            // Test the parity flag gets cleared.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the parity flag.
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::PF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    AddU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0x1),
+                    (RegisterId::AC, 0x2),
+                    (RegisterId::FL, 0x0),
+                ],
+                None,
+                100,
+                0,
+                false,
+                "ADD - CPU parity flag not correctly cleared",
+            ),
+            // Test the signed flag gets set.
+            TestEntryU32Standard::new(
+                &[
+                    // Clear every flag.
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    AddU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                ],
+                &[
+                    (RegisterId::R1, 0b0111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::R2, 0x1),
+                    (RegisterId::AC, 0b1000_0000_0000_0000_0000_0000_0000_0000),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
+                    ),
+                ],
+                None,
+                100,
+                0,
+                false,
+                "ADD - CPU signed flag not correctly set",
+            ),
+            // Test the signed flag gets cleared.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the signed flag.
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    AddU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                ],
+                &[
+                    (RegisterId::R1, 0x1),
+                    (RegisterId::R2, 0x1),
+                    (RegisterId::AC, 0x2),
+                    (RegisterId::FL, 0x0),
+                ],
+                None,
+                100,
+                0,
+                false,
+                "ADD - CPU signed flag not correctly cleared",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test subtraction of u32 immediate from a u32 register instruction.
+    #[test]
+    fn test_sub_u32_imm_u32_reg() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    SubU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0x2), (RegisterId::AC, 0x1)],
+                None,
+                100,
+                0,
+                false,
+                "SUB - incorrect result value produced",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    SubU32ImmU32Reg(u32::MAX, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0x2),
+                    (RegisterId::AC, 0x3),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::PF]),
+                    ),
+                ],
+                None,
+                100,
+                0,
+                false,
+                "SUB - CPU flags not correctly set",
+            ),
+            TestEntryU32Standard::new(
+                &[SubU32ImmU32Reg(0, RegisterId::R1)],
+                &[(
+                    RegisterId::FL,
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
+                )],
+                None,
+                100,
+                0,
+                false,
+                "SUB - CPU flags not correctly set",
+            ),
+            // Test the parity flag gets set.
+            TestEntryU32Standard::new(
+                &[
+                    // Clear every flag.
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x4, RegisterId::R1),
+                    SubU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0x4),
+                    (RegisterId::AC, 0x3),
+                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::PF])),
+                ],
+                None,
+                100,
+                0,
+                false,
+                "SUB - CPU parity flag not correctly set",
+            ),
+            // Test the parity flag gets cleared.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the parity flag.
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::PF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    SubU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0x2),
+                    (RegisterId::AC, 0x1),
+                    (RegisterId::FL, 0x0),
+                ],
+                None,
+                100,
+                0,
+                false,
+                "SUB - CPU parity flag not correctly cleared",
+            ),
+            // Test the signed flag gets set.
+            TestEntryU32Standard::new(
+                &[
+                    // Clear any set flags.
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
+                    SubU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::AC, 0b1111_1111_1111_1111_1111_1111_1111_1110),
+                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::SF])),
+                ],
+                None,
+                100,
+                0,
+                false,
+                "SUB - CPU signed flag not correctly set",
+            ),
+            // Test the signed flag gets cleared.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the signed flag.
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    SubU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0x2),
+                    (RegisterId::AC, 0x1),
+                    (RegisterId::FL, 0x0),
+                ],
+                None,
+                100,
+                0,
+                false,
+                "SUB - CPU signed flag not correctly cleared",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test subtraction of a u32 register from a u32 immediate instruction.
+    #[test]
+    fn test_sub_u32_reg_u32_imm() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    SubU32RegU32Imm(RegisterId::R1, 0x3),
+                ],
+                &[(RegisterId::R1, 0x2), (RegisterId::AC, 0x1)],
+                None,
+                100,
+                0,
+                false,
+                "SUB - incorrect result value produced",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
+                    SubU32RegU32Imm(RegisterId::R1, 0x2),
+                ],
+                &[
+                    (RegisterId::R1, u32::MAX),
+                    (RegisterId::AC, 0x3),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::PF]),
+                    ),
+                ],
+                None,
+                100,
+                0,
+                false,
+                "SUB - CPU flags not correctly set",
+            ),
+            TestEntryU32Standard::new(
+                &[SubU32RegU32Imm(RegisterId::R1, 0)],
+                &[(
+                    RegisterId::FL,
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
+                )],
+                None,
+                100,
+                0,
+                false,
+                "SUB - CPU flags not correctly set",
+            ),
+            // Test the parity flag gets enabled.
+            TestEntryU32Standard::new(
+                &[
+                    // Clear every flag.
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    SubU32RegU32Imm(RegisterId::R1, 0x4),
+                ],
+                &[
+                    (RegisterId::R1, 0x1),
+                    (RegisterId::AC, 0x3),
+                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::PF])),
+                ],
+                None,
+                100,
+                0,
+                false,
+                "SUB - CPU parity flag not correctly set",
+            ),
+            // Test the parity flag gets cleared.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the parity flag.
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::PF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    SubU32RegU32Imm(RegisterId::R1, 0x2),
+                ],
+                &[
+                    (RegisterId::R1, 0x1),
+                    (RegisterId::AC, 0x1),
+                    (RegisterId::FL, 0x0),
+                ],
+                None,
+                100,
+                0,
+                false,
+                "SUB - CPU parity flag not correctly cleared",
+            ),
+            // Test the signed flag gets set.
+            TestEntryU32Standard::new(
+                &[
+                    // Clear every flag.
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    SubU32RegU32Imm(RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                ],
+                &[
+                    (RegisterId::R1, 0x1),
+                    (RegisterId::AC, 0b1111_1111_1111_1111_1111_1111_1111_1110),
+                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::SF])),
+                ],
+                None,
+                100,
+                0,
+                false,
+                "SUB - CPU signed flag not correctly set",
+            ),
+            // Test the signed flag gets cleared.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the signed flag.
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    SubU32RegU32Imm(RegisterId::R1, 0x2),
+                ],
+                &[
+                    (RegisterId::R1, 0x1),
+                    (RegisterId::AC, 0x1),
+                    (RegisterId::FL, 0x0),
+                ],
+                None,
+                100,
+                0,
+                false,
+                "SUB - CPU signed flag not correctly cleared",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the subtract u32 register from u32 register instruction.
+    #[test]
+    fn test_sub_u32_reg_u32_reg() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0xf, RegisterId::R2),
+                    SubU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                ],
+                &[
+                    (RegisterId::R1, 0x1),
+                    (RegisterId::R2, 0xf),
+                    (RegisterId::AC, 0xe),
+                ],
+                None,
+                100,
+                0,
+                false,
+                "SUB - incorrect result value produced",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
+                    MovU32ImmU32Reg(0x2, RegisterId::R2),
+                    SubU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                ],
+                &[
+                    (RegisterId::R1, u32::MAX),
+                    (RegisterId::R2, 0x2),
+                    (RegisterId::AC, 0x3),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::PF]),
+                    ),
+                ],
+                None,
+                100,
+                0,
+                false,
+                "SUB - CPU flags not correctly set",
+            ),
+            TestEntryU32Standard::new(
+                &[SubU32RegU32Reg(RegisterId::R1, RegisterId::R2)],
+                &[(
+                    RegisterId::FL,
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
+                )],
+                None,
+                100,
+                0,
+                false,
+                "SUB - CPU flags not correctly set",
+            ),
+            // Test the parity flag gets enabled.
+            TestEntryU32Standard::new(
+                &[
+                    // Clear every flag.
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x4, RegisterId::R2),
+                    SubU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                ],
+                &[
+                    (RegisterId::R1, 0x1),
+                    (RegisterId::R2, 0x4),
+                    (RegisterId::AC, 0x3),
+                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::PF])),
+                ],
+                None,
+                100,
+                0,
+                false,
+                "SUB - CPU parity flag not correctly set",
+            ),
+            // Test the parity flag gets cleared.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the parity flag.
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::PF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x2, RegisterId::R2),
+                    SubU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                ],
+                &[
+                    (RegisterId::R1, 0x1),
+                    (RegisterId::R2, 0x2),
+                    (RegisterId::AC, 0x1),
+                    (RegisterId::FL, 0x0),
+                ],
+                None,
+                100,
+                0,
+                false,
+                "SUB - CPU parity flag not correctly cleared",
+            ),
+            // Test the signed flag gets set.
+            TestEntryU32Standard::new(
+                &[
+                    // Clear every flag.
+                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R2),
+                    SubU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                ],
+                &[
+                    (RegisterId::R1, 0x1),
+                    (RegisterId::R2, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::AC, 0b1111_1111_1111_1111_1111_1111_1111_1110),
+                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::SF])),
+                ],
+                None,
+                100,
+                0,
+                false,
+                "SUB - CPU signed flag not correctly set",
+            ),
+            // Test the signed flag gets cleared.
+            TestEntryU32Standard::new(
+                &[
+                    // Manually set the signed flag.
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x2, RegisterId::R2),
+                    SubU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                ],
+                &[
+                    (RegisterId::R1, 0x1),
+                    (RegisterId::R2, 0x2),
+                    (RegisterId::AC, 0x1),
+                    (RegisterId::FL, 0x0),
+                ],
+                None,
+                100,
+                0,
+                false,
+                "SUB - CPU signed flag not correctly cleared",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the multiply u32 immediate by a u32 register instruction.
+    #[test]
+    fn test_mul_u32_imm_u32_reg() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    MulU32ImmU32Reg(0x2, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0x1), (RegisterId::AC, 0x2)],
+                None,
+                100,
+                0,
+                false,
+                "MUL - incorrect result value produced",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
+                    MulU32ImmU32Reg(0x2, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, u32::MAX),
+                    (RegisterId::AC, 4294967294),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::CF]),
+                    ),
+                ],
+                None,
+                100,
+                0,
+                false,
+                "MUL - CPU flags not correctly set",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the multiply u32 immediate by a u32 register instruction.
+    #[test]
+    fn test_mul_u32_reg_u32_reg() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    MovU32ImmU32Reg(0x2, RegisterId::R2),
+                    MulU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                ],
+                &[
+                    (RegisterId::R1, 0x1),
+                    (RegisterId::R2, 0x2),
+                    (RegisterId::AC, 0x2),
+                ],
+                None,
+                100,
+                0,
+                false,
+                "MUL - incorrect result value produced",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
+                    MovU32ImmU32Reg(0x2, RegisterId::R2),
+                    MulU32RegU32Reg(RegisterId::R1, RegisterId::R2),
+                ],
+                &[
+                    (RegisterId::R1, u32::MAX),
+                    (RegisterId::R2, 0x2),
+                    (RegisterId::AC, 4294967294),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::CF]),
+                    ),
+                ],
+                None,
+                100,
+                0,
+                false,
+                "MUL - CPU flags not correctly set",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the division of a u32 register by a u32 immediate instruction.
+    #[test]
+    fn test_div_u32_imm_u32_reg() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    DivU32ImmU32Reg(0x1, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0x2), (RegisterId::AC, 0x2)],
+                None,
+                100,
+                0,
+                false,
+                "DIV - incorrect result value produced",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
+                    DivU32ImmU32Reg(0x2, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, u32::MAX), (RegisterId::AC, 2147483647)],
+                None,
+                100,
+                0,
+                false,
+                "DIV - CPU flags not correctly set",
+            ),
+            TestEntryU32Standard::new(
+                &[DivU32ImmU32Reg(0x0, RegisterId::R1)],
+                &[],
+                None,
+                100,
+                0,
+                true,
+                "DIV - failed to panic when attempting to divide by zero",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the division of a u32 immediate by a u32 register instruction.
+    #[test]
+    fn test_div_u32_reg_u32_imm() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    DivU32RegU32Imm(RegisterId::R1, 0x2),
+                ],
+                &[(RegisterId::R1, 0x1), (RegisterId::AC, 0x2)],
+                None,
+                100,
+                0,
+                false,
+                "DIV - incorrect result value produced",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    DivU32RegU32Imm(RegisterId::R1, u32::MAX),
+                ],
+                &[(RegisterId::R1, 0x2), (RegisterId::AC, 2147483647)],
+                None,
+                100,
+                0,
+                false,
+                "DIV - CPU flags not correctly set",
+            ),
+            TestEntryU32Standard::new(
+                &[DivU32RegU32Imm(RegisterId::R1, 0x0)],
+                &[],
+                None,
+                100,
+                0,
+                true,
+                "DIV - failed to panic when attempting to divide by zero",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
+    /// Test the division of a u32 register by a u32 register instruction.
+    #[test]
+    fn test_div_u32_reg_u32_reg() {
+        let tests = [
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmU32Reg(0x2, RegisterId::R1),
+                    MovU32ImmU32Reg(0x1, RegisterId::R2),
+                    DivU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, 0x2),
+                    (RegisterId::R2, 0x1),
+                    (RegisterId::AC, 0x2),
+                ],
+                None,
+                100,
+                0,
+                false,
+                "DIV - incorrect result value produced",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
+                    MovU32ImmU32Reg(0x2, RegisterId::R2),
+                    DivU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                ],
+                &[
+                    (RegisterId::R1, u32::MAX),
+                    (RegisterId::R2, 0x2),
+                    (RegisterId::AC, 2147483647),
+                ],
+                None,
+                100,
+                0,
+                false,
+                "DIV - CPU flags not correctly set",
+            ),
+            TestEntryU32Standard::new(
+                &[
+                    MovU32ImmU32Reg(0x1, RegisterId::R1),
+                    DivU32RegU32Reg(RegisterId::R2, RegisterId::R1),
+                ],
+                &[],
+                None,
+                100,
+                0,
+                true,
+                "DIV - failed to panic when attempting to divide by zero",
+            ),
+        ];
+
+        for (id, test) in tests.iter().enumerate() {
+            test.run_test(id);
+        }
+    }
+
     /// Test the push u32 immediate instruction.
     #[test]
     fn test_push_u32_imm_multiple() {
@@ -1549,1001 +2494,6 @@ mod tests_cpu_version_2 {
 
 /*#[cfg(test)]
 mod tests_cpu {
-    use std::panic;
-
-    use crate::{
-        ins::{
-            instruction::Instruction::{self, *},
-            move_expressions::{ExpressionArgs, ExpressionOperator, MoveExpressionHandler},
-        },
-        mem::memory::Memory,
-        reg::registers::{RegisterId, Registers},
-    };
-
-    use super::{Cpu, CpuFlag};
-
-    struct TestEntryU32Standard {
-        pub instructions: Vec<Instruction>,
-        pub expected_registers: Registers,
-        pub expected_user_memory: Vec<u8>,
-        pub should_panic: bool,
-        pub fail_message: String,
-    }
-
-    impl TestEntryU32Standard {
-        fn new(
-            instructions: &[Instruction],
-            expected_registers: &[(RegisterId, u32)],
-            expected_memory: Vec<u8>,
-            should_panic: bool,
-            fail_message: &str,
-        ) -> Self {
-            // Ensure we always end with a halt instruction.
-            let mut instructions_vec = instructions.to_vec();
-            if let Some(ins) = instructions_vec.last() {
-                if !matches!(ins, Hlt) {
-                    instructions_vec.push(Hlt);
-                }
-            }
-
-            let mut s = Self {
-                instructions: instructions_vec,
-                expected_registers: Registers::default(),
-                expected_user_memory: expected_memory,
-                should_panic,
-                fail_message: fail_message.to_string(),
-            };
-
-            s.build_expected_registers(expected_registers);
-
-            s
-        }
-
-        /// Build the expected [`Registers`] instance for our test.
-        ///
-        /// # Arguments
-        ///
-        /// * `expected_registers` - A slice of tuples, the first entry being the [`RegisterId`] and the second being the expected value.
-        fn build_expected_registers(&mut self, expected_registers: &[(RegisterId, u32)]) {
-            // This should be done before the registers are set because there will be instances
-            // there the number of executed instructions will be different than the total
-            // instruction count, such as if we hit a halt or early return.
-            let size: u32 = self
-                .instructions
-                .iter()
-                .map(|i| i.get_total_instruction_size())
-                .sum();
-
-            self.expected_registers
-                .get_register_u32_mut(RegisterId::IP)
-                .write_unchecked(size);
-            self.expected_registers
-                .get_register_u32_mut(RegisterId::PC)
-                .write_unchecked(self.instructions.len() as u32);
-
-            for (reg, val) in expected_registers {
-                self.expected_registers
-                    .get_register_u32_mut(*reg)
-                    .write_unchecked(*val);
-            }
-        }
-
-        /// Run this specific test entry.
-        ///
-        /// # Arguments
-        ///
-        /// * `id` - The ID of this test.
-        pub fn run_test(&self, id: usize) -> (Memory, Cpu) {
-            let result = panic::catch_unwind(|| {
-                let (mut mem, mut cpu) = create_instance();
-                cpu.run_instructions(&mut mem, &self.instructions);
-
-                (mem, cpu)
-            });
-
-            let did_panic = result.is_err();
-            assert_eq!(
-                did_panic,
-                self.should_panic,
-                "{}",
-                self.fail_message(id, did_panic)
-            );
-
-            if did_panic {
-                return create_instance();
-            }
-
-            let (mem, cpu) = result.unwrap();
-
-            // Check the registers.
-            if cpu.registers != self.expected_registers {
-                // Print the register values that are different.
-                self.expected_registers
-                    .print_differences(&cpu.registers, &["Expected", "Actual"]);
-
-                // Fail the test.
-                panic!("{}", self.fail_message(id, false));
-            }
-
-            // Check the user memory segment.
-            assert_eq!(
-                mem.get_user_segment_storage(),
-                self.expected_user_memory,
-                "{}",
-                self.fail_message(id, false)
-            );
-
-            (mem, cpu)
-        }
-
-        /// Run this specific test entry.
-        ///
-        /// # Arguments
-        ///
-        /// * `id` - The ID of this test.
-        /// * `did_panic` - Did the test panic?
-        pub fn fail_message(&self, id: usize, did_panic: bool) -> String {
-            format!(
-                "Test {id} Failed - Should Panic? {}, Panicked? {did_panic}. Message = {}",
-                self.should_panic, self.fail_message
-            )
-        }
-    }
-
-    /// Run this specific test entry.
-    ///
-    /// # Returns
-    ///
-    /// A tuple containing a [`Memory`] instance and a [`Cpu`] instance.
-    fn create_instance() -> (Memory, Cpu) {
-        let mem = Memory::new(100, &[], &[], 10);
-        let mut cpu = Cpu::default();
-
-        (mem, cpu)
-    }
-
-    /// Test the MRET instruction.
-    #[test]
-    fn test_mret() {
-        let tests = [TestEntryU32Standard::new(
-            &[Mret],
-            &[],
-            vec![0; 100],
-            false,
-            "failed to execute MRET instruction",
-        )];
-
-        for (id, test) in tests.iter().enumerate() {
-            let (_, cpu) = test.run_test(id);
-            assert!(
-                !cpu.is_machine_mode,
-                "Test {id} Failed - machine is still in machine mode after executing mret instruction!"
-            );
-        }
-    }
-
-    /// Test the add u32 immediate to u32 register instruction.
-    #[test]
-    fn test_add_u32_imm_u32_reg() {
-        let tests = [
-            TestEntryU32Standard::new(
-                &[
-                    MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    AddU32ImmU32Reg(0x2, RegisterId::R1),
-                ],
-                &[
-                    (RegisterId::R1, 0x1),
-                    (RegisterId::AC, 0x3),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::PF])),
-                ],
-                vec![0; 100],
-                false,
-                "ADD - incorrect result value produced",
-            ),
-            TestEntryU32Standard::new(
-                &[
-                    MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
-                    AddU32ImmU32Reg(0x2, RegisterId::R1),
-                ],
-                &[
-                    (RegisterId::R1, u32::MAX),
-                    (RegisterId::AC, 0x1),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::OF])),
-                ],
-                vec![0; 100],
-                false,
-                "ADD - CPU flags not correctly set",
-            ),
-            TestEntryU32Standard::new(
-                &[AddU32ImmU32Reg(0, RegisterId::R1)],
-                &[(
-                    RegisterId::FL,
-                    CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
-                )],
-                vec![0; 100],
-                false,
-                "ADD - CPU flags not correctly set",
-            ),
-            // Test the parity flag gets set.
-            TestEntryU32Standard::new(
-                &[
-                    // Clear any set flags.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    MovU32ImmU32Reg(0x2, RegisterId::R1),
-                    AddU32ImmU32Reg(0x1, RegisterId::R1),
-                ],
-                &[
-                    (RegisterId::R1, 0x2),
-                    (RegisterId::AC, 0x3),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::PF])),
-                ],
-                vec![0; 100],
-                false,
-                "ADD - CPU parity flag not correctly set",
-            ),
-            // Test the parity flag gets cleared.
-            TestEntryU32Standard::new(
-                &[
-                    // Manually set the parity flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::PF]), RegisterId::FL),
-                    MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    AddU32ImmU32Reg(0x1, RegisterId::R1),
-                ],
-                &[
-                    (RegisterId::R1, 0x1),
-                    (RegisterId::AC, 0x2),
-                    (RegisterId::FL, 0x0),
-                ],
-                vec![0; 100],
-                false,
-                "ADD - CPU parity flag not correctly cleared",
-            ),
-            // Test the signed flag gets set.
-            TestEntryU32Standard::new(
-                &[
-                    // Clear every flag.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
-                    AddU32ImmU32Reg(0x1, RegisterId::R1),
-                ],
-                &[
-                    (RegisterId::R1, 0b0111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::AC, 0b1000_0000_0000_0000_0000_0000_0000_0000),
-                    (
-                        RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::PF]),
-                    ),
-                ],
-                vec![0; 100],
-                false,
-                "ADD - CPU signed flag not correctly set",
-            ),
-            // Test the signed flag gets cleared.
-            TestEntryU32Standard::new(
-                &[
-                    // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
-                    MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    AddU32ImmU32Reg(0x1, RegisterId::R1),
-                ],
-                &[
-                    (RegisterId::R1, 0x1),
-                    (RegisterId::AC, 0x2),
-                    (RegisterId::FL, 0x0),
-                ],
-                vec![0; 100],
-                false,
-                "ADD - CPU signed flag not correctly cleared",
-            ),
-        ];
-
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
-    }
-
-    /// Test the add u32 register to u32 register instruction.
-    #[test]
-    fn test_add_u32_reg_u32_reg() {
-        let tests = [
-            TestEntryU32Standard::new(
-                &[
-                    MovU32ImmU32Reg(0xf, RegisterId::R1),
-                    MovU32ImmU32Reg(0x1, RegisterId::R2),
-                    AddU32RegU32Reg(RegisterId::R1, RegisterId::R2),
-                ],
-                &[
-                    (RegisterId::R1, 0xf),
-                    (RegisterId::R2, 0x1),
-                    (RegisterId::AC, 0x10),
-                ],
-                vec![0; 100],
-                false,
-                "ADD - incorrect result value produced",
-            ),
-            TestEntryU32Standard::new(
-                &[
-                    MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
-                    MovU32ImmU32Reg(0x2, RegisterId::R2),
-                    AddU32RegU32Reg(RegisterId::R1, RegisterId::R2),
-                ],
-                &[
-                    (RegisterId::R1, u32::MAX),
-                    (RegisterId::R2, 0x2),
-                    (RegisterId::AC, 0x1),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::OF])),
-                ],
-                vec![0; 100],
-                false,
-                "ADD - CPU flags not correctly set",
-            ),
-            TestEntryU32Standard::new(
-                &[AddU32RegU32Reg(RegisterId::R1, RegisterId::R2)],
-                &[(
-                    RegisterId::FL,
-                    CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
-                )],
-                vec![0; 100],
-                false,
-                "ADD - CPU flags not correctly set",
-            ),
-            // Test the parity flag gets set.
-            TestEntryU32Standard::new(
-                &[
-                    // Clear every flag.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    MovU32ImmU32Reg(0x2, RegisterId::R1),
-                    MovU32ImmU32Reg(0x1, RegisterId::R2),
-                    AddU32RegU32Reg(RegisterId::R1, RegisterId::R2),
-                ],
-                &[
-                    (RegisterId::R1, 0x2),
-                    (RegisterId::R2, 0x1),
-                    (RegisterId::AC, 0x3),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::PF])),
-                ],
-                vec![0; 100],
-                false,
-                "ADD - CPU parity flag not correctly set",
-            ),
-            // Test the parity flag gets cleared.
-            TestEntryU32Standard::new(
-                &[
-                    // Manually set the parity flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::PF]), RegisterId::FL),
-                    MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    AddU32ImmU32Reg(0x1, RegisterId::R1),
-                ],
-                &[
-                    (RegisterId::R1, 0x1),
-                    (RegisterId::AC, 0x2),
-                    (RegisterId::FL, 0x0),
-                ],
-                vec![0; 100],
-                false,
-                "ADD - CPU parity flag not correctly cleared",
-            ),
-            // Test the signed flag gets set.
-            TestEntryU32Standard::new(
-                &[
-                    // Clear every flag.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
-                    MovU32ImmU32Reg(0x1, RegisterId::R2),
-                    AddU32RegU32Reg(RegisterId::R1, RegisterId::R2),
-                ],
-                &[
-                    (RegisterId::R1, 0b0111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::R2, 0x1),
-                    (RegisterId::AC, 0b1000_0000_0000_0000_0000_0000_0000_0000),
-                    (
-                        RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::PF]),
-                    ),
-                ],
-                vec![0; 100],
-                false,
-                "ADD - CPU signed flag not correctly set",
-            ),
-            // Test the signed flag gets cleared.
-            TestEntryU32Standard::new(
-                &[
-                    // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
-                    MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    MovU32ImmU32Reg(0x1, RegisterId::R2),
-                    AddU32RegU32Reg(RegisterId::R1, RegisterId::R2),
-                ],
-                &[
-                    (RegisterId::R1, 0x1),
-                    (RegisterId::R2, 0x1),
-                    (RegisterId::AC, 0x2),
-                    (RegisterId::FL, 0x0),
-                ],
-                vec![0; 100],
-                false,
-                "ADD - CPU signed flag not correctly cleared",
-            ),
-        ];
-
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
-    }
-
-    /// Test subtraction of u32 immediate from a u32 register instruction.
-    #[test]
-    fn test_sub_u32_imm_u32_reg() {
-        let tests = [
-            TestEntryU32Standard::new(
-                &[
-                    MovU32ImmU32Reg(0x2, RegisterId::R1),
-                    SubU32ImmU32Reg(0x1, RegisterId::R1),
-                ],
-                &[(RegisterId::R1, 0x2), (RegisterId::AC, 0x1)],
-                vec![0; 100],
-                false,
-                "SUB - incorrect result value produced",
-            ),
-            TestEntryU32Standard::new(
-                &[
-                    MovU32ImmU32Reg(0x2, RegisterId::R1),
-                    SubU32ImmU32Reg(u32::MAX, RegisterId::R1),
-                ],
-                &[
-                    (RegisterId::R1, 0x2),
-                    (RegisterId::AC, 0x3),
-                    (
-                        RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::OF, CpuFlag::PF]),
-                    ),
-                ],
-                vec![0; 100],
-                false,
-                "SUB - CPU flags not correctly set",
-            ),
-            TestEntryU32Standard::new(
-                &[SubU32ImmU32Reg(0, RegisterId::R1)],
-                &[(
-                    RegisterId::FL,
-                    CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
-                )],
-                vec![0; 100],
-                false,
-                "SUB - CPU flags not correctly set",
-            ),
-            // Test the parity flag gets set.
-            TestEntryU32Standard::new(
-                &[
-                    // Clear every flag.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    MovU32ImmU32Reg(0x4, RegisterId::R1),
-                    SubU32ImmU32Reg(0x1, RegisterId::R1),
-                ],
-                &[
-                    (RegisterId::R1, 0x4),
-                    (RegisterId::AC, 0x3),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::PF])),
-                ],
-                vec![0; 100],
-                false,
-                "SUB - CPU parity flag not correctly set",
-            ),
-            // Test the parity flag gets cleared.
-            TestEntryU32Standard::new(
-                &[
-                    // Manually set the parity flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::PF]), RegisterId::FL),
-                    MovU32ImmU32Reg(0x2, RegisterId::R1),
-                    SubU32ImmU32Reg(0x1, RegisterId::R1),
-                ],
-                &[
-                    (RegisterId::R1, 0x2),
-                    (RegisterId::AC, 0x1),
-                    (RegisterId::FL, 0x0),
-                ],
-                vec![0; 100],
-                false,
-                "SUB - CPU parity flag not correctly cleared",
-            ),
-            // Test the signed flag gets set.
-            TestEntryU32Standard::new(
-                &[
-                    // Clear any set flags.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
-                    SubU32ImmU32Reg(0x1, RegisterId::R1),
-                ],
-                &[
-                    (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::AC, 0b1111_1111_1111_1111_1111_1111_1111_1110),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::SF])),
-                ],
-                vec![0; 100],
-                false,
-                "SUB - CPU signed flag not correctly set",
-            ),
-            // Test the signed flag gets cleared.
-            TestEntryU32Standard::new(
-                &[
-                    // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
-                    MovU32ImmU32Reg(0x2, RegisterId::R1),
-                    SubU32ImmU32Reg(0x1, RegisterId::R1),
-                ],
-                &[
-                    (RegisterId::R1, 0x2),
-                    (RegisterId::AC, 0x1),
-                    (RegisterId::FL, 0x0),
-                ],
-                vec![0; 100],
-                false,
-                "SUB - CPU signed flag not correctly cleared",
-            ),
-        ];
-
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
-    }
-
-    /// Test subtraction of a u32 register from a u32 immediate instruction.
-    #[test]
-    fn test_sub_u32_reg_u32_imm() {
-        let tests = [
-            TestEntryU32Standard::new(
-                &[
-                    MovU32ImmU32Reg(0x2, RegisterId::R1),
-                    SubU32RegU32Imm(RegisterId::R1, 0x3),
-                ],
-                &[(RegisterId::R1, 0x2), (RegisterId::AC, 0x1)],
-                vec![0; 100],
-                false,
-                "SUB - incorrect result value produced",
-            ),
-            TestEntryU32Standard::new(
-                &[
-                    MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
-                    SubU32RegU32Imm(RegisterId::R1, 0x2),
-                ],
-                &[
-                    (RegisterId::R1, u32::MAX),
-                    (RegisterId::AC, 0x3),
-                    (
-                        RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::OF, CpuFlag::PF]),
-                    ),
-                ],
-                vec![0; 100],
-                false,
-                "SUB - CPU flags not correctly set",
-            ),
-            TestEntryU32Standard::new(
-                &[SubU32RegU32Imm(RegisterId::R1, 0)],
-                &[(
-                    RegisterId::FL,
-                    CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
-                )],
-                vec![0; 100],
-                false,
-                "SUB - CPU flags not correctly set",
-            ),
-            // Test the parity flag gets enabled.
-            TestEntryU32Standard::new(
-                &[
-                    // Clear every flag.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    SubU32RegU32Imm(RegisterId::R1, 0x4),
-                ],
-                &[
-                    (RegisterId::R1, 0x1),
-                    (RegisterId::AC, 0x3),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::PF])),
-                ],
-                vec![0; 100],
-                false,
-                "SUB - CPU parity flag not correctly set",
-            ),
-            // Test the parity flag gets cleared.
-            TestEntryU32Standard::new(
-                &[
-                    // Manually set the parity flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::PF]), RegisterId::FL),
-                    MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    SubU32RegU32Imm(RegisterId::R1, 0x2),
-                ],
-                &[
-                    (RegisterId::R1, 0x1),
-                    (RegisterId::AC, 0x1),
-                    (RegisterId::FL, 0x0),
-                ],
-                vec![0; 100],
-                false,
-                "SUB - CPU parity flag not correctly cleared",
-            ),
-            // Test the signed flag gets set.
-            TestEntryU32Standard::new(
-                &[
-                    // Clear every flag.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    SubU32RegU32Imm(RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                ],
-                &[
-                    (RegisterId::R1, 0x1),
-                    (RegisterId::AC, 0b1111_1111_1111_1111_1111_1111_1111_1110),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::SF])),
-                ],
-                vec![0; 100],
-                false,
-                "SUB - CPU signed flag not correctly set",
-            ),
-            // Test the signed flag gets cleared.
-            TestEntryU32Standard::new(
-                &[
-                    // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
-                    MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    SubU32RegU32Imm(RegisterId::R1, 0x2),
-                ],
-                &[
-                    (RegisterId::R1, 0x1),
-                    (RegisterId::AC, 0x1),
-                    (RegisterId::FL, 0x0),
-                ],
-                vec![0; 100],
-                false,
-                "SUB - CPU signed flag not correctly cleared",
-            ),
-        ];
-
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
-    }
-
-    /// Test the subtract u32 register from u32 register instruction.
-    #[test]
-    fn test_sub_u32_reg_u32_reg() {
-        let tests = [
-            TestEntryU32Standard::new(
-                &[
-                    MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    MovU32ImmU32Reg(0xf, RegisterId::R2),
-                    SubU32RegU32Reg(RegisterId::R1, RegisterId::R2),
-                ],
-                &[
-                    (RegisterId::R1, 0x1),
-                    (RegisterId::R2, 0xf),
-                    (RegisterId::AC, 0xe),
-                ],
-                vec![0; 100],
-                false,
-                "SUB - incorrect result value produced",
-            ),
-            TestEntryU32Standard::new(
-                &[
-                    MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
-                    MovU32ImmU32Reg(0x2, RegisterId::R2),
-                    SubU32RegU32Reg(RegisterId::R1, RegisterId::R2),
-                ],
-                &[
-                    (RegisterId::R1, u32::MAX),
-                    (RegisterId::R2, 0x2),
-                    (RegisterId::AC, 0x3),
-                    (
-                        RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::OF, CpuFlag::PF]),
-                    ),
-                ],
-                vec![0; 100],
-                false,
-                "SUB - CPU flags not correctly set",
-            ),
-            TestEntryU32Standard::new(
-                &[SubU32RegU32Reg(RegisterId::R1, RegisterId::R2)],
-                &[(
-                    RegisterId::FL,
-                    CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
-                )],
-                vec![0; 100],
-                false,
-                "SUB - CPU flags not correctly set",
-            ),
-            // Test the parity flag gets enabled.
-            TestEntryU32Standard::new(
-                &[
-                    // Clear every flag.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    MovU32ImmU32Reg(0x4, RegisterId::R2),
-                    SubU32RegU32Reg(RegisterId::R1, RegisterId::R2),
-                ],
-                &[
-                    (RegisterId::R1, 0x1),
-                    (RegisterId::R2, 0x4),
-                    (RegisterId::AC, 0x3),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::PF])),
-                ],
-                vec![0; 100],
-                false,
-                "SUB - CPU parity flag not correctly set",
-            ),
-            // Test the parity flag gets cleared.
-            TestEntryU32Standard::new(
-                &[
-                    // Manually set the parity flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::PF]), RegisterId::FL),
-                    MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    MovU32ImmU32Reg(0x2, RegisterId::R2),
-                    SubU32RegU32Reg(RegisterId::R1, RegisterId::R2),
-                ],
-                &[
-                    (RegisterId::R1, 0x1),
-                    (RegisterId::R2, 0x2),
-                    (RegisterId::AC, 0x1),
-                    (RegisterId::FL, 0x0),
-                ],
-                vec![0; 100],
-                false,
-                "SUB - CPU parity flag not correctly cleared",
-            ),
-            // Test the signed flag gets set.
-            TestEntryU32Standard::new(
-                &[
-                    // Clear every flag.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
-                    MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R2),
-                    SubU32RegU32Reg(RegisterId::R1, RegisterId::R2),
-                ],
-                &[
-                    (RegisterId::R1, 0x1),
-                    (RegisterId::R2, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::AC, 0b1111_1111_1111_1111_1111_1111_1111_1110),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::SF])),
-                ],
-                vec![0; 100],
-                false,
-                "SUB - CPU signed flag not correctly set",
-            ),
-            // Test the signed flag gets cleared.
-            TestEntryU32Standard::new(
-                &[
-                    // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
-                    MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    MovU32ImmU32Reg(0x2, RegisterId::R2),
-                    SubU32RegU32Reg(RegisterId::R1, RegisterId::R2),
-                ],
-                &[
-                    (RegisterId::R1, 0x1),
-                    (RegisterId::R2, 0x2),
-                    (RegisterId::AC, 0x1),
-                    (RegisterId::FL, 0x0),
-                ],
-                vec![0; 100],
-                false,
-                "SUB - CPU signed flag not correctly cleared",
-            ),
-        ];
-
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
-    }
-
-    /// Test the multiply u32 immediate by a u32 register instruction.
-    #[test]
-    fn test_mul_u32_imm_u32_reg() {
-        let tests = [
-            TestEntryU32Standard::new(
-                &[
-                    MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    MulU32ImmU32Reg(0x2, RegisterId::R1),
-                ],
-                &[(RegisterId::R1, 0x1), (RegisterId::AC, 0x2)],
-                vec![0; 100],
-                false,
-                "MUL - incorrect result value produced",
-            ),
-            TestEntryU32Standard::new(
-                &[
-                    MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
-                    MulU32ImmU32Reg(0x2, RegisterId::R1),
-                ],
-                &[
-                    (RegisterId::R1, u32::MAX),
-                    (RegisterId::AC, 4294967294),
-                    (
-                        RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::OF, CpuFlag::CF]),
-                    ),
-                ],
-                vec![0; 100],
-                false,
-                "MUL - CPU flags not correctly set",
-            ),
-        ];
-
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
-    }
-
-    /// Test the multiply u32 immediate by a u32 register instruction.
-    #[test]
-    fn test_mul_u32_reg_u32_reg() {
-        let tests = [
-            TestEntryU32Standard::new(
-                &[
-                    MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    MovU32ImmU32Reg(0x2, RegisterId::R2),
-                    MulU32RegU32Reg(RegisterId::R1, RegisterId::R2),
-                ],
-                &[
-                    (RegisterId::R1, 0x1),
-                    (RegisterId::R2, 0x2),
-                    (RegisterId::AC, 0x2),
-                ],
-                vec![0; 100],
-                false,
-                "MUL - incorrect result value produced",
-            ),
-            TestEntryU32Standard::new(
-                &[
-                    MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
-                    MovU32ImmU32Reg(0x2, RegisterId::R2),
-                    MulU32RegU32Reg(RegisterId::R1, RegisterId::R2),
-                ],
-                &[
-                    (RegisterId::R1, u32::MAX),
-                    (RegisterId::R2, 0x2),
-                    (RegisterId::AC, 4294967294),
-                    (
-                        RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::OF, CpuFlag::CF]),
-                    ),
-                ],
-                vec![0; 100],
-                false,
-                "MUL - CPU flags not correctly set",
-            ),
-        ];
-
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
-    }
-
-    /// Test the division of a u32 register by a u32 immediate instruction.
-    #[test]
-    fn test_div_u32_imm_u32_reg() {
-        let tests = [
-            TestEntryU32Standard::new(
-                &[
-                    MovU32ImmU32Reg(0x2, RegisterId::R1),
-                    DivU32ImmU32Reg(0x1, RegisterId::R1),
-                ],
-                &[(RegisterId::R1, 0x2), (RegisterId::AC, 0x2)],
-                vec![0; 100],
-                false,
-                "DIV - incorrect result value produced",
-            ),
-            TestEntryU32Standard::new(
-                &[
-                    MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
-                    DivU32ImmU32Reg(0x2, RegisterId::R1),
-                ],
-                &[(RegisterId::R1, u32::MAX), (RegisterId::AC, 2147483647)],
-                vec![0; 100],
-                false,
-                "DIV - CPU flags not correctly set",
-            ),
-            TestEntryU32Standard::new(
-                &[DivU32ImmU32Reg(0x0, RegisterId::R1)],
-                &[],
-                vec![0; 100],
-                true,
-                "DIV - failed to panic when attempting to divide by zero",
-            ),
-        ];
-
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
-    }
-
-    /// Test the division of a u32 immediate by a u32 register instruction.
-    #[test]
-    fn test_div_u32_reg_u32_imm() {
-        let tests = [
-            TestEntryU32Standard::new(
-                &[
-                    MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    DivU32RegU32Imm(RegisterId::R1, 0x2),
-                ],
-                &[(RegisterId::R1, 0x1), (RegisterId::AC, 0x2)],
-                vec![0; 100],
-                false,
-                "DIV - incorrect result value produced",
-            ),
-            TestEntryU32Standard::new(
-                &[
-                    MovU32ImmU32Reg(0x2, RegisterId::R1),
-                    DivU32RegU32Imm(RegisterId::R1, u32::MAX),
-                ],
-                &[(RegisterId::R1, 0x2), (RegisterId::AC, 2147483647)],
-                vec![0; 100],
-                false,
-                "DIV - CPU flags not correctly set",
-            ),
-            TestEntryU32Standard::new(
-                &[DivU32RegU32Imm(RegisterId::R1, 0x0)],
-                &[],
-                vec![0; 100],
-                true,
-                "DIV - failed to panic when attempting to divide by zero",
-            ),
-        ];
-
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
-    }
-
-    /// Test the division of a u32 register by a u32 register instruction.
-    #[test]
-    fn test_div_u32_reg_u32_reg() {
-        let tests = [
-            TestEntryU32Standard::new(
-                &[
-                    MovU32ImmU32Reg(0x2, RegisterId::R1),
-                    MovU32ImmU32Reg(0x1, RegisterId::R2),
-                    DivU32RegU32Reg(RegisterId::R2, RegisterId::R1),
-                ],
-                &[
-                    (RegisterId::R1, 0x2),
-                    (RegisterId::R2, 0x1),
-                    (RegisterId::AC, 0x2),
-                ],
-                vec![0; 100],
-                false,
-                "DIV - incorrect result value produced",
-            ),
-            TestEntryU32Standard::new(
-                &[
-                    MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
-                    MovU32ImmU32Reg(0x2, RegisterId::R2),
-                    DivU32RegU32Reg(RegisterId::R2, RegisterId::R1),
-                ],
-                &[
-                    (RegisterId::R1, u32::MAX),
-                    (RegisterId::R2, 0x2),
-                    (RegisterId::AC, 2147483647),
-                ],
-                vec![0; 100],
-                false,
-                "DIV - CPU flags not correctly set",
-            ),
-            TestEntryU32Standard::new(
-                &[
-                    MovU32ImmU32Reg(0x1, RegisterId::R1),
-                    DivU32RegU32Reg(RegisterId::R2, RegisterId::R1),
-                ],
-                &[],
-                vec![0; 100],
-                true,
-                "DIV - failed to panic when attempting to divide by zero",
-            ),
-        ];
-
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
-    }
-
     /// Test the modulo of a u32 register by a u32 immediate instruction.
     #[test]
     fn test_mod_u32_imm_u32_reg() {
