@@ -1264,20 +1264,24 @@ mod tests_cpu_version_2 {
             }
         }
 
+        /// Run each unit test in the specified sequence.
         pub fn run_all(&self) {
             for (id, test) in self.tests.iter().enumerate() {
                 test.run_test(id);
             }
         }
 
+        /// Run each unit test in the specified sequence, then apply the closure function to the resulting virtual machine instance.
+        ///
+        /// # Arguments
+        ///
+        /// * `closure` - The closure to be executed on the completed virtual machine, to perform additional checks.
         pub fn run_all_special<F>(&self, closure: F)
         where
             F: Fn(usize, Option<VirtualMachine>),
         {
             for (id, test) in self.tests.iter().enumerate() {
-                let vm = test.run_test(id);
-
-                closure(id, vm);
+                closure(id, test.run_test(id));
             }
         }
     }
