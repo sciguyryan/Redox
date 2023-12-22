@@ -1253,6 +1253,36 @@ mod tests_cpu_version_2 {
 
     use super::{Cpu, CpuFlag};
 
+    struct TestsU32 {
+        tests: Vec<TestEntryU32Standard>,
+    }
+
+    impl TestsU32 {
+        pub fn new(tests: &[TestEntryU32Standard]) -> Self {
+            Self {
+                tests: tests.to_vec(),
+            }
+        }
+
+        pub fn run_all(&self) {
+            for (id, test) in self.tests.iter().enumerate() {
+                test.run_test(id);
+            }
+        }
+
+        pub fn run_all_special<F>(&self, closure: F)
+        where
+            F: Fn(usize, Option<VirtualMachine>),
+        {
+            for (id, test) in self.tests.iter().enumerate() {
+                let vm = test.run_test(id);
+
+                closure(id, vm);
+            }
+        }
+    }
+
+    #[derive(Clone)]
     struct TestEntryU32Standard {
         pub instructions: Vec<Instruction>,
         pub expected_changed_registers: HashMap<RegisterId, u32>,
@@ -1271,15 +1301,18 @@ mod tests_cpu_version_2 {
         /// * `instructions` - A slice of [`Instruction`]s to be executed.
         /// * `expected_registers` - A slice of a tuple containing the [`RegisterId`] and the expected value of the register after execution.
         /// * `expected_user_seg_contents` - An option containing a vector of bytes representing the expected user segment memory contents after execution, if specified.
-        /// * `user_seg_capacity_bytes` - The capacity of the user memory segment, in bytes.
         /// * `stack_seg_capacity_u32` - The capacity of the stack memory segment, in bytes.
         /// * `should_panic` - A boolean indicating whether the test should panic or not.
         /// * `fail_message` - A string slice that provides the message to be displayed if the test fails.
+        ///
+        /// # Note
+        ///
+        /// If the results need to check the user segment memory contents then the VM  will automatically be
+        /// created with a memory segment of the correct size. It doesn't need to be specified manually.
         fn new(
             instructions: &[Instruction],
             expected_registers: &[(RegisterId, u32)],
             expected_user_seg_contents: Option<Vec<u8>>,
-            user_seg_capacity_bytes: usize,
             stack_seg_capacity_u32: usize,
             should_panic: bool,
             fail_message: &str,
@@ -1298,11 +1331,18 @@ mod tests_cpu_version_2 {
                 changed_registers.insert(*id, *value);
             }
 
+            let (user_segment_memory_capacity, user_segment_contents) =
+                if let Some(m) = expected_user_seg_contents {
+                    (m.len(), Some(m))
+                } else {
+                    (100, None)
+                };
+
             Self {
                 instructions: instructions_vec,
                 expected_changed_registers: changed_registers,
-                user_seg_capacity_bytes,
-                expected_user_seg_contents,
+                user_seg_capacity_bytes: user_segment_memory_capacity,
+                expected_user_seg_contents: user_segment_contents,
                 stack_seg_capacity_u32,
                 should_panic,
                 fail_message: fail_message.to_string(),
@@ -1383,7 +1423,7 @@ mod tests_cpu_version_2 {
             if let Some(contents) = &self.expected_user_seg_contents {
                 assert_eq!(
                     vm.ram.get_user_segment_storage(),
-                    contents,
+                    *contents,
                     "{}",
                     self.fail_message(id, false)
                 );
@@ -1429,25 +1469,22 @@ mod tests_cpu_version_2 {
         );
     }
 
-    /// Test the NOP instruction.
+    /// Test the nop instruction.
     #[test]
     fn test_nop() {
         let tests = [TestEntryU32Standard::new(
             &[Nop],
             &[],
             None,
-            100,
             0,
             false,
             "failed to execute NOP instruction",
         )];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
-    /// Test the HLT instruction.
+    /// Test the halt instruction.
     #[test]
     fn test_hlt() {
         let tests = [
@@ -1455,7 +1492,6 @@ mod tests_cpu_version_2 {
                 &[Hlt],
                 &[],
                 None,
-                100,
                 0,
                 false,
                 "failed to execute HLT instruction",
@@ -1466,42 +1502,40 @@ mod tests_cpu_version_2 {
                 &[Hlt, Nop],
                 &[(RegisterId::IP, 104), (RegisterId::PC, 1)],
                 None,
-                100,
                 0,
                 false,
                 "failed to correctly stop execution after a HLT instruction",
             ),
         ];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
-    /// Test the MRET instruction.
+    /// Test the mret instruction.
     #[test]
     fn test_mret() {
         let tests = [TestEntryU32Standard::new(
             &[Mret],
             &[],
             None,
-            100,
             0,
             false,
             "failed to execute MRET instruction",
         )];
 
-        for (id, test) in tests.iter().enumerate() {
-            if let Some(vm) = test.run_test(id) {
+        let c = |id: usize, vm: Option<VirtualMachine>| {
+            if let Some(v) = vm {
                 assert!(
-                    !vm.cpu.is_machine_mode,
+                    !v.cpu.is_machine_mode,
                     "Test {id} Failed - machine is still in machine mode after executing mret instruction!"
                 );
             } else {
                 // We can't do anything here. The test asserted and so we didn't
                 // yield a valid virtual machine instance to interrogate.
             }
-        }
+        };
+
+        TestsU32::new(&tests).run_all_special(c);
     }
 
     /// Test the add u32 immediate to u32 register instruction.
@@ -1519,7 +1553,6 @@ mod tests_cpu_version_2 {
                     (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
                 None,
-                100,
                 0,
                 false,
                 "ADD - incorrect result value produced",
@@ -1535,7 +1568,6 @@ mod tests_cpu_version_2 {
                     (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::OF])),
                 ],
                 None,
-                100,
                 0,
                 false,
                 "ADD - CPU flags not correctly set",
@@ -1547,7 +1579,6 @@ mod tests_cpu_version_2 {
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                 )],
                 None,
-                100,
                 0,
                 false,
                 "ADD - CPU flags not correctly set",
@@ -1566,7 +1597,6 @@ mod tests_cpu_version_2 {
                     (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
                 None,
-                100,
                 0,
                 false,
                 "ADD - CPU parity flag not correctly set",
@@ -1585,7 +1615,6 @@ mod tests_cpu_version_2 {
                     (RegisterId::FL, 0x0),
                 ],
                 None,
-                100,
                 0,
                 false,
                 "ADD - CPU parity flag not correctly cleared",
@@ -1607,7 +1636,6 @@ mod tests_cpu_version_2 {
                     ),
                 ],
                 None,
-                100,
                 0,
                 false,
                 "ADD - CPU signed flag not correctly set",
@@ -1626,16 +1654,13 @@ mod tests_cpu_version_2 {
                     (RegisterId::FL, 0x0),
                 ],
                 None,
-                100,
                 0,
                 false,
                 "ADD - CPU signed flag not correctly cleared",
             ),
         ];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
     /// Test the add u32 register to u32 register instruction.
@@ -1654,7 +1679,6 @@ mod tests_cpu_version_2 {
                     (RegisterId::AC, 0x10),
                 ],
                 None,
-                100,
                 0,
                 false,
                 "ADD - incorrect result value produced",
@@ -1672,7 +1696,6 @@ mod tests_cpu_version_2 {
                     (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::OF])),
                 ],
                 None,
-                100,
                 0,
                 false,
                 "ADD - CPU flags not correctly set",
@@ -1684,7 +1707,6 @@ mod tests_cpu_version_2 {
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                 )],
                 None,
-                100,
                 0,
                 false,
                 "ADD - CPU flags not correctly set",
@@ -1705,7 +1727,6 @@ mod tests_cpu_version_2 {
                     (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
                 None,
-                100,
                 0,
                 false,
                 "ADD - CPU parity flag not correctly set",
@@ -1724,7 +1745,6 @@ mod tests_cpu_version_2 {
                     (RegisterId::FL, 0x0),
                 ],
                 None,
-                100,
                 0,
                 false,
                 "ADD - CPU parity flag not correctly cleared",
@@ -1748,7 +1768,6 @@ mod tests_cpu_version_2 {
                     ),
                 ],
                 None,
-                100,
                 0,
                 false,
                 "ADD - CPU signed flag not correctly set",
@@ -1769,16 +1788,13 @@ mod tests_cpu_version_2 {
                     (RegisterId::FL, 0x0),
                 ],
                 None,
-                100,
                 0,
                 false,
                 "ADD - CPU signed flag not correctly cleared",
             ),
         ];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
     /// Test subtraction of u32 immediate from a u32 register instruction.
@@ -1792,7 +1808,6 @@ mod tests_cpu_version_2 {
                 ],
                 &[(RegisterId::R1, 0x2), (RegisterId::AC, 0x1)],
                 None,
-                100,
                 0,
                 false,
                 "SUB - incorrect result value produced",
@@ -1811,7 +1826,6 @@ mod tests_cpu_version_2 {
                     ),
                 ],
                 None,
-                100,
                 0,
                 false,
                 "SUB - CPU flags not correctly set",
@@ -1823,7 +1837,6 @@ mod tests_cpu_version_2 {
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                 )],
                 None,
-                100,
                 0,
                 false,
                 "SUB - CPU flags not correctly set",
@@ -1842,7 +1855,6 @@ mod tests_cpu_version_2 {
                     (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
                 None,
-                100,
                 0,
                 false,
                 "SUB - CPU parity flag not correctly set",
@@ -1861,7 +1873,6 @@ mod tests_cpu_version_2 {
                     (RegisterId::FL, 0x0),
                 ],
                 None,
-                100,
                 0,
                 false,
                 "SUB - CPU parity flag not correctly cleared",
@@ -1880,7 +1891,6 @@ mod tests_cpu_version_2 {
                     (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::SF])),
                 ],
                 None,
-                100,
                 0,
                 false,
                 "SUB - CPU signed flag not correctly set",
@@ -1899,16 +1909,13 @@ mod tests_cpu_version_2 {
                     (RegisterId::FL, 0x0),
                 ],
                 None,
-                100,
                 0,
                 false,
                 "SUB - CPU signed flag not correctly cleared",
             ),
         ];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
     /// Test subtraction of a u32 register from a u32 immediate instruction.
@@ -1922,7 +1929,6 @@ mod tests_cpu_version_2 {
                 ],
                 &[(RegisterId::R1, 0x2), (RegisterId::AC, 0x1)],
                 None,
-                100,
                 0,
                 false,
                 "SUB - incorrect result value produced",
@@ -1941,7 +1947,6 @@ mod tests_cpu_version_2 {
                     ),
                 ],
                 None,
-                100,
                 0,
                 false,
                 "SUB - CPU flags not correctly set",
@@ -1953,7 +1958,6 @@ mod tests_cpu_version_2 {
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                 )],
                 None,
-                100,
                 0,
                 false,
                 "SUB - CPU flags not correctly set",
@@ -1972,7 +1976,6 @@ mod tests_cpu_version_2 {
                     (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
                 None,
-                100,
                 0,
                 false,
                 "SUB - CPU parity flag not correctly set",
@@ -1991,7 +1994,6 @@ mod tests_cpu_version_2 {
                     (RegisterId::FL, 0x0),
                 ],
                 None,
-                100,
                 0,
                 false,
                 "SUB - CPU parity flag not correctly cleared",
@@ -2010,7 +2012,6 @@ mod tests_cpu_version_2 {
                     (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::SF])),
                 ],
                 None,
-                100,
                 0,
                 false,
                 "SUB - CPU signed flag not correctly set",
@@ -2029,16 +2030,13 @@ mod tests_cpu_version_2 {
                     (RegisterId::FL, 0x0),
                 ],
                 None,
-                100,
                 0,
                 false,
                 "SUB - CPU signed flag not correctly cleared",
             ),
         ];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
     /// Test the subtract u32 register from u32 register instruction.
@@ -2057,7 +2055,6 @@ mod tests_cpu_version_2 {
                     (RegisterId::AC, 0xe),
                 ],
                 None,
-                100,
                 0,
                 false,
                 "SUB - incorrect result value produced",
@@ -2078,7 +2075,6 @@ mod tests_cpu_version_2 {
                     ),
                 ],
                 None,
-                100,
                 0,
                 false,
                 "SUB - CPU flags not correctly set",
@@ -2090,7 +2086,6 @@ mod tests_cpu_version_2 {
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                 )],
                 None,
-                100,
                 0,
                 false,
                 "SUB - CPU flags not correctly set",
@@ -2111,7 +2106,6 @@ mod tests_cpu_version_2 {
                     (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
                 None,
-                100,
                 0,
                 false,
                 "SUB - CPU parity flag not correctly set",
@@ -2132,7 +2126,6 @@ mod tests_cpu_version_2 {
                     (RegisterId::FL, 0x0),
                 ],
                 None,
-                100,
                 0,
                 false,
                 "SUB - CPU parity flag not correctly cleared",
@@ -2153,7 +2146,6 @@ mod tests_cpu_version_2 {
                     (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::SF])),
                 ],
                 None,
-                100,
                 0,
                 false,
                 "SUB - CPU signed flag not correctly set",
@@ -2174,16 +2166,13 @@ mod tests_cpu_version_2 {
                     (RegisterId::FL, 0x0),
                 ],
                 None,
-                100,
                 0,
                 false,
                 "SUB - CPU signed flag not correctly cleared",
             ),
         ];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
     /// Test the multiply u32 immediate by a u32 register instruction.
@@ -2197,7 +2186,6 @@ mod tests_cpu_version_2 {
                 ],
                 &[(RegisterId::R1, 0x1), (RegisterId::AC, 0x2)],
                 None,
-                100,
                 0,
                 false,
                 "MUL - incorrect result value produced",
@@ -2216,16 +2204,13 @@ mod tests_cpu_version_2 {
                     ),
                 ],
                 None,
-                100,
                 0,
                 false,
                 "MUL - CPU flags not correctly set",
             ),
         ];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
     /// Test the multiply u32 immediate by a u32 register instruction.
@@ -2244,7 +2229,6 @@ mod tests_cpu_version_2 {
                     (RegisterId::AC, 0x2),
                 ],
                 None,
-                100,
                 0,
                 false,
                 "MUL - incorrect result value produced",
@@ -2265,16 +2249,13 @@ mod tests_cpu_version_2 {
                     ),
                 ],
                 None,
-                100,
                 0,
                 false,
                 "MUL - CPU flags not correctly set",
             ),
         ];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
     /// Test the division of a u32 register by a u32 immediate instruction.
@@ -2288,7 +2269,6 @@ mod tests_cpu_version_2 {
                 ],
                 &[(RegisterId::R1, 0x2), (RegisterId::AC, 0x2)],
                 None,
-                100,
                 0,
                 false,
                 "DIV - incorrect result value produced",
@@ -2300,7 +2280,6 @@ mod tests_cpu_version_2 {
                 ],
                 &[(RegisterId::R1, u32::MAX), (RegisterId::AC, 2147483647)],
                 None,
-                100,
                 0,
                 false,
                 "DIV - CPU flags not correctly set",
@@ -2309,16 +2288,13 @@ mod tests_cpu_version_2 {
                 &[DivU32ImmU32Reg(0x0, RegisterId::R1)],
                 &[],
                 None,
-                100,
                 0,
                 true,
                 "DIV - failed to panic when attempting to divide by zero",
             ),
         ];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
     /// Test the division of a u32 immediate by a u32 register instruction.
@@ -2332,7 +2308,6 @@ mod tests_cpu_version_2 {
                 ],
                 &[(RegisterId::R1, 0x1), (RegisterId::AC, 0x2)],
                 None,
-                100,
                 0,
                 false,
                 "DIV - incorrect result value produced",
@@ -2344,7 +2319,6 @@ mod tests_cpu_version_2 {
                 ],
                 &[(RegisterId::R1, 0x2), (RegisterId::AC, 2147483647)],
                 None,
-                100,
                 0,
                 false,
                 "DIV - CPU flags not correctly set",
@@ -2353,16 +2327,13 @@ mod tests_cpu_version_2 {
                 &[DivU32RegU32Imm(RegisterId::R1, 0x0)],
                 &[],
                 None,
-                100,
                 0,
                 true,
                 "DIV - failed to panic when attempting to divide by zero",
             ),
         ];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
     /// Test the division of a u32 register by a u32 register instruction.
@@ -2381,7 +2352,6 @@ mod tests_cpu_version_2 {
                     (RegisterId::AC, 0x2),
                 ],
                 None,
-                100,
                 0,
                 false,
                 "DIV - incorrect result value produced",
@@ -2398,7 +2368,6 @@ mod tests_cpu_version_2 {
                     (RegisterId::AC, 2147483647),
                 ],
                 None,
-                100,
                 0,
                 false,
                 "DIV - CPU flags not correctly set",
@@ -2410,90 +2379,15 @@ mod tests_cpu_version_2 {
                 ],
                 &[],
                 None,
-                100,
                 0,
                 true,
                 "DIV - failed to panic when attempting to divide by zero",
             ),
         ];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
-    /// Test the push u32 immediate instruction.
-    #[test]
-    fn test_push_u32_imm_multiple() {
-        let test = TestEntryU32Standard::new(
-            &[PushU32Imm(0x123), PushU32Imm(0x321)],
-            &[],
-            None,
-            100,
-            2,
-            false,
-            "failed to execute PUSH instruction",
-        );
-
-        let vm = test.run_test(0);
-        if vm.is_none() {
-            panic!("{}", test.fail_message(0, true));
-        }
-
-        let mut vm = vm.unwrap();
-        assert_eq!(vm.ram.pop_u32(), 0x321);
-        assert_eq!(vm.ram.pop_u32(), 0x123);
-    }
-
-    /// Test the push u32 immediate instruction.
-    #[test]
-    fn test_push_u32_imm_single() {
-        let test = TestEntryU32Standard::new(
-            &[PushU32Imm(0x123)],
-            &[],
-            None,
-            100,
-            1,
-            false,
-            "failed to execute PUSH instruction",
-        );
-
-        let vm = test.run_test(0);
-        if vm.is_none() {
-            panic!("{}", test.fail_message(0, true));
-        }
-
-        let mut vm = vm.unwrap();
-        assert_eq!(vm.ram.pop_u32(), 0x123);
-    }
-
-    /// Test the push u32 immediate instruction.
-    #[test]
-    #[should_panic]
-    fn test_push_u32_imm_invalid_pop() {
-        let test = TestEntryU32Standard::new(
-            &[Nop],
-            &[],
-            None,
-            100,
-            2,
-            false,
-            "failed to execute PUSH instruction",
-        );
-
-        let vm = test.run_test(0);
-        if vm.is_none() {
-            panic!("{}", test.fail_message(0, true));
-        }
-
-        // There is nothing on the stack, this should assert.
-        let mut vm = vm.unwrap();
-        _ = vm.ram.pop_u32();
-    }
-}
-
-/*#[cfg(test)]
-mod tests_cpu {
     /// Test the modulo of a u32 register by a u32 immediate instruction.
     #[test]
     fn test_mod_u32_imm_u32_reg() {
@@ -2504,7 +2398,8 @@ mod tests_cpu {
                     ModU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x2), (RegisterId::AC, 0x0)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "MOD - incorrect result value produced",
             ),
@@ -2514,22 +2409,22 @@ mod tests_cpu {
                     ModU32ImmU32Reg(0x2, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x3), (RegisterId::AC, 0x1)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "MOD - incorrect result value produced",
             ),
             TestEntryU32Standard::new(
                 &[DivU32ImmU32Reg(0x0, RegisterId::R1)],
                 &[],
-                vec![0; 100],
+                None,
+                0,
                 true,
                 "MOD - failed to panic when attempting to divide by zero",
             ),
         ];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
     /// Test the modulo of a u32 immediate by a u32 register instruction.
@@ -2542,7 +2437,8 @@ mod tests_cpu {
                     ModU32RegU32Imm(RegisterId::R1, 0x2),
                 ],
                 &[(RegisterId::R1, 0x1), (RegisterId::AC, 0x0)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "MOD - incorrect result value produced",
             ),
@@ -2552,22 +2448,22 @@ mod tests_cpu {
                     ModU32RegU32Imm(RegisterId::R1, 0x3),
                 ],
                 &[(RegisterId::R1, 0x2), (RegisterId::AC, 0x1)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "MOD - incorrect result value produced",
             ),
             TestEntryU32Standard::new(
                 &[ModU32RegU32Imm(RegisterId::R1, 0x0)],
                 &[],
-                vec![0; 100],
+                None,
+                0,
                 true,
                 "MOD - failed to panic when attempting to divide by zero",
             ),
         ];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
     /// Test the modulo of a u32 register by a u32 register instruction.
@@ -2585,7 +2481,8 @@ mod tests_cpu {
                     (RegisterId::R2, 0x2),
                     (RegisterId::AC, 0x0),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "MOD - incorrect result value produced",
             ),
@@ -2600,22 +2497,22 @@ mod tests_cpu {
                     (RegisterId::R2, 0x3),
                     (RegisterId::AC, 0x1),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "MOD - incorrect result value produced",
             ),
             TestEntryU32Standard::new(
                 &[ModU32RegU32Reg(RegisterId::R1, RegisterId::R2)],
                 &[],
-                vec![0; 100],
+                None,
+                0,
                 true,
                 "MOD - failed to panic when attempting to divide by zero",
             ),
         ];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
     /// Test the increment u32 register instruction.
@@ -2625,7 +2522,8 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[IncU32Reg(RegisterId::R1)],
                 &[(RegisterId::R1, 0x1)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "INC - incorrect result value produced",
             ),
@@ -2638,10 +2536,11 @@ mod tests_cpu {
                     (RegisterId::R1, 0),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::OF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::OF, CpuFlag::PF]),
                     ),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "INC - CPU flags not correctly set",
             ),
@@ -2655,9 +2554,10 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::R1, 0x3),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::PF])),
+                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "INC - CPU parity flag not correctly set",
             ),
@@ -2665,11 +2565,12 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the parity flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::PF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::PF]), RegisterId::FL),
                     IncU32Reg(RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1), (RegisterId::FL, 0x0)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "INC - CPU parity flag not correctly cleared",
             ),
@@ -2685,10 +2586,11 @@ mod tests_cpu {
                     (RegisterId::R1, 0b1000_0000_0000_0000_0000_0000_0000_0000),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "INC - CPU signed flag not correctly set",
             ),
@@ -2696,19 +2598,18 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::FL),
                     IncU32Reg(RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1), (RegisterId::FL, 0x0)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "INC - CPU signed flag not correctly cleared",
             ),
         ];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
     /// Test the decrement u32 register instruction.
@@ -2724,10 +2625,11 @@ mod tests_cpu {
                     (RegisterId::R1, 0x0),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                     ),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "DEC - incorrect result value produced",
             ),
@@ -2737,10 +2639,11 @@ mod tests_cpu {
                     (RegisterId::R1, u32::MAX),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::OF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::OF, CpuFlag::PF]),
                     ),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "DEC - CPU flags not correctly set",
             ),
@@ -2754,9 +2657,10 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::R1, 0x3),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::PF])),
+                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "DEC - CPU parity flag not correctly set",
             ),
@@ -2764,12 +2668,13 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the parity flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::PF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::PF]), RegisterId::FL),
                     MovU32ImmU32Reg(0x3, RegisterId::R1),
                     DecU32Reg(RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x2), (RegisterId::FL, 0x0)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "DEC - CPU parity flag not correctly cleared",
             ),
@@ -2783,9 +2688,10 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::SF])),
+                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::SF])),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "DEC - CPU signed flag not correctly set",
             ),
@@ -2793,20 +2699,19 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::FL),
                     MovU32ImmU32Reg(0x2, RegisterId::R1),
                     DecU32Reg(RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1), (RegisterId::FL, 0x0)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "DEC - CPU signed flag not correctly cleared",
             ),
         ];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
     /// Test the bitwise and of a u32 immediate and a u32 register instruction.
@@ -2819,7 +2724,8 @@ mod tests_cpu {
                     AndU32ImmU32Reg(0x2, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x3), (RegisterId::AC, 0x2)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "AND - incorrect result value produced",
             ),
@@ -2829,7 +2735,8 @@ mod tests_cpu {
                     AndU32ImmU32Reg(0x3, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x2), (RegisterId::AC, 0x2)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "AND - incorrect result value produced",
             ),
@@ -2843,10 +2750,11 @@ mod tests_cpu {
                     (RegisterId::AC, 0x0),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                     ),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "AND - incorrect result value produced",
             ),
@@ -2857,9 +2765,10 @@ mod tests_cpu {
                 ],
                 &[(
                     RegisterId::FL,
-                    CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                 )],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "AND - CPU flags not correctly set",
             ),
@@ -2874,9 +2783,10 @@ mod tests_cpu {
                 &[
                     (RegisterId::R1, 0x3),
                     (RegisterId::AC, 0x3),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::PF])),
+                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "AND - CPU parity flag not correctly set",
             ),
@@ -2884,7 +2794,7 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the parity flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::PF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::PF]), RegisterId::FL),
                     MovU32ImmU32Reg(0x3, RegisterId::R1),
                     AndU32ImmU32Reg(0x2, RegisterId::R1),
                 ],
@@ -2893,7 +2803,8 @@ mod tests_cpu {
                     (RegisterId::AC, 0x2),
                     (RegisterId::FL, 0x0),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "AND - CPU parity flag not correctly cleared",
             ),
@@ -2910,10 +2821,11 @@ mod tests_cpu {
                     (RegisterId::AC, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "AND - CPU signed flag not correctly set",
             ),
@@ -2921,7 +2833,7 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::FL),
                     MovU32ImmU32Reg(0x2, RegisterId::R1),
                     AndU32ImmU32Reg(0x2, RegisterId::R1),
                 ],
@@ -2930,15 +2842,14 @@ mod tests_cpu {
                     (RegisterId::AC, 0x2),
                     (RegisterId::FL, 0x0),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "AND - CPU signed flag not correctly cleared",
             ),
         ];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
     /// Test the left-shift u32 register by u32 immediate value.
@@ -2951,7 +2862,8 @@ mod tests_cpu {
                     LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x2)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SHL - incorrect result value produced",
             ),
@@ -2966,10 +2878,11 @@ mod tests_cpu {
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1000),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::CF]),
+                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::CF]),
                     ),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SHL - CPU flags not correctly set",
             ),
@@ -2984,10 +2897,11 @@ mod tests_cpu {
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::CF, CpuFlag::OF]),
+                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::CF, CpuFlag::OF]),
                     ),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SHL - CPU flags not correctly set",
             ),
@@ -2999,9 +2913,10 @@ mod tests_cpu {
                 ],
                 &[(
                     RegisterId::FL,
-                    CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                 )],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SHL - CPU flags not correctly set",
             ),
@@ -3009,16 +2924,17 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the overflow flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::OF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::OF]), RegisterId::FL),
                     // This will unset the overflow flag and set the zero flag instead.
                     MovU32ImmU32Reg(0x0, RegisterId::R1),
                     LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[(
                     RegisterId::FL,
-                    CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                 )],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SHL - parity or zero flags are not set",
             ),
@@ -3026,7 +2942,8 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[LeftShiftU32ImmU32Reg(0x20, RegisterId::R1)],
                 &[],
-                vec![],
+                None,
+                0,
                 true,
                 "SHL - successfully executed instruction with invalid shift value",
             ),
@@ -3034,12 +2951,13 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the parity flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::PF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::PF]), RegisterId::FL),
                     MovU32ImmU32Reg(0x1, RegisterId::R1),
                     LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x2), (RegisterId::FL, 0x0)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SHL - CPU parity flag not correctly cleared",
             ),
@@ -3050,7 +2968,8 @@ mod tests_cpu {
                     LeftShiftU32ImmU32Reg(0x0, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SHL - zero left-shift did not leave the result unchanged",
             ),
@@ -3066,10 +2985,11 @@ mod tests_cpu {
                     (RegisterId::R1, 0b1000_0000_0000_0000_0000_0000_0000_0000),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SHL - CPU signed flag not correctly set",
             ),
@@ -3077,20 +2997,19 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::FL),
                     MovU32ImmU32Reg(0x1, RegisterId::R1),
                     LeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x2), (RegisterId::FL, 0x0)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SHL - CPU signed flag not correctly cleared",
             ),
         ];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
     /// Test the left-shift u32 register by u32 register value.
@@ -3104,7 +3023,8 @@ mod tests_cpu {
                     LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x2), (RegisterId::R2, 0x1)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SHL - incorrect result value produced",
             ),
@@ -3121,10 +3041,11 @@ mod tests_cpu {
                     (RegisterId::R2, 0x3),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::CF]),
+                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::CF]),
                     ),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SHL - invalid CPU flag state",
             ),
@@ -3141,10 +3062,11 @@ mod tests_cpu {
                     (RegisterId::R2, 0x1),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::OF, CpuFlag::CF]),
+                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::OF, CpuFlag::CF]),
                     ),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SHL - CPU flags not correctly set",
             ),
@@ -3160,10 +3082,11 @@ mod tests_cpu {
                     (RegisterId::R2, 0x1),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::OF, CpuFlag::CF]),
+                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::OF, CpuFlag::CF]),
                     ),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SHL - CPU flags not correctly set",
             ),
@@ -3178,10 +3101,11 @@ mod tests_cpu {
                     (RegisterId::R2, 0x1),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                     ),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SHL - CPU flags not correctly set",
             ),
@@ -3189,7 +3113,7 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the overflow flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::OF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::OF]), RegisterId::FL),
                     // This will unset the overflow flag and set the zero flag instead.
                     MovU32ImmU32Reg(0x0, RegisterId::R1),
                     MovU32ImmU32Reg(0x1, RegisterId::R2),
@@ -3199,10 +3123,11 @@ mod tests_cpu {
                     (RegisterId::R2, 0x1),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                     ),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SHL - CPU flags not correctly set",
             ),
@@ -3213,7 +3138,8 @@ mod tests_cpu {
                     LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[],
-                vec![],
+                None,
+                0,
                 true,
                 "SHL - successfully executed instruction with invalid shift value",
             ),
@@ -3224,7 +3150,8 @@ mod tests_cpu {
                     LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SHL - zero left-shift did not leave the result unchanged",
             ),
@@ -3242,10 +3169,11 @@ mod tests_cpu {
                     (RegisterId::R2, 0x1),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SHL - CPU signed flag not correctly set",
             ),
@@ -3253,7 +3181,7 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::FL),
                     MovU32ImmU32Reg(0x1, RegisterId::R1),
                     MovU32ImmU32Reg(0x1, RegisterId::R2),
                     LeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
@@ -3263,15 +3191,14 @@ mod tests_cpu {
                     (RegisterId::R2, 0x1),
                     (RegisterId::FL, 0x0),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SHL - CPU signed flag not correctly cleared",
             ),
         ];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
     /// Test the arithmetic left-shift u32 register by u32 immediate value.
@@ -3284,7 +3211,8 @@ mod tests_cpu {
                     ArithLeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x2)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SAL - incorrect result value produced",
             ),
@@ -3295,9 +3223,10 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1101),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::SF])),
+                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::SF])),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SAL - incorrect result value produced",
             ),
@@ -3309,9 +3238,10 @@ mod tests_cpu {
                 ],
                 &[(
                     RegisterId::FL,
-                    CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                 )],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SAL - CPU flags not correctly set",
             ),
@@ -3322,7 +3252,8 @@ mod tests_cpu {
                     ArithLeftShiftU32ImmU32Reg(0x0, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SAL - zero left-shift did not leave the result unchanged",
             ),
@@ -3338,10 +3269,11 @@ mod tests_cpu {
                     (RegisterId::R1, 0b1000_0000_0000_0000_0000_0000_0000_0000),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SAL - CPU signed flag not correctly set",
             ),
@@ -3349,20 +3281,19 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::FL),
                     MovU32ImmU32Reg(0x1, RegisterId::R1),
                     ArithLeftShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x2), (RegisterId::FL, 0x0)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SAL - CPU signed flag not correctly cleared",
             ),
         ];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
     /// Test the arithmetic left-shift u32 register by u32 register.
@@ -3376,7 +3307,8 @@ mod tests_cpu {
                     ArithLeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x2), (RegisterId::R2, 0x1)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SAL - incorrect result value produced",
             ),
@@ -3389,9 +3321,10 @@ mod tests_cpu {
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1101),
                     (RegisterId::R2, 0x1),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::SF])),
+                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::SF])),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SAL - incorrect result value produced",
             ),
@@ -3406,10 +3339,11 @@ mod tests_cpu {
                     (RegisterId::R2, 0x1),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                     ),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SAL - CPU flags not correctly set",
             ),
@@ -3420,7 +3354,8 @@ mod tests_cpu {
                     ArithLeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SAL - zero left-shift did not leave the result unchanged",
             ),
@@ -3438,10 +3373,11 @@ mod tests_cpu {
                     (RegisterId::R2, 0x1),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SAL - CPU signed flag not correctly set",
             ),
@@ -3449,7 +3385,7 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::FL),
                     MovU32ImmU32Reg(0x1, RegisterId::R1),
                     MovU32ImmU32Reg(0x1, RegisterId::R2),
                     ArithLeftShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
@@ -3459,15 +3395,14 @@ mod tests_cpu {
                     (RegisterId::R2, 0x1),
                     (RegisterId::FL, 0x0),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SAL - CPU signed flag not correctly cleared",
             ),
         ];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
     /// Test the right-shift u32 register by u32 immediate value.
@@ -3480,7 +3415,8 @@ mod tests_cpu {
                     RightShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SHR - incorrect result value produced",
             ),
@@ -3489,7 +3425,7 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the overflow flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::OF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::OF]), RegisterId::FL),
                     // Execute the test instruction.
                     MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
                     RightShiftU32ImmU32Reg(0x1, RegisterId::R1),
@@ -3498,10 +3434,11 @@ mod tests_cpu {
                     (RegisterId::R1, 0b0011_1111_1111_1111_1111_1111_1111_1111),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::CF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::PF]),
                     ),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SHR - carry or parity CPU flags were not correctly set",
             ),
@@ -3510,16 +3447,17 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the overflow flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::OF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::OF]), RegisterId::FL),
                     // Execute the test instruction.
                     MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1110, RegisterId::R1),
                     RightShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[
                     (RegisterId::R1, 0b0011_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::PF])),
+                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SHR - CPU flags were not correctly set",
             ),
@@ -3531,9 +3469,10 @@ mod tests_cpu {
                 ],
                 &[(
                     RegisterId::FL,
-                    CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                 )],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SHR - zero or parity CPU flags were not correctly set",
             ),
@@ -3541,7 +3480,8 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[RightShiftU32ImmU32Reg(0x20, RegisterId::R1)],
                 &[],
-                vec![],
+                None,
+                0,
                 true,
                 "SHR - successfully executed instruction with invalid shift value",
             ),
@@ -3552,7 +3492,8 @@ mod tests_cpu {
                     RightShiftU32ImmU32Reg(0x0, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SHR - zero right-shift did not leave the result unchanged",
             ),
@@ -3560,7 +3501,7 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::FL),
                     MovU32ImmU32Reg(0x1, RegisterId::R1),
                     RightShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
@@ -3568,18 +3509,17 @@ mod tests_cpu {
                     (RegisterId::R1, 0x0),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::CF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::CF, CpuFlag::PF]),
                     ),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SAL - CPU signed flag not correctly cleared",
             ),
         ];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
     /// Test the right-shift u32 register by u32 register.
@@ -3593,7 +3533,8 @@ mod tests_cpu {
                     RightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1), (RegisterId::R2, 0x1)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SHR - incorrect result value produced",
             ),
@@ -3602,7 +3543,7 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the overflow flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::OF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::OF]), RegisterId::FL),
                     MovU32ImmU32Reg(0x1, RegisterId::R2),
                     // Execute the test instruction.
                     MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::R1),
@@ -3613,10 +3554,11 @@ mod tests_cpu {
                     (RegisterId::R2, 0x1),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::CF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::PF]),
                     ),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SHR - carry or parity CPU flags were not correctly set",
             ),
@@ -3625,7 +3567,7 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the overflow flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::OF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::OF]), RegisterId::FL),
                     MovU32ImmU32Reg(0x1, RegisterId::R2),
                     // Execute the test instruction.
                     MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1110, RegisterId::R1),
@@ -3634,9 +3576,10 @@ mod tests_cpu {
                 &[
                     (RegisterId::R1, 0b0011_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::R2, 0x1),
-                    (RegisterId::FL, CpuFlag::compute_for(&[CpuFlag::PF])),
+                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SHR - CPU flags were not correctly set",
             ),
@@ -3651,10 +3594,11 @@ mod tests_cpu {
                     (RegisterId::R2, 0x1),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                     ),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SHR - zero or parity CPU flags were not correctly set",
             ),
@@ -3665,7 +3609,8 @@ mod tests_cpu {
                     RightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[],
-                vec![],
+                None,
+                0,
                 true,
                 "SHR - successfully executed instruction with invalid shift value",
             ),
@@ -3676,15 +3621,14 @@ mod tests_cpu {
                     RightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SHR - zero right-shift did not leave the result unchanged",
             ),
         ];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
     /// Test the arithmetic right-shift u32 register by u32 immediate value.
@@ -3697,7 +3641,8 @@ mod tests_cpu {
                     ArithRightShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SAR - incorrect result value produced",
             ),
@@ -3710,10 +3655,11 @@ mod tests_cpu {
                     (RegisterId::R1, 0b1011_1111_1111_1111_1111_1111_1111_1111),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SAR - incorrect result value produced",
             ),
@@ -3725,9 +3671,10 @@ mod tests_cpu {
                 ],
                 &[(
                     RegisterId::FL,
-                    CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                 )],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SAR - zero or parity CPU flags were not correctly set",
             ),
@@ -3738,7 +3685,8 @@ mod tests_cpu {
                     ArithRightShiftU32ImmU32Reg(0x0, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SAR - zero right-shift did not leave the result unchanged",
             ),
@@ -3754,10 +3702,11 @@ mod tests_cpu {
                     (RegisterId::R1, 0b1000_0000_0000_0000_0000_0000_0000_0000),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SAR - CPU signed flag not correctly set",
             ),
@@ -3765,20 +3714,19 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::FL),
                     MovU32ImmU32Reg(0x2, RegisterId::R1),
                     ArithRightShiftU32ImmU32Reg(0x1, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1), (RegisterId::FL, 0x0)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SAR - CPU signed flag not correctly cleared",
             ),
         ];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
     /// Test the arithmetic right-shift u32 register by u32 register.
@@ -3792,7 +3740,8 @@ mod tests_cpu {
                     ArithRightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1), (RegisterId::R2, 0x1)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SAR - incorrect result value produced",
             ),
@@ -3807,10 +3756,11 @@ mod tests_cpu {
                     (RegisterId::R2, 0x1),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SAR - incorrect result value produced",
             ),
@@ -3825,10 +3775,11 @@ mod tests_cpu {
                     (RegisterId::R2, 0x1),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::ZF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                     ),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SAR - zero or parity CPU flags were not correctly set",
             ),
@@ -3839,7 +3790,8 @@ mod tests_cpu {
                     ArithRightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x1)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SAR - zero right-shift did not leave the result unchanged",
             ),
@@ -3857,10 +3809,11 @@ mod tests_cpu {
                     (RegisterId::R2, 0x1),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_for(&[CpuFlag::SF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SAR - CPU signed flag not correctly set",
             ),
@@ -3868,7 +3821,7 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[
                     // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_for(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::FL),
                     MovU32ImmU32Reg(0x2, RegisterId::R1),
                     MovU32ImmU32Reg(0x1, RegisterId::R2),
                     ArithRightShiftU32RegU32Reg(RegisterId::R2, RegisterId::R1),
@@ -3878,15 +3831,14 @@ mod tests_cpu {
                     (RegisterId::R2, 0x1),
                     (RegisterId::FL, 0x0),
                 ],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "SAR - CPU signed flag not correctly cleared",
             ),
         ];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
     /// Test the move u32 immediate to u32 register instruction.
@@ -3896,7 +3848,8 @@ mod tests_cpu {
             TestEntryU32Standard::new(
                 &[MovU32ImmU32Reg(0x1, RegisterId::R1)],
                 &[(RegisterId::R1, 0x1)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "MOV - invalid value moved to register",
             ),
@@ -3906,15 +3859,14 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0x2, RegisterId::R1),
                 ],
                 &[(RegisterId::R1, 0x2)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "MOV - invalid value moved to register",
             ),
         ];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
     /// Test the move u32 register to u32 register instruction.
@@ -3927,7 +3879,8 @@ mod tests_cpu {
                     MovU32RegU32Reg(RegisterId::R1, RegisterId::R2),
                 ],
                 &[(RegisterId::R1, 0x1), (RegisterId::R2, 0x1)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "MOV - immediate value not moved to register",
             ),
@@ -3938,15 +3891,14 @@ mod tests_cpu {
                     MovU32RegU32Reg(RegisterId::R1, RegisterId::R2),
                 ],
                 &[(RegisterId::R1, 0x1), (RegisterId::R2, 0x1)],
-                vec![0; 100],
+                None,
+                0,
                 false,
                 "MOV - immediate value not moved to register",
             ),
         ];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
     /// Test the move u32 literal to memory instruction.
@@ -3955,19 +3907,18 @@ mod tests_cpu {
         let tests = [TestEntryU32Standard::new(
             &[MovU32ImmMemRelSimple(0x123, 0x0)],
             &[],
-            vec![
+            Some(vec![
                 35, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            ],
+            ]),
+            0,
             false,
             "MOV - immediate value not moved to memory",
         )];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
     /// Test the move u32 register to memory instruction.
@@ -3979,19 +3930,18 @@ mod tests_cpu {
                 MovU32RegMemRelSimple(RegisterId::R1, 0x0),
             ],
             &[(RegisterId::R1, 0x123)],
-            vec![
+            Some(vec![
                 35, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            ],
+            ]),
+            0,
             false,
             "MOV - u32 register value not moved to memory",
         )];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
     /// Test the move u32 register to memory instruction.
@@ -4006,19 +3956,18 @@ mod tests_cpu {
                 MovMemU32RegRelSimple(0x0, RegisterId::R2),
             ],
             &[(RegisterId::R1, 0x123), (RegisterId::R2, 0x123)],
-            vec![
+            Some(vec![
                 35, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            ],
+            ]),
+            0,
             false,
             "MOV - value not correctly moved from memory to register",
         )];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
     /// Test the move u32 to register from address provided by a different register.
@@ -4035,19 +3984,18 @@ mod tests_cpu {
                 MovU32RegPtrU32RegRelSimple(RegisterId::R2, RegisterId::R3),
             ],
             &[(RegisterId::R1, 0x123), (RegisterId::R3, 0x123)],
-            vec![
+            Some(vec![
                 35, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            ],
+            ]),
+            0,
             false,
             "MOV - value not correctly moved from memory to register via register pointer",
         )];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
     /// Test the swap u32 register to u32 register instruction.
@@ -4060,14 +4008,31 @@ mod tests_cpu {
                 SwapU32RegU32Reg(RegisterId::R1, RegisterId::R2),
             ],
             &[(RegisterId::R1, 0x2), (RegisterId::R2, 0x1)],
-            vec![0; 100],
+            None,
+            0,
             false,
             "SWAP - values of the two registers were not correctly swapped",
         )];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
+    }
+
+    /// Test the byte swap u32 register instruction.
+    #[test]
+    fn test_byte_swap_u32_reg() {
+        let tests = [TestEntryU32Standard::new(
+            &[
+                MovU32ImmU32Reg(0xAABBCCDD, RegisterId::R1),
+                ByteSwapU32(RegisterId::R1),
+            ],
+            &[(RegisterId::R1, 0xDDCCBBAA)],
+            None,
+            0,
+            false,
+            "BSWAP - the byte order of the register was not correctly swapped",
+        )];
+
+        TestsU32::new(&tests).run_all();
     }
 
     /// Test the complex move value to expression-derived memory address.
@@ -4088,12 +4053,13 @@ mod tests_cpu {
                     .pack(),
                 )],
                 &[],
-                vec![
+                Some(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ],
+                ]),
+                0,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - two constants",
             ),
@@ -4114,12 +4080,13 @@ mod tests_cpu {
                     ),
                 ],
                 &[(RegisterId::R1, 0x8), (RegisterId::R2, 0x8)],
-                vec![
+                Some(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ],
+                ]),
+                0,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - two registers",
             ),
@@ -4139,12 +4106,13 @@ mod tests_cpu {
                     ),
                 ],
                 &[(RegisterId::R1, 0x8)],
-                vec![
+                Some(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ],
+                ]),
+                0,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - one constant and one register",
             ),
@@ -4165,12 +4133,13 @@ mod tests_cpu {
                     ),
                 ],
                 &[(RegisterId::R1, 0x2), (RegisterId::R2, 0x8)],
-                vec![
+                Some(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ],
+                ]),
+                0,
                 false,
                 "MOV - value not correctly moved from memory to register - using multiplication",
             ),
@@ -4191,12 +4160,13 @@ mod tests_cpu {
                     ),
                 ],
                 &[(RegisterId::R1, 0x1A), (RegisterId::R2, 0x4)],
-                vec![
+                Some(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ],
+                ]),
+                0,
                 false,
                 "MOV - value not correctly moved from memory to register - using subtraction",
             ),
@@ -4216,20 +4186,19 @@ mod tests_cpu {
                     .pack(),
                 )],
                 &[],
-                vec![
+                Some(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ],
+                ]),
+                0,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - three constants",
             ),
         ];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
     /// Test the complex move from an expression-derived memory address to a register.
@@ -4252,12 +4221,13 @@ mod tests_cpu {
                     ),
                 ],
                 &[(RegisterId::R8, 0x123)],
-                vec![
+                Some(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ],
+                ]),
+                0,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - two constants",
             ),
@@ -4283,12 +4253,13 @@ mod tests_cpu {
                     (RegisterId::R2, 0x8),
                     (RegisterId::R8, 0x123),
                 ],
-                vec![
+                Some(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ],
+                ]),
+                0,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - two registers",
             ),
@@ -4309,12 +4280,13 @@ mod tests_cpu {
                     ),
                 ],
                 &[(RegisterId::R1, 0x8), (RegisterId::R8, 0x123)],
-                vec![
+                Some(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ],
+                ]),
+                0,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - one constant and one register",
             ),
@@ -4340,12 +4312,13 @@ mod tests_cpu {
                     (RegisterId::R2, 0x8),
                     (RegisterId::R8, 0x123),
                 ],
-                vec![
+                Some(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ],
+                ]),
+                0,
                 false,
                 "MOV - value not correctly moved from memory to register - using multiplication",
             ),
@@ -4371,12 +4344,13 @@ mod tests_cpu {
                     (RegisterId::R2, 0x4),
                     (RegisterId::R8, 0x123),
                 ],
-                vec![
+                Some(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ],
+                ]),
+                0,
                 false,
                 "MOV - value not correctly moved from memory to register - using subtraction",
             ),
@@ -4398,20 +4372,19 @@ mod tests_cpu {
                     ),
                 ],
                 &[(RegisterId::R8, 0x123)],
-                vec![
+                Some(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ],
+                ]),
+                0,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - two constants",
             ),
         ];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
     /// Test the complex move from a register to an expression-derived memory address.
@@ -4434,12 +4407,13 @@ mod tests_cpu {
                     ),
                 ],
                 &[(RegisterId::R8, 0x123)],
-                vec![
+                Some(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ],
+                ]),
+                0,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - two constants",
             ),
@@ -4466,12 +4440,13 @@ mod tests_cpu {
                     (RegisterId::R2, 0x8),
                     (RegisterId::R8, 0x123),
                 ],
-                vec![
+                Some(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ],
+                ]),
+                0,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - two registers",
             ),
@@ -4493,12 +4468,13 @@ mod tests_cpu {
                     ),
                 ],
                 &[(RegisterId::R1, 0x8), (RegisterId::R8, 0x123)],
-                vec![
+                Some(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ],
+                ]),
+                0,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - one constant and one register",
             ),
@@ -4525,12 +4501,13 @@ mod tests_cpu {
                     (RegisterId::R2, 0x8),
                     (RegisterId::R8, 0x123),
                 ],
-                vec![
+                Some(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ],
+                ]),
+                0,
                 false,
                 "MOV - value not correctly moved from memory to register - using multiplication",
             ),
@@ -4557,12 +4534,13 @@ mod tests_cpu {
                     (RegisterId::R2, 0x4),
                     (RegisterId::R8, 0x123),
                 ],
-                vec![
+                Some(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ],
+                ]),
+                0,
                 false,
                 "MOV - value not correctly moved from memory to register - using subtraction",
             ),
@@ -4584,41 +4562,88 @@ mod tests_cpu {
                     ),
                 ],
                 &[(RegisterId::R8, 0x123)],
-                vec![
+                Some(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ],
+                ]),
+                0,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - two constants",
             ),
         ];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        TestsU32::new(&tests).run_all();
     }
 
-    /// Test the byte swap u32 register instruction.
+    /// Test the push u32 immediate instruction.
     #[test]
-    fn test_byte_swap_u32_reg() {
+    fn test_push_u32_imm_multiple() {
         let tests = [TestEntryU32Standard::new(
-            &[
-                MovU32ImmU32Reg(0xAABBCCDD, RegisterId::R1),
-                ByteSwapU32(RegisterId::R1),
-            ],
-            &[(RegisterId::R1, 0xDDCCBBAA)],
-            vec![0; 100],
+            &[PushU32Imm(0x123), PushU32Imm(0x321)],
+            &[],
+            None,
+            2,
             false,
-            "BSWAP - the byte order of the register was not correctly swapped",
+            "failed to execute PUSH instruction",
         )];
 
-        for (id, test) in tests.iter().enumerate() {
-            test.run_test(id);
-        }
+        let c = |_id: usize, vm: Option<VirtualMachine>| {
+            let mut vm = vm.expect("failed to correctly execute test code");
+            assert_eq!(vm.ram.pop_u32(), 0x321);
+            assert_eq!(vm.ram.pop_u32(), 0x123);
+        };
+
+        TestsU32::new(&tests).run_all_special(c);
     }
 
+    /// Test the push u32 immediate instruction.
+    #[test]
+    fn test_push_u32_imm_single() {
+        let tests = [TestEntryU32Standard::new(
+            &[PushU32Imm(0x123)],
+            &[],
+            None,
+            1,
+            false,
+            "failed to execute PUSH instruction",
+        )];
+
+        let c = |_id: usize, vm: Option<VirtualMachine>| {
+            let mut vm = vm.expect("failed to correctly execute test code");
+            assert_eq!(vm.ram.pop_u32(), 0x123);
+        };
+
+        TestsU32::new(&tests).run_all_special(c);
+    }
+
+    /// Test the push u32 immediate instruction.
+    #[test]
+    #[should_panic]
+    fn test_push_u32_imm_invalid_pop() {
+        let tests = [TestEntryU32Standard::new(
+            &[Nop],
+            &[],
+            None,
+            2,
+            false,
+            "failed to execute PUSH instruction",
+        )];
+
+        let c = |_id: usize, vm: Option<VirtualMachine>| {
+            let mut vm = vm.expect("failed to correctly execute test code");
+
+            // There is nothing on the stack, this should assert.
+            _ = vm.ram.pop_u32();
+        };
+
+        TestsU32::new(&tests).run_all_special(c);
+    }
+}
+
+/*#[cfg(test)]
+mod tests_cpu {
     /// Test the zero high bit by index instruction.
     #[test]
     fn test_zhbi_u32_reg() {
