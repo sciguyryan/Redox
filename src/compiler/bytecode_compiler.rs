@@ -52,9 +52,9 @@ impl Compiler {
             | Instruction::ArithLeftShiftU32ImmU32Reg(imm, reg)
             | Instruction::RightShiftU32ImmU32Reg(imm, reg)
             | Instruction::ArithRightShiftU32ImmU32Reg(imm, reg)
-            | Instruction::MovU32ImmU32Reg(imm, reg)
-            | Instruction::MovMemU32RegRelSimple(imm, reg)
-            | Instruction::MovMemExprU32RegRel(imm, reg)
+            | Instruction::MovU32ImmU32(imm, reg)
+            | Instruction::MovMemU32RegSimple(imm, reg)
+            | Instruction::MovMemExprU32Reg(imm, reg)
             | Instruction::BitScanReverseU32MemU32Reg(imm, reg)
             | Instruction::BitScanForwardU32MemU32Reg(imm, reg)
             | Instruction::SubU32ImmU32Reg(imm, reg)
@@ -73,8 +73,8 @@ impl Compiler {
             | Instruction::RightShiftU32RegU32Reg(reg_1, reg_2)
             | Instruction::ArithRightShiftU32RegU32Reg(reg_1, reg_2)
             | Instruction::SwapU32RegU32Reg(reg_1, reg_2)
-            | Instruction::MovU32RegU32Reg(reg_1, reg_2)
-            | Instruction::MovU32RegPtrU32RegRelSimple(reg_1, reg_2)
+            | Instruction::MovU32RegU32(reg_1, reg_2)
+            | Instruction::MovU32RegPtrU32RegSimple(reg_1, reg_2)
             | Instruction::BitScanReverseU32RegU32Reg(reg_1, reg_2)
             | Instruction::BitScanForwardU32RegU32Reg(reg_1, reg_2)
             | Instruction::SubU32RegU32Reg(reg_1, reg_2)
@@ -86,8 +86,8 @@ impl Compiler {
             }
 
             /******** [u32 immediate and u32 immediate] ********/
-            Instruction::MovU32ImmMemRelSimple(imm_1, imm_2)
-            | Instruction::MovU32ImmMemExprRel(imm_1, imm_2)
+            Instruction::MovU32ImmMemSimple(imm_1, imm_2)
+            | Instruction::MovU32ImmMemExpr(imm_1, imm_2)
             | Instruction::BitScanReverseU32MemU32Mem(imm_1, imm_2)
             | Instruction::BitScanForwardU32MemU32Mem(imm_1, imm_2) => {
                 self.write_u32(imm_1);
@@ -95,8 +95,8 @@ impl Compiler {
             }
 
             /******** [u32 register and u32 immediate] ********/
-            Instruction::MovU32RegMemRelSimple(reg, imm)
-            | Instruction::MovU32RegMemExprRel(reg, imm)
+            Instruction::MovU32RegMemSimple(reg, imm)
+            | Instruction::MovU32RegMemExpr(reg, imm)
             | Instruction::BitScanReverseU32RegMemU32(reg, imm)
             | Instruction::BitScanForwardU32RegMemU32(reg, imm)
             | Instruction::SubU32RegU32Imm(reg, imm)
@@ -254,17 +254,17 @@ mod tests_compiler {
                 OpCode::Int => Instruction::Int(0xdeadbeef),
                 OpCode::IntRet => Instruction::IntRet,
                 OpCode::SwapU32RegU32Reg => Instruction::SwapU32RegU32Reg(R2, R3),
-                OpCode::MovU32ImmU32Reg => Instruction::MovU32ImmU32Reg(0x123, R2),
-                OpCode::MovU32RegU32Reg => Instruction::MovU32RegU32Reg(R2, R3),
-                OpCode::MovU32ImmMemRelSimple => Instruction::MovU32ImmMemRelSimple(0x123, 0x321),
-                OpCode::MovU32RegMemRelSimple => Instruction::MovU32RegMemRelSimple(R2, 0x123),
-                OpCode::MovMemU32RegRelSimple => Instruction::MovMemU32RegRelSimple(0x123, R2),
-                OpCode::MovU32RegPtrU32RegRelSimple => {
-                    Instruction::MovU32RegPtrU32RegRelSimple(R2, R3)
+                OpCode::MovU32ImmU32Reg => Instruction::MovU32ImmU32(0x123, R2),
+                OpCode::MovU32RegU32Reg => Instruction::MovU32RegU32(R2, R3),
+                OpCode::MovU32ImmMemSimple => Instruction::MovU32ImmMemSimple(0x123, 0x321),
+                OpCode::MovU32RegMemSimple => Instruction::MovU32RegMemSimple(R2, 0x123),
+                OpCode::MovMemU32RegSimple => Instruction::MovMemU32RegSimple(0x123, R2),
+                OpCode::MovU32RegPtrU32RegSimple => {
+                    Instruction::MovU32RegPtrU32RegSimple(R2, R3)
                 }
-                OpCode::MovU32ImmMemExprRel => Instruction::MovU32ImmMemExprRel(0x123, 0x321),
-                OpCode::MovMemExprU32RegRel => Instruction::MovMemExprU32RegRel(0x123, R2),
-                OpCode::MovU32RegMemExprRel => Instruction::MovU32RegMemExprRel(R2, 0x123),
+                OpCode::MovU32ImmMemExpr => Instruction::MovU32ImmMemExpr(0x123, 0x321),
+                OpCode::MovMemExprU32Reg => Instruction::MovMemExprU32Reg(0x123, R2),
+                OpCode::MovU32RegMemExpr => Instruction::MovU32RegMemExpr(R2, 0x123),
                 OpCode::ByteSwapU32 => Instruction::ByteSwapU32(R2),
                 OpCode::ZeroHighBitsByIndexU32Reg => {
                     Instruction::ZeroHighBitsByIndexU32Reg(R2, R3, R4)

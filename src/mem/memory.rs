@@ -405,55 +405,55 @@ impl Memory {
                 let imm = block.read_u32();
                 let reg = block.read_register_id();
 
-                Instruction::MovU32ImmU32Reg(imm, reg)
+                Instruction::MovU32ImmU32(imm, reg)
             }
             OpCode::MovU32RegU32Reg => {
                 let in_reg = block.read_register_id();
                 let out_reg = block.read_register_id();
 
-                Instruction::MovU32RegU32Reg(in_reg, out_reg)
+                Instruction::MovU32RegU32(in_reg, out_reg)
             }
-            OpCode::MovU32ImmMemRelSimple => {
+            OpCode::MovU32ImmMemSimple => {
                 let imm = block.read_u32();
                 let addr = block.read_u32();
 
-                Instruction::MovU32ImmMemRelSimple(imm, addr)
+                Instruction::MovU32ImmMemSimple(imm, addr)
             }
-            OpCode::MovU32RegMemRelSimple => {
+            OpCode::MovU32RegMemSimple => {
                 let reg = block.read_register_id();
                 let addr = block.read_u32();
 
-                Instruction::MovU32RegMemRelSimple(reg, addr)
+                Instruction::MovU32RegMemSimple(reg, addr)
             }
-            OpCode::MovMemU32RegRelSimple => {
+            OpCode::MovMemU32RegSimple => {
                 let addr = block.read_u32();
                 let reg = block.read_register_id();
 
-                Instruction::MovMemU32RegRelSimple(addr, reg)
+                Instruction::MovMemU32RegSimple(addr, reg)
             }
-            OpCode::MovU32RegPtrU32RegRelSimple => {
+            OpCode::MovU32RegPtrU32RegSimple => {
                 let in_reg = block.read_register_id();
                 let out_reg = block.read_register_id();
 
-                Instruction::MovU32RegPtrU32RegRelSimple(in_reg, out_reg)
+                Instruction::MovU32RegPtrU32RegSimple(in_reg, out_reg)
             }
-            OpCode::MovU32ImmMemExprRel => {
+            OpCode::MovU32ImmMemExpr => {
                 let imm = block.read_u32();
                 let expr = block.read_u32();
 
-                Instruction::MovU32ImmMemExprRel(imm, expr)
+                Instruction::MovU32ImmMemExpr(imm, expr)
             }
-            OpCode::MovMemExprU32RegRel => {
+            OpCode::MovMemExprU32Reg => {
                 let expr = block.read_u32();
                 let reg = block.read_register_id();
 
-                Instruction::MovMemExprU32RegRel(expr, reg)
+                Instruction::MovMemExprU32Reg(expr, reg)
             }
-            OpCode::MovU32RegMemExprRel => {
+            OpCode::MovU32RegMemExpr => {
                 let reg = block.read_register_id();
                 let expr = block.read_u32();
 
-                Instruction::MovU32RegMemExprRel(reg, expr)
+                Instruction::MovU32RegMemExpr(reg, expr)
             }
             OpCode::ByteSwapU32 => {
                 let reg = block.read_register_id();

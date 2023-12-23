@@ -84,23 +84,23 @@ pub enum Instruction {
     /// Swap the values of the two registers.
     SwapU32RegU32Reg(RegisterId, RegisterId),
     /// Move a u32 immediate to u32 register (A). The result is copied into register A.
-    MovU32ImmU32Reg(u32, RegisterId),
+    MovU32ImmU32(u32, RegisterId),
     /// Move a u32 register (B) to u32 register (A). The result is copied into register A.
-    MovU32RegU32Reg(RegisterId, RegisterId),
-    /// Move a u32 iImmediate to memory (relative to the base address of the code block). The result is copied into the specified memory address.
-    MovU32ImmMemRelSimple(u32, u32),
-    /// Move a u32 register to memory (relative to the base address of the code block). The result is copied into the specified memory address.
-    MovU32RegMemRelSimple(RegisterId, u32),
-    /// Move a u32 value from memory (relative to the base address of the code block) to a u32 register. The result is copied into the specified register.
-    MovMemU32RegRelSimple(u32, RegisterId),
-    /// Move the value from the memory address specified by a register (relative to the base address of the code block). The result is copied into the specified register.
-    MovU32RegPtrU32RegRelSimple(RegisterId, RegisterId),
-    /// Move a u32 immediate to memory (relative to the base address of the code block). The result is copied into the specified memory address.
-    MovU32ImmMemExprRel(u32, u32),
-    /// Move the address as given by an expression (from memory, relative to the base address of the code block). The result is copied into the specified register.
-    MovMemExprU32RegRel(u32, RegisterId),
-    /// Move the value of a register to the address given by an expression (relative to the base address of the code block). The result is copied into the specified memory address.
-    MovU32RegMemExprRel(RegisterId, u32),
+    MovU32RegU32(RegisterId, RegisterId),
+    /// Move a u32 iImmediate to memory. The result is copied into the specified memory address.
+    MovU32ImmMemSimple(u32, u32),
+    /// Move a u32 register to memory. The result is copied into the specified memory address.
+    MovU32RegMemSimple(RegisterId, u32),
+    /// Move a u32 value from memory to a u32 register. The result is copied into the specified register.
+    MovMemU32RegSimple(u32, RegisterId),
+    /// Move the value from the memory address specified by a register. The result is copied into the specified register.
+    MovU32RegPtrU32RegSimple(RegisterId, RegisterId),
+    /// Move a u32 immediate to memory. The result is copied into the specified memory address.
+    MovU32ImmMemExpr(u32, u32),
+    /// Move the address as given by an expression. The result is copied into the specified register.
+    MovMemExprU32Reg(u32, RegisterId),
+    /// Move the value of a register to the address given by an expression. The result is copied into the specified memory address.
+    MovU32RegMemExpr(RegisterId, u32),
     /// Reverse the order of bytes in a specified register.
     ByteSwapU32(RegisterId),
     /// Zero the high bits of the source value starting from a specified index.
@@ -241,41 +241,41 @@ impl Display for Instruction {
             Instruction::SwapU32RegU32Reg(reg_1, reg_2) => {
                 format!("swap %{reg_1}, %{reg_2}")
             }
-            Instruction::MovU32ImmU32Reg(imm, reg) => {
+            Instruction::MovU32ImmU32(imm, reg) => {
                 format!("mov ${imm:04x}, %{reg}")
             }
-            Instruction::MovU32RegU32Reg(in_reg, out_reg) => {
+            Instruction::MovU32RegU32(in_reg, out_reg) => {
                 format!("mov %{in_reg}, %{out_reg}")
             }
-            Instruction::MovU32ImmMemRelSimple(imm, addr) => {
-                format!("mov.rs ${imm:04x}, [${addr:04x}]")
+            Instruction::MovU32ImmMemSimple(imm, addr) => {
+                format!("mov.s ${imm:04x}, [${addr:04x}]")
             }
-            Instruction::MovU32RegMemRelSimple(reg, addr) => {
-                format!("mov.rs %{reg}, [${addr:04x}]")
+            Instruction::MovU32RegMemSimple(reg, addr) => {
+                format!("mov.s %{reg}, [${addr:04x}]")
             }
-            Instruction::MovMemU32RegRelSimple(addr, reg) => {
-                format!("mov.rs [${addr:04x}], %{reg}")
+            Instruction::MovMemU32RegSimple(addr, reg) => {
+                format!("mov.s [${addr:04x}], %{reg}")
             }
-            Instruction::MovU32RegPtrU32RegRelSimple(in_reg, out_reg) => {
-                format!("mov.rs [%{in_reg}], %{out_reg}")
+            Instruction::MovU32RegPtrU32RegSimple(in_reg, out_reg) => {
+                format!("mov.s [%{in_reg}], %{out_reg}")
             }
-            Instruction::MovU32ImmMemExprRel(imm, expr) => {
+            Instruction::MovU32ImmMemExpr(imm, expr) => {
                 let mut decoder = MoveExpressionHandler::new();
                 decoder.unpack(expr);
 
-                format!("mov.rc ${imm:04x}, [{decoder}]")
+                format!("mov.c ${imm:04x}, [{decoder}]")
             }
-            Instruction::MovMemExprU32RegRel(expr, reg) => {
+            Instruction::MovMemExprU32Reg(expr, reg) => {
                 let mut decoder = MoveExpressionHandler::new();
                 decoder.unpack(expr);
 
-                format!("mov.rc [{decoder}], %{reg}")
+                format!("mov.c [{decoder}], %{reg}")
             }
-            Instruction::MovU32RegMemExprRel(reg, expr) => {
+            Instruction::MovU32RegMemExpr(reg, expr) => {
                 let mut decoder = MoveExpressionHandler::new();
                 decoder.unpack(expr);
 
-                format!("mov.rc %{reg}, [{decoder}]")
+                format!("mov.c %{reg}, [{decoder}]")
             }
             Instruction::ByteSwapU32(reg) => {
                 format!("bswap %{reg}")
@@ -390,13 +390,13 @@ impl Instruction {
             OpCode::SwapU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
             OpCode::MovU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
             OpCode::MovU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-            OpCode::MovU32ImmMemRelSimple => ARG_U32_IMM_SIZE + ARG_MEM_ADDR_SIZE,
-            OpCode::MovU32RegMemRelSimple => ARG_REG_ID_SIZE + ARG_MEM_ADDR_SIZE,
-            OpCode::MovMemU32RegRelSimple => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
-            OpCode::MovU32RegPtrU32RegRelSimple => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-            OpCode::MovU32ImmMemExprRel => ARG_U32_IMM_SIZE + ARG_MEM_ADDR_SIZE,
-            OpCode::MovMemExprU32RegRel => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
-            OpCode::MovU32RegMemExprRel => ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE,
+            OpCode::MovU32ImmMemSimple => ARG_U32_IMM_SIZE + ARG_MEM_ADDR_SIZE,
+            OpCode::MovU32RegMemSimple => ARG_REG_ID_SIZE + ARG_MEM_ADDR_SIZE,
+            OpCode::MovMemU32RegSimple => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
+            OpCode::MovU32RegPtrU32RegSimple => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
+            OpCode::MovU32ImmMemExpr => ARG_U32_IMM_SIZE + ARG_MEM_ADDR_SIZE,
+            OpCode::MovMemExprU32Reg => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
+            OpCode::MovU32RegMemExpr => ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE,
             OpCode::ByteSwapU32 => ARG_REG_ID_SIZE,
             OpCode::ZeroHighBitsByIndexU32Reg => {
                 ARG_REG_ID_SIZE + ARG_REG_ID_SIZE + ARG_REG_ID_SIZE

@@ -75,20 +75,20 @@ pub enum OpCode {
     MovU32ImmU32Reg,
     /// Move a u32 register (B) to u32 register (A). The result is copied into register A.
     MovU32RegU32Reg,
-    /// Move a u32 iImmediate to memory (relative to the base address of the code block). The result is copied into the specified memory address.
-    MovU32ImmMemRelSimple,
-    /// Move a u32 register to memory (relative to the base address of the code block). The result is copied into the specified memory address.
-    MovU32RegMemRelSimple,
-    /// Move a u32 value from memory (relative to the base address of the code block) to a u32 register. The result is copied into the specified register.
-    MovMemU32RegRelSimple,
-    /// Move the value from the memory address specified by a register (relative to the base address of the code block). The result is copied into the specified register.
-    MovU32RegPtrU32RegRelSimple,
-    /// Move a u32 immediate to memory (relative to the base address of the code block). The result is copied into the specified memory address.
-    MovU32ImmMemExprRel,
-    /// Move the address as given by an expression (from memory, relative to the base address of the code block). The result is copied into the specified register.
-    MovMemExprU32RegRel,
-    /// Move the value of a register to the address given by an expression (relative to the base address of the code block). The result is copied into the specified memory address.
-    MovU32RegMemExprRel,
+    /// Move a u32 immediate to memory. The result is copied into the specified memory address.
+    MovU32ImmMemSimple,
+    /// Move a u32 register to memory. The result is copied into the specified memory address.
+    MovU32RegMemSimple,
+    /// Move a u32 value from memory to a u32 register. The result is copied into the specified register.
+    MovMemU32RegSimple,
+    /// Move the value from the memory address specified by a register. The result is copied into the specified register.
+    MovU32RegPtrU32RegSimple,
+    /// Move a u32 immediate to memory. The result is copied into the specified memory address.
+    MovU32ImmMemExpr,
+    /// Move the address as given by an expression. The result is copied into the specified register.
+    MovMemExprU32Reg,
+    /// Move the value of a register to the address given by an expression. The result is copied into the specified memory address.
+    MovU32RegMemExpr,
     /// Reverse the order of bytes in a specified register.
     ByteSwapU32,
     /// Zero the high bits of the source value starting from a specified index.
@@ -180,15 +180,15 @@ impl From<Instruction> for OpCode {
 
             /******** [Data Instructions] ********/
             Instruction::SwapU32RegU32Reg(_, _) => OpCode::SwapU32RegU32Reg,
-            Instruction::MovU32ImmU32Reg(_, _) => OpCode::MovU32ImmU32Reg,
-            Instruction::MovU32RegU32Reg(_, _) => OpCode::MovU32RegU32Reg,
-            Instruction::MovU32ImmMemRelSimple(_, _) => OpCode::MovU32ImmMemRelSimple,
-            Instruction::MovU32RegMemRelSimple(_, _) => OpCode::MovU32RegMemRelSimple,
-            Instruction::MovMemU32RegRelSimple(_, _) => OpCode::MovMemU32RegRelSimple,
-            Instruction::MovU32RegPtrU32RegRelSimple(_, _) => OpCode::MovU32RegPtrU32RegRelSimple,
-            Instruction::MovU32ImmMemExprRel(_, _) => OpCode::MovU32ImmMemExprRel,
-            Instruction::MovMemExprU32RegRel(_, _) => OpCode::MovMemExprU32RegRel,
-            Instruction::MovU32RegMemExprRel(_, _) => OpCode::MovU32RegMemExprRel,
+            Instruction::MovU32ImmU32(_, _) => OpCode::MovU32ImmU32Reg,
+            Instruction::MovU32RegU32(_, _) => OpCode::MovU32RegU32Reg,
+            Instruction::MovU32ImmMemSimple(_, _) => OpCode::MovU32ImmMemSimple,
+            Instruction::MovU32RegMemSimple(_, _) => OpCode::MovU32RegMemSimple,
+            Instruction::MovMemU32RegSimple(_, _) => OpCode::MovMemU32RegSimple,
+            Instruction::MovU32RegPtrU32RegSimple(_, _) => OpCode::MovU32RegPtrU32RegSimple,
+            Instruction::MovU32ImmMemExpr(_, _) => OpCode::MovU32ImmMemExpr,
+            Instruction::MovMemExprU32Reg(_, _) => OpCode::MovMemExprU32Reg,
+            Instruction::MovU32RegMemExpr(_, _) => OpCode::MovU32RegMemExpr,
             Instruction::ByteSwapU32(_) => OpCode::ByteSwapU32,
             Instruction::ZeroHighBitsByIndexU32Reg(_, _, _) => OpCode::ZeroHighBitsByIndexU32Reg,
             Instruction::ZeroHighBitsByIndexU32RegU32Imm(_, _, _) => {
