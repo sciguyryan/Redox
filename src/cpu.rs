@@ -111,19 +111,14 @@ impl Cpu {
     /// # Returns
     ///
     /// The next [`Instruction`] to be executed.
-    fn fetch_decode_next_instruction(&mut self, mem: &Memory) -> Option<Instruction> {
+    fn fetch_decode_next_instruction(&mut self, mem: &Memory) -> Instruction {
         // Get the current instruction pointer.
         let ip = *self
             .registers
             .get_register_u32(RegisterId::IP)
             .read_unchecked() as usize;
 
-        // Are we within valid memory bounds?
-        if ip < mem.len() {
-            Some(mem.get_instruction(ip))
-        } else {
-            None
-        }
+        mem.get_instruction(ip)
     }
 
     /// Get the size of the current stack frame.
@@ -602,11 +597,8 @@ impl Cpu {
     /// * `mem` - A reference to the virtual machine [`Memory`] instance.
     pub fn run(&mut self, mem: &mut Memory) {
         loop {
-            if let Some(ins) = self.fetch_decode_next_instruction(mem) {
-                self.run_instruction(mem, &ins);
-            } else {
-                self.is_halted = true;
-            }
+            let ins = self.fetch_decode_next_instruction(mem);
+            self.run_instruction(mem, &ins);
 
             if self.is_halted {
                 break;
