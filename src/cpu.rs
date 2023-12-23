@@ -102,7 +102,7 @@ impl Cpu {
         }
     }
 
-    /// Execute a move instruction expression.
+    /// Fetch and decode the next instruction to be executed.
     ///
     /// # Arguments
     ///
