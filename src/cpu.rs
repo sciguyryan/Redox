@@ -178,10 +178,7 @@ impl Cpu {
     /// This method affects the following flags: Sign (SF), Overflow (OF), Zero (ZF) and Parity (PF). Any other flags are undefined.
     #[inline(always)]
     fn perform_checked_add_u32(&mut self, value_1: u32, value_2: u32) -> u32 {
-        let (final_value, overflow) = match value_1.checked_add(value_2) {
-            Some(val) => (val, false),
-            None => (value_1.wrapping_add(value_2), true),
-        };
+        let (final_value, overflow) = value_1.overflowing_add(value_2);
 
         self.set_standard_flags_by_value(final_value, overflow);
 
@@ -204,10 +201,7 @@ impl Cpu {
     /// This method affects the following flags: Sign (SF), Overflow (OF), Zero (ZF) and Parity (PF). Any other flags are undefined.
     #[inline(always)]
     fn perform_checked_subtract_u32(&mut self, value_1: u32, value_2: u32) -> u32 {
-        let (final_value, overflow) = match value_1.checked_sub(value_2) {
-            Some(val) => (val, false),
-            None => (value_1.wrapping_sub(value_2), true),
-        };
+        let (final_value, overflow) = value_1.overflowing_sub(value_2);
 
         self.set_standard_flags_by_value(final_value, overflow);
 
