@@ -5,6 +5,9 @@ use crate::ins::{instruction::Instruction, op_codes::OpCode};
 
 use super::memory_block_reader::MemoryBlockReader;
 
+/// The size of a 256 megabyte memory block.
+const MEM_256_MB: usize = 1028 * 256;
+
 #[allow(unused)]
 enum StackTypeHint {
     F32,
@@ -98,6 +101,11 @@ impl Memory {
             stack_segment_start = data_segment_end;
             stack_segment_end = stack_segment_start;
         }
+
+        // Assert that the entire memory will be less than 256 megabytes in size.
+        // This will ensure that we can map the mirrored regions without having them
+        // conflict with the actual main memory segments.
+        assert!(stack_segment_end < MEM_256_MB);
 
         // Now we have the locations of the memory segments, we can create the memory
         let mut mem = Self {
