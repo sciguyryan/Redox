@@ -6,7 +6,7 @@ use crate::ins::{instruction::Instruction, op_codes::OpCode};
 use super::memory_block_reader::MemoryBlockReader;
 
 /// The size of a 256 megabyte memory block.
-const MEM_256_MB: usize = 1028 * 256;
+const MEM_256_MB: usize = 1024 * 1024 * 256;
 
 #[allow(unused)]
 enum StackTypeHint {
