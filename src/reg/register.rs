@@ -82,13 +82,18 @@ impl RegisterU32 {
         self.value -= value;
     }
 
+    /// Get the value of the CPU flags register as a human-readable string.
     pub fn get_flags_register_string(&self) -> String {
         let mut flags = String::new();
 
         if self.id == RegisterId::FL {
             let states: Vec<String> = CpuFlag::iterator()
                 .map(|flag_type| {
-                    let is_set = utils::is_bit_set(self.value, (*flag_type) as u8);
+                    let is_set = if utils::is_bit_set(self.value, (*flag_type) as u8) {
+                        '1'
+                    } else {
+                        '0'
+                    };
                     format!("{flag_type} = {is_set}")
                 })
                 .collect();

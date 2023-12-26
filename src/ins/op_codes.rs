@@ -180,8 +180,8 @@ impl From<Instruction> for OpCode {
 
             /******** [Data Instructions] ********/
             Instruction::SwapU32RegU32Reg(_, _) => OpCode::SwapU32RegU32Reg,
-            Instruction::MovU32ImmU32(_, _) => OpCode::MovU32ImmU32Reg,
-            Instruction::MovU32RegU32(_, _) => OpCode::MovU32RegU32Reg,
+            Instruction::MovU32ImmU32Reg(_, _) => OpCode::MovU32ImmU32Reg,
+            Instruction::MovU32RegU32Reg(_, _) => OpCode::MovU32RegU32Reg,
             Instruction::MovU32ImmMemSimple(_, _) => OpCode::MovU32ImmMemSimple,
             Instruction::MovU32RegMemSimple(_, _) => OpCode::MovU32RegMemSimple,
             Instruction::MovMemU32RegSimple(_, _) => OpCode::MovMemU32RegSimple,

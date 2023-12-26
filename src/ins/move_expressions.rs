@@ -125,6 +125,7 @@ impl MoveExpressionHandler {
     }
 
     /// Pack this move expression into its encoded format.
+    #[allow(dead_code)]
     pub fn pack(&self) -> u32 {
         // Layout:
         // [BIT 0]      [BIT 1]      [BIT 2]      [BIT 3]       [BIT 4-5]  [BIT 6-7]  [BIT 8-15]  [BIT 16-23]  [BIT 24-31]

@@ -52,7 +52,7 @@ impl Compiler {
             | Instruction::ArithLeftShiftU32ImmU32Reg(imm, reg)
             | Instruction::RightShiftU32ImmU32Reg(imm, reg)
             | Instruction::ArithRightShiftU32ImmU32Reg(imm, reg)
-            | Instruction::MovU32ImmU32(imm, reg)
+            | Instruction::MovU32ImmU32Reg(imm, reg)
             | Instruction::MovMemU32RegSimple(imm, reg)
             | Instruction::MovMemExprU32Reg(imm, reg)
             | Instruction::BitScanReverseU32MemU32Reg(imm, reg)
@@ -73,7 +73,7 @@ impl Compiler {
             | Instruction::RightShiftU32RegU32Reg(reg_1, reg_2)
             | Instruction::ArithRightShiftU32RegU32Reg(reg_1, reg_2)
             | Instruction::SwapU32RegU32Reg(reg_1, reg_2)
-            | Instruction::MovU32RegU32(reg_1, reg_2)
+            | Instruction::MovU32RegU32Reg(reg_1, reg_2)
             | Instruction::MovU32RegPtrU32RegSimple(reg_1, reg_2)
             | Instruction::BitScanReverseU32RegU32Reg(reg_1, reg_2)
             | Instruction::BitScanForwardU32RegU32Reg(reg_1, reg_2)
@@ -254,14 +254,12 @@ mod tests_compiler {
                 OpCode::Int => Instruction::Int(0xdeadbeef),
                 OpCode::IntRet => Instruction::IntRet,
                 OpCode::SwapU32RegU32Reg => Instruction::SwapU32RegU32Reg(R2, R3),
-                OpCode::MovU32ImmU32Reg => Instruction::MovU32ImmU32(0x123, R2),
-                OpCode::MovU32RegU32Reg => Instruction::MovU32RegU32(R2, R3),
+                OpCode::MovU32ImmU32Reg => Instruction::MovU32ImmU32Reg(0x123, R2),
+                OpCode::MovU32RegU32Reg => Instruction::MovU32RegU32Reg(R2, R3),
                 OpCode::MovU32ImmMemSimple => Instruction::MovU32ImmMemSimple(0x123, 0x321),
                 OpCode::MovU32RegMemSimple => Instruction::MovU32RegMemSimple(R2, 0x123),
                 OpCode::MovMemU32RegSimple => Instruction::MovMemU32RegSimple(0x123, R2),
-                OpCode::MovU32RegPtrU32RegSimple => {
-                    Instruction::MovU32RegPtrU32RegSimple(R2, R3)
-                }
+                OpCode::MovU32RegPtrU32RegSimple => Instruction::MovU32RegPtrU32RegSimple(R2, R3),
                 OpCode::MovU32ImmMemExpr => Instruction::MovU32ImmMemExpr(0x123, 0x321),
                 OpCode::MovMemExprU32Reg => Instruction::MovMemExprU32Reg(0x123, R2),
                 OpCode::MovU32RegMemExpr => Instruction::MovU32RegMemExpr(R2, 0x123),
@@ -320,7 +318,7 @@ mod tests_compiler {
         let decompiled_instructions = Decompiler::decompile(&compiler.bytes);
 
         let mut success = true;
-        for (i, (original, decompiled)) in decompiled_instructions
+        for (i, (decompiled, original)) in decompiled_instructions
             .iter()
             .zip(&instructions_in)
             .enumerate()

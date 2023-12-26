@@ -84,9 +84,9 @@ pub enum Instruction {
     /// Swap the values of the two registers.
     SwapU32RegU32Reg(RegisterId, RegisterId),
     /// Move a u32 immediate to u32 register (A). The result is copied into register A.
-    MovU32ImmU32(u32, RegisterId),
+    MovU32ImmU32Reg(u32, RegisterId),
     /// Move a u32 register (B) to u32 register (A). The result is copied into register A.
-    MovU32RegU32(RegisterId, RegisterId),
+    MovU32RegU32Reg(RegisterId, RegisterId),
     /// Move a u32 iImmediate to memory. The result is copied into the specified memory address.
     MovU32ImmMemSimple(u32, u32),
     /// Move a u32 register to memory. The result is copied into the specified memory address.
@@ -241,10 +241,10 @@ impl Display for Instruction {
             Instruction::SwapU32RegU32Reg(reg_1, reg_2) => {
                 format!("swap %{reg_1}, %{reg_2}")
             }
-            Instruction::MovU32ImmU32(imm, reg) => {
+            Instruction::MovU32ImmU32Reg(imm, reg) => {
                 format!("mov ${imm:04x}, %{reg}")
             }
-            Instruction::MovU32RegU32(in_reg, out_reg) => {
+            Instruction::MovU32RegU32Reg(in_reg, out_reg) => {
                 format!("mov %{in_reg}, %{out_reg}")
             }
             Instruction::MovU32ImmMemSimple(imm, addr) => {

@@ -12,21 +12,25 @@ impl<'a> MemoryBlockReader<'a> {
         Self { cursor: 0, data }
     }
 
+    /// Attempt to read a register ID from memory.
     pub fn read_register_id(&mut self) -> RegisterId {
         FromPrimitive::from_u8(*self.read_u8_internal())
             .expect("failed to read register ID from memory")
     }
 
+    /// Attempt to read a u8 value from memory.
     fn read_u8_internal(&mut self) -> &u8 {
         let pos = self.cursor;
         self.cursor += 1;
         &self.data[pos]
     }
 
+    /// Attempt to read a u8 value from memory.
     pub fn read_u8(&mut self) -> u8 {
         *self.read_u8_internal()
     }
 
+    /// Attempt to read a u32 value from memory.
     pub fn read_u32(&mut self) -> u32 {
         // This will assert if the value is out of range anyway.
         let bytes: [u8; 4] = self.data[self.cursor..self.cursor + 4]

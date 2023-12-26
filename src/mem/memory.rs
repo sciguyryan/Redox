@@ -3,10 +3,22 @@ use prettytable::{row, Table};
 
 use crate::ins::{instruction::Instruction, op_codes::OpCode};
 
-use super::memory_block_reader::MemoryBlockReader;
+use super::{mapped_memory_region::MappedMemoryRegion, memory_block_reader::MemoryBlockReader};
 
-/// The size of a 256 megabyte memory block.
-const MEM_256_MB: usize = 1024 * 1024 * 256;
+/// The number of bytes in a megabyte.
+const MEGABYTE: usize = 1024 * 1024;
+
+/// The start index of the boot mapped memory region.
+const BOOT_MEMORY_START: usize = 0x20_000_000; // Starting at the 512 megabyte region.
+/// The end index of the boot mapped memory region.
+const BOOT_MEMORY_END: usize = 0x20_100_000; // Extending for 1 megabyte.
+                                             // The ID of the boot mapped memory region.
+const BOOT_MEMORY_ID: usize = 0;
+
+/// The maximum permissible size of the emulate physical memory. Here it is 256 megabyte in size.
+const MAX_PHYSICAL_MEMORY: usize = MEGABYTE * 256;
+/// The ID of the physical mapped memory region.
+const PHYSICAL_MEMORY_ID: usize = 1;
 
 #[allow(unused)]
 enum StackTypeHint {
@@ -27,11 +39,17 @@ enum StackTypeHint {
  *
  * Since the system does not have memory write enforcement, technically the entire thing is writable,
  * meaning that self-modifying code is technically also possible too.
+ *
+ * Certain memory areas are mapped to things outside of the emulated physical memory but can be
+ * accessed as though they were. These mirrored areas will be used for graphics memory and the memory
+ * of other emulated devices.
+ * These areas are always mapped to regions outside the space of the emulated physical memory to avoid
+ * causing conflicts.
  */
 
 pub struct Memory {
-    /// The raw byte storage of this memory module.
-    storage: Vec<u8>,
+    /// A list of the registered handlers for specially mapped memory regions.
+    mapped_memory: Vec<MappedMemoryRegion>,
 
     /// The start address of the user segment.
     pub user_segment_start: usize,
@@ -105,11 +123,20 @@ impl Memory {
         // Assert that the entire memory will be less than 256 megabytes in size.
         // This will ensure that we can map the mirrored regions without having them
         // conflict with the actual main memory segments.
-        assert!(stack_segment_end < MEM_256_MB);
+        assert!(stack_segment_end < MAX_PHYSICAL_MEMORY);
+
+        // The physical mapped memory region.
+        let physical_mapped_mem =
+            MappedMemoryRegion::new(0, stack_segment_end, String::from("physical"));
+
+        // The boot mapped memory region.
+        // TODO - build a compiled boot region and set the instruction pointer to it.
+        let boot_mapped_mem =
+            MappedMemoryRegion::new(BOOT_MEMORY_START, BOOT_MEMORY_END, String::from("boot"));
 
         // Now we have the locations of the memory segments, we can create the memory
         let mut mem = Self {
-            storage: vec![0x0; stack_segment_end],
+            mapped_memory: vec![boot_mapped_mem, physical_mapped_mem],
             user_segment_start,
             user_segment_end,
             code_segment_start,
@@ -135,19 +162,6 @@ impl Memory {
         mem
     }
 
-    /// Assert that a specific memory position is within the valid memory region.
-    ///
-    /// # Arguments
-    ///
-    /// * `pos` - The point in memory to be checked.
-    #[inline]
-    fn assert_point_in_bounds(&self, pos: usize) {
-        assert!(
-            self.is_in_bounds(pos),
-            "The memory location is outside of the valid memory bounds. Point = {pos}"
-        );
-    }
-
     /// Can we pop a u32 value from the stack?
     #[inline(always)]
     pub fn can_pop_u32(&self) -> bool {
@@ -164,7 +178,7 @@ impl Memory {
 
     /// Completely clear the memory.
     pub fn clear(&mut self) {
-        self.storage = vec![0; self.storage.len()];
+        self.mapped_memory[PHYSICAL_MEMORY_ID].clear()
     }
 
     /// Attempt to decompile any instructions between a start and end memory location.
@@ -201,9 +215,11 @@ impl Memory {
     ///
     /// A pointer to the specific byte in memory.
     pub fn get_byte_ptr(&self, pos: usize) -> &u8 {
-        self.assert_point_in_bounds(pos);
+        let region = self
+            .get_mapped_region_by_address(pos)
+            .expect("failed to get mapped memory region for address");
 
-        &self.storage[pos]
+        &region.memory[pos - region.start]
     }
 
     /// Attempt to read and clone a byte from memory.
@@ -216,9 +232,11 @@ impl Memory {
     ///
     /// A clone of the specific byte from memory.
     pub fn get_byte_clone(&self, pos: usize) -> u8 {
-        assert!(self.is_in_bounds(pos));
+        let region = self
+            .get_mapped_region_by_address(pos)
+            .expect("failed to get mapped memory region for address");
 
-        self.storage[pos]
+        region.memory[pos - region.start]
     }
 
     /// Attempt to read an instruction from memory.
@@ -413,13 +431,13 @@ impl Memory {
                 let imm = block.read_u32();
                 let reg = block.read_register_id();
 
-                Instruction::MovU32ImmU32(imm, reg)
+                Instruction::MovU32ImmU32Reg(imm, reg)
             }
             OpCode::MovU32RegU32Reg => {
                 let in_reg = block.read_register_id();
                 let out_reg = block.read_register_id();
 
-                Instruction::MovU32RegU32(in_reg, out_reg)
+                Instruction::MovU32RegU32Reg(in_reg, out_reg)
             }
             OpCode::MovU32ImmMemSimple => {
                 let imm = block.read_u32();
@@ -581,6 +599,49 @@ impl Memory {
         }
     }
 
+    /// Attempt to find the mapped memory region that is associated with a given address.
+    ///
+    /// # Arguments
+    ///
+    /// * `pos` - The position of the byte in memory.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the associated [`MappedMemory`] region.
+    ///
+    /// # Note
+    ///
+    /// This method will assert if no valid memory region is located.
+    #[inline]
+    pub fn get_mapped_region_by_address(&self, pos: usize) -> Option<&MappedMemoryRegion> {
+        self.mapped_memory
+            .iter()
+            .find(|e| pos >= e.start && pos <= e.end)
+    }
+
+    /// Attempt to find the mapped memory region that is associated with a given address.
+    ///
+    /// # Arguments
+    ///
+    /// * `pos` - The position of the byte in memory.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the associated [`MappedMemory`] region.
+    ///
+    /// # Note
+    ///
+    /// This method will assert if no valid memory region is located.
+    #[inline]
+    pub fn get_mapped_region_by_address_mut(
+        &mut self,
+        pos: usize,
+    ) -> Option<&mut MappedMemoryRegion> {
+        self.mapped_memory
+            .iter_mut()
+            .find(|e| pos >= e.start && pos <= e.end)
+    }
+
     /// Attempt to read a u32 value from memory.
     ///
     /// # Arguments
@@ -610,11 +671,17 @@ impl Memory {
     ///
     /// A reference to a u8 slice from memory.
     pub fn get_range_ptr(&self, start: usize, len: usize) -> &[u8] {
-        let end = start + len;
-        self.assert_point_in_bounds(start);
-        self.assert_point_in_bounds(end);
+        let region = self
+            .get_mapped_region_by_address(start)
+            .expect("failed to get mapped memory region for address");
 
-        &self.storage[start..end]
+        // Does this region completely contain the address range?
+        let mapped_start = start - region.start;
+        let mapped_end = mapped_start + len;
+
+        assert!(region.contains_range(mapped_start, mapped_end));
+
+        &region.memory[mapped_start..mapped_end]
     }
 
     /// Attempt to clone a range of bytes from memory.
@@ -637,7 +704,8 @@ impl Memory {
     ///
     /// A slice of u8 values.
     pub fn get_code_segment_storage(&self) -> &[u8] {
-        &self.storage[self.code_segment_start..self.code_segment_end]
+        &self.mapped_memory[PHYSICAL_MEMORY_ID].memory
+            [self.code_segment_start..self.code_segment_end]
     }
 
     /// Get a slice of the data segment contents.
@@ -646,7 +714,8 @@ impl Memory {
     ///
     /// A slice of u8 values.
     pub fn get_data_segment_storage(&self) -> &[u8] {
-        &self.storage[self.data_segment_start..self.data_segment_end]
+        &self.mapped_memory[PHYSICAL_MEMORY_ID].memory
+            [self.data_segment_start..self.data_segment_end]
     }
 
     /// Get a slice of the raw stack segment contents.
@@ -655,7 +724,8 @@ impl Memory {
     ///
     /// A slice of u8 values
     pub fn get_stack_segment_storage(&self) -> &[u8] {
-        &self.storage[self.stack_segment_start..self.stack_segment_end]
+        &self.mapped_memory[PHYSICAL_MEMORY_ID].memory
+            [self.stack_segment_start..self.stack_segment_end]
     }
 
     /// Get a slice of the entire memory contents.
@@ -664,7 +734,7 @@ impl Memory {
     ///
     /// A slice of u8 values, referencing every byte in memory.
     pub fn get_storage(&self) -> &[u8] {
-        &self.storage
+        &self.mapped_memory[PHYSICAL_MEMORY_ID].memory
     }
 
     /// Get a slice of the user segment contents.
@@ -673,7 +743,7 @@ impl Memory {
     ///
     /// A slice of u8 values
     pub fn get_user_segment_storage(&self) -> &[u8] {
-        &self.storage[..self.code_segment_start]
+        &self.mapped_memory[PHYSICAL_MEMORY_ID].memory[..self.code_segment_start]
     }
 
     /// Checks whether the allocated memory region has a size greater than 0.
@@ -681,27 +751,13 @@ impl Memory {
         self.len() == 0
     }
 
-    /// Checks whether a specific memory position is within the valid memory region bounds.
-    ///
-    /// # Arguments
-    ///
-    /// * `pos` - The point in memory to be checked.
+    /// Get the size of the emulated physical memory.
     ///
     /// # Returns
     ///
-    /// True if the memory region is within the valid memory region bounds, false otherwise.
-    #[inline]
-    fn is_in_bounds(&self, pos: usize) -> bool {
-        pos <= self.len()
-    }
-
-    /// Get the size of the currently allocated memory.
-    ///
-    /// # Returns
-    ///
-    /// The length of the memory, in bytes.
+    /// The length of the physical memory region, in bytes.
     pub fn len(&self) -> usize {
-        self.storage.len()
+        self.mapped_memory[PHYSICAL_MEMORY_ID].len()
     }
 
     // Attempt to pop a [`StackTypeHint`] from the stack hint list.
@@ -721,9 +777,6 @@ impl Memory {
             self.can_pop_u32(),
             "insufficient space on the stack to pop a u32 value"
         );
-        //assert!(
-        //    value_start_pos >= self.stack_segment_start && value_start_pos < self.stack_segment_end
-        //);
 
         // Read the value from the stack.
         let result = self.get_u32(value_start_pos);
@@ -785,9 +838,11 @@ impl Memory {
     /// * `pos` - The point in memory to be checked.
     /// * `value` - The value to be written into memory.
     pub fn set(&mut self, pos: usize, value: u8) {
-        self.assert_point_in_bounds(pos);
+        let region = self
+            .get_mapped_region_by_address_mut(pos)
+            .expect("failed to get mapped memory region for address");
 
-        self.storage[pos] = value;
+        region.memory[pos - region.start] = value;
     }
 
     /// Set the value of a range of values in memory.
@@ -797,12 +852,22 @@ impl Memory {
     /// * `pos` - The position of the first byte to be written into memory.
     /// * `values` - A slice of values that are to be written into memory.
     pub fn set_range(&mut self, start: usize, values: &[u8]) {
-        let end = start + values.len();
-        self.assert_point_in_bounds(start);
-        self.assert_point_in_bounds(end);
+        let region = self
+            .get_mapped_region_by_address_mut(start)
+            .expect("failed to get mapped memory region for address");
 
-        for (i, b) in values.iter().enumerate() {
-            self.storage[start + i] = *b;
+        // Does this region completely contain the address range?
+        let mapped_start = start - region.start;
+        let mapped_end = mapped_start + values.len();
+        assert!(region.contains_range(mapped_start, mapped_end));
+
+        // This is safe since we have checked that the range is completely
+        // valid relative to the mapped memory region.
+        for (i, b) in region.memory[mapped_start..mapped_end]
+            .iter_mut()
+            .enumerate()
+        {
+            *b = values[i];
         }
     }
 
@@ -816,20 +881,6 @@ impl Memory {
         let bytes = u32::to_le_bytes(value);
 
         self.set_range(pos, &bytes);
-    }
-
-    /// Print te entire contents of memory.
-    pub fn print(&self) {
-        println!("{:?}", self.storage);
-    }
-
-    /// Print a specific range of bytes from memory.
-    pub fn print_range(&self, start: usize, len: usize) {
-        let end = start + len;
-        self.assert_point_in_bounds(start);
-        self.assert_point_in_bounds(end);
-
-        println!("{:?}", self.storage[start..end].to_vec());
     }
 
     /// Print the contents of the stack.
@@ -870,19 +921,20 @@ impl Memory {
 
 impl From<&[u8]> for Memory {
     fn from(values: &[u8]) -> Self {
-        let mut mem = Memory::new(values.len(), &[], &[], 0);
-        mem.storage = values.to_vec();
-
-        mem
+        Memory::new(100, values, &[], 0)
     }
 }
 
 #[cfg(test)]
 mod tests_memory {
-    use super::Memory;
+    use super::{Memory, PHYSICAL_MEMORY_ID};
 
     fn fill_memory_sequential(mem: &mut Memory) {
-        for (i, byte) in &mut mem.storage.iter_mut().enumerate() {
+        for (i, byte) in &mut mem.mapped_memory[PHYSICAL_MEMORY_ID]
+            .memory
+            .iter_mut()
+            .enumerate()
+        {
             *byte = (i as u8) % 255;
         }
     }

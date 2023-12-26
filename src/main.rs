@@ -13,14 +13,7 @@ pub mod vm;
 
 use vm::VirtualMachine;
 
-use crate::{
-    compiler::bytecode_compiler::Compiler,
-    ins::{
-        instruction::Instruction,
-        move_expressions::{ExpressionArgs, ExpressionOperator, MoveExpressionHandler},
-    },
-    reg::registers::RegisterId,
-};
+use crate::{compiler::bytecode_compiler::Compiler, ins::instruction::Instruction};
 
 // https://onlinedocs.microchip.com/pr/GUID-0E320577-28E6-4365-9BB8-9E1416A0A6E4-en-US-6/index.html?GUID-4983CB0C-7FEB-40F1-99D3-0608805404F3
 // https://www.youtube.com/watch?v=KkenLT8S9Hs&list=WL&index=17
@@ -80,48 +73,15 @@ fn main() {
         panic!("currently unsupported");
     }
 
-    /*let mut vm_1 = VirtualMachine::new(10, &vec![1, 2, 3, 4, 5, 6, 7, 8, 9], &vec![1, 2, 3, 4, 5, 6, 7, 8, 9], 1);
-    println!("{:?}", vm_1.ram.get_stack_segment_storage());
-    return;*/
-
-    let expr_args_1 = [
+    /*let expr_args_1 = [
         ExpressionArgs::Register(RegisterId::R7),
         ExpressionArgs::Operator(ExpressionOperator::Add),
         ExpressionArgs::Register(RegisterId::R8),
     ];
 
-    let expr = MoveExpressionHandler::from(&expr_args_1[..]).pack();
+    let expr = MoveExpressionHandler::from(&expr_args_1[..]).pack();*/
 
     let instructions = &[
-        /*Instruction::MovU32ImmU32Reg(0x1, RegisterId::R1),
-        Instruction::MovU32ImmU32Reg(0x2, RegisterId::R2),
-        Instruction::SwapU32RegU32Reg(RegisterId::R1, RegisterId::R2),
-        Instruction::Mret,
-        Instruction::MovU32ImmU32Reg(100, RegisterId::R7),
-        Instruction::MovU32ImmU32Reg(50, RegisterId::R8),
-        Instruction::MovU32ImmMemExprRel(0x123, expr),*/
-
-        /*Instruction::MovU32ImmMemRelSimple(0x123, 150),
-        Instruction::MovMemExprU32RegRel(
-            MoveExpressionHandler::from(&[
-                ExpressionArgs::Immediate(25),
-                ExpressionArgs::Operator(ExpressionOperator::Add),
-                ExpressionArgs::Immediate(25),
-            ][..]).encode(),
-            RegisterId::R1,
-        ),*/
-
-        /*Instruction::MovU32ImmMemRelSimple(0x123, 150),
-        Instruction::MovU32RegMemExprRel(
-            RegisterId::R1,
-            MoveExpressionHandler::from(&[
-                ExpressionArgs::Immediate(25),
-                ExpressionArgs::Operator(ExpressionOperator::Add),
-                ExpressionArgs::Immediate(25),
-                ExpressionArgs::Operator(ExpressionOperator::Add),
-                ExpressionArgs::Register(RegisterId::R1),
-            ][..]).encode(),
-        ),*/
         Instruction::PushU32Imm(1234),
         Instruction::PushU32Imm(4321),
         Instruction::Hlt,

@@ -6,7 +6,7 @@ pub struct Decompiler {}
 #[allow(dead_code)]
 impl Decompiler {
     pub fn decompile(bytes: &[u8]) -> Vec<Instruction> {
-        let memory = Memory::from(bytes);
+        let memory = Memory::new(0, bytes, &[], 0);
         memory.decompile_instructions(0, memory.len())
     }
 }
