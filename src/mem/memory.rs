@@ -9,16 +9,16 @@ use super::{mapped_memory_region::MappedMemoryRegion, memory_block_reader::Memor
 const MEGABYTE: usize = 1024 * 1024;
 
 /// The start index of the boot mapped memory region.
-const BOOT_MEMORY_START: usize = 0x20_000_000; // Starting at the 512 megabyte region.
+pub const BOOT_MEMORY_START: usize = 0x12_C00_000; // Starting at the 300 megabyte region.
 /// The end index of the boot mapped memory region.
-const BOOT_MEMORY_END: usize = 0x20_100_000; // Extending for 1 megabyte.
-                                             // The ID of the boot mapped memory region.
-const BOOT_MEMORY_ID: usize = 0;
+pub const BOOT_MEMORY_LENGTH: usize = MEGABYTE; // Extending for 1 megabyte.
+                                                // The ID of the boot mapped memory region.
+pub const BOOT_MEMORY_ID: usize = 0;
 
 /// The maximum permissible size of the emulate physical memory. Here it is 256 megabyte in size.
-const MAX_PHYSICAL_MEMORY: usize = MEGABYTE * 256;
+pub const MAX_PHYSICAL_MEMORY: usize = MEGABYTE * 256;
 /// The ID of the physical mapped memory region.
-const PHYSICAL_MEMORY_ID: usize = 1;
+pub const PHYSICAL_MEMORY_ID: usize = 1;
 
 #[allow(unused)]
 enum StackTypeHint {
@@ -125,18 +125,9 @@ impl Memory {
         // conflict with the actual main memory segments.
         assert!(stack_segment_end < MAX_PHYSICAL_MEMORY);
 
-        // The physical mapped memory region.
-        let physical_mapped_mem =
-            MappedMemoryRegion::new(0, stack_segment_end, String::from("physical"));
-
-        // The boot mapped memory region.
-        // TODO - build a compiled boot region and set the instruction pointer to it.
-        let boot_mapped_mem =
-            MappedMemoryRegion::new(BOOT_MEMORY_START, BOOT_MEMORY_END, String::from("boot"));
-
         // Now we have the locations of the memory segments, we can create the memory
         let mut mem = Self {
-            mapped_memory: vec![boot_mapped_mem, physical_mapped_mem],
+            mapped_memory: vec![],
             user_segment_start,
             user_segment_end,
             code_segment_start,
@@ -149,6 +140,22 @@ impl Memory {
             stack_pointer: stack_segment_end,
         };
 
+        // TODO - build a compiled boot region and set the instruction pointer to it.
+        // TODO - This can hold all of the initial setup code for the CPU, replacing the stuff that is
+        // TODO - currently setup in registers.rs, etc.
+
+        // Insert the boot memory mapped region.
+        mem.add_mapped_memory_region(BOOT_MEMORY_START, BOOT_MEMORY_LENGTH, true, false, "boot");
+
+        // Insert the physical memory mapped region.
+        mem.add_mapped_memory_region(
+            0,
+            stack_segment_end - user_segment_start,
+            true,
+            true,
+            "physical",
+        );
+
         // Load the code segment bytes into RAM, if it has been provided.
         if !code_segment_bytes.is_empty() {
             mem.set_range(code_segment_start, code_segment_bytes);
@@ -160,6 +167,34 @@ impl Memory {
         }
 
         mem
+    }
+
+    /// Add a mapped memory region.
+    ///
+    /// # Arguments
+    ///
+    /// * `start` - The start address of the mapped memory region.
+    /// * `length` - The length of the mapped memory region.
+    /// * `can_read` - Can the region be read from?
+    /// * `can_write` - Can the region be written to?
+    /// * `name` - The name of the memory region.
+    ///
+    /// # Returns
+    ///
+    /// A usize indicating the ID of the added memory region.
+    pub fn add_mapped_memory_region(
+        &mut self,
+        start: usize,
+        length: usize,
+        can_read: bool,
+        can_write: bool,
+        name: &str,
+    ) -> usize {
+        self.mapped_memory.push(MappedMemoryRegion::new(
+            start, length, can_read, can_write, name,
+        ));
+
+        self.mapped_memory.len() - 1
     }
 
     /// Can we pop a u32 value from the stack?
@@ -219,6 +254,8 @@ impl Memory {
             .get_mapped_region_by_address(pos)
             .expect("failed to get mapped memory region for address");
 
+        assert!(region.can_read);
+
         &region.memory[pos - region.start]
     }
 
@@ -235,6 +272,8 @@ impl Memory {
         let region = self
             .get_mapped_region_by_address(pos)
             .expect("failed to get mapped memory region for address");
+
+        assert!(region.can_read);
 
         region.memory[pos - region.start]
     }
@@ -675,11 +714,15 @@ impl Memory {
             .get_mapped_region_by_address(start)
             .expect("failed to get mapped memory region for address");
 
-        // Does this region completely contain the address range?
-        let mapped_start = start - region.start;
-        let mapped_end = mapped_start + len;
+        assert!(region.can_read);
 
-        assert!(region.contains_range(mapped_start, mapped_end));
+        // Does this region completely contain the address range?
+        let absolute_end = start + len;
+        assert!(region.contains_range(start, absolute_end));
+
+        // Translate the address into the local varia
+        let mapped_start = start - region.start;
+        let mapped_end = absolute_end - region.start;
 
         &region.memory[mapped_start..mapped_end]
     }
@@ -842,6 +885,8 @@ impl Memory {
             .get_mapped_region_by_address_mut(pos)
             .expect("failed to get mapped memory region for address");
 
+        assert!(region.can_write);
+
         region.memory[pos - region.start] = value;
     }
 
@@ -849,17 +894,22 @@ impl Memory {
     ///
     /// # Arguments
     ///
-    /// * `pos` - The position of the first byte to be written into memory.
+    /// * `pos` - The absolute position of the first byte to be written into memory.
     /// * `values` - A slice of values that are to be written into memory.
     pub fn set_range(&mut self, start: usize, values: &[u8]) {
         let region = self
             .get_mapped_region_by_address_mut(start)
             .expect("failed to get mapped memory region for address");
 
+        assert!(region.can_write);
+
         // Does this region completely contain the address range?
+        let absolute_end = start + values.len();
+        assert!(region.contains_range(start, absolute_end));
+
+        // Translate the address into the local variant.
         let mapped_start = start - region.start;
-        let mapped_end = mapped_start + values.len();
-        assert!(region.contains_range(mapped_start, mapped_end));
+        let mapped_end = absolute_end - region.start;
 
         // This is safe since we have checked that the range is completely
         // valid relative to the mapped memory region.
@@ -927,7 +977,7 @@ impl From<&[u8]> for Memory {
 
 #[cfg(test)]
 mod tests_memory {
-    use super::{Memory, PHYSICAL_MEMORY_ID};
+    use super::{Memory, MEGABYTE, PHYSICAL_MEMORY_ID};
 
     fn fill_memory_sequential(mem: &mut Memory) {
         for (i, byte) in &mut mem.mapped_memory[PHYSICAL_MEMORY_ID]
@@ -948,13 +998,96 @@ mod tests_memory {
         ram
     }
 
-    /// Test reading beyond RAM bounds.
+    /// Test adding and working with mapped memory regions.
+    #[test]
+    fn test_adding_mapped_memory_region() {
+        let mut ram = Memory::new(100, &[], &[], 0);
+
+        // Well past the boot memory region.
+        let start = MEGABYTE * 512;
+        let length = 100;
+
+        // Add the region.
+        ram.add_mapped_memory_region(start, length, true, true, "tester");
+        assert_eq!(ram.mapped_memory.len(), 3);
+
+        // Next, testing we can read and write to the mapped memory region.
+        ram.set_u32(start, 0xDEADBEEF);
+
+        // Next, test that we can read the value back from the mapped memory region.
+        assert_eq!(ram.get_u32(start), 0xDEADBEEF);
+    }
+
+    /// Test reading from a mapped memory region that doesn't support it.
     #[test]
     #[should_panic]
-    fn test_overread_ram() {
-        let ram = Memory::new(100, &[], &[], 0);
+    fn test_mapped_memory_region_no_reading() {
+        let mut ram = Memory::new(100, &[], &[], 0);
 
-        _ = ram.get_range_ptr(usize::MAX, 1);
+        // Well past the boot memory region.
+        let start = MEGABYTE * 512;
+        let length = 100;
+
+        // Add the region.
+        ram.add_mapped_memory_region(start, length, false, true, "tester");
+        assert_eq!(ram.mapped_memory.len(), 3);
+
+        // Can we read from the memory region?
+        let _ = ram.get_u32(start);
+    }
+
+    /// Test writing to a mapped memory region that doesn't support it.
+    #[test]
+    #[should_panic]
+    fn test_mapped_memory_region_no_writing() {
+        let mut ram = Memory::new(100, &[], &[], 0);
+
+        // Well past the boot memory region.
+        let start = MEGABYTE * 512;
+        let length = 100;
+
+        // Add the region.
+        ram.add_mapped_memory_region(start, length, true, false, "tester");
+        assert_eq!(ram.mapped_memory.len(), 3);
+
+        // Can we read from the memory region?
+        ram.set_u32(start, 0xDEAFBEEF);
+    }
+
+    /// Test attempting to read beyond the bounds of a mapped memory region.
+    #[test]
+    #[should_panic]
+    fn test_mapped_memory_region_read_past_bounds() {
+        let mut ram = Memory::new(100, &[], &[], 0);
+
+        // Well past the boot memory region.
+        let start = MEGABYTE * 512;
+        let length = 2;
+
+        // Add the region.
+        ram.add_mapped_memory_region(start, length, true, true, "tester");
+        assert_eq!(ram.mapped_memory.len(), 3);
+
+        // Can we read from the memory region?
+        let _ = ram.get_u32(start);
+    }
+
+    /// Test attempting to write beyond the bounds of a mapped memory region.
+    #[test]
+    #[should_panic]
+    fn test_mapped_memory_region_write_past_bounds() {
+        let mut ram = Memory::new(100, &[], &[], 0);
+
+        // Well past the boot memory region.
+        let start = MEGABYTE * 512;
+        let length = 2;
+
+        // Add the region.
+        ram.add_mapped_memory_region(start, length, true, true, "tester");
+        assert_eq!(ram.mapped_memory.len(), 3);
+
+        // Can we read from the memory region?
+        ram.set_u32(start, 0xDEADBEEF);
     }
 
     /// Test the basic aspects of creating a RAM module.
@@ -1007,6 +1140,15 @@ mod tests_memory {
 
         // Check the stack segment is correct.
         assert_eq!(stack_bytes, ram.get_stack_segment_storage());
+    }
+
+    /// Test reading beyond RAM bounds.
+    #[test]
+    #[should_panic]
+    fn test_overread_ram() {
+        let ram = Memory::new(100, &[], &[], 0);
+
+        _ = ram.get_range_ptr(usize::MAX, 1);
     }
 
     /// Test basic reading and writing.

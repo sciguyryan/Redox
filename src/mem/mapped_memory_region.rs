@@ -6,17 +6,23 @@ pub struct MappedMemoryRegion {
     pub start: usize,
     /// The end index of this mapped memory region.
     pub end: usize,
+    /// Whether reading from this mapped memory region is permitted.
+    pub can_read: bool,
+    /// Whether writing to this mapped memory region is permitted.
+    pub can_write: bool,
     /// The physical contents of this memory region.
     pub memory: Vec<u8>,
 }
 
 impl MappedMemoryRegion {
-    pub fn new(start: usize, end: usize, name: String) -> Self {
+    pub fn new(start: usize, length: usize, can_read: bool, can_write: bool, name: &str) -> Self {
         Self {
-            name,
+            name: name.to_string(),
             start,
-            end,
-            memory: vec![0x0; end],
+            end: start + length,
+            can_read,
+            can_write,
+            memory: vec![0x0; length],
         }
     }
 
