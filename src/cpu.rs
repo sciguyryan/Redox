@@ -151,9 +151,17 @@ impl Cpu {
             .read_unchecked()
     }
 
+    /// Increment the instruction pointer (IP) register by a specified amount.
+    #[inline(always)]
+    fn increment_ip_register(&mut self, amount: usize) {
+        self.registers
+            .get_register_u32_mut(RegisterId::IP)
+            .add_unchecked(amount as u32);
+    }
+
     /// Update the program counter (PC) register.
     #[inline(always)]
-    fn increment_program_counter_register(&mut self) {
+    fn increment_pc_register(&mut self) {
         self.registers
             .get_register_u32_mut(RegisterId::PC)
             .increment_unchecked();
@@ -986,16 +994,11 @@ impl Cpu {
             }
         };
 
-        self.increment_program_counter_register();
+        self.increment_pc_register();
 
-        // Move the instruction pointer register forward by the number of
-        // bytes used to build the instruction.
-        let new_ip = self.get_instruction_pointer() + instruction.get_total_instruction_size();
-        self.set_instruction_pointer(new_ip);
-
-        if new_ip as usize >= mem.code_segment_end {
-            self.set_halted(true);
-        }
+        // Advance the instruction pointer by the number of bytes
+        // used to build the instruction.
+        self.increment_ip_register(instruction.get_total_instruction_size());
     }
 
     /// Set the state of the specified CPU flag.

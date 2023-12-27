@@ -11,7 +11,6 @@ mod reg;
 mod utils;
 pub mod vm;
 
-use rand::Rng;
 use vm::VirtualMachine;
 
 use crate::{compiler::bytecode_compiler::Compiler, ins::instruction::Instruction};

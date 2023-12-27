@@ -303,7 +303,7 @@ impl Memory {
             FromPrimitive::from_u32(opcode_id).expect("failed to read valid instruction opcode");
 
         // calculate the length of the arguments, in bytes.
-        let arg_len = Instruction::get_instruction_arg_size_from_op(opcode) as usize;
+        let arg_len = Instruction::get_instruction_arg_size_from_op(opcode);
         let arg_bytes = self.get_range_ptr(pos + 4, arg_len);
 
         // Create a memory block reader.
@@ -995,6 +995,8 @@ impl From<&[u8]> for Memory {
 
 #[cfg(test)]
 mod tests_memory {
+    use num_traits::ToBytes;
+
     use super::{Memory, MEGABYTE, PHYSICAL_MEMORY_ID};
 
     fn fill_memory_sequential(mem: &mut Memory) {
@@ -1251,5 +1253,22 @@ mod tests_memory {
 
         ram.push_u32(0x123);
         ram.push_u32(0x321);
+    }
+
+    /// Test asserting when reading an invalid opcode ID.
+    #[test]
+    #[should_panic]
+    fn test_assert_invalid_opcode_id() {
+        // This will generate an invalid opcode ID.
+        let opcode = u32::MAX.to_le_bytes();
+
+        let mut code = opcode.to_vec();
+        code.extend_from_slice(&opcode);
+
+        // Load the fake data into memory.
+        let ram = Memory::new(100, &opcode, &[], 0);
+
+        // Attempt to decompile the instruction, yielding an invalid opcode.
+        let _ = ram.decompile_instructions(ram.code_segment_start, ram.code_segment_end);
     }
 }

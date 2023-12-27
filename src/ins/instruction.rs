@@ -8,15 +8,15 @@ use crate::{ins::move_expressions::MoveExpressionHandler, reg::registers::Regist
 use super::op_codes::OpCode;
 
 /// The size of the instruction, in bytes.
-const INSTRUCTION_SIZE: u32 = 4;
+const INSTRUCTION_SIZE: usize = 4;
 /// The size of a u32 argument, in bytes.
-const ARG_U32_IMM_SIZE: u32 = 4;
+const ARG_U32_IMM_SIZE: usize = 4;
 /// The size of a u8 argument, in bytes.
-const ARG_U8_IMM_SIZE: u32 = 1;
+const ARG_U8_IMM_SIZE: usize = 1;
 /// The size of a memory address argument, in bytes.
-const ARG_MEM_ADDR_SIZE: u32 = 4;
+const ARG_MEM_ADDR_SIZE: usize = 4;
 /// The size of a register ID argument, in bytes.
-const ARG_REG_ID_SIZE: u32 = 1;
+const ARG_REG_ID_SIZE: usize = 1;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[cfg_attr(test, derive(EnumIter))]
@@ -344,11 +344,11 @@ impl Display for Instruction {
 }
 
 impl Instruction {
-    pub fn get_instruction_arg_size(&self) -> u32 {
+    pub fn get_instruction_arg_size(&self) -> usize {
         Instruction::get_instruction_arg_size_from_op((*self).into())
     }
 
-    pub fn get_instruction_arg_size_from_op(opcode: OpCode) -> u32 {
+    pub fn get_instruction_arg_size_from_op(opcode: OpCode) -> usize {
         // Note: Yes, yes... code duplication since this is the same code as
         //       get_instruction_arg_size above, but I don't care here.
         match opcode {
@@ -429,7 +429,7 @@ impl Instruction {
         }
     }
 
-    pub fn get_total_instruction_size(&self) -> u32 {
+    pub fn get_total_instruction_size(&self) -> usize {
         self.get_instruction_arg_size() + INSTRUCTION_SIZE
     }
 }
