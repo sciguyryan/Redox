@@ -128,6 +128,7 @@ impl RegisterU32 {
     /// # Returns
     ///
     /// A reference to the u32 value of this register.
+    #[inline(always)]
     pub fn read(&self, privilege: &PrivilegeLevel) -> &u32 {
         // Check whether the register has read permissions.
         self.validate_access(&DataAccessType::Read, privilege);
@@ -140,6 +141,7 @@ impl RegisterU32 {
     /// # Returns
     ///
     /// A reference to the u32 value of this register.
+    #[inline(always)]
     pub fn read_unchecked(&self) -> &u32 {
         &self.value
     }
@@ -164,6 +166,7 @@ impl RegisterU32 {
     ///
     /// * `value` - The u32 value to be written to this register.
     /// * `privilege` - The [`PrivilegeLevel`] to be used when completing this action.
+    #[inline(always)]
     pub fn write(&mut self, value: u32, privilege: &PrivilegeLevel) {
         // Check whether the register has write permissions.
         self.validate_access(&DataAccessType::Write, privilege);
@@ -176,6 +179,7 @@ impl RegisterU32 {
     /// # Arguments
     ///
     /// * `value` - The u32 value to be written to this register.
+    #[inline(always)]
     pub fn write_unchecked(&mut self, value: u32) {
         self.value = value;
     }

@@ -155,7 +155,7 @@ impl Compiler {
             | Instruction::Mret
             | Instruction::Hlt => {}
 
-            /* This pseudo-instruction should -NEVER- be constructed outside of tests. */
+            /* This pseudo-instruction should -NEVER- be constructed, outside of tests. */
             Instruction::Unknown(imm) => {
                 if cfg!(not(test)) {
                     unreachable!();

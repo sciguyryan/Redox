@@ -340,20 +340,32 @@ impl Display for Instruction {
             Instruction::Ret => String::from("ret"),
             Instruction::Mret => String::from("mret"),
             Instruction::Hlt => String::from("hlt"),
-            Instruction::Unknown(id) => format!("UNKNOWN ({id:04x})"),
+            Instruction::Unknown(id) => format!("UNKNOWN! ID = {id:04x}"),
         };
         write!(f, "{asm_format}")
     }
 }
 
 impl Instruction {
+    /// Get the expected argument size of an [`Instruction`], in bytes.
+    ///
+    /// # Returns
+    ///
+    /// A usize giving the expected argument size, in bytes.
     pub fn get_instruction_arg_size(&self) -> usize {
         Instruction::get_instruction_arg_size_from_op((*self).into())
     }
 
+    /// Get the expected argument size of an [`OpCode`], in bytes.
+    ///
+    /// # Arguments
+    ///
+    /// * `opcode` - The [`OpCode`] which should be used to calculate the argument size
+    ///
+    /// # Returns
+    ///
+    /// A usize giving the expected argument size, in bytes.
     pub fn get_instruction_arg_size_from_op(opcode: OpCode) -> usize {
-        // Note: Yes, yes... code duplication since this is the same code as
-        //       get_instruction_arg_size above, but I don't care here.
         match opcode {
             OpCode::Nop => 0,
 
@@ -433,6 +445,11 @@ impl Instruction {
         }
     }
 
+    /// Get the total size of an [`Instruction`], in bytes.
+    ///
+    /// # Returns
+    ///
+    /// A usize giving the total size of the [`Instruction`], in bytes.
     pub fn get_total_instruction_size(&self) -> usize {
         self.get_instruction_arg_size() + INSTRUCTION_SIZE
     }

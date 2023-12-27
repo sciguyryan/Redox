@@ -11,9 +11,11 @@ mod reg;
 mod utils;
 pub mod vm;
 
-use vm::VirtualMachine;
+use crate::{
+    compiler::bytecode_compiler::Compiler, ins::instruction::Instruction, vm::VirtualMachine,
+};
 
-use crate::{compiler::bytecode_compiler::Compiler, ins::instruction::Instruction};
+use std::time::Instant;
 
 // https://onlinedocs.microchip.com/pr/GUID-0E320577-28E6-4365-9BB8-9E1416A0A6E4-en-US-6/index.html?GUID-4983CB0C-7FEB-40F1-99D3-0608805404F3
 // https://www.youtube.com/watch?v=KkenLT8S9Hs&list=WL&index=17
@@ -103,11 +105,13 @@ fn main() {
     }
     println!();
 
+    let now = Instant::now();
     vm.run();
-
-    //vm.run_instructions(&instructions[..]);
+    let elapsed = now.elapsed().as_nanos();
 
     println!("----------[CPU]----------");
+    println!("Code successfully executed in {elapsed} ns!");
+    println!();
     println!("Machine Mode? {}", vm.cpu.is_machine_mode);
     println!("Stack Frame Size: {}", vm.cpu.get_stack_frame_size());
     println!();

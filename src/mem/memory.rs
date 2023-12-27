@@ -299,10 +299,11 @@ impl Memory {
         let opcode_id = self.get_u32(pos);
 
         // Validate the opcode is one of the ones we know about.
-        // In certain cases we might want to preserve invalid opcode ID (such as debugging).
-        let opcode = FromPrimitive::from_u32(opcode_id).unwrap_or(OpCode::Unknown);
+        // In the case we encounter an unrecognized opcode ID then we will
+        // default to the Unknown opcode, which is useful for debugging.
+        let opcode = FromPrimitive::from_u32(opcode_id).unwrap_or_default();
 
-        // calculate the length of the arguments, in bytes.
+        // Calculate the length of the arguments, in bytes.
         let arg_len = Instruction::get_instruction_arg_size_from_op(opcode);
         let arg_bytes = self.get_range_ptr(pos + 4, arg_len);
 

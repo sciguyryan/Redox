@@ -6,7 +6,7 @@ use super::instruction::Instruction;
 
 /// The opcode for an instruction.
 #[repr(u32)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq, FromPrimitive)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, FromPrimitive)]
 #[cfg_attr(test, derive(EnumIter))]
 pub enum OpCode {
     /// No Operation - an empty instruction.
@@ -142,6 +142,7 @@ pub enum OpCode {
 
     // Note - u32::MAX - 1 should never be assigned as it is used in various tests as an invalid opcode ID.
     /// A placeholder in instances where the opcode isn't recognised. This should never be constructed directly.
+    #[default]
     Unknown = u32::MAX,
 }
 
