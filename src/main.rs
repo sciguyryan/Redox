@@ -89,8 +89,6 @@ fn main() {
 
     let mut compiler = Compiler::new();
     let data = compiler.compile(instructions);
-    //println!("compiled data = {data:?}");
-    //println!("compiled data len = {}", data.len());
 
     let mut vm = VirtualMachine::new(
         vm::MIN_USER_SEGMENT_SIZE,
@@ -118,10 +116,15 @@ fn main() {
     vm.cpu.registers.print_registers();
     println!();
 
-    println!("----------[Program Segment]----------");
-    println!("{:?}", &vm.ram.get_code_segment_storage());
+    println!("----------[Code Memory Segment]----------");
+    println!("{:?}", &vm.mem.get_code_segment_storage());
     println!();
 
     println!("----------[Stack]----------");
-    vm.ram.print_stack();
+    vm.mem.print_stack();
+    println!();
+
+    println!("----------[Mapped Memory Regions]----------");
+    vm.mem.print_mapped_memory_regions();
+    println!();
 }

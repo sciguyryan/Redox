@@ -190,6 +190,14 @@ impl Memory {
         can_write: bool,
         name: &str,
     ) -> usize {
+        // Check whether we have a mapped memory region that would intersect
+        // with this one. We don't want to allow regions to cross like this.
+        let end = start + length;
+        assert!(!self
+            .mapped_memory
+            .iter()
+            .any(|m| (start >= m.start && end <= m.end) || (start <= m.end && m.start <= end)));
+
         self.mapped_memory.push(MappedMemoryRegion::new(
             start, length, can_read, can_write, name,
         ));
@@ -651,7 +659,7 @@ impl Memory {
     /// # Note
     ///
     /// This method will assert if no valid memory region is located.
-    #[inline]
+    #[inline(always)]
     pub fn get_mapped_region_by_address(&self, pos: usize) -> Option<&MappedMemoryRegion> {
         self.mapped_memory
             .iter()
@@ -671,7 +679,7 @@ impl Memory {
     /// # Note
     ///
     /// This method will assert if no valid memory region is located.
-    #[inline]
+    #[inline(always)]
     pub fn get_mapped_region_by_address_mut(
         &mut self,
         pos: usize,
@@ -720,11 +728,8 @@ impl Memory {
         let absolute_end = start + len;
         assert!(region.contains_range(start, absolute_end));
 
-        // Translate the address into the local varia
-        let mapped_start = start - region.start;
-        let mapped_end = absolute_end - region.start;
-
-        &region.memory[mapped_start..mapped_end]
+        // Translate the absolute address into the absolute local variant.
+        &region.memory[(start - region.start)..(absolute_end - region.start)]
     }
 
     /// Attempt to clone a range of bytes from memory.
@@ -907,13 +912,10 @@ impl Memory {
         let absolute_end = start + values.len();
         assert!(region.contains_range(start, absolute_end));
 
-        // Translate the address into the local variant.
-        let mapped_start = start - region.start;
-        let mapped_end = absolute_end - region.start;
-
+        // Translate the absolute address into the absolute local variant.
         // This is safe since we have checked that the range is completely
         // valid relative to the mapped memory region.
-        for (i, b) in region.memory[mapped_start..mapped_end]
+        for (i, b) in region.memory[(start - region.start)..(absolute_end - region.start)]
             .iter_mut()
             .enumerate()
         {
@@ -928,9 +930,25 @@ impl Memory {
     /// * `pos` - The position of the first byte to be written into memory.
     /// * `value` - The value to be written into memory.
     pub fn set_u32(&mut self, pos: usize, value: u32) {
-        let bytes = u32::to_le_bytes(value);
+        self.set_range(pos, &u32::to_le_bytes(value));
+    }
 
-        self.set_range(pos, &bytes);
+    /// Print a list of the mapped memory regions.
+    pub fn print_mapped_memory_regions(&self) {
+        let mut table = Table::new();
+
+        table.add_row(row!["ID", "Name", "Start", "End"]);
+
+        for (i, region) in self.mapped_memory.iter().enumerate() {
+            table.add_row(row![
+                i,
+                region.name,
+                format!("{}", region.start),
+                format!("{}", region.end)
+            ]);
+        }
+
+        table.printstd();
     }
 
     /// Print the contents of the stack.
@@ -1145,7 +1163,7 @@ mod tests_memory {
     /// Test reading beyond RAM bounds.
     #[test]
     #[should_panic]
-    fn test_overread_ram() {
+    fn test_read_no_mapped_region() {
         let ram = Memory::new(100, &[], &[], 0);
 
         _ = ram.get_range_ptr(usize::MAX, 1);

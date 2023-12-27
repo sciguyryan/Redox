@@ -1415,7 +1415,7 @@ mod tests_cpu_version_2 {
             // it has been specified in the test parameters.
             if let Some(contents) = &self.expected_user_seg_contents {
                 assert_eq!(
-                    vm.ram.get_user_segment_storage(),
+                    vm.mem.get_user_segment_storage(),
                     *contents,
                     "{}",
                     self.fail_message(id, false)
@@ -5604,8 +5604,8 @@ mod tests_cpu_version_2 {
 
         TestsU32::new(&tests).run_all_special(|_id: usize, vm: Option<VirtualMachine>| {
             let mut vm = vm.expect("failed to correctly execute test code");
-            assert_eq!(vm.ram.pop_u32(), 0x321);
-            assert_eq!(vm.ram.pop_u32(), 0x123);
+            assert_eq!(vm.mem.pop_u32(), 0x321);
+            assert_eq!(vm.mem.pop_u32(), 0x123);
         });
     }
 
@@ -5623,7 +5623,7 @@ mod tests_cpu_version_2 {
 
         TestsU32::new(&tests).run_all_special(|_id: usize, vm: Option<VirtualMachine>| {
             let mut vm = vm.expect("failed to correctly execute test code");
-            assert_eq!(vm.ram.pop_u32(), 0x123);
+            assert_eq!(vm.mem.pop_u32(), 0x123);
         });
     }
 
@@ -5644,7 +5644,7 @@ mod tests_cpu_version_2 {
             let mut vm = vm.expect("failed to correctly execute test code");
 
             // There is nothing on the stack, this should assert.
-            _ = vm.ram.pop_u32();
+            _ = vm.mem.pop_u32();
         });
     }
 }
