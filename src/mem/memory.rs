@@ -229,7 +229,7 @@ impl Memory {
     /// # Arguments
     ///
     /// * `start` - The starting memory location.
-    /// * `end` - The ending memory location.
+    /// * `end` - The ending memory location
     ///
     /// # Returns
     ///
@@ -242,7 +242,7 @@ impl Memory {
             let ins = self.get_instruction(cursor);
             instructions.push(ins);
 
-            cursor += ins.get_total_instruction_size() as usize;
+            cursor += ins.get_total_instruction_size();
         }
 
         instructions
@@ -299,8 +299,8 @@ impl Memory {
         let opcode_id = self.get_u32(pos);
 
         // Validate the opcode is one of the ones we know about.
-        let opcode: OpCode =
-            FromPrimitive::from_u32(opcode_id).expect("failed to read valid instruction opcode");
+        // In certain cases we might want to preserve invalid opcode ID (such as debugging).
+        let opcode = FromPrimitive::from_u32(opcode_id).unwrap_or(OpCode::Unknown);
 
         // calculate the length of the arguments, in bytes.
         let arg_len = Instruction::get_instruction_arg_size_from_op(opcode);
@@ -643,6 +643,7 @@ impl Memory {
             OpCode::Ret => Instruction::Ret,
             OpCode::Mret => Instruction::Mret,
             OpCode::Hlt => Instruction::Hlt,
+            OpCode::Unknown => Instruction::Unknown(opcode_id),
         }
     }
 
@@ -858,9 +859,9 @@ impl Memory {
     ///
     /// # Notes
     ///
-    /// This method will automatically keep track of the stack pointer
-    /// as held within the memory object, but the CPU registers **must** be
-    /// updated separately or they will fall out of sync.
+    /// This method will automatically keep track of the stack pointer as held within
+    /// the memory object, but the CPU registers **must** be updated separately or
+    /// they will fall out of sync.
     pub fn push_u32(&mut self, value: u32) {
         assert!(
             self.can_push_u32(),
@@ -900,7 +901,7 @@ impl Memory {
     /// # Arguments
     ///
     /// * `pos` - The absolute position of the first byte to be written into memory.
-    /// * `values` - A slice of values that are to be written into memory.
+    /// * `values` - A slice of u8 values that are to be written into memory.
     pub fn set_range(&mut self, pos: usize, values: &[u8]) {
         let region = self
             .get_mapped_region_by_address_mut(pos)
@@ -995,7 +996,7 @@ impl From<&[u8]> for Memory {
 
 #[cfg(test)]
 mod tests_memory {
-    use num_traits::ToBytes;
+    use crate::ins::instruction::Instruction;
 
     use super::{Memory, MEGABYTE, PHYSICAL_MEMORY_ID};
 
@@ -1255,20 +1256,18 @@ mod tests_memory {
         ram.push_u32(0x321);
     }
 
-    /// Test asserting when reading an invalid opcode ID.
+    /// Test asserting when reading an invalid opcode ID, generating a special Unknown instruction.
     #[test]
-    #[should_panic]
-    fn test_assert_invalid_opcode_id() {
+    fn test_assert_invalid_opcode_id_preserve() {
         // This will generate an invalid opcode ID.
-        let opcode = u32::MAX.to_le_bytes();
-
-        let mut code = opcode.to_vec();
-        code.extend_from_slice(&opcode);
+        let id = u32::MAX - 1;
 
         // Load the fake data into memory.
-        let ram = Memory::new(100, &opcode, &[], 0);
+        let ram = Memory::new(100, &id.to_le_bytes(), &[], 0);
 
         // Attempt to decompile the instruction, yielding an invalid opcode.
-        let _ = ram.decompile_instructions(ram.code_segment_start, ram.code_segment_end);
+        let result = ram.decompile_instructions(ram.code_segment_start, ram.code_segment_end);
+
+        assert_eq!(result, vec![Instruction::Unknown(id)]);
     }
 }

@@ -147,6 +147,8 @@ pub enum Instruction {
     Mret,
     /// Halt the execution of the processor.
     Hlt,
+    /// An unrecognized opcode that should never be constructed, in practice.
+    Unknown(u32),
 }
 
 impl Display for Instruction {
@@ -338,6 +340,7 @@ impl Display for Instruction {
             Instruction::Ret => String::from("ret"),
             Instruction::Mret => String::from("mret"),
             Instruction::Hlt => String::from("hlt"),
+            Instruction::Unknown(id) => format!("UNKNOWN ({id:04x})"),
         };
         write!(f, "{asm_format}")
     }
@@ -426,6 +429,7 @@ impl Instruction {
             OpCode::Ret => 0,
             OpCode::Mret => 0,
             OpCode::Hlt => 0,
+            OpCode::Unknown => 0,
         }
     }
 

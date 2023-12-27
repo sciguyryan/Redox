@@ -139,6 +139,10 @@ pub enum OpCode {
     Mret = 32766,
     /// Halt the execution of the virtual machine.
     Hlt = 32767,
+
+    // Note - u32::MAX - 1 should never be assigned as it is used in various tests as an invalid opcode ID.
+    /// A placeholder in instances where the opcode isn't recognised. This should never be constructed directly.
+    Unknown = u32::MAX,
 }
 
 impl From<Instruction> for OpCode {
@@ -216,6 +220,7 @@ impl From<Instruction> for OpCode {
             Instruction::Ret => OpCode::Ret,
             Instruction::Mret => OpCode::Mret,
             Instruction::Hlt => OpCode::Hlt,
+            Instruction::Unknown(_) => OpCode::Unknown,
         }
     }
 }

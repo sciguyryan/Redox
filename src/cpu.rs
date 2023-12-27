@@ -16,9 +16,13 @@ use crate::{
 const U32_LOW_BYTE_MASK: u32 = 0xff;
 
 pub struct Cpu {
+    /// The registers associated with this CPU.
     pub registers: Registers,
+    // Is the CPU currently halted?
     pub is_halted: bool,
+    /// Is the CPU currently running in machine mode (superuser)?
     pub is_machine_mode: bool,
+    /// Is the CPU currently in an interrupt handler?
     pub is_in_interrupt_handler: bool,
 }
 
@@ -992,6 +996,9 @@ impl Cpu {
             Instruction::Hlt => {
                 self.set_halted(true);
             }
+            Instruction::Unknown(id) => {
+                unreachable!("attempted to run an unrecognized instruction: {id}");
+            }
         };
 
         self.increment_pc_register();
@@ -1530,6 +1537,21 @@ mod tests_cpu_version_2 {
                 // yield a valid virtual machine instance to interrogate.
             }
         });
+    }
+
+    /// Test the unrecognized instruction.
+    #[test]
+    fn test_invalid_instruction() {
+        let tests = [TestU32::new(
+            &[Unknown(0xABC)],
+            &[],
+            None,
+            0,
+            true,
+            "Unknown Opcode - succeeded in executing an unrecognized opcode",
+        )];
+
+        TestsU32::new(&tests).run_all();
     }
 
     /// Test the add u32 immediate to u32 register instruction.

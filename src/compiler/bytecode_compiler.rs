@@ -154,6 +154,15 @@ impl Compiler {
             | Instruction::Ret
             | Instruction::Mret
             | Instruction::Hlt => {}
+
+            /* This pseudo-instruction should -NEVER- be constructed outside of tests. */
+            Instruction::Unknown(imm) => {
+                if cfg!(not(test)) {
+                    unreachable!();
+                }
+
+                self.write_u32(imm);
+            }
         }
     }
 
@@ -304,6 +313,9 @@ mod tests_compiler {
                 OpCode::Ret => Instruction::Ret,
                 OpCode::Mret => Instruction::Mret,
                 OpCode::Hlt => Instruction::Hlt,
+
+                // We don't want to test constructing this instruction.
+                OpCode::Unknown => continue,
             };
 
             instructions_in.push(ins);

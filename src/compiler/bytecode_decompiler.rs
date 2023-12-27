@@ -5,6 +5,15 @@ pub struct Decompiler {}
 
 #[allow(dead_code)]
 impl Decompiler {
+    /// Attempt to read an instruction from memory.
+    ///
+    /// # Arguments
+    ///
+    /// * `bytes` - A slice of u8 values representing the compiled code.
+    ///
+    /// # Returns
+    ///
+    /// A vector of [`Instruction`]s that contains the decompiled instructions.
     pub fn decompile(bytes: &[u8]) -> Vec<Instruction> {
         let memory = Memory::new(0, bytes, &[], 0);
         memory.decompile_instructions(0, memory.len())
@@ -13,15 +22,18 @@ impl Decompiler {
 
 #[cfg(test)]
 mod tests_compiler {
-    use crate::{compiler::bytecode_decompiler::Decompiler, ins::op_codes::OpCode};
+    use crate::{
+        compiler::bytecode_decompiler::Decompiler,
+        ins::{instruction::Instruction, op_codes::OpCode},
+    };
 
-    /// Test decompiling with invalid opcode.
+    /// Test decompiling with invalid opcode, generating a special Unknown instruction.
     #[test]
-    #[should_panic]
-    fn test_decompile_invalid_opcode() {
-        let bytes = u32::MAX.to_le_bytes();
+    fn test_decompile_invalid_opcode_preserve() {
+        let id = u32::MAX - 1;
+        let result = Decompiler::decompile(&id.to_le_bytes());
 
-        let _ = Decompiler::decompile(&bytes);
+        assert_eq!(result, vec![Instruction::Unknown(id)]);
     }
 
     /// Test decompiling with insufficient instruction arguments.
@@ -31,7 +43,7 @@ mod tests_compiler {
         // This instruction should have a u32 argument and a register ID argument.
         let bytes = (OpCode::AddU32ImmU32Reg as u32).to_le_bytes();
 
-        let _ = Decompiler::decompile(&bytes);
+        _ = Decompiler::decompile(&bytes);
     }
 
     /// Test decompiling with an invalid register ID argument.
@@ -47,6 +59,6 @@ mod tests_compiler {
         // Add an invalid register ID.
         bytes.push(u8::MAX);
 
-        let _ = Decompiler::decompile(&bytes);
+        _ = Decompiler::decompile(&bytes);
     }
 }
