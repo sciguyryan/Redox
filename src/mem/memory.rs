@@ -901,25 +901,25 @@ impl Memory {
     ///
     /// * `pos` - The absolute position of the first byte to be written into memory.
     /// * `values` - A slice of values that are to be written into memory.
-    pub fn set_range(&mut self, start: usize, values: &[u8]) {
+    pub fn set_range(&mut self, pos: usize, values: &[u8]) {
         let region = self
-            .get_mapped_region_by_address_mut(start)
+            .get_mapped_region_by_address_mut(pos)
             .expect("failed to get mapped memory region for address");
 
         assert!(region.can_write);
 
         // Does this region completely contain the address range?
-        let absolute_end = start + values.len();
-        assert!(region.contains_range(start, absolute_end));
+        let absolute_end = pos + values.len();
+        assert!(region.contains_range(pos, absolute_end));
 
         // Translate the absolute address into the absolute local variant.
         // This is safe since we have checked that the range is completely
         // valid relative to the mapped memory region.
-        for (i, b) in region.memory[(start - region.start)..(absolute_end - region.start)]
+        for (old, new) in region.memory[(pos - region.start)..(absolute_end - region.start)]
             .iter_mut()
-            .enumerate()
+            .zip(values.iter())
         {
-            *b = values[i];
+            *old = *new;
         }
     }
 
@@ -1034,6 +1034,24 @@ mod tests_memory {
 
         // Next, test that we can read the value back from the mapped memory region.
         assert_eq!(ram.get_u32(start), 0xDEADBEEF);
+    }
+
+    /// Test adding an overlapping memory region panics.
+    #[test]
+    #[should_panic]
+    fn test_adding_mapped_memory_region_overlapping() {
+        let mut ram = Memory::new(100, &[], &[], 0);
+
+        // Well past the boot memory region.
+        let start = MEGABYTE * 512;
+        let length = 100;
+
+        // Add the region.
+        ram.add_mapped_memory_region(start, length, true, true, "tester");
+        assert_eq!(ram.mapped_memory.len(), 3);
+
+        // Attempt to add another region that intersects with the one we previously added.
+        ram.add_mapped_memory_region(start + 1, length, true, true, "tester 2");
     }
 
     /// Test reading from a mapped memory region that doesn't support it.
@@ -1211,6 +1229,7 @@ mod tests_memory {
 
         ram.push_u32(0x123);
         ram.push_u32(0x321);
+
         assert_eq!(ram.pop_u32(), 0x321);
         assert_eq!(ram.pop_u32(), 0x123);
     }
