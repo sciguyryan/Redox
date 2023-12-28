@@ -352,6 +352,7 @@ impl Instruction {
     /// # Returns
     ///
     /// A usize giving the expected argument size, in bytes.
+    #[inline(always)]
     pub fn get_instruction_arg_size(&self) -> usize {
         Instruction::get_instruction_arg_size_from_op((*self).into())
     }
@@ -365,6 +366,7 @@ impl Instruction {
     /// # Returns
     ///
     /// A usize giving the expected argument size, in bytes.
+    #[inline(always)]
     pub fn get_instruction_arg_size_from_op(opcode: OpCode) -> usize {
         match opcode {
             OpCode::Nop => 0,
@@ -450,6 +452,7 @@ impl Instruction {
     /// # Returns
     ///
     /// A usize giving the total size of the [`Instruction`], in bytes.
+    #[inline(always)]
     pub fn get_total_instruction_size(&self) -> usize {
         self.get_instruction_arg_size() + INSTRUCTION_SIZE
     }

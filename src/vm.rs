@@ -1,4 +1,9 @@
-use crate::{cpu::Cpu, ins::instruction::Instruction, mem::memory::Memory};
+use crate::{
+    boot_rom::{BootROM, BOOT_MEMORY_LENGTH, BOOT_MEMORY_START, BOOT_NAME},
+    cpu::Cpu,
+    ins::instruction::Instruction,
+    mem::memory::Memory,
+};
 
 pub const MIN_USER_SEGMENT_SIZE: usize = 1024 * 1024 * 32;
 pub const MIN_BINARY_LOAD_ADDRESS: usize = 0x10000;
@@ -8,6 +13,8 @@ pub const BYTES_IN_U32: usize = 4;
 pub struct VirtualMachine {
     pub mem: Memory,
     pub cpu: Cpu,
+
+    boot_rom: BootROM,
 }
 
 impl VirtualMachine {
@@ -40,7 +47,11 @@ impl VirtualMachine {
                 stack_segment_size,
             ),
             cpu: Cpu::default(),
+            boot_rom: BootROM::new(),
         };
+
+        // Add the mapped boot ROM memory region.
+        //vm.mem.add_mapped_memory_region(BOOT_MEMORY_START, BOOT_MEMORY_LENGTH, true, false, BOOT_NAME);
 
         // Synchronize certain CPU registers with the local variables
         // held in the memory instance.

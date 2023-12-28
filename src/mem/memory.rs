@@ -6,7 +6,7 @@ use crate::ins::{instruction::Instruction, op_codes::OpCode};
 use super::{mapped_memory_region::MappedMemoryRegion, memory_block_reader::MemoryBlockReader};
 
 /// The number of bytes in a megabyte.
-const MEGABYTE: usize = 1024 * 1024;
+pub const MEGABYTE: usize = 1024 * 1024;
 
 /// The start index of the boot mapped memory region.
 pub const BOOT_MEMORY_START: usize = 0x12_C00_000; // Starting at the 300 megabyte region.
@@ -719,6 +719,7 @@ impl Memory {
     /// # Returns
     ///
     /// A reference to a u8 slice from memory.
+    #[inline(always)]
     pub fn get_range_ptr(&self, start: usize, len: usize) -> &[u8] {
         let region = self
             .get_mapped_region_by_address(start)
@@ -903,6 +904,7 @@ impl Memory {
     ///
     /// * `pos` - The absolute position of the first byte to be written into memory.
     /// * `values` - A slice of u8 values that are to be written into memory.
+    #[inline(always)]
     pub fn set_range(&mut self, pos: usize, values: &[u8]) {
         let region = self
             .get_mapped_region_by_address_mut(pos)

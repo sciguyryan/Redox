@@ -1,5 +1,6 @@
 #![crate_name = "redox"]
 
+mod boot_rom;
 mod compiler;
 mod cpu;
 mod data_access_type;
@@ -12,7 +13,8 @@ mod utils;
 pub mod vm;
 
 use crate::{
-    compiler::bytecode_compiler::Compiler, ins::instruction::Instruction, vm::VirtualMachine,
+    compiler::bytecode_compiler::Compiler, ins::instruction::Instruction,
+    mem::memory_interface::MemoryInterface, vm::VirtualMachine,
 };
 
 use std::time::Instant;
@@ -74,6 +76,11 @@ fn main() {
     if cfg!(target_endian = "big") {
         panic!("currently unsupported");
     }
+
+    /*let rom = boot_rom::BootROM::new();
+    let b = rom.get_byte_ptr(0);
+    println!("{b}");
+    return;*/
 
     /*let expr_args_1 = [
         ExpressionArgs::Register(RegisterId::R7),

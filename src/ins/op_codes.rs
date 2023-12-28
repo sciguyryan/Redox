@@ -1,13 +1,13 @@
 use num_derive::FromPrimitive;
-#[cfg(test)]
 use strum_macros::EnumIter;
 
 use super::instruction::Instruction;
 
 /// The opcode for an instruction.
 #[repr(u32)]
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, FromPrimitive)]
-#[cfg_attr(test, derive(EnumIter))]
+#[derive(
+    Clone, Copy, Debug, Default, Eq, PartialOrd, Ord, PartialEq, Hash, FromPrimitive, EnumIter,
+)]
 pub enum OpCode {
     /// No Operation - an empty instruction.
     Nop,
