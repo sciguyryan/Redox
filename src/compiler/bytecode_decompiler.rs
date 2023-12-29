@@ -1,4 +1,5 @@
-use crate::{ins::instruction::Instruction, mem::memory::Memory};
+use crate::{ins::instruction::Instruction, mem::memory_handler::MemoryHandler};
+use crate::MemoryInterface;
 
 #[allow(dead_code)]
 pub struct Decompiler {}
@@ -14,8 +15,8 @@ impl Decompiler {
     /// # Returns
     ///
     /// A vector of [`Instruction`]s that contains the decompiled instructions.
-    pub fn decompile(bytes: &[u8]) -> Vec<Instruction> {
-        let memory = Memory::new(0, bytes, &[], 0);
+    pub fn decompile<T: MemoryInterface>(bytes: &[u8]) -> Vec<Instruction> {
+        let memory: MemoryHandler<T> = MemoryHandler::new(0, bytes, &[], 0);
         memory.decompile_instructions(0, memory.len())
     }
 }

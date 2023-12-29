@@ -3,22 +3,16 @@ use prettytable::{row, Table};
 
 use crate::ins::{instruction::Instruction, op_codes::OpCode};
 
-use super::{mapped_memory_region::MappedMemoryRegion, memory_block_reader::MemoryBlockReader};
+use super::{mapped_memory_region::MappedMemoryRegion, memory_block_reader::MemoryBlockReader, memory_interface::MemoryInterface, ram::Ram};
 
 /// The number of bytes in a megabyte.
 pub const MEGABYTE: usize = 1024 * 1024;
 
-/// The start index of the boot mapped memory region.
-pub const BOOT_MEMORY_START: usize = 0x12_C00_000; // Starting at the 300 megabyte region.
-/// The end index of the boot mapped memory region.
-pub const BOOT_MEMORY_LENGTH: usize = MEGABYTE; // Extending for 1 megabyte.
-                                                // The ID of the boot mapped memory region.
-pub const BOOT_MEMORY_ID: usize = 0;
+// The ID of the main memory mapped RAM module. We can guarantee this since it is created by the constructor.
+const PHYSICAL_MEMORY_ID: usize = 0;
 
 /// The maximum permissible size of the emulate physical memory. Here it is 256 megabyte in size.
 pub const MAX_PHYSICAL_MEMORY: usize = MEGABYTE * 256;
-/// The ID of the physical mapped memory region.
-pub const PHYSICAL_MEMORY_ID: usize = 1;
 
 #[allow(unused)]
 enum StackTypeHint {
@@ -47,9 +41,12 @@ enum StackTypeHint {
  * causing conflicts.
  */
 
-pub struct Memory {
+pub struct MemoryHandler<'a, T: MemoryInterface> {
+    /// The internal physical RAM module.
+    ram: Ram,
+
     /// A list of the registered handlers for specially mapped memory regions.
-    mapped_memory: Vec<MappedMemoryRegion>,
+    mapped_memory: Vec<&'a mut T>,
 
     /// The start address of the user segment.
     pub user_segment_start: usize,
@@ -76,7 +73,7 @@ pub struct Memory {
     stack_pointer: usize,
 }
 
-impl Memory {
+impl<'a, T: MemoryInterface> MemoryHandler<'a, T> {
     pub fn new(
         user_segment_capacity: usize,
         code_segment_bytes: &[u8],
@@ -127,6 +124,7 @@ impl Memory {
 
         // Now we have the locations of the memory segments, we can create the memory
         let mut mem = Self {
+            ram: Ram::new(stack_segment_end),
             mapped_memory: vec![],
             user_segment_start,
             user_segment_end,
@@ -140,21 +138,8 @@ impl Memory {
             stack_pointer: stack_segment_end,
         };
 
-        // TODO - build a compiled boot region and set the instruction pointer to it.
-        // TODO - This can hold all of the initial setup code for the CPU, replacing the stuff that is
-        // TODO - currently setup in registers.rs, etc.
-
-        // Insert the boot memory mapped region.
-        mem.add_mapped_memory_region(BOOT_MEMORY_START, BOOT_MEMORY_LENGTH, true, false, "boot");
-
-        // Insert the physical memory mapped region.
-        mem.add_mapped_memory_region(
-            0,
-            stack_segment_end - user_segment_start,
-            true,
-            true,
-            "physical",
-        );
+        // Add the physical RAM to the mapped device list.
+        mem.register_memory_mapped_device(&mut mem.ram);
 
         // Load the code segment bytes into RAM, if it has been provided.
         if !code_segment_bytes.is_empty() {
@@ -169,38 +154,28 @@ impl Memory {
         mem
     }
 
-    /// Add a mapped memory region.
+    /// Register a mapped memory device to a specific mapped region.
     ///
     /// # Arguments
     ///
-    /// * `start` - The start address of the mapped memory region.
-    /// * `length` - The length of the mapped memory region.
-    /// * `can_read` - Can the region be read from?
-    /// * `can_write` - Can the region be written to?
-    /// * `name` - The name of the memory region.
+    /// * `device` - The mutable reference to the device being registered.
     ///
     /// # Returns
     ///
-    /// A usize indicating the ID of the added memory region.
-    pub fn add_mapped_memory_region(
-        &mut self,
-        start: usize,
-        length: usize,
-        can_read: bool,
-        can_write: bool,
-        name: &str,
-    ) -> usize {
+    /// A usize indicating the ID of the added memory mapped device.
+    pub fn register_memory_mapped_device(&mut self, device: &mut T) -> usize {
+        let start = device.get_map_start();
+        let end = device.get_map_end();
+
         // Check whether we have a mapped memory region that would intersect
-        // with this one. We don't want to allow regions to cross like this.
-        let end = start + length;
+        // with this one.
+        // We don't want to allow regions to cross like this.
         assert!(!self
             .mapped_memory
             .iter()
-            .any(|m| (start >= m.start && end <= m.end) || (start <= m.end && m.start <= end)));
+            .any(|m| (start >= m.get_map_start() && end <= m.get_map_end()) || (start <= m.get_map_end() && m.get_map_start() <= end)));
 
-        self.mapped_memory.push(MappedMemoryRegion::new(
-            start, length, can_read, can_write, name,
-        ));
+        self.mapped_memory.push(device);
 
         self.mapped_memory.len() - 1
     }
@@ -991,19 +966,19 @@ impl Memory {
     }
 }
 
-impl From<&[u8]> for Memory {
+/*impl From<&[u8]> for Memory {
     fn from(values: &[u8]) -> Self {
         Memory::new(100, values, &[], 0)
     }
-}
+}*/
 
 #[cfg(test)]
 mod tests_memory {
     use crate::ins::instruction::Instruction;
 
-    use super::{Memory, MEGABYTE, PHYSICAL_MEMORY_ID};
+    use super::{MemoryHandler, MEGABYTE, PHYSICAL_MEMORY_ID};
 
-    fn fill_memory_sequential(mem: &mut Memory) {
+    fn fill_memory_sequential<T>(mem: &mut MemoryHandler<T>) {
         for (i, byte) in &mut mem.mapped_memory[PHYSICAL_MEMORY_ID]
             .memory
             .iter_mut()
@@ -1013,8 +988,8 @@ mod tests_memory {
         }
     }
 
-    fn get_test_ram_instance() -> Memory {
-        let mut ram = Memory::new(100, &[], &[], 0);
+    fn get_test_ram_instance<'a, T>() -> MemoryHandler<'a, T> {
+        let mut ram = MemoryHandler::new(100, &[], &[], 0);
 
         // Fill the memory with debug data.
         fill_memory_sequential(&mut ram);
@@ -1025,14 +1000,14 @@ mod tests_memory {
     /// Test adding and working with mapped memory regions.
     #[test]
     fn test_adding_mapped_memory_region() {
-        let mut ram = Memory::new(100, &[], &[], 0);
+        let mut ram = MemoryHandler::new(100, &[], &[], 0);
 
         // Well past the boot memory region.
         let start = MEGABYTE * 512;
         let length = 100;
 
         // Add the region.
-        ram.add_mapped_memory_region(start, length, true, true, "tester");
+        ram.register_mapped_region_device(start, length, true, true, "tester");
         assert_eq!(ram.mapped_memory.len(), 3);
 
         // Next, testing we can read and write to the mapped memory region.
@@ -1046,32 +1021,32 @@ mod tests_memory {
     #[test]
     #[should_panic]
     fn test_adding_mapped_memory_region_overlapping() {
-        let mut ram = Memory::new(100, &[], &[], 0);
+        let mut ram = MemoryHandler::new(100, &[], &[], 0);
 
         // Well past the boot memory region.
         let start = MEGABYTE * 512;
         let length = 100;
 
         // Add the region.
-        ram.add_mapped_memory_region(start, length, true, true, "tester");
+        ram.register_mapped_region_device(start, length, true, true, "tester");
         assert_eq!(ram.mapped_memory.len(), 3);
 
         // Attempt to add another region that intersects with the one we previously added.
-        ram.add_mapped_memory_region(start + 1, length, true, true, "tester 2");
+        ram.register_mapped_region_device(start + 1, length, true, true, "tester 2");
     }
 
     /// Test reading from a mapped memory region that doesn't support it.
     #[test]
     #[should_panic]
     fn test_mapped_memory_region_no_reading() {
-        let mut ram = Memory::new(100, &[], &[], 0);
+        let mut ram = MemoryHandler::new(100, &[], &[], 0);
 
         // Well past the boot memory region.
         let start = MEGABYTE * 512;
         let length = 100;
 
         // Add the region.
-        ram.add_mapped_memory_region(start, length, false, true, "tester");
+        ram.register_mapped_region_device(start, length, false, true, "tester");
         assert_eq!(ram.mapped_memory.len(), 3);
 
         // Can we read from the memory region?
@@ -1082,14 +1057,14 @@ mod tests_memory {
     #[test]
     #[should_panic]
     fn test_mapped_memory_region_no_writing() {
-        let mut ram = Memory::new(100, &[], &[], 0);
+        let mut ram = MemoryHandler::new(100, &[], &[], 0);
 
         // Well past the boot memory region.
         let start = MEGABYTE * 512;
         let length = 100;
 
         // Add the region.
-        ram.add_mapped_memory_region(start, length, true, false, "tester");
+        ram.register_mapped_region_device(start, length, true, false, "tester");
         assert_eq!(ram.mapped_memory.len(), 3);
 
         // Can we read from the memory region?
@@ -1100,14 +1075,14 @@ mod tests_memory {
     #[test]
     #[should_panic]
     fn test_mapped_memory_region_read_past_bounds() {
-        let mut ram = Memory::new(100, &[], &[], 0);
+        let mut ram = MemoryHandler::new(100, &[], &[], 0);
 
         // Well past the boot memory region.
         let start = MEGABYTE * 512;
         let length = 2;
 
         // Add the region.
-        ram.add_mapped_memory_region(start, length, true, true, "tester");
+        ram.register_mapped_region_device(start, length, true, true, "tester");
         assert_eq!(ram.mapped_memory.len(), 3);
 
         // Can we read from the memory region?
@@ -1118,14 +1093,14 @@ mod tests_memory {
     #[test]
     #[should_panic]
     fn test_mapped_memory_region_write_past_bounds() {
-        let mut ram = Memory::new(100, &[], &[], 0);
+        let mut ram = MemoryHandler::new(100, &[], &[], 0);
 
         // Well past the boot memory region.
         let start = MEGABYTE * 512;
         let length = 2;
 
         // Add the region.
-        ram.add_mapped_memory_region(start, length, true, true, "tester");
+        ram.register_mapped_region_device(start, length, true, true, "tester");
         assert_eq!(ram.mapped_memory.len(), 3);
 
         // Can we read from the memory region?
@@ -1136,7 +1111,7 @@ mod tests_memory {
     #[test]
     fn test_ram_creation_simple() {
         let size = 100;
-        let ram = Memory::new(size, &[], &[], 0);
+        let ram = MemoryHandler::new(size, &[], &[], 0);
 
         assert_eq!(
             ram.len(),
@@ -1158,7 +1133,7 @@ mod tests_memory {
         let stack_capacity_bytes = 2 * 4;
         let code = [0x1; 10];
         let data = [0x2; 10];
-        let mut ram = Memory::new(user_size, &code, &data, stack_capacity_bytes);
+        let mut ram = MemoryHandler::new(user_size, &code, &data, stack_capacity_bytes);
 
         // Add some stack entries.
         let mut stack_bytes = vec![];
@@ -1188,7 +1163,7 @@ mod tests_memory {
     #[test]
     #[should_panic]
     fn test_read_no_mapped_region() {
-        let ram = Memory::new(100, &[], &[], 0);
+        let ram = MemoryHandler::new(100, &[], &[], 0);
 
         _ = ram.get_range_ptr(usize::MAX, 1);
     }
@@ -1231,7 +1206,7 @@ mod tests_memory {
     /// Test a stack push and pop round-trip.
     #[test]
     fn test_stack_u32_push_pop() {
-        let mut ram = Memory::new(10, &[1, 2, 3, 4], &[9, 8, 7, 6, 5], 2 * 4);
+        let mut ram = MemoryHandler::new(10, &[1, 2, 3, 4], &[9, 8, 7, 6, 5], 2 * 4);
 
         ram.push_u32(0x123);
         ram.push_u32(0x321);
@@ -1244,7 +1219,7 @@ mod tests_memory {
     #[test]
     #[should_panic]
     fn test_stack_pop_with_empty_stack() {
-        let mut ram = Memory::new(100, &[], &[], 2);
+        let mut ram = MemoryHandler::new(100, &[], &[], 2);
 
         _ = ram.pop_u32();
     }
@@ -1253,7 +1228,7 @@ mod tests_memory {
     #[test]
     #[should_panic]
     fn test_pushing_to_full_stack() {
-        let mut ram = Memory::new(100, &[], &[], 1);
+        let mut ram = MemoryHandler::new(100, &[], &[], 1);
 
         ram.push_u32(0x123);
         ram.push_u32(0x321);
@@ -1266,7 +1241,7 @@ mod tests_memory {
         let id = u32::MAX - 1;
 
         // Load the fake data into memory.
-        let ram = Memory::new(100, &id.to_le_bytes(), &[], 0);
+        let ram = MemoryHandler::new(100, &id.to_le_bytes(), &[], 0);
 
         // Attempt to decompile the instruction, yielding an invalid opcode.
         let result = ram.decompile_instructions(ram.code_segment_start, ram.code_segment_end);
