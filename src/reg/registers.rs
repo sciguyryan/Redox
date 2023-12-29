@@ -1,7 +1,7 @@
 use core::fmt;
 use num_derive::FromPrimitive;
 use prettytable::{row, Table};
-use std::{collections::BTreeMap, fmt::Display};
+use std::{collections::HashMap, fmt::Display};
 
 use super::register::{RegisterF32, RegisterPermission, RegisterU32};
 
@@ -139,9 +139,9 @@ macro_rules! register_f32 {
 #[derive(Debug)]
 pub struct Registers {
     /// A hashmap of the u32 registers.
-    pub registers_u32: BTreeMap<RegisterId, RegisterU32>,
+    pub registers_u32: HashMap<RegisterId, RegisterU32>,
     /// A hashmap of the f32 registers.
-    pub registers_f32: BTreeMap<RegisterId, RegisterF32>,
+    pub registers_f32: HashMap<RegisterId, RegisterF32>,
 }
 
 impl PartialEq for Registers {
@@ -177,7 +177,7 @@ impl Registers {
         let prpw = RegisterPermission::PR | RegisterPermission::PW;
 
         Self {
-            registers_u32: BTreeMap::from([
+            registers_u32: HashMap::from([
                 // [ User Registers ] //
                 register_u32!(RegisterId::R1, &rw, 0),
                 register_u32!(RegisterId::R2, &rw, 0),
@@ -203,7 +203,7 @@ impl Registers {
                 #[cfg(test)]
                 register_u32!(RegisterId::TEST0, &prpw, 0),
             ]),
-            registers_f32: BTreeMap::from([
+            registers_f32: HashMap::from([
                 // [ User Registers ] //
                 register_f32!(RegisterId::F1, &rw, 0f32),
             ]),
