@@ -3,16 +3,16 @@ use prettytable::{row, Table};
 
 use crate::ins::{instruction::Instruction, op_codes::OpCode};
 
-use super::{mapped_memory_region::MappedMemoryRegion, memory_block_reader::MemoryBlockReader};
+use super::{mapped_memory::MappedMemory, memory_block_reader::MemoryBlockReader};
 
 /// The number of bytes in a megabyte.
 pub const MEGABYTE: usize = 1024 * 1024;
 
-// The ID of the main memory mapped RAM module. We can guarantee this since it is created by the constructor.
-const PHYSICAL_MEMORY_ID: usize = 0;
-
 /// The maximum permissible size of the emulate physical memory. Here it is 256 megabyte in size.
 pub const MAX_PHYSICAL_MEMORY: usize = MEGABYTE * 256;
+
+/// The name of the emulated physical RAM region.
+pub const RAM_REGION_NAME: &str = "ram";
 
 #[allow(unused)]
 enum StackTypeHint {
@@ -43,7 +43,7 @@ enum StackTypeHint {
 
 pub struct MemoryHandler {
     /// A list of the registered handlers for specially mapped memory regions.
-    mapped_memory: Vec<MappedMemoryRegion>,
+    mapped_memory: Vec<MappedMemory>,
 
     /// The start address of the user segment.
     pub user_segment_start: usize,
@@ -135,7 +135,13 @@ impl MemoryHandler {
         };
 
         // Insert the physical memory mapped region that represents the RAM.
-        mem.add_mapped_memory_region(0, stack_segment_end - user_segment_start, true, true, "ram");
+        mem.add_mapped_memory_region(
+            0,
+            stack_segment_end - user_segment_start,
+            true,
+            true,
+            RAM_REGION_NAME,
+        );
 
         // Load the code segment bytes into RAM, if it has been provided.
         if !code_segment_bytes.is_empty() {
@@ -179,9 +185,8 @@ impl MemoryHandler {
             .iter()
             .any(|m| (start >= m.start && end <= m.end) || (start <= m.end && m.start <= end)));
 
-        self.mapped_memory.push(MappedMemoryRegion::new(
-            start, length, can_read, can_write, name,
-        ));
+        self.mapped_memory
+            .push(MappedMemory::new(start, length, can_read, can_write, name));
 
         self.mapped_memory.len() - 1
     }
@@ -200,9 +205,9 @@ impl MemoryHandler {
             && self.stack_pointer <= self.stack_segment_end
     }
 
-    /// Completely clear the memory.
+    /// Completely clear the physical (RAM) memory segment.
     pub fn clear(&mut self) {
-        self.mapped_memory[PHYSICAL_MEMORY_ID].clear()
+        self.get_physical_memory_segment_mut().clear();
     }
 
     /// Attempt to decompile any instructions between a start and end memory location.
@@ -240,7 +245,7 @@ impl MemoryHandler {
     /// A pointer to the specific byte in memory.
     pub fn get_byte_ptr(&self, pos: usize) -> &u8 {
         let region = self
-            .get_mapped_region_by_address(pos)
+            .get_mapped_segment_by_address(pos)
             .expect("failed to get mapped memory region for address");
 
         assert!(region.can_read);
@@ -259,7 +264,7 @@ impl MemoryHandler {
     /// A clone of the specific byte from memory.
     pub fn get_byte_clone(&self, pos: usize) -> u8 {
         let region = self
-            .get_mapped_region_by_address(pos)
+            .get_mapped_segment_by_address(pos)
             .expect("failed to get mapped memory region for address");
 
         assert!(region.can_read);
@@ -629,7 +634,7 @@ impl MemoryHandler {
         }
     }
 
-    /// Attempt to find the mapped memory region that is associated with a given address.
+    /// Attempt to find the mapped memory segment that is associated with a given address.
     ///
     /// # Arguments
     ///
@@ -637,19 +642,19 @@ impl MemoryHandler {
     ///
     /// # Returns
     ///
-    /// A reference to the associated [`MappedMemory`] region.
+    /// A reference to the associated [`MappedMemory`] segment.
     ///
     /// # Note
     ///
-    /// This method will assert if no valid memory region is located.
+    /// This method will assert if no valid memory segment is located.
     #[inline(always)]
-    pub fn get_mapped_region_by_address(&self, pos: usize) -> Option<&MappedMemoryRegion> {
+    pub fn get_mapped_segment_by_address(&self, pos: usize) -> Option<&MappedMemory> {
         self.mapped_memory
             .iter()
             .find(|e| pos >= e.start && pos <= e.end)
     }
 
-    /// Attempt to find the mapped memory region that is associated with a given address.
+    /// Attempt to find the mapped memory segment that is associated with a given address.
     ///
     /// # Arguments
     ///
@@ -657,19 +662,65 @@ impl MemoryHandler {
     ///
     /// # Returns
     ///
-    /// A reference to the associated [`MappedMemory`] region.
+    /// A reference to the associated [`MappedMemory`] segment.
     ///
     /// # Note
     ///
-    /// This method will assert if no valid memory region is located.
+    /// This method will assert if no valid memory segment is located.
     #[inline(always)]
-    pub fn get_mapped_region_by_address_mut(
-        &mut self,
-        pos: usize,
-    ) -> Option<&mut MappedMemoryRegion> {
+    pub fn get_mapped_segment_by_address_mut(&mut self, pos: usize) -> Option<&mut MappedMemory> {
         self.mapped_memory
             .iter_mut()
             .find(|e| pos >= e.start && pos <= e.end)
+    }
+    /// Attempt to find the mapped memory segment that has a specific name.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - A string giving the name of the segment.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the associated [`MappedMemory`] segment.
+    ///
+    /// # Note
+    ///
+    /// This method will assert if no valid memory segment is located.
+    #[inline(always)]
+    pub fn get_mapped_segment_by_name(&self, name: &str) -> Option<&MappedMemory> {
+        self.mapped_memory.iter().find(|e| e.name == name)
+    }
+
+    /// Attempt to find the mapped memory segment that has a specific name.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - A string giving the name of the segment.
+    ///
+    /// # Returns
+    ///
+    /// A mutable reference to the associated [`MappedMemory`] segment.
+    ///
+    /// # Note
+    ///
+    /// This method will assert if no valid memory segment is located.
+    #[inline(always)]
+    pub fn get_mapped_segment_by_name_mut(&mut self, name: &str) -> Option<&mut MappedMemory> {
+        self.mapped_memory.iter_mut().find(|e| e.name == name)
+    }
+
+    /// Get a reference to the physical (RAM) memory segment.
+    #[inline(always)]
+    pub fn get_physical_memory_segment(&self) -> &MappedMemory {
+        self.get_mapped_segment_by_name(RAM_REGION_NAME)
+            .expect("failed to get physical RAM memory segment")
+    }
+
+    /// Get a mutable reference to the physical RAM memory segment.
+    #[inline(always)]
+    pub fn get_physical_memory_segment_mut(&mut self) -> &mut MappedMemory {
+        self.get_mapped_segment_by_name_mut(RAM_REGION_NAME)
+            .expect("failed to get physical RAM memory segment")
     }
 
     /// Attempt to read a u32 value from memory.
@@ -703,7 +754,7 @@ impl MemoryHandler {
     #[inline(always)]
     pub fn get_range_ptr(&self, start: usize, len: usize) -> &[u8] {
         let region = self
-            .get_mapped_region_by_address(start)
+            .get_mapped_segment_by_address(start)
             .expect("failed to get mapped memory region for address");
 
         assert!(region.can_read);
@@ -736,8 +787,7 @@ impl MemoryHandler {
     ///
     /// A slice of u8 values.
     pub fn get_code_segment_storage(&self) -> &[u8] {
-        &self.mapped_memory[PHYSICAL_MEMORY_ID].memory
-            [self.code_segment_start..self.code_segment_end]
+        &self.get_ram_storage()[self.code_segment_start..self.code_segment_end]
     }
 
     /// Get a slice of the data segment contents.
@@ -746,8 +796,7 @@ impl MemoryHandler {
     ///
     /// A slice of u8 values.
     pub fn get_data_segment_storage(&self) -> &[u8] {
-        &self.mapped_memory[PHYSICAL_MEMORY_ID].memory
-            [self.data_segment_start..self.data_segment_end]
+        &self.get_ram_storage()[self.data_segment_start..self.data_segment_end]
     }
 
     /// Get a slice of the raw stack segment contents.
@@ -756,8 +805,7 @@ impl MemoryHandler {
     ///
     /// A slice of u8 values
     pub fn get_stack_segment_storage(&self) -> &[u8] {
-        &self.mapped_memory[PHYSICAL_MEMORY_ID].memory
-            [self.stack_segment_start..self.stack_segment_end]
+        &self.get_ram_storage()[self.stack_segment_start..self.stack_segment_end]
     }
 
     /// Get a slice of the entire memory contents.
@@ -765,8 +813,8 @@ impl MemoryHandler {
     /// # Returns
     ///
     /// A slice of u8 values, referencing every byte in memory.
-    pub fn get_storage(&self) -> &[u8] {
-        &self.mapped_memory[PHYSICAL_MEMORY_ID].memory
+    pub fn get_ram_storage(&self) -> &[u8] {
+        &self.get_physical_memory_segment().memory
     }
 
     /// Get a slice of the user segment contents.
@@ -775,7 +823,7 @@ impl MemoryHandler {
     ///
     /// A slice of u8 values
     pub fn get_user_segment_storage(&self) -> &[u8] {
-        &self.mapped_memory[PHYSICAL_MEMORY_ID].memory[..self.code_segment_start]
+        &self.get_ram_storage()[..self.code_segment_start]
     }
 
     /// Checks whether the allocated memory region has a size greater than 0.
@@ -789,7 +837,7 @@ impl MemoryHandler {
     ///
     /// The length of the physical memory region, in bytes.
     pub fn len(&self) -> usize {
-        self.mapped_memory[PHYSICAL_MEMORY_ID].len()
+        self.get_ram_storage().len()
     }
 
     // Attempt to pop a [`StackTypeHint`] from the stack hint list.
@@ -871,7 +919,7 @@ impl MemoryHandler {
     /// * `value` - The value to be written into memory.
     pub fn set(&mut self, pos: usize, value: u8) {
         let region = self
-            .get_mapped_region_by_address_mut(pos)
+            .get_mapped_segment_by_address_mut(pos)
             .expect("failed to get mapped memory region for address");
 
         assert!(region.can_write);
@@ -888,7 +936,7 @@ impl MemoryHandler {
     #[inline(always)]
     pub fn set_range(&mut self, pos: usize, values: &[u8]) {
         let region = self
-            .get_mapped_region_by_address_mut(pos)
+            .get_mapped_segment_by_address_mut(pos)
             .expect("failed to get mapped memory region for address");
 
         assert!(region.can_write);
@@ -982,10 +1030,11 @@ impl From<&[u8]> for MemoryHandler {
 mod tests_memory {
     use crate::ins::instruction::Instruction;
 
-    use super::{MemoryHandler, MEGABYTE, PHYSICAL_MEMORY_ID};
+    use super::{MemoryHandler, MEGABYTE};
 
     fn fill_memory_sequential(mem: &mut MemoryHandler) {
-        for (i, byte) in &mut mem.mapped_memory[PHYSICAL_MEMORY_ID]
+        for (i, byte) in &mut mem
+            .get_physical_memory_segment_mut()
             .memory
             .iter_mut()
             .enumerate()

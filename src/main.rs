@@ -75,11 +75,6 @@ fn main() {
         panic!("currently unsupported");
     }
 
-    /*let rom = boot_rom::BootROM::new();
-    let b = rom.get_byte_ptr(0);
-    println!("{b}");
-    return;*/
-
     /*let expr_args_1 = [
         ExpressionArgs::Register(RegisterId::R7),
         ExpressionArgs::Operator(ExpressionOperator::Add),
