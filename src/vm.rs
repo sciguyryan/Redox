@@ -1,4 +1,5 @@
 use crate::{
+    boot_rom::{BootRom, BOOT_MEMORY_LENGTH, BOOT_MEMORY_START, BOOT_REGION_NAME},
     cpu::Cpu,
     ins::instruction::Instruction,
     mem::memory_handler::{MemoryHandler, MEGABYTE},
@@ -7,11 +8,6 @@ use crate::{
 pub const MIN_USER_SEGMENT_SIZE: usize = MEGABYTE * 32;
 pub const U32_STACK_CAPACITY: usize = 1000;
 pub const BYTES_IN_U32: usize = 4;
-
-/// The start index of the boot mapped memory region.
-pub const BOOT_MEMORY_START: usize = 0x12_C00_000; // Starting at the 300 megabyte region.
-/// The end index of the boot mapped memory region.
-pub const BOOT_MEMORY_LENGTH: usize = MEGABYTE; // Extending for 1 megabyte.
 
 pub struct VirtualMachine {
     pub mem: MemoryHandler,
@@ -50,15 +46,34 @@ impl VirtualMachine {
             cpu: Cpu::default(),
         };
 
-        // Insert the boot memory mapped region.
-        vm.mem
-            .add_mapped_memory_region(BOOT_MEMORY_START, BOOT_MEMORY_LENGTH, true, false, "boot");
+        // Build and load the boot ROM.
+        vm.load_boot_rom();
 
         // Synchronize certain CPU registers with the local variables
         // held in the memory instance.
         vm.cpu.synchronize_registers(&vm.mem);
 
         vm
+    }
+
+    fn load_boot_rom(&mut self) {
+        // Create the bootable ROM.
+        let boot_rom = BootRom::new();
+
+        // Create the new memory segment.
+        let boot_mem_id = self.mem.add_mapped_memory_segment(
+            BOOT_MEMORY_START,
+            BOOT_MEMORY_LENGTH,
+            true,
+            false,
+            BOOT_REGION_NAME,
+        );
+
+        // Load the contents of the boot into the newly created memory segment.
+        self.mem
+            .get_mapped_segment_by_index_mut(boot_mem_id)
+            .expect("failed to get memory segment")
+            .set_contents(&boot_rom.compiled);
     }
 
     pub fn run(&mut self) {

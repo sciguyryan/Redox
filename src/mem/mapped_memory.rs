@@ -11,7 +11,7 @@ pub struct MappedMemory {
     /// Whether writing to this mapped memory segment is permitted.
     pub can_write: bool,
     /// The physical contents of this memory segment.
-    pub memory: Vec<u8>,
+    pub data: Vec<u8>,
 }
 
 impl MappedMemory {
@@ -22,15 +22,29 @@ impl MappedMemory {
             end: start + length,
             can_read,
             can_write,
-            memory: vec![0x0; length],
+            data: vec![0x0; length],
         }
     }
 
     /// Clear the contents of this memory segment.
     pub fn clear(&mut self) {
-        for b in &mut self.memory {
+        for b in &mut self.data {
             *b = 0;
         }
+    }
+
+    /// Check whether a point exists within this memory region.
+    ///
+    /// # Arguments
+    ///
+    /// * `pos` - The memory location.
+    ///
+    /// # Returns
+    ///
+    /// A boolean indicating whether this memory segment contains the specified address.
+    #[inline(always)]
+    pub fn contains_point(&self, pos: usize) -> bool {
+        self.contains_range(pos, pos)
     }
 
     /// Check whether a range completely exists within this memory segment.
@@ -43,18 +57,19 @@ impl MappedMemory {
     /// # Returns
     ///
     /// A boolean indicating whether this memory segment contains the specified address range.
+    #[inline(always)]
     pub fn contains_range(&self, start: usize, end: usize) -> bool {
         start >= self.start && end <= self.end
     }
 
     /// Get the length of this memory segment.
     pub fn len(&self) -> usize {
-        self.memory.len()
+        self.data.len()
     }
 
     /// Print the entire contents of this memory segment.
     pub fn print(&self) {
-        println!("{:?}", self.memory);
+        println!("{:?}", self.data);
     }
 
     /// Print a specific range of bytes from memory.
@@ -67,6 +82,21 @@ impl MappedMemory {
         let end = start + len;
         assert!(self.contains_range(start, end));
 
-        println!("{:?}", self.memory[start..end].to_vec());
+        println!("{:?}", self.data[start..end].to_vec());
+    }
+
+    /// Set the contents of this memory segment.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The raw bytes to be loaded into this memory segment.
+    ///
+    /// # Notes
+    ///
+    /// This method enforced the fact that the new data will fit within the currently allocated segment.
+    pub fn set_contents(&mut self, bytes: &[u8]) {
+        assert!(bytes.len() < self.len());
+
+        self.data[..bytes.len()].copy_from_slice(bytes);
     }
 }

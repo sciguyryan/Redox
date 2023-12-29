@@ -1,5 +1,6 @@
 #![crate_name = "redox"]
 
+mod boot_rom;
 mod compiler;
 mod cpu;
 mod data_access_type;
@@ -74,14 +75,6 @@ fn main() {
     if cfg!(target_endian = "big") {
         panic!("currently unsupported");
     }
-
-    /*let expr_args_1 = [
-        ExpressionArgs::Register(RegisterId::R7),
-        ExpressionArgs::Operator(ExpressionOperator::Add),
-        ExpressionArgs::Register(RegisterId::R8),
-    ];
-
-    let expr = MoveExpressionHandler::from(&expr_args_1[..]).pack();*/
 
     let instructions = &[
         Instruction::PushU32Imm(1234),
