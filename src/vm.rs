@@ -1,23 +1,24 @@
 use crate::{
-    boot_rom::BootROM,
     cpu::Cpu,
     ins::instruction::Instruction,
-    mem::{memory_handler::MemoryHandler, memory_interface::MemoryInterface},
+    mem::memory_handler::{MemoryHandler, MEGABYTE},
 };
 
-pub const MIN_USER_SEGMENT_SIZE: usize = 1024 * 1024 * 32;
-pub const MIN_BINARY_LOAD_ADDRESS: usize = 0x10000;
+pub const MIN_USER_SEGMENT_SIZE: usize = MEGABYTE * 32;
 pub const U32_STACK_CAPACITY: usize = 1000;
 pub const BYTES_IN_U32: usize = 4;
 
-pub struct VirtualMachine<'a, T: MemoryInterface> {
-    pub mem: MemoryHandler<'a, T>,
-    pub cpu: Cpu,
+/// The start index of the boot mapped memory region.
+pub const BOOT_MEMORY_START: usize = 0x12_C00_000; // Starting at the 300 megabyte region.
+/// The end index of the boot mapped memory region.
+pub const BOOT_MEMORY_LENGTH: usize = MEGABYTE; // Extending for 1 megabyte.
 
-    boot_rom: BootROM,
+pub struct VirtualMachine {
+    pub mem: MemoryHandler,
+    pub cpu: Cpu,
 }
 
-impl<'a, T: MemoryInterface> VirtualMachine<'a, T> {
+impl VirtualMachine {
     /// Build a virtual machine instance.
     ///
     /// # Arguments
@@ -47,12 +48,11 @@ impl<'a, T: MemoryInterface> VirtualMachine<'a, T> {
                 stack_segment_size,
             ),
             cpu: Cpu::default(),
-            boot_rom: BootROM::new(),
         };
 
-        // Add the mapped boot ROM memory region.
-        //vm.mem.add_mapped_memory_region(BOOT_MEMORY_START, BOOT_MEMORY_LENGTH, true, false, BOOT_NAME);
-        vm.mem.register_memory_mapped_device(&mut vm.boot_rom);
+        // Insert the boot memory mapped region.
+        vm.mem
+            .add_mapped_memory_region(BOOT_MEMORY_START, BOOT_MEMORY_LENGTH, true, false, "boot");
 
         // Synchronize certain CPU registers with the local variables
         // held in the memory instance.

@@ -6,7 +6,7 @@ use crate::{
         instruction::Instruction,
         move_expressions::{ExpressionArgs, MoveExpressionHandler},
     },
-    mem::{memory_handler::MemoryHandler, memory_interface::MemoryInterface},
+    mem::memory_handler::MemoryHandler,
     privilege_level::PrivilegeLevel,
     reg::registers::{RegisterId, Registers},
     utils,
@@ -124,7 +124,7 @@ impl Cpu {
     /// # Returns
     ///
     /// The next [`Instruction`] to be executed.
-    fn fetch_decode_next_instruction<T: MemoryInterface>(&mut self, mem: &MemoryHandler<T>) -> Instruction {
+    fn fetch_decode_next_instruction(&mut self, mem: &MemoryHandler) -> Instruction {
         // Get the current instruction pointer.
         let ip = *self
             .registers
@@ -598,7 +598,7 @@ impl Cpu {
     /// # Arguments
     ///
     /// * `mem` - A reference to the virtual machine [`Memory`] instance.
-    pub fn run<T: MemoryInterface>(&mut self, mem: &mut MemoryHandler<T>) {
+    pub fn run(&mut self, mem: &mut MemoryHandler) {
         loop {
             let ins = self.fetch_decode_next_instruction(mem);
             self.run_instruction(mem, &ins);
@@ -615,7 +615,7 @@ impl Cpu {
     ///
     /// * `mem` - The [`Memory`] connected to this CPU instance.
     /// * `instructions` - A slice of [`Instruction`] instances to be executed.
-    pub fn run_instructions<T: MemoryInterface>(&mut self, mem: &mut MemoryHandler<T>, instructions: &[Instruction]) {
+    pub fn run_instructions(&mut self, mem: &mut MemoryHandler, instructions: &[Instruction]) {
         for ins in instructions {
             self.run_instruction(mem, ins);
 
@@ -633,7 +633,7 @@ impl Cpu {
     ///
     /// * `mem` - The [`Memory`] connected to this CPU instance.
     /// * `instruction` - An [`Instruction`] instance to be executed.
-    fn run_instruction<T: MemoryInterface>(&mut self, mem: &mut MemoryHandler<T>, instruction: &Instruction) {
+    fn run_instruction(&mut self, mem: &mut MemoryHandler, instruction: &Instruction) {
         let privilege = &self.get_privilege();
 
         match instruction {
@@ -1059,7 +1059,7 @@ impl Cpu {
     ///
     /// * `mem` - A reference to the VM [`Memory`] instance.
     #[inline(always)]
-    pub fn set_segment_registers<T: MemoryInterface>(&mut self, mem: &MemoryHandler<T>) {
+    pub fn set_segment_registers(&mut self, mem: &MemoryHandler) {
         self.registers
             .get_register_u32_mut(RegisterId::SS)
             .write_unchecked(mem.stack_segment_start as u32);
@@ -1109,7 +1109,7 @@ impl Cpu {
     ///
     /// * `mem` - A reference to the VM [`Memory`] instance.
     #[inline(always)]
-    pub fn synchronize_registers<T: MemoryInterface>(&mut self, mem: &MemoryHandler<T>) {
+    pub fn synchronize_registers(&mut self, mem: &MemoryHandler) {
         // Update the segment registers, now that we know where the segments
         // are located in RAM.
         self.set_segment_registers(mem);
@@ -1244,7 +1244,7 @@ mod tests_cpu_version_2 {
             move_expressions::{ExpressionArgs, ExpressionOperator, MoveExpressionHandler},
         },
         reg::registers::RegisterId,
-        vm::{self, VirtualMachine}, mem::memory_interface::MemoryInterface,
+        vm::{self, VirtualMachine},
     };
 
     use super::{Cpu, CpuFlag};
@@ -1272,9 +1272,9 @@ mod tests_cpu_version_2 {
         /// # Arguments
         ///
         /// * `closure` - The closure to be executed on the completed virtual machine, to perform additional checks.
-        pub fn run_all_special<F, T: MemoryInterface>(&self, closure: F)
+        pub fn run_all_special<F>(&self, closure: F)
         where
-            F: Fn(usize, Option<VirtualMachine<T>>),
+            F: Fn(usize, Option<VirtualMachine>),
         {
             for (id, test) in self.tests.iter().enumerate() {
                 closure(id, test.run_test(id));
@@ -1357,7 +1357,7 @@ mod tests_cpu_version_2 {
         /// # Arguments
         ///
         /// * `id` - The ID of this test.
-        pub fn run_test<T: MemoryInterface>(&self, id: usize) -> Option<VirtualMachine<T>> {
+        pub fn run_test(&self, id: usize) -> Option<VirtualMachine> {
             // Compile the test code.
             let mut compiler = Compiler::new();
             let compiled = compiler.compile(&self.instructions);

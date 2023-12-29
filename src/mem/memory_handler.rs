@@ -3,7 +3,7 @@ use prettytable::{row, Table};
 
 use crate::ins::{instruction::Instruction, op_codes::OpCode};
 
-use super::{mapped_memory_region::MappedMemoryRegion, memory_block_reader::MemoryBlockReader, memory_interface::MemoryInterface, ram::Ram};
+use super::{mapped_memory_region::MappedMemoryRegion, memory_block_reader::MemoryBlockReader};
 
 /// The number of bytes in a megabyte.
 pub const MEGABYTE: usize = 1024 * 1024;
@@ -41,12 +41,9 @@ enum StackTypeHint {
  * causing conflicts.
  */
 
-pub struct MemoryHandler<'a, T: MemoryInterface> {
-    /// The internal physical RAM module.
-    ram: Ram,
-
+pub struct MemoryHandler {
     /// A list of the registered handlers for specially mapped memory regions.
-    mapped_memory: Vec<&'a mut T>,
+    mapped_memory: Vec<MappedMemoryRegion>,
 
     /// The start address of the user segment.
     pub user_segment_start: usize,
@@ -73,7 +70,7 @@ pub struct MemoryHandler<'a, T: MemoryInterface> {
     stack_pointer: usize,
 }
 
-impl<'a, T: MemoryInterface> MemoryHandler<'a, T> {
+impl MemoryHandler {
     pub fn new(
         user_segment_capacity: usize,
         code_segment_bytes: &[u8],
@@ -124,7 +121,6 @@ impl<'a, T: MemoryInterface> MemoryHandler<'a, T> {
 
         // Now we have the locations of the memory segments, we can create the memory
         let mut mem = Self {
-            ram: Ram::new(stack_segment_end),
             mapped_memory: vec![],
             user_segment_start,
             user_segment_end,
@@ -138,8 +134,8 @@ impl<'a, T: MemoryInterface> MemoryHandler<'a, T> {
             stack_pointer: stack_segment_end,
         };
 
-        // Add the physical RAM to the mapped device list.
-        mem.register_memory_mapped_device(&mut mem.ram);
+        // Insert the physical memory mapped region that represents the RAM.
+        mem.add_mapped_memory_region(0, stack_segment_end - user_segment_start, true, true, "ram");
 
         // Load the code segment bytes into RAM, if it has been provided.
         if !code_segment_bytes.is_empty() {
@@ -154,28 +150,38 @@ impl<'a, T: MemoryInterface> MemoryHandler<'a, T> {
         mem
     }
 
-    /// Register a mapped memory device to a specific mapped region.
+    /// Add a mapped memory region.
     ///
     /// # Arguments
     ///
-    /// * `device` - The mutable reference to the device being registered.
+    /// * `start` - The start address of the mapped memory region.
+    /// * `length` - The length of the mapped memory region.
+    /// * `can_read` - Can the region be read from?
+    /// * `can_write` - Can the region be written to?
+    /// * `name` - The name of the memory region.
     ///
     /// # Returns
     ///
-    /// A usize indicating the ID of the added memory mapped device.
-    pub fn register_memory_mapped_device(&mut self, device: &mut T) -> usize {
-        let start = device.get_map_start();
-        let end = device.get_map_end();
-
+    /// A usize indicating the ID of the added memory region.
+    pub fn add_mapped_memory_region(
+        &mut self,
+        start: usize,
+        length: usize,
+        can_read: bool,
+        can_write: bool,
+        name: &str,
+    ) -> usize {
         // Check whether we have a mapped memory region that would intersect
-        // with this one.
-        // We don't want to allow regions to cross like this.
+        // with this one. We don't want to allow regions to cross like this.
+        let end = start + length;
         assert!(!self
             .mapped_memory
             .iter()
-            .any(|m| (start >= m.get_map_start() && end <= m.get_map_end()) || (start <= m.get_map_end() && m.get_map_start() <= end)));
+            .any(|m| (start >= m.start && end <= m.end) || (start <= m.end && m.start <= end)));
 
-        self.mapped_memory.push(device);
+        self.mapped_memory.push(MappedMemoryRegion::new(
+            start, length, can_read, can_write, name,
+        ));
 
         self.mapped_memory.len() - 1
     }
@@ -966,11 +972,11 @@ impl<'a, T: MemoryInterface> MemoryHandler<'a, T> {
     }
 }
 
-/*impl From<&[u8]> for Memory {
+impl From<&[u8]> for MemoryHandler {
     fn from(values: &[u8]) -> Self {
-        Memory::new(100, values, &[], 0)
+        MemoryHandler::new(100, values, &[], 0)
     }
-}*/
+}
 
 #[cfg(test)]
 mod tests_memory {
@@ -978,7 +984,7 @@ mod tests_memory {
 
     use super::{MemoryHandler, MEGABYTE, PHYSICAL_MEMORY_ID};
 
-    fn fill_memory_sequential<T>(mem: &mut MemoryHandler<T>) {
+    fn fill_memory_sequential(mem: &mut MemoryHandler) {
         for (i, byte) in &mut mem.mapped_memory[PHYSICAL_MEMORY_ID]
             .memory
             .iter_mut()
@@ -988,7 +994,7 @@ mod tests_memory {
         }
     }
 
-    fn get_test_ram_instance<'a, T>() -> MemoryHandler<'a, T> {
+    fn get_test_ram_instance() -> MemoryHandler {
         let mut ram = MemoryHandler::new(100, &[], &[], 0);
 
         // Fill the memory with debug data.
@@ -1007,8 +1013,8 @@ mod tests_memory {
         let length = 100;
 
         // Add the region.
-        ram.register_mapped_region_device(start, length, true, true, "tester");
-        assert_eq!(ram.mapped_memory.len(), 3);
+        ram.add_mapped_memory_region(start, length, true, true, "tester");
+        assert_eq!(ram.mapped_memory.len(), 2);
 
         // Next, testing we can read and write to the mapped memory region.
         ram.set_u32(start, 0xDEADBEEF);
@@ -1028,11 +1034,11 @@ mod tests_memory {
         let length = 100;
 
         // Add the region.
-        ram.register_mapped_region_device(start, length, true, true, "tester");
+        ram.add_mapped_memory_region(start, length, true, true, "tester");
         assert_eq!(ram.mapped_memory.len(), 3);
 
         // Attempt to add another region that intersects with the one we previously added.
-        ram.register_mapped_region_device(start + 1, length, true, true, "tester 2");
+        ram.add_mapped_memory_region(start + 1, length, true, true, "tester 2");
     }
 
     /// Test reading from a mapped memory region that doesn't support it.
@@ -1046,7 +1052,7 @@ mod tests_memory {
         let length = 100;
 
         // Add the region.
-        ram.register_mapped_region_device(start, length, false, true, "tester");
+        ram.add_mapped_memory_region(start, length, false, true, "tester");
         assert_eq!(ram.mapped_memory.len(), 3);
 
         // Can we read from the memory region?
@@ -1064,7 +1070,7 @@ mod tests_memory {
         let length = 100;
 
         // Add the region.
-        ram.register_mapped_region_device(start, length, true, false, "tester");
+        ram.add_mapped_memory_region(start, length, true, false, "tester");
         assert_eq!(ram.mapped_memory.len(), 3);
 
         // Can we read from the memory region?
@@ -1082,7 +1088,7 @@ mod tests_memory {
         let length = 2;
 
         // Add the region.
-        ram.register_mapped_region_device(start, length, true, true, "tester");
+        ram.add_mapped_memory_region(start, length, true, true, "tester");
         assert_eq!(ram.mapped_memory.len(), 3);
 
         // Can we read from the memory region?
@@ -1100,7 +1106,7 @@ mod tests_memory {
         let length = 2;
 
         // Add the region.
-        ram.register_mapped_region_device(start, length, true, true, "tester");
+        ram.add_mapped_memory_region(start, length, true, true, "tester");
         assert_eq!(ram.mapped_memory.len(), 3);
 
         // Can we read from the memory region?

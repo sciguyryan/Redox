@@ -1,6 +1,5 @@
 #![crate_name = "redox"]
 
-mod boot_rom;
 mod compiler;
 mod cpu;
 mod data_access_type;
@@ -13,8 +12,7 @@ mod utils;
 pub mod vm;
 
 use crate::{
-    compiler::bytecode_compiler::Compiler, ins::instruction::Instruction,
-    mem::memory_interface::MemoryInterface, vm::VirtualMachine,
+    compiler::bytecode_compiler::Compiler, ins::instruction::Instruction, vm::VirtualMachine,
 };
 
 use std::time::Instant;
