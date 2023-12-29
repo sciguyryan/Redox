@@ -8,11 +8,10 @@ use super::{mapped_memory::MappedMemory, memory_block_reader::MemoryBlockReader}
 /// The number of bytes in a megabyte.
 pub const MEGABYTE: usize = 1024 * 1024;
 
-/// The maximum permissible size of the system RAM. Here it is 256 megabyte in size.
+/// The maximum permissible size of the system RAM segment.
 pub const MAX_PHYSICAL_MEMORY: usize = MEGABYTE * 256;
-
-/// The name of the RAM region.
-pub const RAM_REGION_NAME: &str = "ram";
+/// The name of the RAM segment.
+pub const RAM_SEGMENT_NAME: &str = "ram";
 
 #[allow(unused)]
 enum StackTypeHint {
@@ -35,14 +34,14 @@ enum StackTypeHint {
  * meaning that self-modifying code is technically also possible too.
  *
  * Certain memory areas are mapped to things outside of the emulated physical memory but can be
- * accessed as though they were. These mirrored areas will be used for graphics memory and the memory
+ * accessed as though they were. These mirrored segments will be used for graphics memory and the memory
  * of other emulated devices.
- * These areas are always mapped to regions outside the space of the emulated physical memory to avoid
+ * These areas are always mapped to segments outside the space of the emulated physical memory to avoid
  * causing conflicts.
  */
 
 pub struct MemoryHandler {
-    /// A list of the registered handlers for specially mapped memory regions.
+    /// A list of the registered handlers for specially memory-mapped segments.
     mapped_memory: Vec<MappedMemory>,
 
     /// The start address of the user segment.
@@ -115,7 +114,7 @@ impl MemoryHandler {
         }
 
         // Assert that the entire memory will be less than 256 megabytes in size.
-        // This will ensure that we can map the mirrored regions without having them
+        // This will ensure that we can map the mirrored segments without having them
         // conflict with the actual main memory segments.
         assert!(stack_segment_end < MAX_PHYSICAL_MEMORY);
 
@@ -133,13 +132,14 @@ impl MemoryHandler {
             stack_pointer: stack_segment_end,
         };
 
-        // Insert the physical RAM memory-mapped region that represents the RAM.
+        // Insert the physical RAM memory-mapped segments that
+        // represents the physical RAM.
         mem.add_mapped_memory_segment(
             0,
             stack_segment_end - user_segment_start,
             true,
             true,
-            RAM_REGION_NAME,
+            RAM_SEGMENT_NAME,
         );
 
         // Load the code segment bytes into RAM, if it has been provided.
@@ -234,7 +234,7 @@ impl MemoryHandler {
         instructions
     }
 
-    /// Attempt to get a pointer to a byte in memory.
+    /// Attempt to get a reference to a byte in memory.
     ///
     /// # Arguments
     ///
@@ -243,14 +243,14 @@ impl MemoryHandler {
     /// # Returns
     ///
     /// A pointer to the specific byte in memory.
-    pub fn get_byte_ptr(&self, pos: usize) -> &u8 {
-        let region = self
+    pub fn get_byte_ref(&self, pos: usize) -> &u8 {
+        let segment = self
             .get_mapped_segment_by_address(pos)
-            .expect("failed to get mapped memory region for address");
+            .expect("failed to get mapped memory segment for address");
 
-        assert!(region.can_read);
+        assert!(segment.can_read);
 
-        &region.data[pos - region.start]
+        &segment.data[pos - segment.start]
     }
 
     /// Attempt to read and clone a byte from memory.
@@ -263,13 +263,13 @@ impl MemoryHandler {
     ///
     /// A clone of the specific byte from memory.
     pub fn get_byte_clone(&self, pos: usize) -> u8 {
-        let region = self
+        let segment = self
             .get_mapped_segment_by_address(pos)
-            .expect("failed to get mapped memory region for address");
+            .expect("failed to get mapped memory segment for address");
 
-        assert!(region.can_read);
+        assert!(segment.can_read);
 
-        region.data[pos - region.start]
+        segment.data[pos - segment.start]
     }
 
     /// Attempt to read an instruction from memory.
@@ -634,7 +634,7 @@ impl MemoryHandler {
         }
     }
 
-    /// Attempt to find the mapped memory segment that is associated with a given address.
+    /// Attempt to find the memory-mapped segment that is associated with a given address.
     ///
     /// # Arguments
     ///
@@ -649,7 +649,9 @@ impl MemoryHandler {
     /// This method will assert if no valid memory segment is located.
     #[inline(always)]
     pub fn get_mapped_segment_by_address(&self, pos: usize) -> Option<&MappedMemory> {
-        self.mapped_memory.iter().find(|e| e.contains_point(pos))
+        self.mapped_memory
+            .iter()
+            .find(|e| e.can_contains_range(pos, pos))
     }
 
     /// Attempt to find the mapped memory segment that is associated with a given address.
@@ -669,7 +671,7 @@ impl MemoryHandler {
     pub fn get_mapped_segment_by_address_mut(&mut self, pos: usize) -> Option<&mut MappedMemory> {
         self.mapped_memory
             .iter_mut()
-            .find(|e| e.contains_point(pos))
+            .find(|e| e.can_contains_range(pos, pos))
     }
 
     /// Attempt to find the memory-mapped segment that has the specified index.
@@ -733,14 +735,14 @@ impl MemoryHandler {
     /// Get a reference to the physical (RAM) memory segment.
     #[inline(always)]
     pub fn get_physical_memory_segment(&self) -> &MappedMemory {
-        self.get_mapped_segment_by_name(RAM_REGION_NAME)
+        self.get_mapped_segment_by_name(RAM_SEGMENT_NAME)
             .expect("failed to get physical RAM memory segment")
     }
 
     /// Get a mutable reference to the physical RAM memory segment.
     #[inline(always)]
     pub fn get_physical_memory_segment_mut(&mut self) -> &mut MappedMemory {
-        self.get_mapped_segment_by_name_mut(RAM_REGION_NAME)
+        self.get_mapped_segment_by_name_mut(RAM_SEGMENT_NAME)
             .expect("failed to get physical RAM memory segment")
     }
 
@@ -766,40 +768,41 @@ impl MemoryHandler {
     ///
     /// # Arguments
     ///
-    /// * `start` - The starting position of the bytes in memory.
+    /// * `pos` - The starting position of the bytes in memory.
     /// * `len` - The number of bytes to read from memory.
     ///
     /// # Returns
     ///
     /// A reference to a u8 slice from memory.
     #[inline(always)]
-    pub fn get_range_ptr(&self, start: usize, len: usize) -> &[u8] {
-        let region = self
-            .get_mapped_segment_by_address(start)
-            .expect("failed to get mapped memory region for address");
+    pub fn get_range_ptr(&self, pos: usize, len: usize) -> &[u8] {
+        let segment = self
+            .get_mapped_segment_by_address(pos)
+            .expect("failed to get mapped memory segment for address");
 
-        assert!(region.can_read);
+        assert!(segment.can_read);
 
-        // Does this region completely contain the address range?
-        let absolute_end = start + len;
-        assert!(region.contains_range(start, absolute_end));
+        // Translate the global address into the local variant.
+        let start = pos - segment.start;
+        let end = start + len;
+        segment.assert_within_bounds(end);
 
         // Translate the absolute address into the absolute local variant.
-        &region.data[(start - region.start)..(absolute_end - region.start)]
+        &segment.data[start..end]
     }
 
     /// Attempt to clone a range of bytes from memory.
     ///
     /// # Arguments
     ///
-    /// * `start` - The starting position of the bytes in memory.
+    /// * `pos` - The starting position of the bytes in memory.
     /// * `len` - The number of bytes to read from memory.
     ///
     /// # Returns
     ///
     /// A vector containing the bytes cloned from memory.
-    pub fn get_range_clone(&self, start: usize, len: usize) -> Vec<u8> {
-        self.get_range_ptr(start, len).to_vec()
+    pub fn get_range_clone(&self, pos: usize, len: usize) -> Vec<u8> {
+        self.get_range_ptr(pos, len).to_vec()
     }
 
     /// Get a slice of the code segment contents.
@@ -847,16 +850,16 @@ impl MemoryHandler {
         &self.get_ram_storage()[..self.code_segment_start]
     }
 
-    /// Checks whether the allocated memory region has a size greater than 0.
+    /// Is the physicla memory segment empty?
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
-    /// Get the size of the emulated physical memory.
+    /// Get the size of the physical memory segment.
     ///
     /// # Returns
     ///
-    /// The length of the physical memory region, in bytes.
+    /// The length of the physical memory segment, in bytes.
     pub fn len(&self) -> usize {
         self.get_ram_storage().len()
     }
@@ -939,13 +942,14 @@ impl MemoryHandler {
     /// * `pos` - The point in memory to be checked.
     /// * `value` - The value to be written into memory.
     pub fn set(&mut self, pos: usize, value: u8) {
-        let region = self
+        let segment = self
             .get_mapped_segment_by_address_mut(pos)
-            .expect("failed to get mapped memory region for address");
+            .expect("failed to get mapped memory segment for address");
 
-        assert!(region.can_write);
+        assert!(segment.can_write);
 
-        region.data[pos - region.start] = value;
+        // Translate the global address into the local variant.
+        segment.data[pos - segment.start] = value;
     }
 
     /// Set the value of a range of values in memory.
@@ -956,25 +960,20 @@ impl MemoryHandler {
     /// * `values` - A slice of u8 values that are to be written into memory.
     #[inline(always)]
     pub fn set_range(&mut self, pos: usize, values: &[u8]) {
-        let region = self
+        let segment = self
             .get_mapped_segment_by_address_mut(pos)
-            .expect("failed to get mapped memory region for address");
+            .expect("failed to get mapped memory segment for address");
 
-        assert!(region.can_write);
+        assert!(segment.can_write);
 
-        // Does this region completely contain the address range?
-        let absolute_end = pos + values.len();
-        assert!(region.contains_range(pos, absolute_end));
+        // Translate the global address into the local variant.
+        let start = pos - segment.start;
+        let end = start + values.len();
+        segment.assert_within_bounds(end);
 
-        // Translate the absolute address into the absolute local variant.
         // This is safe since we have checked that the range is completely
-        // valid relative to the mapped memory region.
-        for (old, new) in region.data[(pos - region.start)..(absolute_end - region.start)]
-            .iter_mut()
-            .zip(values.iter())
-        {
-            *old = *new;
-        }
+        // contained within the specific memory segment.
+        segment.data[start..end].copy_from_slice(values);
     }
 
     /// Write a u32 value into memory.
@@ -987,18 +986,18 @@ impl MemoryHandler {
         self.set_range(pos, &u32::to_le_bytes(value));
     }
 
-    /// Print a list of the mapped memory regions.
-    pub fn print_mapped_memory_regions(&self) {
+    /// Print a list of the mapped memory segments.
+    pub fn print_mapped_memory_segments(&self) {
         let mut table = Table::new();
 
         table.add_row(row!["ID", "Name", "Start", "End"]);
 
-        for (i, region) in self.mapped_memory.iter().enumerate() {
+        for (i, segment) in self.mapped_memory.iter().enumerate() {
             table.add_row(row![
                 i,
-                region.name,
-                format!("{}", region.start),
-                format!("{}", region.end)
+                segment.name,
+                format!("{}", segment.start),
+                format!("{}", segment.end)
             ]);
         }
 
@@ -1073,113 +1072,113 @@ mod tests_memory {
         ram
     }
 
-    /// Test adding and working with mapped memory regions.
+    /// Test adding and working with mapped memory segments.
     #[test]
-    fn test_adding_mapped_memory_region() {
+    fn test_adding_mapped_memory_segment() {
         let mut ram = MemoryHandler::new(100, &[], &[], 0);
 
-        // Well past the boot memory region.
+        // Well past the boot memory segment.
         let start = MEGABYTE * 512;
         let length = 100;
 
-        // Add the region.
+        // Add the segment.
         ram.add_mapped_memory_segment(start, length, true, true, "tester");
         assert_eq!(ram.mapped_memory.len(), 2);
 
-        // Next, testing we can read and write to the mapped memory region.
+        // Next, testing we can read and write to the mapped memory segment.
         ram.set_u32(start, 0xDEADBEEF);
 
-        // Next, test that we can read the value back from the mapped memory region.
+        // Next, test that we can read the value back from the mapped memory segment.
         assert_eq!(ram.get_u32(start), 0xDEADBEEF);
     }
 
-    /// Test adding an overlapping memory region panics.
+    /// Test adding an overlapping memory segment panics.
     #[test]
     #[should_panic]
-    fn test_adding_mapped_memory_region_overlapping() {
+    fn test_adding_mapped_memory_segment_overlapping() {
         let mut ram = MemoryHandler::new(100, &[], &[], 0);
 
-        // Well past the boot memory region.
+        // Well past the boot memory segment.
         let start = MEGABYTE * 512;
         let length = 100;
 
-        // Add the region.
+        // Add the segment.
         ram.add_mapped_memory_segment(start, length, true, true, "tester");
         assert_eq!(ram.mapped_memory.len(), 3);
 
-        // Attempt to add another region that intersects with the one we previously added.
+        // Attempt to add another segment that intersects with the one we previously added.
         ram.add_mapped_memory_segment(start + 1, length, true, true, "tester 2");
     }
 
-    /// Test reading from a mapped memory region that doesn't support it.
+    /// Test reading from a mapped memory segment that doesn't support it.
     #[test]
     #[should_panic]
-    fn test_mapped_memory_region_no_reading() {
+    fn test_mapped_memory_segment_no_reading() {
         let mut ram = MemoryHandler::new(100, &[], &[], 0);
 
-        // Well past the boot memory region.
+        // Well past the boot memory segment.
         let start = MEGABYTE * 512;
         let length = 100;
 
-        // Add the region.
+        // Add the segment.
         ram.add_mapped_memory_segment(start, length, false, true, "tester");
         assert_eq!(ram.mapped_memory.len(), 3);
 
-        // Can we read from the memory region?
+        // Can we read from the memory segment?
         let _ = ram.get_u32(start);
     }
 
-    /// Test writing to a mapped memory region that doesn't support it.
+    /// Test writing to a mapped memory segment that doesn't support it.
     #[test]
     #[should_panic]
-    fn test_mapped_memory_region_no_writing() {
+    fn test_mapped_memory_segment_no_writing() {
         let mut ram = MemoryHandler::new(100, &[], &[], 0);
 
-        // Well past the boot memory region.
+        // Well past the boot memory segment.
         let start = MEGABYTE * 512;
         let length = 100;
 
-        // Add the region.
+        // Add the segment.
         ram.add_mapped_memory_segment(start, length, true, false, "tester");
         assert_eq!(ram.mapped_memory.len(), 3);
 
-        // Can we read from the memory region?
+        // Can we read from the memory segment?
         ram.set_u32(start, 0xDEAFBEEF);
     }
 
-    /// Test attempting to read beyond the bounds of a mapped memory region.
+    /// Test attempting to read beyond the bounds of a mapped memory segment.
     #[test]
     #[should_panic]
-    fn test_mapped_memory_region_read_past_bounds() {
+    fn test_mapped_memory_segment_read_past_bounds() {
         let mut ram = MemoryHandler::new(100, &[], &[], 0);
 
-        // Well past the boot memory region.
+        // Well past the boot memory segment.
         let start = MEGABYTE * 512;
         let length = 2;
 
-        // Add the region.
+        // Add the segment.
         ram.add_mapped_memory_segment(start, length, true, true, "tester");
         assert_eq!(ram.mapped_memory.len(), 3);
 
-        // Can we read from the memory region?
+        // Can we read from the memory segment?
         let _ = ram.get_u32(start);
     }
 
-    /// Test attempting to write beyond the bounds of a mapped memory region.
+    /// Test attempting to write beyond the bounds of a mapped memory segment.
     #[test]
     #[should_panic]
-    fn test_mapped_memory_region_write_past_bounds() {
+    fn test_mapped_memory_segment_write_past_bounds() {
         let mut ram = MemoryHandler::new(100, &[], &[], 0);
 
-        // Well past the boot memory region.
+        // Well past the boot memory segment.
         let start = MEGABYTE * 512;
         let length = 2;
 
-        // Add the region.
+        // Add the segment.
         ram.add_mapped_memory_segment(start, length, true, true, "tester");
         assert_eq!(ram.mapped_memory.len(), 3);
 
-        // Can we read from the memory region?
+        // Can we read from the memory segment?
         ram.set_u32(start, 0xDEADBEEF);
     }
 
@@ -1238,7 +1237,7 @@ mod tests_memory {
     /// Test reading beyond RAM bounds.
     #[test]
     #[should_panic]
-    fn test_read_no_mapped_region() {
+    fn test_read_no_mapped_segment() {
         let ram = MemoryHandler::new(100, &[], &[], 0);
 
         _ = ram.get_range_ptr(usize::MAX, 1);
@@ -1254,7 +1253,7 @@ mod tests_memory {
         ram.set(0, byte);
         assert_eq!(
             byte,
-            *ram.get_byte_ptr(0),
+            *ram.get_byte_ref(0),
             "failed to read correct value from memory"
         );
 

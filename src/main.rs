@@ -12,6 +12,8 @@ mod reg;
 mod utils;
 pub mod vm;
 
+use rand::Rng;
+
 use crate::{
     compiler::bytecode_compiler::Compiler, ins::instruction::Instruction, vm::VirtualMachine,
 };
@@ -122,6 +124,6 @@ fn main() {
     println!();
 
     println!("----------[Mapped Memory Regions]----------");
-    vm.mem.print_mapped_memory_regions();
+    vm.mem.print_mapped_memory_segments();
     println!();
 }

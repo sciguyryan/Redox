@@ -26,28 +26,17 @@ impl MappedMemory {
         }
     }
 
-    /// Clear the contents of this memory segment.
-    pub fn clear(&mut self) {
-        for b in &mut self.data {
-            *b = 0;
-        }
-    }
-
-    /// Check whether a point exists within this memory region.
+    /// Assert that a specified end point is within the bounds of this memory segment.
     ///
     /// # Arguments
     ///
-    /// * `pos` - The memory location.
-    ///
-    /// # Returns
-    ///
-    /// A boolean indicating whether this memory segment contains the specified address.
+    /// * `end` - The ending memory location.
     #[inline(always)]
-    pub fn contains_point(&self, pos: usize) -> bool {
-        self.contains_range(pos, pos)
+    pub fn assert_within_bounds(&self, end: usize) {
+        assert!(end <= self.len());
     }
 
-    /// Check whether a range completely exists within this memory segment.
+    /// Check whether a range can completely exist within this memory segment.
     ///
     /// # Arguments
     ///
@@ -58,8 +47,15 @@ impl MappedMemory {
     ///
     /// A boolean indicating whether this memory segment contains the specified address range.
     #[inline(always)]
-    pub fn contains_range(&self, start: usize, end: usize) -> bool {
+    pub fn can_contains_range(&self, start: usize, end: usize) -> bool {
         start >= self.start && end <= self.end
+    }
+
+    /// Clear the contents of this memory segment.
+    pub fn clear(&mut self) {
+        for b in &mut self.data {
+            *b = 0;
+        }
     }
 
     /// Get the length of this memory segment.
@@ -80,7 +76,7 @@ impl MappedMemory {
     /// * `len` - The number of bytes to print.
     pub fn print_range(&self, start: usize, len: usize) {
         let end = start + len;
-        assert!(self.contains_range(start, end));
+        self.assert_within_bounds(end);
 
         println!("{:?}", self.data[start..end].to_vec());
     }
