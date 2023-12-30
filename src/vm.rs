@@ -5,8 +5,11 @@ use crate::{
     mem::memory_handler::{MemoryHandler, MEGABYTE},
 };
 
+/// The smallest permitted size of the user memory segment.
 pub const MIN_USER_SEGMENT_SIZE: usize = MEGABYTE * 32;
+/// The default size of the stack, in terms of how many u32 values can be held.
 pub const U32_STACK_CAPACITY: usize = 1000;
+/// The size of a u32 value, in bytes.
 pub const BYTES_IN_U32: usize = 4;
 
 pub struct VirtualMachine {

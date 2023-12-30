@@ -126,7 +126,7 @@ impl MemoryHandler {
             code_segment_end,
             data_segment_start,
             data_segment_end,
-            stack_type_hints: vec![],
+            stack_type_hints: Vec::with_capacity(stack_segment_capacity),
             stack_segment_start,
             stack_segment_end,
             stack_pointer: stack_segment_end,
