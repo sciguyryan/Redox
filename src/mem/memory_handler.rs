@@ -81,37 +81,31 @@ impl MemoryHandler {
         let user_segment_end = user_segment_capacity;
 
         // Next, if specified, will be the code segment.
-        let code_segment_start: usize;
-        let code_segment_end: usize;
-        if !code_segment_bytes.is_empty() {
-            code_segment_start = user_segment_end;
-            code_segment_end = code_segment_start + code_segment_bytes.len();
-        } else {
-            code_segment_start = user_segment_end;
-            code_segment_end = code_segment_start;
-        }
+        let code_segment_start = user_segment_end;
+        let code_segment_end = code_segment_start
+            + if !code_segment_bytes.is_empty() {
+                code_segment_bytes.len()
+            } else {
+                0
+            };
 
         // Next, if specified, will be the data segment.
-        let data_segment_start: usize;
-        let data_segment_end: usize;
-        if !data_segment_bytes.is_empty() {
-            data_segment_start = code_segment_end;
-            data_segment_end = data_segment_start + data_segment_bytes.len();
-        } else {
-            data_segment_start = code_segment_end;
-            data_segment_end = data_segment_start;
-        }
+        let data_segment_start = code_segment_end;
+        let data_segment_end = data_segment_start
+            + if !data_segment_bytes.is_empty() {
+                data_segment_bytes.len()
+            } else {
+                0
+            };
 
         // Next, if specified, will be the stack segment.
-        let stack_segment_start: usize;
-        let stack_segment_end: usize;
-        if stack_segment_capacity > 0 {
-            stack_segment_start = data_segment_end;
-            stack_segment_end = stack_segment_start + stack_segment_capacity;
-        } else {
-            stack_segment_start = data_segment_end;
-            stack_segment_end = stack_segment_start;
-        }
+        let stack_segment_start = data_segment_end;
+        let stack_segment_end = stack_segment_start
+            + if stack_segment_capacity > 0 {
+                stack_segment_capacity
+            } else {
+                0
+            };
 
         // Assert that the entire memory will be less than a predefined size.
         // This will ensure that we can map the mirrored segments without having them
