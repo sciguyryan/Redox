@@ -113,7 +113,7 @@ impl MemoryHandler {
             stack_segment_end = stack_segment_start;
         }
 
-        // Assert that the entire memory will be less than 256 megabytes in size.
+        // Assert that the entire memory will be less than a predefined size.
         // This will ensure that we can map the mirrored segments without having them
         // conflict with the actual main memory segments.
         assert!(stack_segment_end < MAX_PHYSICAL_MEMORY);
