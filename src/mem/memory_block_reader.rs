@@ -19,6 +19,7 @@ impl<'a> MemoryBlockReader<'a> {
     }
 
     /// Attempt to read a u8 value from memory.
+    #[inline(always)]
     fn read_u8_internal(&mut self) -> &u8 {
         let pos = self.cursor;
         self.cursor += 1;
