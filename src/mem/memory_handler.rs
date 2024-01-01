@@ -8,6 +8,9 @@ use super::{mapped_memory::MappedMemory, memory_block_reader::MemoryBlockReader}
 /// The number of bytes in a megabyte.
 pub const MEGABYTE: usize = 1024 * 1024;
 
+/// The size of a u32 value, in bytes.
+pub const BYTES_IN_U32: usize = 4;
+
 /// The maximum permissible size of the system RAM segment.
 pub const MAX_PHYSICAL_MEMORY: usize = MEGABYTE * 256;
 /// The name of the RAM segment.
@@ -276,6 +279,9 @@ impl MemoryHandler {
     ///
     /// An [`Instruction`] instance, if the memory address contains a valid instruction.
     pub fn get_instruction(&self, pos: usize) -> Instruction {
+        use OpCode::*;
+
+        // Read the OpCode ID.
         let opcode_id = self.get_u32(pos);
 
         // Validate the opcode is one of the ones we know about.
@@ -292,98 +298,98 @@ impl MemoryHandler {
 
         // Create our instruction instance.
         match opcode {
-            OpCode::Nop => Instruction::Nop,
+            Nop => Instruction::Nop,
 
             /******** [Arithmetic Instructions] ********/
-            OpCode::AddU32ImmU32Reg => {
+            AddU32ImmU32Reg => {
                 let imm = block.read_u32();
                 let reg = block.read_register_id();
 
                 Instruction::AddU32ImmU32Reg(imm, reg)
             }
-            OpCode::AddU32RegU32Reg => {
+            AddU32RegU32Reg => {
                 let reg_1 = block.read_register_id();
                 let reg_2 = block.read_register_id();
 
                 Instruction::AddU32RegU32Reg(reg_1, reg_2)
             }
-            OpCode::SubU32ImmU32Reg => {
+            SubU32ImmU32Reg => {
                 let imm = block.read_u32();
                 let reg = block.read_register_id();
 
                 Instruction::SubU32ImmU32Reg(imm, reg)
             }
-            OpCode::SubU32RegU32Imm => {
+            SubU32RegU32Imm => {
                 let reg = block.read_register_id();
                 let imm = block.read_u32();
 
                 Instruction::SubU32RegU32Imm(reg, imm)
             }
-            OpCode::SubU32RegU32Reg => {
+            SubU32RegU32Reg => {
                 let reg_1 = block.read_register_id();
                 let reg_2 = block.read_register_id();
 
                 Instruction::SubU32RegU32Reg(reg_1, reg_2)
             }
-            OpCode::MulU32ImmU32Reg => {
+            MulU32ImmU32Reg => {
                 let imm = block.read_u32();
                 let reg = block.read_register_id();
 
                 Instruction::MulU32ImmU32Reg(imm, reg)
             }
-            OpCode::MulU32RegU32Reg => {
+            MulU32RegU32Reg => {
                 let reg_1 = block.read_register_id();
                 let reg_2 = block.read_register_id();
 
                 Instruction::MulU32RegU32Reg(reg_1, reg_2)
             }
-            OpCode::DivU32ImmU32Reg => {
+            DivU32ImmU32Reg => {
                 let imm = block.read_u32();
                 let reg = block.read_register_id();
 
                 Instruction::DivU32ImmU32Reg(imm, reg)
             }
-            OpCode::DivU32RegU32Imm => {
+            DivU32RegU32Imm => {
                 let reg = block.read_register_id();
                 let imm = block.read_u32();
 
                 Instruction::DivU32RegU32Imm(reg, imm)
             }
-            OpCode::DivU32RegU32Reg => {
+            DivU32RegU32Reg => {
                 let reg_1 = block.read_register_id();
                 let reg_2 = block.read_register_id();
 
                 Instruction::DivU32RegU32Reg(reg_1, reg_2)
             }
-            OpCode::ModU32ImmU32Reg => {
+            ModU32ImmU32Reg => {
                 let imm = block.read_u32();
                 let reg = block.read_register_id();
 
                 Instruction::ModU32ImmU32Reg(imm, reg)
             }
-            OpCode::ModU32RegU32Imm => {
+            ModU32RegU32Imm => {
                 let reg = block.read_register_id();
                 let imm = block.read_u32();
 
                 Instruction::ModU32RegU32Imm(reg, imm)
             }
-            OpCode::ModU32RegU32Reg => {
+            ModU32RegU32Reg => {
                 let reg_1 = block.read_register_id();
                 let reg_2 = block.read_register_id();
 
                 Instruction::ModU32RegU32Reg(reg_1, reg_2)
             }
-            OpCode::IncU32Reg => {
+            IncU32Reg => {
                 let reg = block.read_register_id();
 
                 Instruction::IncU32Reg(reg)
             }
-            OpCode::DecU32Reg => {
+            DecU32Reg => {
                 let reg = block.read_register_id();
 
                 Instruction::DecU32Reg(reg)
             }
-            OpCode::AndU32ImmU32Reg => {
+            AndU32ImmU32Reg => {
                 let imm = block.read_u32();
                 let reg = block.read_register_id();
 
@@ -391,49 +397,49 @@ impl MemoryHandler {
             }
 
             /******** [Bit Operation Instructions] ********/
-            OpCode::LeftShiftU32ImmU32Reg => {
+            LeftShiftU32ImmU32Reg => {
                 let imm = block.read_u32();
                 let reg = block.read_register_id();
 
                 Instruction::LeftShiftU32ImmU32Reg(imm, reg)
             }
-            OpCode::LeftShiftU32RegU32Reg => {
+            LeftShiftU32RegU32Reg => {
                 let shift_reg = block.read_register_id();
                 let reg = block.read_register_id();
 
                 Instruction::LeftShiftU32RegU32Reg(shift_reg, reg)
             }
-            OpCode::ArithLeftShiftU32ImmU32Reg => {
+            ArithLeftShiftU32ImmU32Reg => {
                 let imm = block.read_u32();
                 let reg = block.read_register_id();
 
                 Instruction::ArithLeftShiftU32ImmU32Reg(imm, reg)
             }
-            OpCode::ArithLeftShiftU32RegU32Reg => {
+            ArithLeftShiftU32RegU32Reg => {
                 let shift_reg = block.read_register_id();
                 let reg = block.read_register_id();
 
                 Instruction::ArithLeftShiftU32RegU32Reg(shift_reg, reg)
             }
-            OpCode::RightShiftU32ImmU32Reg => {
+            RightShiftU32ImmU32Reg => {
                 let imm = block.read_u32();
                 let reg = block.read_register_id();
 
                 Instruction::RightShiftU32ImmU32Reg(imm, reg)
             }
-            OpCode::RightShiftU32RegU32Reg => {
+            RightShiftU32RegU32Reg => {
                 let shift_reg = block.read_register_id();
                 let reg = block.read_register_id();
 
                 Instruction::RightShiftU32RegU32Reg(shift_reg, reg)
             }
-            OpCode::ArithRightShiftU32ImmU32Reg => {
+            ArithRightShiftU32ImmU32Reg => {
                 let imm = block.read_u32();
                 let reg = block.read_register_id();
 
                 Instruction::ArithRightShiftU32ImmU32Reg(imm, reg)
             }
-            OpCode::ArithRightShiftU32RegU32Reg => {
+            ArithRightShiftU32RegU32Reg => {
                 let shift_reg = block.read_register_id();
                 let reg = block.read_register_id();
 
@@ -441,179 +447,179 @@ impl MemoryHandler {
             }
 
             /******** [Branching Instructions] ********/
-            OpCode::Int => {
+            Int => {
                 let addr = block.read_u32();
 
                 Instruction::Int(addr)
             }
-            OpCode::IntRet => Instruction::IntRet,
+            IntRet => Instruction::IntRet,
 
             /******** [Data Instructions] ********/
-            OpCode::SwapU32RegU32Reg => {
+            SwapU32RegU32Reg => {
                 let reg1 = block.read_register_id();
                 let reg2 = block.read_register_id();
 
                 Instruction::SwapU32RegU32Reg(reg1, reg2)
             }
-            OpCode::MovU32ImmU32Reg => {
+            MovU32ImmU32Reg => {
                 let imm = block.read_u32();
                 let reg = block.read_register_id();
 
                 Instruction::MovU32ImmU32Reg(imm, reg)
             }
-            OpCode::MovU32RegU32Reg => {
+            MovU32RegU32Reg => {
                 let in_reg = block.read_register_id();
                 let out_reg = block.read_register_id();
 
                 Instruction::MovU32RegU32Reg(in_reg, out_reg)
             }
-            OpCode::MovU32ImmMemSimple => {
+            MovU32ImmMemSimple => {
                 let imm = block.read_u32();
                 let addr = block.read_u32();
 
                 Instruction::MovU32ImmMemSimple(imm, addr)
             }
-            OpCode::MovU32RegMemSimple => {
+            MovU32RegMemSimple => {
                 let reg = block.read_register_id();
                 let addr = block.read_u32();
 
                 Instruction::MovU32RegMemSimple(reg, addr)
             }
-            OpCode::MovMemU32RegSimple => {
+            MovMemU32RegSimple => {
                 let addr = block.read_u32();
                 let reg = block.read_register_id();
 
                 Instruction::MovMemU32RegSimple(addr, reg)
             }
-            OpCode::MovU32RegPtrU32RegSimple => {
+            MovU32RegPtrU32RegSimple => {
                 let in_reg = block.read_register_id();
                 let out_reg = block.read_register_id();
 
                 Instruction::MovU32RegPtrU32RegSimple(in_reg, out_reg)
             }
-            OpCode::MovU32ImmMemExpr => {
+            MovU32ImmMemExpr => {
                 let imm = block.read_u32();
                 let expr = block.read_u32();
 
                 Instruction::MovU32ImmMemExpr(imm, expr)
             }
-            OpCode::MovMemExprU32Reg => {
+            MovMemExprU32Reg => {
                 let expr = block.read_u32();
                 let reg = block.read_register_id();
 
                 Instruction::MovMemExprU32Reg(expr, reg)
             }
-            OpCode::MovU32RegMemExpr => {
+            MovU32RegMemExpr => {
                 let reg = block.read_register_id();
                 let expr = block.read_u32();
 
                 Instruction::MovU32RegMemExpr(reg, expr)
             }
-            OpCode::ByteSwapU32 => {
+            ByteSwapU32 => {
                 let reg = block.read_register_id();
 
                 Instruction::ByteSwapU32(reg)
             }
-            OpCode::ZeroHighBitsByIndexU32Reg => {
+            ZeroHighBitsByIndexU32Reg => {
                 let index_reg = block.read_register_id();
                 let in_reg = block.read_register_id();
                 let out_reg = block.read_register_id();
 
                 Instruction::ZeroHighBitsByIndexU32Reg(index_reg, in_reg, out_reg)
             }
-            OpCode::ZeroHighBitsByIndexU32RegU32Imm => {
+            ZeroHighBitsByIndexU32RegU32Imm => {
                 let index = block.read_u32();
                 let in_reg = block.read_register_id();
                 let out_reg = block.read_register_id();
 
                 Instruction::ZeroHighBitsByIndexU32RegU32Imm(index, in_reg, out_reg)
             }
-            OpCode::PushU32Imm => {
+            PushU32Imm => {
                 let imm = block.read_u32();
 
                 Instruction::PushU32Imm(imm)
             }
 
             /******** [Logic Instructions] ********/
-            OpCode::BitTestU32Reg => {
+            BitTestU32Reg => {
                 let bit = block.read_u8();
                 let reg = block.read_register_id();
 
                 Instruction::BitTestU32Reg(bit, reg)
             }
-            OpCode::BitTestU32Mem => {
+            BitTestU32Mem => {
                 let bit = block.read_u8();
                 let addr = block.read_u32();
 
                 Instruction::BitTestU32Mem(bit, addr)
             }
-            OpCode::BitTestResetU32Reg => {
+            BitTestResetU32Reg => {
                 let bit = block.read_u8();
                 let reg = block.read_register_id();
 
                 Instruction::BitTestResetU32Reg(bit, reg)
             }
-            OpCode::BitTestResetU32Mem => {
+            BitTestResetU32Mem => {
                 let bit = block.read_u8();
                 let addr = block.read_u32();
 
                 Instruction::BitTestResetU32Mem(bit, addr)
             }
-            OpCode::BitTestSetU32Reg => {
+            BitTestSetU32Reg => {
                 let bit = block.read_u8();
                 let reg = block.read_register_id();
 
                 Instruction::BitTestSetU32Reg(bit, reg)
             }
-            OpCode::BitTestSetU32Mem => {
+            BitTestSetU32Mem => {
                 let bit = block.read_u8();
                 let addr = block.read_u32();
 
                 Instruction::BitTestSetU32Mem(bit, addr)
             }
-            OpCode::BitScanReverseU32RegU32Reg => {
+            BitScanReverseU32RegU32Reg => {
                 let in_reg = block.read_register_id();
                 let out_reg = block.read_register_id();
 
                 Instruction::BitScanReverseU32RegU32Reg(in_reg, out_reg)
             }
-            OpCode::BitScanReverseU32MemU32Reg => {
+            BitScanReverseU32MemU32Reg => {
                 let addr = block.read_u32();
                 let reg = block.read_register_id();
 
                 Instruction::BitScanReverseU32MemU32Reg(addr, reg)
             }
-            OpCode::BitScanReverseU32RegMemU32 => {
+            BitScanReverseU32RegMemU32 => {
                 let reg = block.read_register_id();
                 let out_addr = block.read_u32();
 
                 Instruction::BitScanReverseU32RegMemU32(reg, out_addr)
             }
-            OpCode::BitScanReverseU32MemU32Mem => {
+            BitScanReverseU32MemU32Mem => {
                 let in_addr = block.read_u32();
                 let out_addr = block.read_u32();
 
                 Instruction::BitScanReverseU32MemU32Mem(in_addr, out_addr)
             }
-            OpCode::BitScanForwardU32RegU32Reg => {
+            BitScanForwardU32RegU32Reg => {
                 let in_reg = block.read_register_id();
                 let out_reg = block.read_register_id();
 
                 Instruction::BitScanForwardU32RegU32Reg(in_reg, out_reg)
             }
-            OpCode::BitScanForwardU32MemU32Reg => {
+            BitScanForwardU32MemU32Reg => {
                 let addr = block.read_u32();
                 let reg = block.read_register_id();
 
                 Instruction::BitScanForwardU32MemU32Reg(addr, reg)
             }
-            OpCode::BitScanForwardU32RegMemU32 => {
+            BitScanForwardU32RegMemU32 => {
                 let reg = block.read_register_id();
                 let out_addr = block.read_u32();
 
                 Instruction::BitScanForwardU32RegMemU32(reg, out_addr)
             }
-            OpCode::BitScanForwardU32MemU32Mem => {
+            BitScanForwardU32MemU32Mem => {
                 let in_addr = block.read_u32();
                 let out_addr = block.read_u32();
 
@@ -621,10 +627,10 @@ impl MemoryHandler {
             }
 
             /******** [Special Instructions] ********/
-            OpCode::Ret => Instruction::Ret,
-            OpCode::Mret => Instruction::Mret,
-            OpCode::Hlt => Instruction::Hlt,
-            OpCode::Unknown => Instruction::Unknown(opcode_id),
+            Ret => Instruction::Ret,
+            Mret => Instruction::Mret,
+            Hlt => Instruction::Hlt,
+            Unknown => Instruction::Unknown(opcode_id),
         }
     }
 

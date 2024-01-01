@@ -634,108 +634,110 @@ impl Cpu {
     /// * `mem` - The [`Memory`] connected to this CPU instance.
     /// * `instruction` - An [`Instruction`] instance to be executed.
     fn run_instruction(&mut self, mem: &mut MemoryHandler, instruction: &Instruction) {
+        use Instruction::*;
+
         let privilege = &self.get_privilege();
 
         match instruction {
-            Instruction::Nop => {}
+            Nop => {}
 
             /******** [Arithmetic Instructions] ********/
-            Instruction::AddU32ImmU32Reg(imm, reg) => {
+            AddU32ImmU32Reg(imm, reg) => {
                 let old_value = self.read_reg_u32(reg, privilege);
                 let new_value = self.perform_checked_add_u32(old_value, *imm);
 
                 self.set_u32_accumulator(new_value);
             }
-            Instruction::AddU32RegU32Reg(in_reg, out_reg) => {
+            AddU32RegU32Reg(in_reg, out_reg) => {
                 let value1 = self.read_reg_u32(in_reg, privilege);
                 let value2 = self.read_reg_u32(out_reg, privilege);
                 let new_value = self.perform_checked_add_u32(value1, value2);
 
                 self.set_u32_accumulator(new_value);
             }
-            Instruction::SubU32ImmU32Reg(imm, reg) => {
+            SubU32ImmU32Reg(imm, reg) => {
                 let old_value = self.read_reg_u32(reg, privilege);
                 let new_value = self.perform_checked_subtract_u32(old_value, *imm);
 
                 self.set_u32_accumulator(new_value);
             }
-            Instruction::SubU32RegU32Imm(reg, imm) => {
+            SubU32RegU32Imm(reg, imm) => {
                 let old_value = self.read_reg_u32(reg, privilege);
                 let new_value = self.perform_checked_subtract_u32(*imm, old_value);
 
                 self.set_u32_accumulator(new_value);
             }
-            Instruction::SubU32RegU32Reg(reg_1, reg_2) => {
+            SubU32RegU32Reg(reg_1, reg_2) => {
                 let reg_1_val = self.read_reg_u32(reg_1, privilege);
                 let reg_2_val = self.read_reg_u32(reg_2, privilege);
                 let new_value = self.perform_checked_subtract_u32(reg_2_val, reg_1_val);
 
                 self.set_u32_accumulator(new_value);
             }
-            Instruction::MulU32ImmU32Reg(imm, reg) => {
+            MulU32ImmU32Reg(imm, reg) => {
                 let old_value = self.read_reg_u32(reg, privilege);
                 let new_value = self.perform_checked_mul_u32(old_value, *imm);
 
                 self.set_u32_accumulator(new_value);
             }
-            Instruction::MulU32RegU32Reg(reg_1, reg_2) => {
+            MulU32RegU32Reg(reg_1, reg_2) => {
                 let reg_1_val = self.read_reg_u32(reg_1, privilege);
                 let reg_2_val = self.read_reg_u32(reg_2, privilege);
                 let new_value = self.perform_checked_mul_u32(reg_1_val, reg_2_val);
 
                 self.set_u32_accumulator(new_value);
             }
-            Instruction::DivU32ImmU32Reg(imm, reg) => {
+            DivU32ImmU32Reg(imm, reg) => {
                 let old_value = self.read_reg_u32(reg, privilege);
                 let new_value = self.perform_checked_div_u32(old_value, *imm);
 
                 self.set_u32_accumulator(new_value);
             }
-            Instruction::DivU32RegU32Imm(reg, imm) => {
+            DivU32RegU32Imm(reg, imm) => {
                 let old_value = self.read_reg_u32(reg, privilege);
                 let new_value = self.perform_checked_div_u32(*imm, old_value);
 
                 self.set_u32_accumulator(new_value);
             }
-            Instruction::DivU32RegU32Reg(reg_1, reg_2) => {
+            DivU32RegU32Reg(reg_1, reg_2) => {
                 let reg_1_val = self.read_reg_u32(reg_1, privilege);
                 let reg_2_val = self.read_reg_u32(reg_2, privilege);
                 let new_value = self.perform_checked_div_u32(reg_2_val, reg_1_val);
 
                 self.set_u32_accumulator(new_value);
             }
-            Instruction::ModU32ImmU32Reg(imm, reg) => {
+            ModU32ImmU32Reg(imm, reg) => {
                 let reg_val = self.read_reg_u32(reg, privilege);
                 let new_value = self.perform_modulo_u32(reg_val, *imm);
 
                 self.set_u32_accumulator(new_value);
             }
-            Instruction::ModU32RegU32Imm(reg, imm) => {
+            ModU32RegU32Imm(reg, imm) => {
                 let reg_val = self.read_reg_u32(reg, privilege);
                 let new_value = self.perform_modulo_u32(*imm, reg_val);
 
                 self.set_u32_accumulator(new_value);
             }
-            Instruction::ModU32RegU32Reg(reg_1, reg_2) => {
+            ModU32RegU32Reg(reg_1, reg_2) => {
                 let reg_1_val = self.read_reg_u32(reg_1, privilege);
                 let reg_2_val = self.read_reg_u32(reg_2, privilege);
                 let new_value = self.perform_modulo_u32(reg_2_val, reg_1_val);
 
                 self.set_u32_accumulator(new_value);
             }
-            Instruction::IncU32Reg(reg) => {
+            IncU32Reg(reg) => {
                 let value = self.read_reg_u32(reg, privilege);
                 let new_value = self.perform_checked_add_u32(value, 1);
 
                 self.write_reg_u32(reg, new_value, privilege);
             }
-            Instruction::DecU32Reg(reg) => {
+            DecU32Reg(reg) => {
                 let value = self.read_reg_u32(reg, privilege);
                 let new_value = self.perform_checked_subtract_u32(value, 1);
 
                 self.write_reg_u32(reg, new_value, privilege);
             }
-            Instruction::AndU32ImmU32Reg(imm, reg) => {
+            AndU32ImmU32Reg(imm, reg) => {
                 let value = self.read_reg_u32(reg, privilege);
                 let new_value = self.perform_bitwise_and_u32(*imm, value);
 
@@ -743,52 +745,52 @@ impl Cpu {
             }
 
             /******** [Bit Operation Instructions] ********/
-            Instruction::LeftShiftU32ImmU32Reg(imm, reg) => {
+            LeftShiftU32ImmU32Reg(imm, reg) => {
                 let old_value = self.read_reg_u32(reg, privilege);
                 let shifted = self.perform_checked_left_shift_u32(old_value, *imm);
 
                 self.write_reg_u32(reg, shifted, privilege);
             }
-            Instruction::LeftShiftU32RegU32Reg(shift_reg, reg) => {
+            LeftShiftU32RegU32Reg(shift_reg, reg) => {
                 let shift_by = self.read_reg_u32(shift_reg, privilege);
                 let old_value = self.read_reg_u32(reg, privilege);
                 let shifted = self.perform_checked_left_shift_u32(old_value, shift_by);
 
                 self.write_reg_u32(reg, shifted, privilege);
             }
-            Instruction::ArithLeftShiftU32ImmU32Reg(imm, reg) => {
+            ArithLeftShiftU32ImmU32Reg(imm, reg) => {
                 let old_value = self.read_reg_u32(reg, privilege);
                 let shifted = self.perform_arithmetic_left_shift_u32(old_value, *imm);
 
                 self.write_reg_u32(reg, shifted, privilege);
             }
-            Instruction::ArithLeftShiftU32RegU32Reg(shift_reg, reg) => {
+            ArithLeftShiftU32RegU32Reg(shift_reg, reg) => {
                 let shift_by = self.read_reg_u32(shift_reg, privilege);
                 let old_value = self.read_reg_u32(reg, privilege);
                 let shifted = self.perform_arithmetic_left_shift_u32(old_value, shift_by);
 
                 self.write_reg_u32(reg, shifted, privilege);
             }
-            Instruction::RightShiftU32ImmU32Reg(imm, reg) => {
+            RightShiftU32ImmU32Reg(imm, reg) => {
                 let old_value = self.read_reg_u32(reg, privilege);
                 let shifted = self.perform_right_shift_u32(old_value, *imm);
 
                 self.write_reg_u32(reg, shifted, privilege);
             }
-            Instruction::RightShiftU32RegU32Reg(shift_reg, reg) => {
+            RightShiftU32RegU32Reg(shift_reg, reg) => {
                 let shift_by = self.read_reg_u32(shift_reg, privilege);
                 let old_value = self.read_reg_u32(reg, privilege);
                 let shifted = self.perform_right_shift_u32(old_value, shift_by);
 
                 self.write_reg_u32(reg, shifted, privilege);
             }
-            Instruction::ArithRightShiftU32ImmU32Reg(imm, reg) => {
+            ArithRightShiftU32ImmU32Reg(imm, reg) => {
                 let old_value = self.read_reg_u32(reg, privilege);
                 let shifted = self.perform_arithmetic_right_shift_u32(old_value, *imm);
 
                 self.write_reg_u32(reg, shifted, privilege);
             }
-            Instruction::ArithRightShiftU32RegU32Reg(shift_reg, reg) => {
+            ArithRightShiftU32RegU32Reg(shift_reg, reg) => {
                 let shift_by = self.read_reg_u32(shift_reg, privilege);
                 let old_value = self.read_reg_u32(reg, privilege);
                 let shifted = self.perform_arithmetic_right_shift_u32(old_value, shift_by);
@@ -797,78 +799,78 @@ impl Cpu {
             }
 
             /******** [Branching Instructions] ********/
-            Instruction::Int(_addr) => {
+            Int(_addr) => {
                 todo!();
             }
-            Instruction::IntRet => {
+            IntRet => {
                 todo!();
             }
 
             /******** [Data Instructions] ********/
-            Instruction::SwapU32RegU32Reg(reg_1, reg_2) => {
+            SwapU32RegU32Reg(reg_1, reg_2) => {
                 let reg_1_val = self.read_reg_u32(reg_1, privilege);
                 let reg_2_val = self.read_reg_u32(reg_2, privilege);
 
                 self.write_reg_u32(reg_1, reg_2_val, privilege);
                 self.write_reg_u32(reg_2, reg_1_val, privilege);
             }
-            Instruction::MovU32ImmU32Reg(imm, reg) => {
+            MovU32ImmU32Reg(imm, reg) => {
                 self.write_reg_u32(reg, *imm, privilege);
             }
-            Instruction::MovU32RegU32Reg(in_reg, out_reg) => {
+            MovU32RegU32Reg(in_reg, out_reg) => {
                 let value = self.read_reg_u32(in_reg, privilege);
 
                 self.write_reg_u32(out_reg, value, privilege);
             }
-            Instruction::MovU32ImmMemSimple(imm, addr) => {
+            MovU32ImmMemSimple(imm, addr) => {
                 mem.set_u32(*addr as usize, *imm);
             }
-            Instruction::MovU32RegMemSimple(reg, addr) => {
+            MovU32RegMemSimple(reg, addr) => {
                 let value = self.read_reg_u32(reg, privilege);
 
                 mem.set_u32(*addr as usize, value);
             }
-            Instruction::MovMemU32RegSimple(addr, reg) => {
+            MovMemU32RegSimple(addr, reg) => {
                 let value = mem.get_u32(*addr as usize);
 
                 self.write_reg_u32(reg, value, privilege);
             }
-            Instruction::MovU32RegPtrU32RegSimple(in_reg, out_reg) => {
+            MovU32RegPtrU32RegSimple(in_reg, out_reg) => {
                 let address = self.read_reg_u32(in_reg, privilege) as usize;
                 let value = mem.get_u32(address);
 
                 self.write_reg_u32(out_reg, value, privilege);
             }
-            Instruction::MovU32ImmMemExpr(imm, expr) => {
+            MovU32ImmMemExpr(imm, expr) => {
                 // mov imm, [addr] - move immediate to address.
                 let addr = self.decode_evaluate_u32_move_expression(expr, privilege);
 
                 mem.set_u32(addr as usize, *imm);
             }
-            Instruction::MovMemExprU32Reg(expr, reg) => {
+            MovMemExprU32Reg(expr, reg) => {
                 // mov [addr], register - move value at address to register.
                 let addr = self.decode_evaluate_u32_move_expression(expr, privilege);
                 let value = mem.get_u32(addr as usize);
 
                 self.write_reg_u32(reg, value, privilege);
             }
-            Instruction::MovU32RegMemExpr(reg, expr) => {
+            MovU32RegMemExpr(reg, expr) => {
                 // mov reg, [addr] - move value of a register to an address.
                 let addr = self.decode_evaluate_u32_move_expression(expr, privilege);
                 let value = self.read_reg_u32(reg, privilege);
 
                 mem.set_u32(addr as usize, value);
             }
-            Instruction::ZeroHighBitsByIndexU32Reg(index_reg, source_reg, out_reg) => {
+            ZeroHighBitsByIndexU32Reg(index_reg, source_reg, out_reg) => {
                 // zhbi source_reg, index_reg, out_reg
                 let index = self.read_reg_u32(index_reg, privilege);
                 self.perform_zero_high_bit_u32_reg(source_reg, index, out_reg, privilege);
             }
-            Instruction::ZeroHighBitsByIndexU32RegU32Imm(index, source_reg, out_reg) => {
+            ZeroHighBitsByIndexU32RegU32Imm(index, source_reg, out_reg) => {
                 // zhbi source_reg, index, out_reg
                 self.perform_zero_high_bit_u32_reg(source_reg, *index, out_reg, privilege);
             }
-            Instruction::PushU32Imm(imm) => {
+            PushU32Imm(imm) => {
                 // push imm
                 mem.push_u32(*imm);
 
@@ -879,17 +881,17 @@ impl Cpu {
             }
 
             /******** [Logic Instructions] ********/
-            Instruction::BitTestU32Reg(bit, reg) => {
+            BitTestU32Reg(bit, reg) => {
                 // bt bit, reg
                 let value = self.read_reg_u32(reg, privilege);
                 self.perform_bit_test_with_carry_flag(value, *bit);
             }
-            Instruction::BitTestU32Mem(bit, addr) => {
+            BitTestU32Mem(bit, addr) => {
                 // bt bit, [addr]
                 let value = mem.get_u32(*addr as usize);
                 self.perform_bit_test_with_carry_flag(value, *bit);
             }
-            Instruction::BitTestResetU32Reg(bit, reg) => {
+            BitTestResetU32Reg(bit, reg) => {
                 // btr bit, reg
                 // Read the value and set the carry flag state, clear the bit.
                 let mut value = self.read_reg_u32(reg, privilege);
@@ -898,7 +900,7 @@ impl Cpu {
                 // Write the value back to the register.
                 self.write_reg_u32(reg, value, privilege);
             }
-            Instruction::BitTestResetU32Mem(bit, addr) => {
+            BitTestResetU32Mem(bit, addr) => {
                 // btr bit, [addr]
                 // Read the value and set the carry flag state, then clear the bit.
                 let mut value = mem.get_u32(*addr as usize);
@@ -906,7 +908,7 @@ impl Cpu {
 
                 mem.set_u32(*addr as usize, value);
             }
-            Instruction::BitTestSetU32Reg(bit, reg) => {
+            BitTestSetU32Reg(bit, reg) => {
                 // bts bit, reg
                 // Read the value and set the carry flag state, set the bit.
                 let mut value = self.read_reg_u32(reg, privilege);
@@ -915,7 +917,7 @@ impl Cpu {
                 // Write the value back to the register.
                 self.write_reg_u32(reg, value, privilege);
             }
-            Instruction::BitTestSetU32Mem(bit, addr) => {
+            BitTestSetU32Mem(bit, addr) => {
                 // bts bit, [addr]
                 // Read the value and set the carry flag state, then set the bit.
                 let mut value = mem.get_u32(*addr as usize);
@@ -923,63 +925,63 @@ impl Cpu {
 
                 mem.set_u32(*addr as usize, value);
             }
-            Instruction::BitScanReverseU32RegU32Reg(in_reg, out_reg) => {
+            BitScanReverseU32RegU32Reg(in_reg, out_reg) => {
                 // bsr in_reg, out_reg
                 let value = self.read_reg_u32(in_reg, privilege);
                 let index = self.perform_reverse_bit_search(value);
 
                 self.write_reg_u32(out_reg, index, privilege);
             }
-            Instruction::BitScanReverseU32MemU32Reg(addr, reg) => {
+            BitScanReverseU32MemU32Reg(addr, reg) => {
                 // bsr [addr], reg
                 let value = mem.get_u32(*addr as usize);
                 let index = self.perform_reverse_bit_search(value);
 
                 self.write_reg_u32(reg, index, privilege);
             }
-            Instruction::BitScanReverseU32RegMemU32(reg, out_addr) => {
+            BitScanReverseU32RegMemU32(reg, out_addr) => {
                 // bsr reg, [out_addr]
                 let value = self.read_reg_u32(reg, privilege);
                 let index = self.perform_reverse_bit_search(value);
 
                 mem.set_u32(*out_addr as usize, index);
             }
-            Instruction::BitScanReverseU32MemU32Mem(in_addr, out_addr) => {
+            BitScanReverseU32MemU32Mem(in_addr, out_addr) => {
                 // bsr [in_addr], [out_addr]
                 let value = mem.get_u32(*in_addr as usize);
                 let index = self.perform_reverse_bit_search(value);
 
                 mem.set_u32(*out_addr as usize, index);
             }
-            Instruction::BitScanForwardU32RegU32Reg(in_reg, out_reg) => {
+            BitScanForwardU32RegU32Reg(in_reg, out_reg) => {
                 // bsf in_reg, out_reg
                 let value = self.read_reg_u32(in_reg, privilege);
                 let index = self.perform_forward_bit_search(value);
 
                 self.write_reg_u32(out_reg, index, privilege);
             }
-            Instruction::BitScanForwardU32MemU32Reg(addr, reg) => {
+            BitScanForwardU32MemU32Reg(addr, reg) => {
                 // bsf [addr], reg
                 let value = mem.get_u32(*addr as usize);
                 let index = self.perform_forward_bit_search(value);
 
                 self.write_reg_u32(reg, index, privilege);
             }
-            Instruction::BitScanForwardU32RegMemU32(reg, out_addr) => {
+            BitScanForwardU32RegMemU32(reg, out_addr) => {
                 // bsf reg, [out_addr]
                 let value = self.read_reg_u32(reg, privilege);
                 let index = self.perform_forward_bit_search(value);
 
                 mem.set_u32(*out_addr as usize, index);
             }
-            Instruction::BitScanForwardU32MemU32Mem(in_addr, out_addr) => {
+            BitScanForwardU32MemU32Mem(in_addr, out_addr) => {
                 // bsf [in_addr], [out_addr]
                 let value = mem.get_u32(*in_addr as usize);
                 let index = self.perform_forward_bit_search(value);
 
                 mem.set_u32(*out_addr as usize, index);
             }
-            Instruction::ByteSwapU32(reg) => {
+            ByteSwapU32(reg) => {
                 // bswap reg
                 let value = self.read_reg_u32(reg, privilege).swap_bytes();
 
@@ -987,16 +989,16 @@ impl Cpu {
             }
 
             /******** [Special Instructions] ********/
-            Instruction::Ret => {
+            Ret => {
                 todo!();
             }
-            Instruction::Mret => {
+            Mret => {
                 self.set_machine_mode(false);
             }
-            Instruction::Hlt => {
+            Hlt => {
                 self.set_halted(true);
             }
-            Instruction::Unknown(id) => {
+            Unknown(id) => {
                 unreachable!("attempted to run an unrecognized instruction: {id}");
             }
         };
@@ -1233,9 +1235,8 @@ impl From<CpuFlag> for u8 {
 
 #[cfg(test)]
 mod tests_cpu_version_2 {
-    use std::{collections::HashMap, panic};
-
     use prettytable::{row, Table};
+    use std::{collections::HashMap, panic};
 
     use crate::{
         compiler::bytecode_compiler::Compiler,
@@ -1243,8 +1244,9 @@ mod tests_cpu_version_2 {
             instruction::Instruction::{self, *},
             move_expressions::{ExpressionArgs, ExpressionOperator, MoveExpressionHandler},
         },
+        mem,
         reg::registers::RegisterId,
-        vm::{self, VirtualMachine},
+        vm::VirtualMachine,
     };
 
     use super::{Cpu, CpuFlag};
@@ -1314,7 +1316,7 @@ mod tests_cpu_version_2 {
         ///
         /// # Note
         ///
-        /// If the results need to check the user segment memory contents then the VM  will automatically be
+        /// If the results need to check the user segment memory contents then the VM will automatically be
         /// created with a memory segment of the correct size. It doesn't need to be specified manually.
         fn new(
             instructions: &[Instruction],
@@ -1357,6 +1359,10 @@ mod tests_cpu_version_2 {
         /// # Arguments
         ///
         /// * `id` - The ID of this test.
+        ///
+        /// # Returns
+        ///
+        /// An option containing the [`VirtualMachine`] instance if the execution did not panic, or None otherwise.
         pub fn run_test(&self, id: usize) -> Option<VirtualMachine> {
             // Compile the test code.
             let mut compiler = Compiler::new();
@@ -1369,7 +1375,7 @@ mod tests_cpu_version_2 {
                     self.user_seg_capacity_bytes,
                     compiled,
                     &[],
-                    self.stack_seg_capacity_u32 * vm::BYTES_IN_U32,
+                    self.stack_seg_capacity_u32 * mem::memory_handler::BYTES_IN_U32,
                 );
 
                 // Execute the code.

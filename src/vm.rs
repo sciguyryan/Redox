@@ -9,8 +9,6 @@ use crate::{
 pub const MIN_USER_SEGMENT_SIZE: usize = MEGABYTE * 32;
 /// The default size of the stack, in terms of how many u32 values can be held.
 pub const U32_STACK_CAPACITY: usize = 1000;
-/// The size of a u32 value, in bytes.
-pub const BYTES_IN_U32: usize = 4;
 
 pub struct VirtualMachine {
     pub mem: MemoryHandler,
@@ -18,7 +16,7 @@ pub struct VirtualMachine {
 }
 
 impl VirtualMachine {
-    /// Build a virtual machine instance.
+    /// Build a new [`VirtualMachine`] instance.
     ///
     /// # Arguments
     ///
@@ -34,8 +32,11 @@ impl VirtualMachine {
     ) -> Self {
         // We have a minimum memory condition for this VM to ensure that certain assumptions
         // around the placement of things in memory remain sound.
-        if cfg!(not(test)) && user_segment_size <= MIN_USER_SEGMENT_SIZE {
-            println!("WARNING: attempting to create a virtual machine with a user memory segment size that is smaller than the suggested minimum. Some features may not work correctly.");
+        #[cfg(not(test))]
+        {
+            if user_segment_size <= MIN_USER_SEGMENT_SIZE {
+                println!("WARNING: attempting to create a virtual machine with a user memory segment size that is smaller than the suggested minimum. Some features may not work correctly.");
+            }
         }
 
         // Construct out virtual machine.
@@ -59,11 +60,12 @@ impl VirtualMachine {
         vm
     }
 
+    /// Create and load the bootable ROM into memory.
     fn load_boot_rom(&mut self) {
         // Create the bootable ROM.
         let boot_rom = BootRom::new();
 
-        // Create the new memory segment.
+        // Create a new memory segment tp hold the bootable ROM data.
         let boot_mem_id = self.mem.add_mapped_memory_segment(
             BOOT_MEMORY_START,
             BOOT_MEMORY_LENGTH,
@@ -79,10 +81,12 @@ impl VirtualMachine {
             .set_contents(&boot_rom.compiled);
     }
 
+    /// Run the virtual machine until completion.
     pub fn run(&mut self) {
         self.cpu.run(&mut self.mem);
     }
 
+    /// Run a sequence of [`Instruction`]s within the virtual machine.
     pub fn run_instructions(&mut self, instructions: &[Instruction]) {
         self.cpu.run_instructions(&mut self.mem, instructions);
     }
