@@ -1,0 +1,28 @@
+[package]
+name = "redox_terminal"
+version = "0.1.0"
+authors = ["Ryan Jones-Ward <sciguyryan@gmail.com>"]
+edition = "2021"
+readme = "README.md"
+description = "A testing terminal for Redox"
+license = "LGPL 2.1"
+repository = "https://github.com/sciguyryan/Redox"
+homepage = "https://github.com/sciguyryan/Redox"
+build = "build.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+redox_core = { path = "../redox-core" }
+
+[target.'cfg(windows)'.build-dependencies]
+winres = "0.1.12"
+
+[profile.dev]
+opt-level = 0
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true
+#panic = "abort"

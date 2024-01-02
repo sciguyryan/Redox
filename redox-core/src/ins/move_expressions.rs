@@ -211,6 +211,12 @@ impl MoveExpressionHandler {
     }
 }
 
+impl Default for MoveExpressionHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl From<&[ExpressionArgs]> for MoveExpressionHandler {
     fn from(args: &[ExpressionArgs]) -> Self {
         let len = args.len();

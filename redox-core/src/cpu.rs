@@ -589,7 +589,7 @@ impl Cpu {
 
     /// Perform a hard reset on the CPU.
     pub fn reset(&mut self) {
-        self.registers.reset();
+        self.registers = Registers::default();
         self.set_halted(false);
     }
 

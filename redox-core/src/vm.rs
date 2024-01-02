@@ -32,7 +32,7 @@ impl VirtualMachine {
     ) -> Self {
         // We have a minimum memory condition for this VM to ensure that certain assumptions
         // around the placement of things in memory remain sound.
-        #[cfg(not(test))]
+        #[cfg(debug_assertions)]
         {
             if user_segment_size <= MIN_USER_SEGMENT_SIZE {
                 println!("WARNING: attempting to create a virtual machine with a user memory segment size that is smaller than the suggested minimum. Some features may not work correctly.");

@@ -63,6 +63,11 @@ impl MappedMemory {
         self.data.len()
     }
 
+    /// Is is the length of the main memory segment zero?
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// Print the entire contents of this memory segment.
     pub fn print(&self) {
         println!("{:?}", self.data);

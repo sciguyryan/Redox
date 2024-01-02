@@ -1,19 +1,7 @@
-#![crate_name = "redox"]
+#![crate_name = "redox_terminal"]
 
-mod boot_rom;
-mod compiler;
-mod cpu;
-mod data_access_type;
-mod ins;
-mod mem;
-mod parsing;
-mod privilege_level;
-mod reg;
-mod utils;
-pub mod vm;
-
-use crate::{
-    compiler::bytecode_compiler::Compiler, ins::instruction::Instruction, vm::VirtualMachine,
+use redox_core::{
+    compiler::bytecode_compiler::Compiler, ins::instruction::Instruction, vm::VirtualMachine, *,
 };
 
 use std::time::Instant;

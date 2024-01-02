@@ -212,17 +212,6 @@ impl Registers {
         }
     }
 
-    /// Reset every register back to the default value.
-    pub fn reset(&mut self) {
-        for reg in &mut self.registers_u32 {
-            reg.1.write_unchecked(0);
-        }
-
-        for reg in &mut self.registers_f32 {
-            reg.1.write_unchecked(0f32);
-        }
-    }
-
     /// Get a reference to a specific u32 register.
     ///
     /// # Arguments
