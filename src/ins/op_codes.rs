@@ -67,6 +67,8 @@ pub enum OpCode {
     /******** [Branching Instructions] ********/
     Int,
     IntRet,
+    /// Unconditional jump to a specified address.
+    JumpAbsU32Imm,
 
     /******** [Data Instructions] ********/
     /// Swap the values of the two registers.
@@ -182,6 +184,7 @@ impl From<Instruction> for OpCode {
             /******** [Branching Instructions] ********/
             Instruction::Int(_) => OpCode::Int,
             Instruction::IntRet => OpCode::IntRet,
+            Instruction::JumpAbsU32Imm(_) => OpCode::JumpAbsU32Imm,
 
             /******** [Data Instructions] ********/
             Instruction::SwapU32RegU32Reg(_, _) => OpCode::SwapU32RegU32Reg,

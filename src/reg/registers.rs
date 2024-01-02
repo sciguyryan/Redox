@@ -3,6 +3,8 @@ use num_derive::FromPrimitive;
 use prettytable::{row, Table};
 use std::{collections::HashMap, fmt::Display};
 
+use crate::boot_rom::BOOT_MEMORY_START;
+
 use super::register::{RegisterF32, RegisterPermission, RegisterU32};
 
 #[derive(Clone, Copy, Debug, Default, Eq, FromPrimitive, Hash, Ord, PartialEq, PartialOrd)]
@@ -189,12 +191,12 @@ impl Registers {
                 register_u32!(RegisterId::R8, &rw, 0),
                 // [ System Registers ] //
                 register_u32!(RegisterId::AC, &rw, 0),
-                register_u32!(RegisterId::IP, &rw, 0),
+                register_u32!(RegisterId::IP, &rw, BOOT_MEMORY_START as u32),
                 register_u32!(RegisterId::BP, &prpw, 0),
                 register_u32!(RegisterId::SP, &prpw, 0),
                 register_u32!(RegisterId::FL, &rpw, 0),
                 register_u32!(RegisterId::PC, &rpw, 0),
-                register_u32!(RegisterId::IM, &rpw, 0xffffffff),
+                register_u32!(RegisterId::IM, &rpw, 0),
                 // [ Segment Registers ] //
                 register_u32!(RegisterId::SS, &rpw, 0),
                 register_u32!(RegisterId::CS, &rpw, 0),
@@ -257,6 +259,7 @@ impl Registers {
     ///
     /// * `other` - A reference to the other [`Registers`] instance against which this instance should be compared.
     /// * `names` - The names to be displayed in the output.
+    #[cfg(test)]
     pub fn print_differences(&self, other: &Registers, names: &[&str; 2]) {
         let mut u32_different = vec![];
         let mut f32_different = vec![];
@@ -325,20 +328,26 @@ impl Registers {
 
         table.add_row(row!["Register", "Value", "Type", "Notes"]);
 
-        for (id, reg) in &self.registers_u32 {
+        let mut u32_reg_values: Vec<RegisterU32> = self.registers_u32.values().cloned().collect();
+        u32_reg_values.sort();
+
+        for reg in &u32_reg_values {
             let reg_value = *reg.read_unchecked();
             let formatted_value = format!("{reg_value:0>8X}");
             let mut notes = String::new();
 
-            if *id == RegisterId::FL {
+            if reg.id == RegisterId::FL {
                 notes = reg.get_flags_register_string();
             }
 
-            table.add_row(row![id, formatted_value, "u32", notes]);
+            table.add_row(row![reg.id, formatted_value, "u32", notes]);
         }
 
-        for (id, reg) in &self.registers_f32 {
-            table.add_row(row![id, format!("{}", reg.read_unchecked()), "f32", ""]);
+        let mut f32_reg_values: Vec<RegisterF32> = self.registers_f32.values().cloned().collect();
+        f32_reg_values.sort();
+
+        for reg in &f32_reg_values {
+            table.add_row(row![reg.id, format!("{}", reg.read_unchecked()), "f32", ""]);
         }
 
         table.printstd();

@@ -79,6 +79,8 @@ pub enum Instruction {
     /******** [Branching Instructions] ********/
     Int(u32),
     IntRet,
+    /// Unconditional jump to a specified address.
+    JumpAbsU32Imm(u32),
 
     /******** [Data Instructions] ********/
     /// Swap the values of the two registers.
@@ -238,6 +240,9 @@ impl Display for Instruction {
                 format!("int ${addr:04x}")
             }
             Instruction::IntRet => String::from("intret"),
+            Instruction::JumpAbsU32Imm(addr) => {
+                format!("jmp ${addr:04x}")
+            }
 
             /******** [Data Instructions] ********/
             Instruction::SwapU32RegU32Reg(reg_1, reg_2) => {
@@ -402,6 +407,7 @@ impl Instruction {
             /******** [Branching Instructions] ********/
             OpCode::Int => ARG_U32_IMM_SIZE,
             OpCode::IntRet => 0,
+            OpCode::JumpAbsU32Imm => ARG_U32_IMM_SIZE,
 
             /******** [Data Instructions] ********/
             OpCode::SwapU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,

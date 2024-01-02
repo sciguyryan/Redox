@@ -53,17 +53,13 @@ impl VirtualMachine {
         // Build and load the boot ROM.
         vm.load_boot_rom();
 
-        // Synchronize certain CPU registers with the local variables
-        // held in the memory instance.
-        vm.cpu.synchronize_registers(&vm.mem);
-
         vm
     }
 
     /// Create and load the bootable ROM into memory.
     fn load_boot_rom(&mut self) {
         // Create the bootable ROM.
-        let boot_rom = BootRom::new();
+        let boot_rom = BootRom::compile(&self.mem);
 
         // Create a new memory segment tp hold the bootable ROM data.
         let boot_mem_id = self.mem.add_mapped_memory_segment(
@@ -78,7 +74,7 @@ impl VirtualMachine {
         self.mem
             .get_mapped_segment_by_index_mut(boot_mem_id)
             .expect("failed to get memory segment")
-            .set_contents(&boot_rom.compiled);
+            .set_contents(&boot_rom);
     }
 
     /// Run the virtual machine until completion.

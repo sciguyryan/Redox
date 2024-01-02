@@ -107,7 +107,9 @@ impl Compiler {
             }
 
             /******** [u32 immediate] ********/
-            Instruction::Int(imm) | Instruction::PushU32Imm(imm) => {
+            Instruction::Int(imm)
+            | Instruction::PushU32Imm(imm)
+            | Instruction::JumpAbsU32Imm(imm) => {
                 self.write_u32(imm);
             }
 
@@ -262,6 +264,7 @@ mod tests_compiler {
                 }
                 OpCode::Int => Instruction::Int(0xdeadbeef),
                 OpCode::IntRet => Instruction::IntRet,
+                OpCode::JumpAbsU32Imm => Instruction::JumpAbsU32Imm(0xdeadbeef),
                 OpCode::SwapU32RegU32Reg => Instruction::SwapU32RegU32Reg(R2, R3),
                 OpCode::MovU32ImmU32Reg => Instruction::MovU32ImmU32Reg(0x123, R2),
                 OpCode::MovU32RegU32Reg => Instruction::MovU32RegU32Reg(R2, R3),

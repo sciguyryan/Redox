@@ -1,5 +1,8 @@
 use bitflags::bitflags;
-use std::fmt::{self, Display};
+use std::{
+    cmp::Ordering,
+    fmt::{self, Display},
+};
 
 use crate::{
     cpu::CpuFlag, data_access_type::DataAccessType, privilege_level::PrivilegeLevel, utils,
@@ -29,7 +32,7 @@ impl Display for RegisterPermission {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct RegisterU32 {
     /// The [`RegisterId`] of this register.
     pub id: RegisterId,
@@ -211,7 +214,26 @@ impl RegisterU32 {
     }
 }
 
-#[derive(Debug)]
+impl Ord for RegisterU32 {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let id_ordering = self.id.cmp(&other.id);
+
+        // If ids are equal, use lexicographical ordering by value.
+        if id_ordering == Ordering::Equal {
+            self.value.cmp(&other.value)
+        } else {
+            id_ordering
+        }
+    }
+}
+
+impl PartialOrd for RegisterU32 {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct RegisterF32 {
     /// The [`RegisterId`] of this register.
     pub id: RegisterId,
@@ -303,9 +325,38 @@ impl RegisterF32 {
     }
 }
 
-pub trait RegisterTypes {}
-impl RegisterTypes for RegisterF32 {}
-impl RegisterTypes for RegisterU32 {}
+impl Ord for RegisterF32 {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let id_ordering = self.id.cmp(&other.id);
+
+        // If ids are equal, use lexicographical ordering by value.
+        if id_ordering == Ordering::Equal {
+            if self.value < other.value {
+                Ordering::Less
+            } else if self.value == other.value {
+                Ordering::Equal
+            } else {
+                Ordering::Greater
+            }
+        } else {
+            id_ordering
+        }
+    }
+}
+
+impl PartialOrd for RegisterF32 {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Eq for RegisterF32 {}
+
+impl PartialEq for RegisterF32 {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id && self.permissions == other.permissions && self.value == other.value
+    }
+}
 
 #[cfg(test)]
 mod tests_registers {

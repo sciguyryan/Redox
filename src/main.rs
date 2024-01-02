@@ -121,7 +121,7 @@ fn main() {
     vm.mem.print_stack();
     println!();
 
-    println!("----------[Mapped Memory Regions]----------");
+    println!("----------[Mapped Memory Segments]----------");
     vm.mem.print_mapped_memory_segments();
     println!();
 }

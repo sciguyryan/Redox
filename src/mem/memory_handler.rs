@@ -10,10 +10,8 @@ use super::mapped_memory::MappedMemory;
 
 /// The number of bytes in a megabyte.
 pub const MEGABYTE: usize = 1024 * 1024;
-
 /// The size of a u32 value, in bytes.
 pub const BYTES_IN_U32: usize = 4;
-
 /// The maximum permissible size of the system RAM segment.
 pub const MAX_PHYSICAL_MEMORY: usize = MEGABYTE * 256;
 /// The name of the RAM segment.
@@ -296,9 +294,6 @@ impl MemoryHandler {
         let arg_len = Instruction::get_instruction_arg_size_from_op(opcode);
         let arg_bytes = self.get_range_ptr(pos + 4, arg_len);
 
-        // Create a memory block reader.
-        //let mut block = MemoryBlockReader::new(arg_bytes);
-
         let mut cursor = 0;
 
         // Create our instruction instance.
@@ -458,6 +453,11 @@ impl MemoryHandler {
                 Instruction::Int(addr)
             }
             IntRet => Instruction::IntRet,
+            JumpAbsU32Imm => {
+                let addr = self.read_u32(arg_bytes, &mut cursor);
+
+                Instruction::JumpAbsU32Imm(addr)
+            }
 
             /******** [Data Instructions] ********/
             SwapU32RegU32Reg => {
@@ -1041,8 +1041,8 @@ impl MemoryHandler {
             table.add_row(row![
                 i,
                 segment.name,
-                format!("{}", segment.start),
-                format!("{}", segment.end)
+                format!("{:0>8X}", segment.start),
+                format!("{:0>8X}", segment.end)
             ]);
         }
 

@@ -638,6 +638,9 @@ impl Cpu {
 
         let privilege = &self.get_privilege();
 
+        // Should we skip updating the instruction pointer register after this instruction?
+        let mut skip_ip_update = false;
+
         match instruction {
             Nop => {}
 
@@ -804,6 +807,13 @@ impl Cpu {
             }
             IntRet => {
                 todo!();
+            }
+            JumpAbsU32Imm(addr) => {
+                // jmp 0xaaaa
+                // Set the instruction pointer to the jump address.
+                self.set_instruction_pointer(*addr);
+
+                skip_ip_update = true;
             }
 
             /******** [Data Instructions] ********/
@@ -1005,9 +1015,11 @@ impl Cpu {
 
         self.increment_pc_register();
 
-        // Advance the instruction pointer by the number of bytes
-        // used to build the instruction.
-        self.increment_ip_register(instruction.get_total_instruction_size());
+        // Advance the instruction pointer by the number of bytes used for the instruction,
+        // if we don't need to skip this step.
+        if !skip_ip_update {
+            self.increment_ip_register(instruction.get_total_instruction_size());
+        }
     }
 
     /// Set the state of the specified CPU flag.
@@ -1103,25 +1115,6 @@ impl Cpu {
         self.registers
             .get_register_u32_mut(RegisterId::BP)
             .write_unchecked(value);
-    }
-
-    /// Setup the registers that are required for running the CPU.
-    ///
-    /// # Arguments
-    ///
-    /// * `mem` - A reference to the VM [`Memory`] instance.
-    #[inline(always)]
-    pub fn synchronize_registers(&mut self, mem: &MemoryHandler) {
-        // Update the segment registers, now that we know where the segments
-        // are located in RAM.
-        self.set_segment_registers(mem);
-
-        // Configure the CPU instruction pointer.
-        self.set_instruction_pointer(mem.code_segment_start as u32);
-
-        // Configure the CPU registers to account for the new stack pointer.
-        self.set_stack_frame_base_pointer(mem.stack_segment_end as u32);
-        self.set_stack_pointer(mem.stack_segment_end as u32);
     }
 
     // Update the stack pointer (SP) register.
@@ -1234,7 +1227,7 @@ impl From<CpuFlag> for u8 {
 }
 
 #[cfg(test)]
-mod tests_cpu_version_2 {
+mod tests_cpu {
     use prettytable::{row, Table};
     use std::{collections::HashMap, panic};
 
@@ -1506,10 +1499,10 @@ mod tests_cpu_version_2 {
                 "HLT - failed to execute HLT instruction",
             ),
             // The halt instruction should prevent any following instructions from executing, which
-            // means that the program counter should also not increase.
+            // means that the register value will never change.
             TestU32::new(
-                &[Hlt, Nop],
-                &[(RegisterId::IP, 104), (RegisterId::PC, 1)],
+                &[Hlt, MovU32ImmU32Reg(0xf, RegisterId::R1)],
+                &[(RegisterId::R1, 0)],
                 None,
                 0,
                 false,
@@ -1549,7 +1542,7 @@ mod tests_cpu_version_2 {
     #[test]
     fn test_invalid_instruction() {
         let tests = [TestU32::new(
-            &[Unknown(0xABC)],
+            &[Unknown(0xabc)],
             &[],
             None,
             0,
@@ -5677,5 +5670,43 @@ mod tests_cpu_version_2 {
             // There is nothing on the stack, this should assert.
             _ = vm.mem.pop_u32();
         });
+    }
+
+    /// Test the push u32 immediate instruction.
+    #[test]
+    #[should_panic]
+    fn test_jump_absolute_addr() {
+        let tests = [
+            TestU32::new(
+                &[
+                    // The address is calculated as follows:
+                    // The start of the code segment is at byte index 99 since, by default,
+                    // the testing user memory segment is 100 bytes in length.
+                    // The jump instruction is 8 bytes in length (4 for the instruction and 4 for the u32 argument).
+                    // The first move instruction is 8 bytes in length
+                    // (4 for the instruction, 4 for the u32 argument and 1 for the register ID argument).
+                    // This means that the second move instruction starts at byte index: 99 + 8 + 8 = 115.
+                    // We expect that the first move instruction will be skipped entirely.
+                    JumpAbsU32Imm(115),
+                    MovU32ImmU32Reg(0xf, RegisterId::R1),
+                    MovU32ImmU32Reg(0xa, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0xa)],
+                None,
+                0,
+                false,
+                "JMP - failed to execute JMP instruction",
+            ),
+            TestU32::new(
+                &[JumpAbsU32Imm(u32::MAX)],
+                &[],
+                None,
+                0,
+                true,
+                "JMP - successfully jumped outside of valid memory bounds.",
+            ),
+        ];
+
+        TestsU32::new(&tests).run_all();
     }
 }
