@@ -547,37 +547,37 @@ impl MemoryHandler {
 
             /******** [Logic Instructions] ********/
             BitTestU32Reg => {
-                let bit = *self.read_u8(arg_bytes, &mut cursor);
+                let bit = self.read_u8(arg_bytes, &mut cursor);
                 let reg = self.read_register_id(arg_bytes, &mut cursor);
 
                 Instruction::BitTestU32Reg(bit, reg)
             }
             BitTestU32Mem => {
-                let bit = *self.read_u8(arg_bytes, &mut cursor);
+                let bit = self.read_u8(arg_bytes, &mut cursor);
                 let addr = self.read_u32(arg_bytes, &mut cursor);
 
                 Instruction::BitTestU32Mem(bit, addr)
             }
             BitTestResetU32Reg => {
-                let bit = *self.read_u8(arg_bytes, &mut cursor);
+                let bit = self.read_u8(arg_bytes, &mut cursor);
                 let reg = self.read_register_id(arg_bytes, &mut cursor);
 
                 Instruction::BitTestResetU32Reg(bit, reg)
             }
             BitTestResetU32Mem => {
-                let bit = *self.read_u8(arg_bytes, &mut cursor);
+                let bit = self.read_u8(arg_bytes, &mut cursor);
                 let addr = self.read_u32(arg_bytes, &mut cursor);
 
                 Instruction::BitTestResetU32Mem(bit, addr)
             }
             BitTestSetU32Reg => {
-                let bit = *self.read_u8(arg_bytes, &mut cursor);
+                let bit = self.read_u8(arg_bytes, &mut cursor);
                 let reg = self.read_register_id(arg_bytes, &mut cursor);
 
                 Instruction::BitTestSetU32Reg(bit, reg)
             }
             BitTestSetU32Mem => {
-                let bit = *self.read_u8(arg_bytes, &mut cursor);
+                let bit = self.read_u8(arg_bytes, &mut cursor);
                 let addr = self.read_u32(arg_bytes, &mut cursor);
 
                 Instruction::BitTestSetU32Mem(bit, addr)
@@ -940,18 +940,18 @@ impl MemoryHandler {
         self.stack_pointer = value_start_pos;
     }
 
-    /// Attempt to read a [`RegisterId`] from memory.
+    /// Attempt to read a [`RegisterId`] from a memory slice.
     ///
     /// # Arguments
     ///
     /// * `bytes` - A slice of u8 values from which the register ID should be extracted.
     /// * `cursor` - A mutable reference to the cursor, which specifies the starting position within the slice.
     fn read_register_id(&self, bytes: &[u8], cursor: &mut usize) -> RegisterId {
-        FromPrimitive::from_u8(*self.read_u8(bytes, cursor))
+        FromPrimitive::from_u8(self.read_u8(bytes, cursor))
             .expect("failed to read register ID from memory")
     }
 
-    /// Attempt to read a u32 value from memory.
+    /// Attempt to read a u32 value from a memory slice.
     ///
     /// # Arguments
     ///
@@ -967,15 +967,15 @@ impl MemoryHandler {
         u32::from_le_bytes(bytes)
     }
 
-    /// Attempt to read a u8 value from memory.
+    /// Attempt to read a u8 value from a memory slice.
     ///
     /// # Arguments
     ///
     /// * `bytes` - A slice of u8 values from which the register ID should be extracted.
     /// * `cursor` - A mutable reference to the cursor, which specifies the starting position within the slice.
     #[inline(always)]
-    fn read_u8<'a>(&self, bytes: &'a [u8], cursor: &mut usize) -> &'a u8 {
-        let byte = &bytes[*cursor];
+    fn read_u8(&self, bytes: &[u8], cursor: &mut usize) -> u8 {
+        let byte = bytes[*cursor];
         *cursor += 1;
         byte
     }
