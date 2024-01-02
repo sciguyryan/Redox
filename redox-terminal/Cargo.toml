@@ -16,7 +16,7 @@ build = "build.rs"
 redox_core = { path = "../redox-core" }
 
 [target.'cfg(windows)'.build-dependencies]
-winres = "0.1.12"
+winres.workspace = true
 
 [profile.dev]
 opt-level = 0
