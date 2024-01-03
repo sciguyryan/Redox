@@ -4,6 +4,7 @@ use redox_core::{
     compiler::bytecode_compiler::Compiler,
     ins::instruction::Instruction,
     mem,
+    reg::registers::RegisterId,
     vm::{self, VirtualMachine},
 };
 
@@ -74,12 +75,13 @@ fn main() {
     ];
 
     /*let instructions = &[
+        // We expect that the first move instruction will be skipped entirely.
         Instruction::AddU32ImmU32Reg(23, RegisterId::CS), // 9
         Instruction::JumpAbsU32Reg(RegisterId::AC), // 5
-        // This instruction should be skipped.
+        // This instruction should be skipped, so R1 should remain at the default value of 0.
         Instruction::MovU32ImmU32Reg(0xf, RegisterId::R1), // 9
         // The jump should start execution here.
-        Instruction::MovU32ImmU32Reg(0xa, RegisterId::R1),
+        Instruction::MovU32ImmU32Reg(0xa, RegisterId::R2),
         Instruction::Hlt,
     ];*/
 

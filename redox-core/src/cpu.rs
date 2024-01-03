@@ -601,7 +601,6 @@ impl Cpu {
     pub fn run(&mut self, mem: &mut MemoryHandler) {
         while !self.is_halted {
             let ins = self.fetch_decode_next_instruction(mem);
-            eprintln!("cpu.rs {ins}");
             self.run_instruction(mem, &ins);
         }
     }
@@ -5774,14 +5773,13 @@ mod tests_cpu {
 
     /// Test the absolute jump by immediate address instruction.
     #[test]
-    #[should_panic]
     fn test_jump_absolute_addr() {
         let tests = [
             TestU32::new(
                 &[
                     // The address is calculated as follows:
                     //
-                    // The start of the code segment is at byte index 99 since, by default,
+                    // The start of the code segment is at byte index 100 since, by default,
                     // the testing user memory segment is 100 bytes in length.
                     //
                     // The jump instruction is _8 bytes_ in length
@@ -5789,15 +5787,17 @@ mod tests_cpu {
                     // The first move instruction is _9 bytes_ in length
                     //      (4 for the instruction, 4 for the u32 argument and 1 for the register ID argument).
                     //
-                    // This means that the second move instruction starts at byte index: 99 + 8 + 9 = 116,
-                    // minus one since we want to get to the start of the next instruction.
+                    // This means that we need to move to index 100 + 8 + 9 = 117 to get to the
+                    // start of the second move instruction.
                     //
                     // We expect that the first move instruction will be skipped entirely.
-                    JumpAbsU32Imm(115),
+                    JumpAbsU32Imm(117),
+                    // This instruction should be skipped, so R1 should remain at the default value of 0.
                     MovU32ImmU32Reg(0xf, RegisterId::R1),
-                    MovU32ImmU32Reg(0xa, RegisterId::R1),
+                    // The jump should start execution here.
+                    MovU32ImmU32Reg(0xa, RegisterId::R2),
                 ],
-                &[(RegisterId::R1, 0xa)],
+                &[(RegisterId::R1, 0x0), (RegisterId::R2, 0xa)],
                 None,
                 0,
                 false,
@@ -5818,7 +5818,6 @@ mod tests_cpu {
 
     /// Test the absolute jump by immediate address instruction.
     #[test]
-    #[should_panic]
     fn test_jump_absolute_u32_reg_ptr() {
         let tests = [
             TestU32::new(
@@ -5837,14 +5836,14 @@ mod tests_cpu {
                     // to the start of the second move instruction.
                     //
                     // We expect that the first move instruction will be skipped entirely.
-                    AddU32ImmU32Reg(28, RegisterId::CS),
+                    AddU32ImmU32Reg(23, RegisterId::CS),
                     JumpAbsU32Reg(RegisterId::AC),
-                    // This instruction should be skipped.
+                    // This instruction should be skipped, so R1 should remain at the default value of 0.
                     MovU32ImmU32Reg(0xf, RegisterId::R1),
                     // The jump should start execution here.
-                    MovU32ImmU32Reg(0xa, RegisterId::R1),
+                    MovU32ImmU32Reg(0xa, RegisterId::R2),
                 ],
-                &[(RegisterId::R1, 0xa)],
+                &[(RegisterId::R1, 0x0), (RegisterId::R2, 0xa)],
                 None,
                 0,
                 false,
