@@ -5771,7 +5771,7 @@ mod tests_cpu {
         });
     }
 
-    /// Test the push u32 immediate instruction.
+    /// Test the absolute jump by immediate address instruction.
     #[test]
     #[should_panic]
     fn test_jump_absolute_addr() {
@@ -5779,12 +5779,18 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // The address is calculated as follows:
+                    //
                     // The start of the code segment is at byte index 99 since, by default,
                     // the testing user memory segment is 100 bytes in length.
-                    // The jump instruction is 8 bytes in length (4 for the instruction and 4 for the u32 argument).
-                    // The first move instruction is 8 bytes in length
-                    // (4 for the instruction, 4 for the u32 argument and 1 for the register ID argument).
-                    // This means that the second move instruction starts at byte index: 99 + 8 + 8 = 115.
+                    //
+                    // The jump instruction is _8 bytes_ in length
+                    //      (4 for the instruction and 4 for the u32 argument).
+                    // The first move instruction is _9 bytes_ in length
+                    //      (4 for the instruction, 4 for the u32 argument and 1 for the register ID argument).
+                    //
+                    // This means that the second move instruction starts at byte index: 99 + 8 + 9 = 116,
+                    // minus one since we want to get to the start of the next instruction.
+                    //
                     // We expect that the first move instruction will be skipped entirely.
                     JumpAbsU32Imm(115),
                     MovU32ImmU32Reg(0xf, RegisterId::R1),
@@ -5798,6 +5804,59 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[JumpAbsU32Imm(u32::MAX)],
+                &[],
+                None,
+                0,
+                true,
+                "JMP - successfully jumped outside of valid memory bounds.",
+            ),
+        ];
+
+        TestsU32::new(&tests).run_all();
+    }
+
+    /// Test the absolute jump by immediate address instruction.
+    #[test]
+    #[should_panic]
+    fn test_jump_absolute_u32_reg_ptr() {
+        let tests = [
+            TestU32::new(
+                &[
+                    // The address is calculated as follows:
+                    // Move the value of the code segment register into R8.
+                    //
+                    // The instruction 1 is _6 bytes_ in length
+                    //      (4 for the instruction, 1 for each register ID argument).
+                    // The instruction 2 is _9 bytes_ in length
+                    //      (4 for the instruction, 4 for the u32 immediate argument and 1 for the register ID argument).
+                    // The instruction 3 is _5 bytes_ in length
+                    //      (4 for the instruction and 1 for the register ID argument).
+                    // The instruction 4 is _9 bytes_ in length
+                    //      (4 for the instruction, 4 for the u32 argument and 1 for the register ID argument).
+                    //
+                    // This means that we need to add 28 (29 minus one since we want to get to the start of the next instruction)
+                    // to the value of the R8 register to point at the start of the second move instruction.
+                    //
+                    // We expect that the first move instruction will be skipped entirely.
+                    MovU32RegU32Reg(RegisterId::CS, RegisterId::R8),
+                    AddU32ImmU32Reg(28, RegisterId::R8),
+                    JumpAbsU32Reg(RegisterId::AC),
+                    // This instruction should be skipped.
+                    MovU32ImmU32Reg(0xf, RegisterId::R1),
+                    // The jump should start execution here.
+                    MovU32ImmU32Reg(0xa, RegisterId::R1),
+                ],
+                &[(RegisterId::R1, 0xa)],
+                None,
+                0,
+                false,
+                "JMP - failed to execute JMP instruction",
+            ),
+            TestU32::new(
+                &[
+                    MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
+                    JumpAbsU32Reg(RegisterId::R1)
+                ],
                 &[],
                 None,
                 0,
