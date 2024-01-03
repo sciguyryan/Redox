@@ -3144,7 +3144,7 @@ mod tests_cpu {
                 false,
                 "SHL - CPU flags not correctly set",
             ),
-            // Just zero flag should be set here since zero left-shifted by anything will be zero.
+            // The zero flag should be set here since zero left-shifted by anything will be zero.
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0x0, RegisterId::R1),
