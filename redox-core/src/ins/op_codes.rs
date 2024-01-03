@@ -69,6 +69,8 @@ pub enum OpCode {
     IntRet,
     /// Unconditional jump to a specified address.
     JumpAbsU32Imm,
+    /// Unconditional jump to an address as specified by a u32 register.
+    JumpAbsU32Reg,
 
     /******** [Data Instructions] ********/
     /// Swap the values of the two registers.
@@ -185,6 +187,7 @@ impl From<Instruction> for OpCode {
             Instruction::Int(_) => OpCode::Int,
             Instruction::IntRet => OpCode::IntRet,
             Instruction::JumpAbsU32Imm(_) => OpCode::JumpAbsU32Imm,
+            Instruction::JumpAbsU32Reg(_) => OpCode::JumpAbsU32Reg,
 
             /******** [Data Instructions] ********/
             Instruction::SwapU32RegU32Reg(_, _) => OpCode::SwapU32RegU32Reg,

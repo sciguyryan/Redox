@@ -132,7 +132,8 @@ impl Compiler {
             /******** [u32 register] ********/
             Instruction::ByteSwapU32(reg)
             | Instruction::IncU32Reg(reg)
-            | Instruction::DecU32Reg(reg) => {
+            | Instruction::DecU32Reg(reg)
+            | Instruction::JumpAbsU32Reg(reg) => {
                 self.write_register_id(&reg);
             }
 
@@ -271,6 +272,7 @@ mod tests_compiler {
                 OpCode::Int => Instruction::Int(0xdeadbeef),
                 OpCode::IntRet => Instruction::IntRet,
                 OpCode::JumpAbsU32Imm => Instruction::JumpAbsU32Imm(0xdeadbeef),
+                OpCode::JumpAbsU32Reg => Instruction::JumpAbsU32Reg(R1),
                 OpCode::SwapU32RegU32Reg => Instruction::SwapU32RegU32Reg(R2, R3),
                 OpCode::MovU32ImmU32Reg => Instruction::MovU32ImmU32Reg(0x123, R2),
                 OpCode::MovU32RegU32Reg => Instruction::MovU32RegU32Reg(R2, R3),

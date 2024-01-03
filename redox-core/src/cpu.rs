@@ -599,13 +599,9 @@ impl Cpu {
     ///
     /// * `mem` - A reference to the virtual machine [`Memory`] instance.
     pub fn run(&mut self, mem: &mut MemoryHandler) {
-        loop {
+        while !self.is_halted {
             let ins = self.fetch_decode_next_instruction(mem);
             self.run_instruction(mem, &ins);
-
-            if self.is_halted {
-                break;
-            }
         }
     }
 
@@ -812,6 +808,15 @@ impl Cpu {
                 // jmp 0xaaaa
                 // Set the instruction pointer to the jump address.
                 self.set_instruction_pointer(*addr);
+
+                skip_ip_update = true;
+            }
+            JumpAbsU32Reg(reg) => {
+                // jmp %cs
+                let shift_by = self.read_reg_u32(reg, privilege);
+
+                // Set the instruction pointer to the jump address.
+                self.set_instruction_pointer(shift_by);
 
                 skip_ip_update = true;
             }
@@ -1175,7 +1180,7 @@ pub enum CpuFlag {
     CF,
     // The parity flag - set to true depending on the parity of the bits.
     PF,
-    /// The interrupt disabled flag - set to true if interrupts are disabled.
+    /// The interrupt enabled flag - set to true if interrupts are enabled.
     IF,
 }
 
@@ -1565,7 +1570,10 @@ mod tests_cpu {
                 &[
                     (RegisterId::R1, 0x1),
                     (RegisterId::AC, 0x3),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::PF])),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_from(&[CpuFlag::PF, CpuFlag::IF]),
+                    ),
                 ],
                 None,
                 0,
@@ -1580,7 +1588,10 @@ mod tests_cpu {
                 &[
                     (RegisterId::R1, u32::MAX),
                     (RegisterId::AC, 0x1),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::OF])),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::IF]),
+                    ),
                 ],
                 None,
                 0,
@@ -1591,7 +1602,7 @@ mod tests_cpu {
                 &[AddU32ImmU32Reg(0, RegisterId::R1)],
                 &[(
                     RegisterId::FL,
-                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
                 None,
                 0,
@@ -1708,7 +1719,10 @@ mod tests_cpu {
                     (RegisterId::R1, u32::MAX),
                     (RegisterId::R2, 0x2),
                     (RegisterId::AC, 0x1),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::OF])),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::IF]),
+                    ),
                 ],
                 None,
                 0,
@@ -1719,7 +1733,7 @@ mod tests_cpu {
                 &[AddU32RegU32Reg(RegisterId::R1, RegisterId::R2)],
                 &[(
                     RegisterId::FL,
-                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
                 None,
                 0,
@@ -1837,7 +1851,7 @@ mod tests_cpu {
                     (RegisterId::AC, 0x3),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
                 None,
@@ -1849,7 +1863,7 @@ mod tests_cpu {
                 &[SubU32ImmU32Reg(0, RegisterId::R1)],
                 &[(
                     RegisterId::FL,
-                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
                 None,
                 0,
@@ -1958,7 +1972,7 @@ mod tests_cpu {
                     (RegisterId::AC, 0x3),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
                 None,
@@ -1970,7 +1984,7 @@ mod tests_cpu {
                 &[SubU32RegU32Imm(RegisterId::R1, 0)],
                 &[(
                     RegisterId::FL,
-                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
                 None,
                 0,
@@ -2086,7 +2100,7 @@ mod tests_cpu {
                     (RegisterId::AC, 0x3),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
                 None,
@@ -2098,7 +2112,7 @@ mod tests_cpu {
                 &[SubU32RegU32Reg(RegisterId::R1, RegisterId::R2)],
                 &[(
                     RegisterId::FL,
-                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
                 None,
                 0,
@@ -2215,7 +2229,7 @@ mod tests_cpu {
                     (RegisterId::AC, 4294967294),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::CF]),
+                        CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
                 None,
@@ -2260,7 +2274,7 @@ mod tests_cpu {
                     (RegisterId::AC, 4294967294),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::CF]),
+                        CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
                 None,
@@ -2551,7 +2565,12 @@ mod tests_cpu {
                     (RegisterId::R1, 0),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::OF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[
+                            CpuFlag::ZF,
+                            CpuFlag::OF,
+                            CpuFlag::PF,
+                            CpuFlag::IF,
+                        ]),
                     ),
                 ],
                 None,
@@ -2640,7 +2659,7 @@ mod tests_cpu {
                     (RegisterId::R1, 0x0),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
                 None,
@@ -2654,7 +2673,12 @@ mod tests_cpu {
                     (RegisterId::R1, u32::MAX),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::OF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[
+                            CpuFlag::SF,
+                            CpuFlag::OF,
+                            CpuFlag::PF,
+                            CpuFlag::IF,
+                        ]),
                     ),
                 ],
                 None,
@@ -2765,7 +2789,7 @@ mod tests_cpu {
                     (RegisterId::AC, 0x0),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
                 None,
@@ -2780,7 +2804,7 @@ mod tests_cpu {
                 ],
                 &[(
                     RegisterId::FL,
-                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
                 None,
                 0,
@@ -2893,7 +2917,7 @@ mod tests_cpu {
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1000),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::CF]),
+                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
                 None,
@@ -2912,7 +2936,12 @@ mod tests_cpu {
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::CF, CpuFlag::OF]),
+                        CpuFlag::compute_from(&[
+                            CpuFlag::SF,
+                            CpuFlag::CF,
+                            CpuFlag::OF,
+                            CpuFlag::IF,
+                        ]),
                     ),
                 ],
                 None,
@@ -2928,7 +2957,7 @@ mod tests_cpu {
                 ],
                 &[(
                     RegisterId::FL,
-                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
                 None,
                 0,
@@ -3056,7 +3085,7 @@ mod tests_cpu {
                     (RegisterId::R2, 0x3),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::CF]),
+                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
                 None,
@@ -3077,7 +3106,12 @@ mod tests_cpu {
                     (RegisterId::R2, 0x1),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::OF, CpuFlag::CF]),
+                        CpuFlag::compute_from(&[
+                            CpuFlag::SF,
+                            CpuFlag::OF,
+                            CpuFlag::CF,
+                            CpuFlag::IF,
+                        ]),
                     ),
                 ],
                 None,
@@ -3097,7 +3131,12 @@ mod tests_cpu {
                     (RegisterId::R2, 0x1),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::OF, CpuFlag::CF]),
+                        CpuFlag::compute_from(&[
+                            CpuFlag::SF,
+                            CpuFlag::OF,
+                            CpuFlag::CF,
+                            CpuFlag::IF,
+                        ]),
                     ),
                 ],
                 None,
@@ -3116,7 +3155,7 @@ mod tests_cpu {
                     (RegisterId::R2, 0x1),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
                 None,
@@ -3238,7 +3277,10 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1101),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::SF])),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::IF]),
+                    ),
                 ],
                 None,
                 0,
@@ -3253,7 +3295,7 @@ mod tests_cpu {
                 ],
                 &[(
                     RegisterId::FL,
-                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
                 None,
                 0,
@@ -3336,7 +3378,10 @@ mod tests_cpu {
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1101),
                     (RegisterId::R2, 0x1),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::SF])),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::IF]),
+                    ),
                 ],
                 None,
                 0,
@@ -3354,7 +3399,7 @@ mod tests_cpu {
                     (RegisterId::R2, 0x1),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
                 None,
@@ -3476,7 +3521,7 @@ mod tests_cpu {
                 false,
                 "SHR - CPU flags were not correctly set",
             ),
-            // Just zero flag should be set here since zero left-shifted by anything will be zero.
+            // The zero flag should be set here since zero left-shifted by anything will be zero.
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0x0, RegisterId::R1),
@@ -3484,7 +3529,7 @@ mod tests_cpu {
                 ],
                 &[(
                     RegisterId::FL,
-                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
                 None,
                 0,
@@ -3598,7 +3643,7 @@ mod tests_cpu {
                 false,
                 "SHR - CPU flags were not correctly set",
             ),
-            // Just zero flag should be set here since zero left-shifted by anything will be zero.
+            // The zero flag should be set here since zero left-shifted by anything will be zero.
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0x0, RegisterId::R1),
@@ -3609,7 +3654,7 @@ mod tests_cpu {
                     (RegisterId::R2, 0x1),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
                 None,
@@ -3670,7 +3715,7 @@ mod tests_cpu {
                     (RegisterId::R1, 0b1011_1111_1111_1111_1111_1111_1111_1111),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
                 None,
@@ -3686,7 +3731,7 @@ mod tests_cpu {
                 ],
                 &[(
                     RegisterId::FL,
-                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
                 None,
                 0,
@@ -3771,7 +3816,7 @@ mod tests_cpu {
                     (RegisterId::R2, 0x1),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
                 None,
@@ -3790,7 +3835,7 @@ mod tests_cpu {
                     (RegisterId::R2, 0x1),
                     (
                         RegisterId::FL,
-                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
+                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
                 None,
@@ -4606,7 +4651,10 @@ mod tests_cpu {
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::R2, 0x4),
                     (RegisterId::R3, 0b0000_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::CF])),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
+                    ),
                 ],
                 None,
                 0,
@@ -4623,7 +4671,10 @@ mod tests_cpu {
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::R2, 0x18),
                     (RegisterId::R3, 0b0000_0000_0000_0000_0000_0000_1111_1111),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::CF])),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
+                    ),
                 ],
                 None,
                 0,
@@ -4640,7 +4691,10 @@ mod tests_cpu {
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::R2, 0x19),
                     (RegisterId::R3, 0b0000_0000_0000_0000_0000_0000_0111_1111),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::CF])),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
+                    ),
                 ],
                 None,
                 0,
@@ -4669,7 +4723,10 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0x0, RegisterId::R2),
                     ZeroHighBitsByIndexU32Reg(RegisterId::R2, RegisterId::R1, RegisterId::R3),
                 ],
-                &[(RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::ZF]))],
+                &[(
+                    RegisterId::FL,
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
+                )],
                 None,
                 0,
                 false,
@@ -4772,7 +4829,10 @@ mod tests_cpu {
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::R2, 0b0000_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::CF])),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
+                    ),
                 ],
                 None,
                 0,
@@ -4787,7 +4847,10 @@ mod tests_cpu {
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::R2, 0b0000_0000_0000_0000_0000_0000_1111_1111),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::CF])),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
+                    ),
                 ],
                 None,
                 0,
@@ -4802,7 +4865,10 @@ mod tests_cpu {
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::R2, 0b0000_0000_0000_0000_0000_0000_0111_1111),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::CF])),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
+                    ),
                 ],
                 None,
                 0,
@@ -4829,7 +4895,10 @@ mod tests_cpu {
                     RegisterId::R1, // Already has the value of 0.
                     RegisterId::R2,
                 )],
-                &[(RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::ZF]))],
+                &[(
+                    RegisterId::FL,
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
+                )],
                 None,
                 0,
                 false,
@@ -4920,7 +4989,10 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::CF])),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
+                    ),
                 ],
                 None,
                 0,
@@ -4960,7 +5032,10 @@ mod tests_cpu {
                     MovU32ImmMemSimple(0b1111_1111_1111_1111_1111_1111_1111_1111, 0x0),
                     BitTestU32Mem(0x0, 0x0),
                 ],
-                &[(RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::CF]))],
+                &[(
+                    RegisterId::FL,
+                    CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
+                )],
                 Some(vec![
                     255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -5014,7 +5089,7 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::CF])),
+                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF])),
                 ],
                 None,
                 0,
@@ -5062,7 +5137,7 @@ mod tests_cpu {
                     ),
                     BitTestResetU32Mem(0x0, 0x0),
                 ],
-                &[(RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::CF]))],
+                &[(RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]))],
                 Some(vec![
                     254, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -5119,7 +5194,7 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::R1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::CF])),
+                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF])),
                 ],
                 None,
                 0,
@@ -5165,7 +5240,7 @@ mod tests_cpu {
                     ),
                     BitTestSetU32Mem(0x0, 0x0),
                 ],
-                &[(RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::CF]))],
+                &[(RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]))],
                 Some(vec![
                     255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -5244,7 +5319,10 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::R2, 0x20),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::ZF])),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
+                    ),
                 ],
                 None,
                 0,
@@ -5296,7 +5374,10 @@ mod tests_cpu {
                 &[BitScanReverseU32MemU32Reg(0x0, RegisterId::R1)],
                 &[
                     (RegisterId::R1, 0x20),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::ZF])),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
+                    ),
                 ],
                 None,
                 0,
@@ -5341,7 +5422,10 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[BitScanReverseU32RegMemU32(RegisterId::R1, 0x0)],
-                &[(RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::ZF]))],
+                &[(
+                    RegisterId::FL,
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
+                )],
                 Some(vec![
                     32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -5395,7 +5479,10 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[BitScanReverseU32MemU32Mem(0x0, 0x4)],
-                &[(RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::ZF]))],
+                &[(
+                    RegisterId::FL,
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
+                )],
                 Some(vec![
                     0, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -5447,7 +5534,10 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::R2, 0x20),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::ZF])),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
+                    ),
                 ],
                 None,
                 0,
@@ -5499,7 +5589,10 @@ mod tests_cpu {
                 &[BitScanForwardU32MemU32Reg(0x0, RegisterId::R1)],
                 &[
                     (RegisterId::R1, 0x20),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::ZF])),
+                    (
+                        RegisterId::FL,
+                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
+                    ),
                 ],
                 None,
                 0,
@@ -5544,7 +5637,10 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[BitScanForwardU32RegMemU32(RegisterId::R1, 0x0)],
-                &[(RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::ZF]))],
+                &[(
+                    RegisterId::FL,
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
+                )],
                 Some(vec![
                     32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -5598,7 +5694,10 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[BitScanForwardU32MemU32Mem(0x0, 0x4)],
-                &[(RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::ZF]))],
+                &[(
+                    RegisterId::FL,
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
+                )],
                 Some(vec![
                     0, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
