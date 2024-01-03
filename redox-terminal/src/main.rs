@@ -1,7 +1,10 @@
 #![crate_name = "redox_terminal"]
 
 use redox_core::{
-    compiler::bytecode_compiler::Compiler, ins::instruction::Instruction, vm::VirtualMachine, *,
+    compiler::bytecode_compiler::Compiler,
+    ins::instruction::Instruction,
+    mem,
+    vm::{self, VirtualMachine},
 };
 
 use std::time::Instant;
@@ -69,6 +72,16 @@ fn main() {
         Instruction::PushU32Imm(4321),
         Instruction::Hlt,
     ];
+
+    /*let instructions = &[
+        Instruction::AddU32ImmU32Reg(23, RegisterId::CS), // 9
+        Instruction::JumpAbsU32Reg(RegisterId::AC), // 5
+        // This instruction should be skipped.
+        Instruction::MovU32ImmU32Reg(0xf, RegisterId::R1), // 9
+        // The jump should start execution here.
+        Instruction::MovU32ImmU32Reg(0xa, RegisterId::R1),
+        Instruction::Hlt,
+    ];*/
 
     let mut compiler = Compiler::new();
     let data = compiler.compile(instructions);

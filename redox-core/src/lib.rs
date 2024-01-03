@@ -8,6 +8,6 @@ pub mod ins;
 pub mod mem;
 mod parsing;
 mod privilege_level;
-mod reg;
+pub mod reg;
 mod utils;
 pub mod vm;

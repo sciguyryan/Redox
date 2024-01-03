@@ -601,6 +601,7 @@ impl Cpu {
     pub fn run(&mut self, mem: &mut MemoryHandler) {
         while !self.is_halted {
             let ins = self.fetch_decode_next_instruction(mem);
+            eprintln!("cpu.rs {ins}");
             self.run_instruction(mem, &ins);
         }
     }
@@ -5825,8 +5826,6 @@ mod tests_cpu {
                     // The address is calculated as follows:
                     // Move the value of the code segment register into R8.
                     //
-                    // The instruction 1 is _6 bytes_ in length
-                    //      (4 for the instruction, 1 for each register ID argument).
                     // The instruction 2 is _9 bytes_ in length
                     //      (4 for the instruction, 4 for the u32 immediate argument and 1 for the register ID argument).
                     // The instruction 3 is _5 bytes_ in length
@@ -5834,12 +5833,11 @@ mod tests_cpu {
                     // The instruction 4 is _9 bytes_ in length
                     //      (4 for the instruction, 4 for the u32 argument and 1 for the register ID argument).
                     //
-                    // This means that we need to add 28 (29 minus one since we want to get to the start of the next instruction)
-                    // to the value of the R8 register to point at the start of the second move instruction.
+                    // This means that we need to add 23 to the value of the CS register to point
+                    // to the start of the second move instruction.
                     //
                     // We expect that the first move instruction will be skipped entirely.
-                    MovU32RegU32Reg(RegisterId::CS, RegisterId::R8),
-                    AddU32ImmU32Reg(28, RegisterId::R8),
+                    AddU32ImmU32Reg(28, RegisterId::CS),
                     JumpAbsU32Reg(RegisterId::AC),
                     // This instruction should be skipped.
                     MovU32ImmU32Reg(0xf, RegisterId::R1),
@@ -5855,7 +5853,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(u32::MAX, RegisterId::R1),
-                    JumpAbsU32Reg(RegisterId::R1)
+                    JumpAbsU32Reg(RegisterId::R1),
                 ],
                 &[],
                 None,
