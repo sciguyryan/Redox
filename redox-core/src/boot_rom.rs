@@ -28,7 +28,7 @@ impl BootRom {
             Instruction::MovU32ImmU32Reg(mem.stack_segment_start as u32, RegisterId::SS),
             Instruction::MovU32ImmU32Reg(mem.code_segment_start as u32, RegisterId::CS),
             Instruction::MovU32ImmU32Reg(mem.data_segment_start as u32, RegisterId::DS),
-            // Enable the CPU interrupts flag.
+            // Enable CPU interrupts.
             Instruction::MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::IF]), RegisterId::FL),
             // Jump to the start of the user executable code.
             Instruction::JumpAbsU32Reg(RegisterId::CS),

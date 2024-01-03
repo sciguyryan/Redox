@@ -6,8 +6,6 @@ const BIT_MASKS: [u32; 32] = [
 
 #[inline(always)]
 pub fn is_bit_set(value: u32, bit: u8) -> bool {
-    assert!(bit < 32);
-
     (value & BIT_MASKS[bit as usize]) != 0
 }
 
@@ -18,16 +16,12 @@ pub fn is_bit_set_32(value: u32, bit: u32) -> bool {
 
 #[inline(always)]
 pub fn set_bit_state(value: u32, bit: u8, state: bool) -> u32 {
-    assert!(bit < 32);
-
     let mask = BIT_MASKS[bit as usize];
     (value & !mask) | (((state as u32) << bit) & mask)
 }
 
 #[inline(always)]
 pub fn set_bit_state_inline(value: &mut u32, bit: u8, state: bool) {
-    assert!(bit < 32);
-
     let mask = BIT_MASKS[bit as usize];
     *value = (*value & !mask) | (((state as u32) << bit) & mask)
 }
