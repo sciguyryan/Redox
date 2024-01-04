@@ -490,6 +490,7 @@ impl From<&[u8]> for Instruction {
         // default to the Unknown opcode, which is useful for debugging.
         let opcode = FromPrimitive::from_u32(opcode_id).unwrap_or_default();
 
+        // The potential bytes of any arguments that might apply to this instruction.
         let arg_bytes = &bytes[4..];
 
         let mut cursor = 0;

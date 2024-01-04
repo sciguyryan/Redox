@@ -10,12 +10,12 @@ pub const MIN_USER_SEGMENT_SIZE: usize = MEGABYTE * 32;
 /// The default size of the stack, in terms of how many u32 values can be held.
 pub const U32_STACK_CAPACITY: usize = 1000;
 
-pub struct VirtualMachine<'a> {
+pub struct VirtualMachine {
     pub mem: MemoryHandler,
-    pub cpu: Cpu<'a>,
+    pub cpu: Cpu,
 }
 
-impl<'a> VirtualMachine<'a> {
+impl VirtualMachine {
     /// Build a new [`VirtualMachine`] instance.
     ///
     /// # Arguments
