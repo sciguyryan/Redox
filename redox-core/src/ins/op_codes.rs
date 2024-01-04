@@ -1,4 +1,7 @@
+use std::collections::HashMap;
+
 use num_derive::FromPrimitive;
+use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use super::instruction::Instruction;
@@ -230,6 +233,19 @@ impl From<Instruction> for OpCode {
             Instruction::Unknown(_) => OpCode::Unknown,
         }
     }
+}
+
+lazy_static! {
+    pub static ref OPCODE_ARG_SIZES: HashMap<OpCode, usize> = {
+        let mut map = HashMap::new();
+
+        let ops: Vec<OpCode> = OpCode::iter().collect();
+        for op in ops {
+            map.insert(op, Instruction::get_instruction_arg_size_from_op(op));
+        }
+
+        map
+    };
 }
 
 #[cfg(test)]

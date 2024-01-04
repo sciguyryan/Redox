@@ -11,3 +11,6 @@ mod privilege_level;
 pub mod reg;
 mod utils;
 pub mod vm;
+
+#[macro_use]
+extern crate lazy_static;
