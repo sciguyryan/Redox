@@ -1,5 +1,5 @@
 use core::fmt;
-use std::{panic, slice::Iter};
+use std::{collections::HashMap, panic, slice::Iter};
 
 use crate::{
     ins::{
@@ -14,8 +14,14 @@ use crate::{
 
 /// The mask to get only the lowest 8 bits of a u32 value.
 const U32_LOW_BYTE_MASK: u32 = 0xff;
+/// How many items should be able to be stored in the CPU instruction cache?
+const INSTRUCTION_CACHE_SIZE: usize = if cfg!(feature = "instruction-caching") {
+    50_000
+} else {
+    0
+};
 
-pub struct Cpu {
+pub struct Cpu<'a> {
     /// The registers associated with this CPU.
     pub registers: Registers,
     // Is the CPU currently halted?
@@ -24,15 +30,20 @@ pub struct Cpu {
     pub is_machine_mode: bool,
     /// Is the CPU currently in an interrupt handler?
     pub is_in_interrupt_handler: bool,
+
+    // A hashmap to cache the decoded instructions.
+    decode_cache: HashMap<&'a [u8], Instruction>,
 }
 
-impl Cpu {
+impl<'a> Cpu<'a> {
     pub fn new() -> Self {
         Self {
             registers: Registers::default(),
             is_halted: false,
             is_machine_mode: true,
             is_in_interrupt_handler: false,
+
+            decode_cache: HashMap::with_capacity(INSTRUCTION_CACHE_SIZE),
         }
     }
 
@@ -1161,7 +1172,7 @@ impl Cpu {
     }
 }
 
-impl Default for Cpu {
+impl<'a> Default for Cpu<'a> {
     fn default() -> Self {
         Self::new()
     }

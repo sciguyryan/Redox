@@ -27,6 +27,7 @@ divan.workspace = true
 [features]
 default = ["stack-type-hints"]
 stack-type-hints = []
+instruction-caching = []
 
 [[bench]]
 name = "benchmarks"

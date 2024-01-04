@@ -11,7 +11,7 @@ fn main() {
 }
 
 #[divan::bench]
-fn virtual_machine_creation() -> VirtualMachine {
+fn virtual_machine_creation<'a>() -> VirtualMachine<'a> {
     VirtualMachine::new(
         vm::MIN_USER_SEGMENT_SIZE,
         &[],
