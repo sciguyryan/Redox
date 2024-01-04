@@ -15,11 +15,7 @@ use crate::{
 /// The mask to get only the lowest 8 bits of a u32 value.
 const U32_LOW_BYTE_MASK: u32 = 0xff;
 /// How many items should be able to be stored in the CPU instruction cache?
-const INSTRUCTION_CACHE_SIZE: usize = if cfg!(feature = "instruction-caching") {
-    50_000
-} else {
-    0
-};
+const INSTRUCTION_CACHE_SIZE: usize = 50_000;
 
 pub struct Cpu<'a> {
     /// The registers associated with this CPU.
@@ -45,6 +41,13 @@ impl<'a> Cpu<'a> {
 
             decode_cache: HashMap::with_capacity(INSTRUCTION_CACHE_SIZE),
         }
+    }
+
+    //#[cfg(feature = "instruction-caching")]
+    fn get_or_add_instruction_cache_item(&mut self, data: &'a [u8]) -> &Instruction {
+        self.decode_cache
+            .entry(data)
+            .or_insert_with(|| Instruction::Unknown(0))
     }
 
     /// Calculate the parity of the lowest byte of a u32 value.

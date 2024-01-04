@@ -8,6 +8,7 @@ default-members = ["redox-terminal", "redox-core"]
 bitflags = "2.4.1"
 divan = "0.1.8"
 float-cmp = "0.9.0"
+lazy_static = "1.4.0"
 num-traits = "0.2.17"
 num-derive = "0.4.1"
 prettytable = "0.10.0"

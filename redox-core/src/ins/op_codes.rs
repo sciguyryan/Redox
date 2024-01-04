@@ -1,4 +1,6 @@
 use num_derive::FromPrimitive;
+use std::collections::HashMap;
+use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use super::instruction::Instruction;
@@ -145,9 +147,33 @@ pub enum OpCode {
     Hlt = 32767,
 
     // Note - u32::MAX - 1 should never be assigned as it is used in various tests as an invalid opcode ID.
-    /// A placeholder in instances where the opcode isn't recognised. This should never be constructed directly.
+    /// A placeholder in instances where the opcode isn't recognized. This should never be constructed directly.
     #[default]
     Unknown = u32::MAX,
+}
+
+lazy_static! {
+    /// The size of an opcode, calculated based on their opcode.
+    pub static ref OPCODE_SIZE_MAP: HashMap<OpCode, usize> = {
+        let mut m = HashMap::new();
+
+        for op in OpCode::iter() {
+            m.insert(op, Instruction::get_instruction_arg_size_from_op(op) + 4);
+        }
+
+        m
+    };
+
+    /// The size of the opcode, calculated based on their ID.
+    pub static ref OPCODE_ID_SIZE_MAP: HashMap<u32, usize> = {
+        let mut m = HashMap::new();
+
+        for op in OpCode::iter() {
+            m.insert(op as u32, Instruction::get_instruction_arg_size_from_op(op) + 4);
+        }
+
+        m
+    };
 }
 
 impl From<Instruction> for OpCode {

@@ -2,7 +2,7 @@ use num_traits::FromPrimitive;
 use prettytable::{row, Table};
 
 use crate::{
-    ins::{instruction::Instruction, op_codes::OpCode},
+    ins::{instruction::Instruction, op_codes::OPCODE_ID_SIZE_MAP},
     reg::registers::RegisterId,
 };
 
@@ -280,368 +280,15 @@ impl MemoryHandler {
     ///
     /// An [`Instruction`] instance, if the memory address contains a valid instruction.
     pub fn get_instruction(&self, pos: usize) -> Instruction {
-        use OpCode::*;
-
         // Read the OpCode ID.
         let opcode_id = self.get_u32(pos);
 
-        // Validate the opcode is one of the ones we know about.
-        // In the case we encounter an unrecognized opcode ID then we will
-        // default to the Unknown opcode, which is useful for debugging.
-        let opcode = FromPrimitive::from_u32(opcode_id).unwrap_or_default();
-
-        // Calculate the length of the arguments, in bytes.
-        let arg_len = Instruction::get_instruction_arg_size_from_op(opcode);
-        let arg_bytes = self.get_range_ptr(pos + 4, arg_len);
-
-        let mut cursor = 0;
-
-        // Create our instruction instance.
-        match opcode {
-            Nop => Instruction::Nop,
-
-            /******** [Arithmetic Instructions] ********/
-            AddU32ImmU32Reg => {
-                let imm = self.read_u32(arg_bytes, &mut cursor);
-                let reg = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::AddU32ImmU32Reg(imm, reg)
-            }
-            AddU32RegU32Reg => {
-                let reg_1 = self.read_register_id(arg_bytes, &mut cursor);
-                let reg_2 = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::AddU32RegU32Reg(reg_1, reg_2)
-            }
-            SubU32ImmU32Reg => {
-                let imm = self.read_u32(arg_bytes, &mut cursor);
-                let reg = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::SubU32ImmU32Reg(imm, reg)
-            }
-            SubU32RegU32Imm => {
-                let reg = self.read_register_id(arg_bytes, &mut cursor);
-                let imm = self.read_u32(arg_bytes, &mut cursor);
-
-                Instruction::SubU32RegU32Imm(reg, imm)
-            }
-            SubU32RegU32Reg => {
-                let reg_1 = self.read_register_id(arg_bytes, &mut cursor);
-                let reg_2 = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::SubU32RegU32Reg(reg_1, reg_2)
-            }
-            MulU32ImmU32Reg => {
-                let imm = self.read_u32(arg_bytes, &mut cursor);
-                let reg = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::MulU32ImmU32Reg(imm, reg)
-            }
-            MulU32RegU32Reg => {
-                let reg_1 = self.read_register_id(arg_bytes, &mut cursor);
-                let reg_2 = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::MulU32RegU32Reg(reg_1, reg_2)
-            }
-            DivU32ImmU32Reg => {
-                let imm = self.read_u32(arg_bytes, &mut cursor);
-                let reg = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::DivU32ImmU32Reg(imm, reg)
-            }
-            DivU32RegU32Imm => {
-                let reg = self.read_register_id(arg_bytes, &mut cursor);
-                let imm = self.read_u32(arg_bytes, &mut cursor);
-
-                Instruction::DivU32RegU32Imm(reg, imm)
-            }
-            DivU32RegU32Reg => {
-                let reg_1 = self.read_register_id(arg_bytes, &mut cursor);
-                let reg_2 = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::DivU32RegU32Reg(reg_1, reg_2)
-            }
-            ModU32ImmU32Reg => {
-                let imm = self.read_u32(arg_bytes, &mut cursor);
-                let reg = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::ModU32ImmU32Reg(imm, reg)
-            }
-            ModU32RegU32Imm => {
-                let reg = self.read_register_id(arg_bytes, &mut cursor);
-                let imm = self.read_u32(arg_bytes, &mut cursor);
-
-                Instruction::ModU32RegU32Imm(reg, imm)
-            }
-            ModU32RegU32Reg => {
-                let reg_1 = self.read_register_id(arg_bytes, &mut cursor);
-                let reg_2 = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::ModU32RegU32Reg(reg_1, reg_2)
-            }
-            IncU32Reg => {
-                let reg = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::IncU32Reg(reg)
-            }
-            DecU32Reg => {
-                let reg = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::DecU32Reg(reg)
-            }
-            AndU32ImmU32Reg => {
-                let imm = self.read_u32(arg_bytes, &mut cursor);
-                let reg = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::AndU32ImmU32Reg(imm, reg)
-            }
-
-            /******** [Bit Operation Instructions] ********/
-            LeftShiftU32ImmU32Reg => {
-                let imm = self.read_u32(arg_bytes, &mut cursor);
-                let reg = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::LeftShiftU32ImmU32Reg(imm, reg)
-            }
-            LeftShiftU32RegU32Reg => {
-                let shift_reg = self.read_register_id(arg_bytes, &mut cursor);
-                let reg = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::LeftShiftU32RegU32Reg(shift_reg, reg)
-            }
-            ArithLeftShiftU32ImmU32Reg => {
-                let imm = self.read_u32(arg_bytes, &mut cursor);
-                let reg = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::ArithLeftShiftU32ImmU32Reg(imm, reg)
-            }
-            ArithLeftShiftU32RegU32Reg => {
-                let shift_reg = self.read_register_id(arg_bytes, &mut cursor);
-                let reg = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::ArithLeftShiftU32RegU32Reg(shift_reg, reg)
-            }
-            RightShiftU32ImmU32Reg => {
-                let imm = self.read_u32(arg_bytes, &mut cursor);
-                let reg = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::RightShiftU32ImmU32Reg(imm, reg)
-            }
-            RightShiftU32RegU32Reg => {
-                let shift_reg = self.read_register_id(arg_bytes, &mut cursor);
-                let reg = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::RightShiftU32RegU32Reg(shift_reg, reg)
-            }
-            ArithRightShiftU32ImmU32Reg => {
-                let imm = self.read_u32(arg_bytes, &mut cursor);
-                let reg = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::ArithRightShiftU32ImmU32Reg(imm, reg)
-            }
-            ArithRightShiftU32RegU32Reg => {
-                let shift_reg = self.read_register_id(arg_bytes, &mut cursor);
-                let reg = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::ArithRightShiftU32RegU32Reg(shift_reg, reg)
-            }
-
-            /******** [Branching Instructions] ********/
-            Int => {
-                let addr = self.read_u32(arg_bytes, &mut cursor);
-
-                Instruction::Int(addr)
-            }
-            IntRet => Instruction::IntRet,
-            JumpAbsU32Imm => {
-                let addr = self.read_u32(arg_bytes, &mut cursor);
-
-                Instruction::JumpAbsU32Imm(addr)
-            }
-            JumpAbsU32Reg => {
-                let reg = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::JumpAbsU32Reg(reg)
-            }
-
-            /******** [Data Instructions] ********/
-            SwapU32RegU32Reg => {
-                let reg1 = self.read_register_id(arg_bytes, &mut cursor);
-                let reg2 = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::SwapU32RegU32Reg(reg1, reg2)
-            }
-            MovU32ImmU32Reg => {
-                let imm = self.read_u32(arg_bytes, &mut cursor);
-                let reg = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::MovU32ImmU32Reg(imm, reg)
-            }
-            MovU32RegU32Reg => {
-                let in_reg = self.read_register_id(arg_bytes, &mut cursor);
-                let out_reg = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::MovU32RegU32Reg(in_reg, out_reg)
-            }
-            MovU32ImmMemSimple => {
-                let imm = self.read_u32(arg_bytes, &mut cursor);
-                let addr = self.read_u32(arg_bytes, &mut cursor);
-
-                Instruction::MovU32ImmMemSimple(imm, addr)
-            }
-            MovU32RegMemSimple => {
-                let reg = self.read_register_id(arg_bytes, &mut cursor);
-                let addr = self.read_u32(arg_bytes, &mut cursor);
-
-                Instruction::MovU32RegMemSimple(reg, addr)
-            }
-            MovMemU32RegSimple => {
-                let addr = self.read_u32(arg_bytes, &mut cursor);
-                let reg = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::MovMemU32RegSimple(addr, reg)
-            }
-            MovU32RegPtrU32RegSimple => {
-                let in_reg = self.read_register_id(arg_bytes, &mut cursor);
-                let out_reg = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::MovU32RegPtrU32RegSimple(in_reg, out_reg)
-            }
-            MovU32ImmMemExpr => {
-                let imm = self.read_u32(arg_bytes, &mut cursor);
-                let expr = self.read_u32(arg_bytes, &mut cursor);
-
-                Instruction::MovU32ImmMemExpr(imm, expr)
-            }
-            MovMemExprU32Reg => {
-                let expr = self.read_u32(arg_bytes, &mut cursor);
-                let reg = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::MovMemExprU32Reg(expr, reg)
-            }
-            MovU32RegMemExpr => {
-                let reg = self.read_register_id(arg_bytes, &mut cursor);
-                let expr = self.read_u32(arg_bytes, &mut cursor);
-
-                Instruction::MovU32RegMemExpr(reg, expr)
-            }
-            ByteSwapU32 => {
-                let reg = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::ByteSwapU32(reg)
-            }
-            ZeroHighBitsByIndexU32Reg => {
-                let index_reg = self.read_register_id(arg_bytes, &mut cursor);
-                let in_reg = self.read_register_id(arg_bytes, &mut cursor);
-                let out_reg = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::ZeroHighBitsByIndexU32Reg(index_reg, in_reg, out_reg)
-            }
-            ZeroHighBitsByIndexU32RegU32Imm => {
-                let index = self.read_u32(arg_bytes, &mut cursor);
-                let in_reg = self.read_register_id(arg_bytes, &mut cursor);
-                let out_reg = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::ZeroHighBitsByIndexU32RegU32Imm(index, in_reg, out_reg)
-            }
-            PushU32Imm => {
-                let imm = self.read_u32(arg_bytes, &mut cursor);
-
-                Instruction::PushU32Imm(imm)
-            }
-
-            /******** [Logic Instructions] ********/
-            BitTestU32Reg => {
-                let bit = self.read_u8(arg_bytes, &mut cursor);
-                let reg = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::BitTestU32Reg(bit, reg)
-            }
-            BitTestU32Mem => {
-                let bit = self.read_u8(arg_bytes, &mut cursor);
-                let addr = self.read_u32(arg_bytes, &mut cursor);
-
-                Instruction::BitTestU32Mem(bit, addr)
-            }
-            BitTestResetU32Reg => {
-                let bit = self.read_u8(arg_bytes, &mut cursor);
-                let reg = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::BitTestResetU32Reg(bit, reg)
-            }
-            BitTestResetU32Mem => {
-                let bit = self.read_u8(arg_bytes, &mut cursor);
-                let addr = self.read_u32(arg_bytes, &mut cursor);
-
-                Instruction::BitTestResetU32Mem(bit, addr)
-            }
-            BitTestSetU32Reg => {
-                let bit = self.read_u8(arg_bytes, &mut cursor);
-                let reg = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::BitTestSetU32Reg(bit, reg)
-            }
-            BitTestSetU32Mem => {
-                let bit = self.read_u8(arg_bytes, &mut cursor);
-                let addr = self.read_u32(arg_bytes, &mut cursor);
-
-                Instruction::BitTestSetU32Mem(bit, addr)
-            }
-            BitScanReverseU32RegU32Reg => {
-                let in_reg = self.read_register_id(arg_bytes, &mut cursor);
-                let out_reg = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::BitScanReverseU32RegU32Reg(in_reg, out_reg)
-            }
-            BitScanReverseU32MemU32Reg => {
-                let addr = self.read_u32(arg_bytes, &mut cursor);
-                let reg = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::BitScanReverseU32MemU32Reg(addr, reg)
-            }
-            BitScanReverseU32RegMemU32 => {
-                let reg = self.read_register_id(arg_bytes, &mut cursor);
-                let out_addr = self.read_u32(arg_bytes, &mut cursor);
-
-                Instruction::BitScanReverseU32RegMemU32(reg, out_addr)
-            }
-            BitScanReverseU32MemU32Mem => {
-                let in_addr = self.read_u32(arg_bytes, &mut cursor);
-                let out_addr = self.read_u32(arg_bytes, &mut cursor);
-
-                Instruction::BitScanReverseU32MemU32Mem(in_addr, out_addr)
-            }
-            BitScanForwardU32RegU32Reg => {
-                let in_reg = self.read_register_id(arg_bytes, &mut cursor);
-                let out_reg = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::BitScanForwardU32RegU32Reg(in_reg, out_reg)
-            }
-            BitScanForwardU32MemU32Reg => {
-                let addr = self.read_u32(arg_bytes, &mut cursor);
-                let reg = self.read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::BitScanForwardU32MemU32Reg(addr, reg)
-            }
-            BitScanForwardU32RegMemU32 => {
-                let reg = self.read_register_id(arg_bytes, &mut cursor);
-                let out_addr = self.read_u32(arg_bytes, &mut cursor);
-
-                Instruction::BitScanForwardU32RegMemU32(reg, out_addr)
-            }
-            BitScanForwardU32MemU32Mem => {
-                let in_addr = self.read_u32(arg_bytes, &mut cursor);
-                let out_addr = self.read_u32(arg_bytes, &mut cursor);
-
-                Instruction::BitScanForwardU32MemU32Mem(in_addr, out_addr)
-            }
-
-            /******** [Special Instructions] ********/
-            Ret => Instruction::Ret,
-            Mret => Instruction::Mret,
-            Hlt => Instruction::Hlt,
-            Unknown => Instruction::Unknown(opcode_id),
-        }
+        // Calculate the total instruction length.
+        // If the opcode isn't valid, we will read the four bytes that represent the invalid opcode ID.
+        let length = OPCODE_ID_SIZE_MAP.get(&opcode_id).unwrap_or(&4);
+
+        // Build the instruction from the
+        Instruction::from(self.get_range_ptr(pos, *length))
     }
 
     /// Attempt to find the memory-mapped segment that is associated with a given address.
@@ -951,8 +598,8 @@ impl MemoryHandler {
     ///
     /// * `bytes` - A slice of u8 values from which the register ID should be extracted.
     /// * `cursor` - A mutable reference to the cursor, which specifies the starting position within the slice.
-    fn read_register_id(&self, bytes: &[u8], cursor: &mut usize) -> RegisterId {
-        FromPrimitive::from_u8(self.read_u8(bytes, cursor))
+    pub fn read_register_id(bytes: &[u8], cursor: &mut usize) -> RegisterId {
+        FromPrimitive::from_u8(MemoryHandler::read_u8(bytes, cursor))
             .expect("failed to read register ID from memory")
     }
 
@@ -962,7 +609,7 @@ impl MemoryHandler {
     ///
     /// * `bytes` - A slice of u8 values from which the register ID should be extracted.
     /// * `cursor` - A mutable reference to the cursor, which specifies the starting position within the slice.
-    pub fn read_u32(&self, bytes: &[u8], cursor: &mut usize) -> u32 {
+    pub fn read_u32(bytes: &[u8], cursor: &mut usize) -> u32 {
         // This will assert if the value is out of range anyway.
         let bytes: [u8; 4] = bytes[*cursor..(*cursor + 4)]
             .try_into()
@@ -979,7 +626,7 @@ impl MemoryHandler {
     /// * `bytes` - A slice of u8 values from which the register ID should be extracted.
     /// * `cursor` - A mutable reference to the cursor, which specifies the starting position within the slice.
     #[inline(always)]
-    fn read_u8(&self, bytes: &[u8], cursor: &mut usize) -> u8 {
+    pub fn read_u8(bytes: &[u8], cursor: &mut usize) -> u8 {
         let byte = bytes[*cursor];
         *cursor += 1;
         byte
