@@ -3,7 +3,7 @@
 use redox_core::{
     compiler::bytecode_compiler::Compiler,
     ins::instruction::Instruction,
-    mem,
+    mem::{self, memory_handler::MemoryHandler},
     vm::{self, VirtualMachine},
 };
 
@@ -41,11 +41,11 @@ use std::time::Instant;
     let elapsed2 = now2.elapsed().as_nanos() as f32;
 
     println!(
-        "Elapsed (1): {:.2?} microseconds per iteration",
+        "Elapsed (1): {:.2?} microseconds per iteration. Total = {elapsed1}",
         elapsed1 / iterations as f32
     );
     println!(
-        "Elapsed (2): {:.2?} microseconds per iteration",
+        "Elapsed (2): {:.2?} microseconds per iteration. Total = {elapsed2}",
         elapsed2 / iterations as f32
     );
 

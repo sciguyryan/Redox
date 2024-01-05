@@ -875,16 +875,18 @@ impl MemoryHandler {
         self.get_ram_storage().len()
     }
 
-    // Attempt to pop a [`StackTypeHint`] from the stack hint list.
-    #[cfg(feature = "stack-type-hints")]
+    /// Attempt to pop a [`StackTypeHint`] from the stack hint list.
+    ///
+    /// # Note
+    ///
+    /// This function will do nothing if stack type hints are disabled.
     #[inline]
     fn pop_type_hint(&mut self) {
-        self.stack_type_hints.pop();
+        #[cfg(feature = "stack-type-hints")]
+        {
+            self.stack_type_hints.pop();
+        }
     }
-
-    /// Attempt to pop a [`StackTypeHint`] from the stack hint list.
-    #[cfg(not(feature = "stack-type-hints"))]
-    fn pop_type_hint(&mut self) {}
 
     /// Attempt to pop a u32 value from the stack.
     #[inline]
@@ -910,16 +912,17 @@ impl MemoryHandler {
     /// # Arguments
     ///
     /// * `hint` - The [`StackTypeHint`] to be added to the hit list.
-    #[cfg(feature = "stack-type-hints")]
+    ///
+    /// # Note
+    ///
+    /// This function will do nothing if stack type hints are disabled.
     #[inline]
     fn push_type_hint(&mut self, hint: StackTypeHint) {
-        self.stack_type_hints.push(hint);
+        #[cfg(feature = "stack-type-hints")]
+        {
+            self.stack_type_hints.push(hint);
+        }
     }
-
-    /// Attempt to push a [`StackTypeHint`] onto the stack hint list.
-    #[cfg(not(feature = "stack-type-hints"))]
-    #[inline]
-    fn push_type_hint(&mut self, _hint: StackTypeHint) {}
 
     /// Attempt to push a u32 value onto the stack.
     ///
@@ -971,13 +974,16 @@ impl MemoryHandler {
     /// * `cursor` - A mutable reference to the cursor, which specifies the starting position within the slice.
     #[inline]
     pub fn read_u32(bytes: &[u8], cursor: &mut usize) -> u32 {
-        // This will assert if the value is out of range anyway.
-        let bytes: [u8; 4] = bytes[*cursor..(*cursor + 4)]
-            .try_into()
-            .expect("failed to read u32 value from memory");
+        let arr = [
+            bytes[*cursor],
+            bytes[*cursor + 1],
+            bytes[*cursor + 2],
+            bytes[*cursor + 3],
+        ];
+
         *cursor += 4;
 
-        u32::from_le_bytes(bytes)
+        u32::from_le_bytes(arr)
     }
 
     /// Attempt to read a u8 value from a memory slice.
