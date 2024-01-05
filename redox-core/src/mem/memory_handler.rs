@@ -784,7 +784,7 @@ impl MemoryHandler {
     /// # Returns
     ///
     /// A reference to a u8 slice from memory.
-    #[inline(always)]
+    #[inline]
     pub fn get_range_ptr(&self, pos: usize, len: usize) -> &[u8] {
         let segment = self
             .get_mapped_segment_by_address(pos)
@@ -811,6 +811,7 @@ impl MemoryHandler {
     /// # Returns
     ///
     /// A vector containing the bytes cloned from memory.
+    #[inline]
     pub fn get_range_clone(&self, pos: usize, len: usize) -> Vec<u8> {
         self.get_range_ptr(pos, len).to_vec()
     }
@@ -860,7 +861,7 @@ impl MemoryHandler {
         &self.get_ram_storage()[..self.code_segment_start]
     }
 
-    /// Is the physicla memory segment empty?
+    /// Is the physical memory segment empty?
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -876,6 +877,7 @@ impl MemoryHandler {
 
     // Attempt to pop a [`StackTypeHint`] from the stack hint list.
     #[cfg(feature = "stack-type-hints")]
+    #[inline]
     fn pop_type_hint(&mut self) {
         self.stack_type_hints.pop();
     }
@@ -885,6 +887,7 @@ impl MemoryHandler {
     fn pop_type_hint(&mut self) {}
 
     /// Attempt to pop a u32 value from the stack.
+    #[inline]
     pub fn pop_u32(&mut self) -> u32 {
         let value_start_pos = self.stack_pointer;
         assert!(
@@ -908,12 +911,14 @@ impl MemoryHandler {
     ///
     /// * `hint` - The [`StackTypeHint`] to be added to the hit list.
     #[cfg(feature = "stack-type-hints")]
+    #[inline]
     fn push_type_hint(&mut self, hint: StackTypeHint) {
         self.stack_type_hints.push(hint);
     }
 
     /// Attempt to push a [`StackTypeHint`] onto the stack hint list.
     #[cfg(not(feature = "stack-type-hints"))]
+    #[inline]
     fn push_type_hint(&mut self, _hint: StackTypeHint) {}
 
     /// Attempt to push a u32 value onto the stack.
@@ -927,6 +932,7 @@ impl MemoryHandler {
     /// This method will automatically keep track of the stack pointer as held within
     /// the memory object, but the CPU registers **must** be updated separately or
     /// they will fall out of sync.
+    #[inline]
     pub fn push_u32(&mut self, value: u32) {
         assert!(
             self.can_push_u32(),
@@ -961,7 +967,7 @@ impl MemoryHandler {
     ///
     /// # Arguments
     ///
-    /// * `bytes` - A slice of u8 values from which the register ID should be extracted.
+    /// * `bytes` - A slice of u8 values from which the u32 should be extracted.
     /// * `cursor` - A mutable reference to the cursor, which specifies the starting position within the slice.
     #[inline]
     pub fn read_u32(bytes: &[u8], cursor: &mut usize) -> u32 {
@@ -978,7 +984,7 @@ impl MemoryHandler {
     ///
     /// # Arguments
     ///
-    /// * `bytes` - A slice of u8 values from which the register ID should be extracted.
+    /// * `bytes` - A slice of u8 values from which the u8 should be extracted.
     /// * `cursor` - A mutable reference to the cursor, which specifies the starting position within the slice.
     #[inline]
     pub fn read_u8(bytes: &[u8], cursor: &mut usize) -> u8 {
@@ -1035,6 +1041,7 @@ impl MemoryHandler {
     ///
     /// * `pos` - The position of the first byte to be written into memory.
     /// * `value` - The value to be written into memory.
+    #[inline]
     pub fn set_u32(&mut self, pos: usize, value: u32) {
         self.set_range(pos, &u32::to_le_bytes(value));
     }

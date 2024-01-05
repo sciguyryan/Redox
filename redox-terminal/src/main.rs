@@ -15,8 +15,6 @@ use std::time::Instant;
 // Stack stuff - https://www.youtube.com/watch?v=CRTR5ljBjPM
 
 /*fn run_test_2() {
-    use std::time::Instant;
-
     let iterations = 1;
 
     let mut out_val_1 = 0;
