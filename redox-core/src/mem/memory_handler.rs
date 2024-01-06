@@ -974,16 +974,11 @@ impl MemoryHandler {
     /// * `cursor` - A mutable reference to the cursor, which specifies the starting position within the slice.
     #[inline]
     pub fn read_u32(bytes: &[u8], cursor: &mut usize) -> u32 {
-        let arr = [
-            bytes[*cursor],
-            bytes[*cursor + 1],
-            bytes[*cursor + 2],
-            bytes[*cursor + 3],
-        ];
+        let value = u32::from_le_bytes(bytes[*cursor..(*cursor + 4)].try_into().expect(""));
 
         *cursor += 4;
 
-        u32::from_le_bytes(arr)
+        value
     }
 
     /// Attempt to read a u8 value from a memory slice.

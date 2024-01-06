@@ -3,7 +3,7 @@
 use redox_core::{
     compiler::bytecode_compiler::Compiler,
     ins::instruction::Instruction,
-    mem::{self, memory_handler::MemoryHandler},
+    mem,
     vm::{self, VirtualMachine},
 };
 
