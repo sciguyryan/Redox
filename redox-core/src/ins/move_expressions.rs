@@ -430,9 +430,9 @@ mod tests_move_expressions {
         let tests = [
             TestEntry::new(
                 &[
-                    ExpressionArgs::Register(RegisterId::R7),
+                    ExpressionArgs::Register(RegisterId::ER7),
                     ExpressionArgs::Operator(ExpressionOperator::Multiply),
-                    ExpressionArgs::Register(RegisterId::R8),
+                    ExpressionArgs::Register(RegisterId::ER8),
                 ],
                 &[],
                 0,
@@ -454,7 +454,7 @@ mod tests_move_expressions {
                 &[
                     ExpressionArgs::Immediate(123),
                     ExpressionArgs::Operator(ExpressionOperator::Subtract),
-                    ExpressionArgs::Register(RegisterId::R1),
+                    ExpressionArgs::Register(RegisterId::ER1),
                 ],
                 &[],
                 0,
@@ -463,7 +463,7 @@ mod tests_move_expressions {
             ),
             TestEntry::new(
                 &[
-                    ExpressionArgs::Register(RegisterId::R1),
+                    ExpressionArgs::Register(RegisterId::ER1),
                     ExpressionArgs::Operator(ExpressionOperator::Multiply),
                     ExpressionArgs::Immediate(123),
                 ],
@@ -474,7 +474,7 @@ mod tests_move_expressions {
             ),
             TestEntry::new(
                 &[
-                    ExpressionArgs::Register(RegisterId::R1),
+                    ExpressionArgs::Register(RegisterId::ER1),
                     ExpressionArgs::Operator(ExpressionOperator::Multiply),
                 ],
                 &[],
@@ -484,10 +484,10 @@ mod tests_move_expressions {
             ),
             TestEntry::new(
                 &[
-                    ExpressionArgs::Register(RegisterId::R1),
+                    ExpressionArgs::Register(RegisterId::ER1),
                     ExpressionArgs::Operator(ExpressionOperator::Multiply),
-                    ExpressionArgs::Register(RegisterId::R1),
-                    ExpressionArgs::Register(RegisterId::R1),
+                    ExpressionArgs::Register(RegisterId::ER1),
+                    ExpressionArgs::Register(RegisterId::ER1),
                 ],
                 &[],
                 0,
@@ -496,9 +496,9 @@ mod tests_move_expressions {
             ),
             TestEntry::new(
                 &[
-                    ExpressionArgs::Register(RegisterId::R1),
-                    ExpressionArgs::Register(RegisterId::R1),
-                    ExpressionArgs::Register(RegisterId::R1),
+                    ExpressionArgs::Register(RegisterId::ER1),
+                    ExpressionArgs::Register(RegisterId::ER1),
+                    ExpressionArgs::Register(RegisterId::ER1),
                 ],
                 &[],
                 0,
@@ -508,8 +508,8 @@ mod tests_move_expressions {
             TestEntry::new(
                 &[
                     ExpressionArgs::Operator(ExpressionOperator::Multiply),
-                    ExpressionArgs::Register(RegisterId::R1),
-                    ExpressionArgs::Register(RegisterId::R1),
+                    ExpressionArgs::Register(RegisterId::ER1),
+                    ExpressionArgs::Register(RegisterId::ER1),
                 ],
                 &[],
                 0,
@@ -518,8 +518,8 @@ mod tests_move_expressions {
             ),
             TestEntry::new(
                 &[
-                    ExpressionArgs::Register(RegisterId::R1),
-                    ExpressionArgs::Register(RegisterId::R1),
+                    ExpressionArgs::Register(RegisterId::ER1),
+                    ExpressionArgs::Register(RegisterId::ER1),
                     ExpressionArgs::Operator(ExpressionOperator::Multiply),
                 ],
                 &[],
@@ -529,11 +529,11 @@ mod tests_move_expressions {
             ),
             TestEntry::new(
                 &[
-                    ExpressionArgs::Register(RegisterId::R7),
+                    ExpressionArgs::Register(RegisterId::ER7),
                     ExpressionArgs::Operator(ExpressionOperator::Multiply),
-                    ExpressionArgs::Register(RegisterId::R8),
+                    ExpressionArgs::Register(RegisterId::ER8),
                     ExpressionArgs::Operator(ExpressionOperator::Multiply),
-                    ExpressionArgs::Register(RegisterId::R6),
+                    ExpressionArgs::Register(RegisterId::ER6),
                 ],
                 &[],
                 0,
@@ -555,10 +555,10 @@ mod tests_move_expressions {
             ),
             TestEntry::new(
                 &[
-                    ExpressionArgs::Register(RegisterId::R7),
+                    ExpressionArgs::Register(RegisterId::ER7),
                     ExpressionArgs::Operator(ExpressionOperator::Multiply),
-                    ExpressionArgs::Register(RegisterId::R8),
-                    ExpressionArgs::Register(RegisterId::R6),
+                    ExpressionArgs::Register(RegisterId::ER8),
+                    ExpressionArgs::Register(RegisterId::ER6),
                     ExpressionArgs::Operator(ExpressionOperator::Multiply),
                 ],
                 &[],

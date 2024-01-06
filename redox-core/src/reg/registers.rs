@@ -11,27 +11,16 @@ use super::register::{RegisterF32, RegisterPermission, RegisterU32};
 #[repr(u8)]
 pub enum RegisterId {
     // Layout
-    // bits  : 8 16 24 32
-    // bytes : 1 2  3  4
-
-    // Bits  : 8 16
-    // Bytes : 1  2
-    // Data register 1: two highest order bytes.
-    //AX,
-    // Bits  : 16
-    // Byte  : 2
-    // Data register 1: second highest order byte.
-    //AH,
-    // Bits  : 8
-    // Byte  : 1
-    // Data register 1 - highest order byte.
-    //AL,
+    // bits  : 8     16     24     32
+    // bytes : 1     2      3      4
+    //               [      R1X     ]
+    //               [  R1L ][  R1H ]
 
     // [ User Registers ] //
     /// Data register 1.
     #[default]
-    R1,
-    /// Data register 1, two highest order bytes.
+    ER1,
+    /// Data register 1, two lowest order bytes.
     //R1X,
     /// Data register 1, highest order byte.
     //R1H,
@@ -39,38 +28,38 @@ pub enum RegisterId {
     //R1L,
 
     /// Data register 2.
-    R2,
+    ER2,
     /// Data register 3.
-    R3,
+    ER3,
     /// Data register 4.
-    R4,
+    ER4,
     /// Data register 5.
-    R5,
+    ER5,
     /// Data register 6.
-    R6,
+    ER6,
     /// Data register 7.
-    R7,
+    ER7,
     /// Data register 8.
-    R8,
+    ER8,
 
     /// Float data register 1.
     F1,
 
     // [ System Registers ] //
     /// Accumulator register.
-    AC,
+    EAC,
     /// Instruction pointer register.
-    IP,
-    /// The stack frame base pointer.
-    BP,
+    EIP,
+    /// Stack frame base pointer.
+    EBP,
     /// Stack pointer register.
-    SP,
+    ESP,
     /// CPU flags register.
     FL,
     /// Program counter register.
-    PC,
+    EPC,
     /// Interrupt mask register.
-    IM,
+    EIM,
 
     // [ Segment Registers ] //
     /// Stack segment register.
@@ -88,24 +77,24 @@ pub enum RegisterId {
 impl Display for RegisterId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let printable = match *self {
-            RegisterId::R1 => "R1",
-            RegisterId::R2 => "R2",
-            RegisterId::R3 => "R3",
-            RegisterId::R4 => "R4",
-            RegisterId::R5 => "R5",
-            RegisterId::R6 => "R6",
-            RegisterId::R7 => "R7",
-            RegisterId::R8 => "R8",
+            RegisterId::ER1 => "R1",
+            RegisterId::ER2 => "R2",
+            RegisterId::ER3 => "R3",
+            RegisterId::ER4 => "R4",
+            RegisterId::ER5 => "R5",
+            RegisterId::ER6 => "R6",
+            RegisterId::ER7 => "R7",
+            RegisterId::ER8 => "R8",
             RegisterId::F1 => "F1",
-            RegisterId::AC => "AC",
+            RegisterId::EAC => "AC",
 
-            RegisterId::IP => "IP",
-            RegisterId::BP => "BP",
-            RegisterId::SP => "SP",
+            RegisterId::EIP => "IP",
+            RegisterId::EBP => "BP",
+            RegisterId::ESP => "SP",
 
             RegisterId::FL => "FL",
-            RegisterId::IM => "IM",
-            RegisterId::PC => "PC",
+            RegisterId::EIM => "IM",
+            RegisterId::EPC => "PC",
 
             RegisterId::SS => "SS",
             RegisterId::CS => "CS",
@@ -181,22 +170,22 @@ impl Registers {
         Self {
             registers_u32: HashMap::from([
                 // [ User Registers ] //
-                register_u32!(RegisterId::R1, &rw, 0),
-                register_u32!(RegisterId::R2, &rw, 0),
-                register_u32!(RegisterId::R3, &rw, 0),
-                register_u32!(RegisterId::R4, &rw, 0),
-                register_u32!(RegisterId::R5, &rw, 0),
-                register_u32!(RegisterId::R6, &rw, 0),
-                register_u32!(RegisterId::R7, &rw, 0),
-                register_u32!(RegisterId::R8, &rw, 0),
+                register_u32!(RegisterId::ER1, &rw, 0),
+                register_u32!(RegisterId::ER2, &rw, 0),
+                register_u32!(RegisterId::ER3, &rw, 0),
+                register_u32!(RegisterId::ER4, &rw, 0),
+                register_u32!(RegisterId::ER5, &rw, 0),
+                register_u32!(RegisterId::ER6, &rw, 0),
+                register_u32!(RegisterId::ER7, &rw, 0),
+                register_u32!(RegisterId::ER8, &rw, 0),
                 // [ System Registers ] //
-                register_u32!(RegisterId::AC, &rw, 0),
-                register_u32!(RegisterId::IP, &rw, BOOT_MEMORY_START as u32),
-                register_u32!(RegisterId::BP, &prpw, 0),
-                register_u32!(RegisterId::SP, &prpw, 0),
+                register_u32!(RegisterId::EAC, &rw, 0),
+                register_u32!(RegisterId::EIP, &rw, BOOT_MEMORY_START as u32),
+                register_u32!(RegisterId::EBP, &prpw, 0),
+                register_u32!(RegisterId::ESP, &prpw, 0),
                 register_u32!(RegisterId::FL, &rpw, 0),
-                register_u32!(RegisterId::PC, &rpw, 0),
-                register_u32!(RegisterId::IM, &rpw, 0),
+                register_u32!(RegisterId::EPC, &rpw, 0),
+                register_u32!(RegisterId::EIM, &rpw, 0),
                 // [ Segment Registers ] //
                 register_u32!(RegisterId::SS, &rpw, 0),
                 register_u32!(RegisterId::CS, &rpw, 0),

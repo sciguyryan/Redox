@@ -237,86 +237,86 @@ mod tests_compiler {
         for opcode in OpCode::iter() {
             let ins = match opcode {
                 OpCode::Nop => Instruction::Nop,
-                OpCode::AddU32ImmU32Reg => Instruction::AddU32ImmU32Reg(0x123, R2),
-                OpCode::AddU32RegU32Reg => Instruction::AddU32RegU32Reg(R2, R3),
-                OpCode::SubU32ImmU32Reg => Instruction::SubU32ImmU32Reg(0x123, R2),
-                OpCode::SubU32RegU32Imm => Instruction::SubU32RegU32Imm(R2, 0x123),
-                OpCode::SubU32RegU32Reg => Instruction::SubU32RegU32Reg(R2, R3),
-                OpCode::MulU32ImmU32Reg => Instruction::MulU32ImmU32Reg(0x123, R2),
-                OpCode::MulU32RegU32Reg => Instruction::MulU32RegU32Reg(R2, R3),
-                OpCode::DivU32ImmU32Reg => Instruction::DivU32ImmU32Reg(0x123, R2),
-                OpCode::DivU32RegU32Imm => Instruction::DivU32RegU32Imm(R2, 0x123),
-                OpCode::DivU32RegU32Reg => Instruction::DivU32RegU32Reg(R2, R3),
-                OpCode::ModU32ImmU32Reg => Instruction::ModU32ImmU32Reg(0x123, R2),
-                OpCode::ModU32RegU32Imm => Instruction::ModU32RegU32Imm(R2, 0x123),
-                OpCode::ModU32RegU32Reg => Instruction::ModU32RegU32Reg(R2, R3),
-                OpCode::IncU32Reg => Instruction::IncU32Reg(R2),
-                OpCode::DecU32Reg => Instruction::DecU32Reg(R2),
-                OpCode::AndU32ImmU32Reg => Instruction::AndU32ImmU32Reg(0x123, R2),
-                OpCode::LeftShiftU32ImmU32Reg => Instruction::LeftShiftU32ImmU32Reg(31, R2),
-                OpCode::LeftShiftU32RegU32Reg => Instruction::LeftShiftU32RegU32Reg(R2, R3),
+                OpCode::AddU32ImmU32Reg => Instruction::AddU32ImmU32Reg(0x123, ER2),
+                OpCode::AddU32RegU32Reg => Instruction::AddU32RegU32Reg(ER2, ER3),
+                OpCode::SubU32ImmU32Reg => Instruction::SubU32ImmU32Reg(0x123, ER2),
+                OpCode::SubU32RegU32Imm => Instruction::SubU32RegU32Imm(ER2, 0x123),
+                OpCode::SubU32RegU32Reg => Instruction::SubU32RegU32Reg(ER2, ER3),
+                OpCode::MulU32ImmU32Reg => Instruction::MulU32ImmU32Reg(0x123, ER2),
+                OpCode::MulU32RegU32Reg => Instruction::MulU32RegU32Reg(ER2, ER3),
+                OpCode::DivU32ImmU32Reg => Instruction::DivU32ImmU32Reg(0x123, ER2),
+                OpCode::DivU32RegU32Imm => Instruction::DivU32RegU32Imm(ER2, 0x123),
+                OpCode::DivU32RegU32Reg => Instruction::DivU32RegU32Reg(ER2, ER3),
+                OpCode::ModU32ImmU32Reg => Instruction::ModU32ImmU32Reg(0x123, ER2),
+                OpCode::ModU32RegU32Imm => Instruction::ModU32RegU32Imm(ER2, 0x123),
+                OpCode::ModU32RegU32Reg => Instruction::ModU32RegU32Reg(ER2, ER3),
+                OpCode::IncU32Reg => Instruction::IncU32Reg(ER2),
+                OpCode::DecU32Reg => Instruction::DecU32Reg(ER2),
+                OpCode::AndU32ImmU32Reg => Instruction::AndU32ImmU32Reg(0x123, ER2),
+                OpCode::LeftShiftU32ImmU32Reg => Instruction::LeftShiftU32ImmU32Reg(31, ER2),
+                OpCode::LeftShiftU32RegU32Reg => Instruction::LeftShiftU32RegU32Reg(ER2, ER3),
                 OpCode::ArithLeftShiftU32ImmU32Reg => {
-                    Instruction::ArithLeftShiftU32ImmU32Reg(31, R2)
+                    Instruction::ArithLeftShiftU32ImmU32Reg(31, ER2)
                 }
                 OpCode::ArithLeftShiftU32RegU32Reg => {
-                    Instruction::ArithLeftShiftU32RegU32Reg(R2, R3)
+                    Instruction::ArithLeftShiftU32RegU32Reg(ER2, ER3)
                 }
-                OpCode::RightShiftU32ImmU32Reg => Instruction::RightShiftU32ImmU32Reg(31, R2),
-                OpCode::RightShiftU32RegU32Reg => Instruction::RightShiftU32RegU32Reg(R2, R3),
+                OpCode::RightShiftU32ImmU32Reg => Instruction::RightShiftU32ImmU32Reg(31, ER2),
+                OpCode::RightShiftU32RegU32Reg => Instruction::RightShiftU32RegU32Reg(ER2, ER3),
                 OpCode::ArithRightShiftU32ImmU32Reg => {
-                    Instruction::ArithRightShiftU32ImmU32Reg(31, R2)
+                    Instruction::ArithRightShiftU32ImmU32Reg(31, ER2)
                 }
                 OpCode::ArithRightShiftU32RegU32Reg => {
-                    Instruction::ArithRightShiftU32RegU32Reg(R2, R3)
+                    Instruction::ArithRightShiftU32RegU32Reg(ER2, ER3)
                 }
                 OpCode::Int => Instruction::Int(0xdeadbeef),
                 OpCode::IntRet => Instruction::IntRet,
                 OpCode::JumpAbsU32Imm => Instruction::JumpAbsU32Imm(0xdeadbeef),
-                OpCode::JumpAbsU32Reg => Instruction::JumpAbsU32Reg(R1),
-                OpCode::SwapU32RegU32Reg => Instruction::SwapU32RegU32Reg(R2, R3),
-                OpCode::MovU32ImmU32Reg => Instruction::MovU32ImmU32Reg(0x123, R2),
-                OpCode::MovU32RegU32Reg => Instruction::MovU32RegU32Reg(R2, R3),
+                OpCode::JumpAbsU32Reg => Instruction::JumpAbsU32Reg(ER1),
+                OpCode::SwapU32RegU32Reg => Instruction::SwapU32RegU32Reg(ER2, ER3),
+                OpCode::MovU32ImmU32Reg => Instruction::MovU32ImmU32Reg(0x123, ER2),
+                OpCode::MovU32RegU32Reg => Instruction::MovU32RegU32Reg(ER2, ER3),
                 OpCode::MovU32ImmMemSimple => Instruction::MovU32ImmMemSimple(0x123, 0x321),
-                OpCode::MovU32RegMemSimple => Instruction::MovU32RegMemSimple(R2, 0x123),
-                OpCode::MovMemU32RegSimple => Instruction::MovMemU32RegSimple(0x123, R2),
-                OpCode::MovU32RegPtrU32RegSimple => Instruction::MovU32RegPtrU32RegSimple(R2, R3),
+                OpCode::MovU32RegMemSimple => Instruction::MovU32RegMemSimple(ER2, 0x123),
+                OpCode::MovMemU32RegSimple => Instruction::MovMemU32RegSimple(0x123, ER2),
+                OpCode::MovU32RegPtrU32RegSimple => Instruction::MovU32RegPtrU32RegSimple(ER2, ER3),
                 OpCode::MovU32ImmMemExpr => Instruction::MovU32ImmMemExpr(0x123, 0x321),
-                OpCode::MovMemExprU32Reg => Instruction::MovMemExprU32Reg(0x123, R2),
-                OpCode::MovU32RegMemExpr => Instruction::MovU32RegMemExpr(R2, 0x123),
-                OpCode::ByteSwapU32 => Instruction::ByteSwapU32(R2),
+                OpCode::MovMemExprU32Reg => Instruction::MovMemExprU32Reg(0x123, ER2),
+                OpCode::MovU32RegMemExpr => Instruction::MovU32RegMemExpr(ER2, 0x123),
+                OpCode::ByteSwapU32 => Instruction::ByteSwapU32(ER2),
                 OpCode::ZeroHighBitsByIndexU32Reg => {
-                    Instruction::ZeroHighBitsByIndexU32Reg(R2, R3, R4)
+                    Instruction::ZeroHighBitsByIndexU32Reg(ER2, ER3, ER4)
                 }
                 OpCode::ZeroHighBitsByIndexU32RegU32Imm => {
-                    Instruction::ZeroHighBitsByIndexU32RegU32Imm(0x123, R2, R3)
+                    Instruction::ZeroHighBitsByIndexU32RegU32Imm(0x123, ER2, ER3)
                 }
                 OpCode::PushU32Imm => Instruction::PushU32Imm(0x123),
-                OpCode::BitTestU32Reg => Instruction::BitTestU32Reg(0x40, R2),
+                OpCode::BitTestU32Reg => Instruction::BitTestU32Reg(0x40, ER2),
                 OpCode::BitTestU32Mem => Instruction::BitTestU32Mem(0x40, 0x123),
-                OpCode::BitTestResetU32Reg => Instruction::BitTestResetU32Reg(0x40, R2),
+                OpCode::BitTestResetU32Reg => Instruction::BitTestResetU32Reg(0x40, ER2),
                 OpCode::BitTestResetU32Mem => Instruction::BitTestResetU32Mem(0x40, 0x123),
-                OpCode::BitTestSetU32Reg => Instruction::BitTestSetU32Reg(0x40, R2),
+                OpCode::BitTestSetU32Reg => Instruction::BitTestSetU32Reg(0x40, ER2),
                 OpCode::BitTestSetU32Mem => Instruction::BitTestSetU32Mem(0x40, 0x123),
                 OpCode::BitScanReverseU32RegU32Reg => {
-                    Instruction::BitScanReverseU32RegU32Reg(R2, R3)
+                    Instruction::BitScanReverseU32RegU32Reg(ER2, ER3)
                 }
                 OpCode::BitScanReverseU32MemU32Reg => {
-                    Instruction::BitScanReverseU32MemU32Reg(0x123, R2)
+                    Instruction::BitScanReverseU32MemU32Reg(0x123, ER2)
                 }
                 OpCode::BitScanReverseU32RegMemU32 => {
-                    Instruction::BitScanReverseU32RegMemU32(R2, 0x123)
+                    Instruction::BitScanReverseU32RegMemU32(ER2, 0x123)
                 }
                 OpCode::BitScanReverseU32MemU32Mem => {
                     Instruction::BitScanReverseU32MemU32Mem(0x123, 0x321)
                 }
                 OpCode::BitScanForwardU32RegU32Reg => {
-                    Instruction::BitScanForwardU32RegU32Reg(R2, R3)
+                    Instruction::BitScanForwardU32RegU32Reg(ER2, ER3)
                 }
                 OpCode::BitScanForwardU32MemU32Reg => {
-                    Instruction::BitScanForwardU32MemU32Reg(0x123, R2)
+                    Instruction::BitScanForwardU32MemU32Reg(0x123, ER2)
                 }
                 OpCode::BitScanForwardU32RegMemU32 => {
-                    Instruction::BitScanForwardU32RegMemU32(R2, 0x123)
+                    Instruction::BitScanForwardU32RegMemU32(ER2, 0x123)
                 }
                 OpCode::BitScanForwardU32MemU32Mem => {
                     Instruction::BitScanForwardU32MemU32Mem(0x123, 0x321)
