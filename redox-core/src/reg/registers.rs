@@ -77,24 +77,24 @@ pub enum RegisterId {
 impl Display for RegisterId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let printable = match *self {
-            RegisterId::ER1 => "R1",
-            RegisterId::ER2 => "R2",
-            RegisterId::ER3 => "R3",
-            RegisterId::ER4 => "R4",
-            RegisterId::ER5 => "R5",
-            RegisterId::ER6 => "R6",
-            RegisterId::ER7 => "R7",
-            RegisterId::ER8 => "R8",
+            RegisterId::ER1 => "ER1",
+            RegisterId::ER2 => "ER2",
+            RegisterId::ER3 => "ER3",
+            RegisterId::ER4 => "ER4",
+            RegisterId::ER5 => "ER5",
+            RegisterId::ER6 => "ER6",
+            RegisterId::ER7 => "ER7",
+            RegisterId::ER8 => "ER8",
             RegisterId::F1 => "F1",
-            RegisterId::EAC => "AC",
+            RegisterId::EAC => "EAC",
 
-            RegisterId::EIP => "IP",
-            RegisterId::EBP => "BP",
-            RegisterId::ESP => "SP",
+            RegisterId::EIP => "EIP",
+            RegisterId::EBP => "EBP",
+            RegisterId::ESP => "ESP",
 
             RegisterId::FL => "FL",
-            RegisterId::EIM => "IM",
-            RegisterId::EPC => "PC",
+            RegisterId::EIM => "EIM",
+            RegisterId::EPC => "EPC",
 
             RegisterId::SS => "SS",
             RegisterId::CS => "CS",
