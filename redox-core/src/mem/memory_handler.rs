@@ -549,6 +549,11 @@ impl MemoryHandler {
 
                 Instruction::PushU32Imm(imm)
             }
+            PopU32ImmU32Reg => {
+                let out_reg = Self::read_register_id(arg_bytes, &mut cursor);
+
+                Instruction::PopU32ImmU32Reg(out_reg)
+            }
 
             /******** [Logic Instructions] ********/
             BitTestU32Reg => {

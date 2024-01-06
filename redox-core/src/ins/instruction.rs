@@ -113,6 +113,8 @@ pub enum Instruction {
     ZeroHighBitsByIndexU32RegU32Imm(u32, RegisterId, RegisterId),
     /// Push a u32 immediate value onto the stack.
     PushU32Imm(u32),
+    /// Pop a u32 value from the stack to a u32 register.
+    PopU32ImmU32Reg(RegisterId),
 
     /******** [Logic Instructions] ********/
     /// Test the state of a bit from a u32 register. The CF flag will be set to the state of the bit.
@@ -301,6 +303,9 @@ impl Display for Instruction {
             Instruction::PushU32Imm(index) => {
                 format!("push ${index:04x}")
             }
+            Instruction::PopU32ImmU32Reg(out_reg) => {
+                format!("pop %{out_reg}")
+            }
 
             /******** [Logic Instructions] ********/
             Instruction::BitTestU32Reg(bit, reg) => {
@@ -434,6 +439,7 @@ impl Instruction {
                 ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE + ARG_REG_ID_SIZE
             }
             OpCode::PushU32Imm => ARG_U32_IMM_SIZE,
+            OpCode::PopU32ImmU32Reg => ARG_REG_ID_SIZE,
 
             /******** [Logic Instructions] ********/
             OpCode::BitTestU32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,

@@ -20,7 +20,7 @@ pub enum RegisterId {
     /// Data register 1.
     #[default]
     ER1,
-    /// Data register 1, two lowest order bytes.
+    /// Data register 1, two highest order bytes.
     //R1X,
     /// Data register 1, highest order byte.
     //R1H,
@@ -55,7 +55,7 @@ pub enum RegisterId {
     /// Stack pointer register.
     ESP,
     /// CPU flags register.
-    FL,
+    EFL,
     /// Program counter register.
     EPC,
     /// Interrupt mask register.
@@ -63,11 +63,11 @@ pub enum RegisterId {
 
     // [ Segment Registers ] //
     /// Stack segment register.
-    SS,
+    ESS,
     /// Code segment register.
-    CS,
+    ECS,
     /// Data segment register.
-    DS,
+    EDS,
 
     // [ Test Registers ] //
     #[cfg(test)]
@@ -92,18 +92,18 @@ impl Display for RegisterId {
             RegisterId::EBP => "EBP",
             RegisterId::ESP => "ESP",
 
-            RegisterId::FL => "FL",
+            RegisterId::EFL => "EFL",
             RegisterId::EIM => "EIM",
             RegisterId::EPC => "EPC",
 
-            RegisterId::SS => "SS",
-            RegisterId::CS => "CS",
-            RegisterId::DS => "DS",
+            RegisterId::ESS => "ESS",
+            RegisterId::ECS => "ECS",
+            RegisterId::EDS => "EDS",
 
             #[cfg(test)]
             RegisterId::TEST0 => "TEST0",
         };
-        write!(f, "{}", printable)
+        write!(f, "{printable}")
     }
 }
 
@@ -183,13 +183,13 @@ impl Registers {
                 register_u32!(RegisterId::EIP, &rw, BOOT_MEMORY_START as u32),
                 register_u32!(RegisterId::EBP, &prpw, 0),
                 register_u32!(RegisterId::ESP, &prpw, 0),
-                register_u32!(RegisterId::FL, &rpw, 0),
+                register_u32!(RegisterId::EFL, &rpw, 0),
                 register_u32!(RegisterId::EPC, &rpw, 0),
                 register_u32!(RegisterId::EIM, &rpw, 0),
                 // [ Segment Registers ] //
-                register_u32!(RegisterId::SS, &rpw, 0),
-                register_u32!(RegisterId::CS, &rpw, 0),
-                register_u32!(RegisterId::DS, &rpw, 0),
+                register_u32!(RegisterId::ESS, &rpw, 0),
+                register_u32!(RegisterId::ECS, &rpw, 0),
+                register_u32!(RegisterId::EDS, &rpw, 0),
                 // [ Test Registers ] //
                 #[cfg(test)]
                 register_u32!(RegisterId::TEST0, &prpw, 0),
@@ -252,7 +252,7 @@ impl Registers {
                 let mut other_val = other_reg.read_unchecked().to_string();
 
                 // We want to show the flags (rather than the value) for simplicity.
-                if self_reg.id == RegisterId::FL {
+                if self_reg.id == RegisterId::EFL {
                     self_val = format!("[{}]", self_reg.get_flags_register_string());
                     other_val = format!("[{}]", other_reg.get_flags_register_string());
                 }
@@ -314,7 +314,7 @@ impl Registers {
             let formatted_value = format!("{reg_value:0>8X}");
             let mut notes = String::new();
 
-            if reg.id == RegisterId::FL {
+            if reg.id == RegisterId::EFL {
                 notes = reg.get_flags_register_string();
             }
 

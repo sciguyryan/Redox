@@ -25,13 +25,13 @@ impl BootRom {
             Instruction::MovU32ImmU32Reg(mem.stack_segment_end as u32, RegisterId::EBP),
             Instruction::MovU32ImmU32Reg(mem.stack_segment_end as u32, RegisterId::ESP),
             // Setup the segment registers.
-            Instruction::MovU32ImmU32Reg(mem.stack_segment_start as u32, RegisterId::SS),
-            Instruction::MovU32ImmU32Reg(mem.code_segment_start as u32, RegisterId::CS),
-            Instruction::MovU32ImmU32Reg(mem.data_segment_start as u32, RegisterId::DS),
+            Instruction::MovU32ImmU32Reg(mem.stack_segment_start as u32, RegisterId::ESS),
+            Instruction::MovU32ImmU32Reg(mem.code_segment_start as u32, RegisterId::ECS),
+            Instruction::MovU32ImmU32Reg(mem.data_segment_start as u32, RegisterId::EDS),
             // Enable CPU interrupts.
-            Instruction::MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::IF]), RegisterId::FL),
+            Instruction::MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::IF]), RegisterId::EFL),
             // Jump to the start of the user executable code.
-            Instruction::JumpAbsU32Reg(RegisterId::CS),
+            Instruction::JumpAbsU32Reg(RegisterId::ECS),
         ];
 
         let mut compiler = Compiler::new();

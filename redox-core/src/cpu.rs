@@ -889,10 +889,16 @@ impl Cpu {
                 // push imm
                 mem.push_u32(*imm);
 
-                // Update the stack pointer register. The
+                // Update the stack pointer register.
                 self.registers
                     .get_register_u32_mut(RegisterId::ESP)
                     .subtract_unchecked(4);
+            }
+            PopU32ImmU32Reg(out_reg) => {
+                // pop %out_reg
+                self.registers
+                    .get_register_u32_mut(*out_reg)
+                    .write(mem.pop_u32(), privilege);
             }
 
             /******** [Logic Instructions] ********/
@@ -1035,7 +1041,7 @@ impl Cpu {
     /// * `state` - The new state of the flag.
     #[inline(always)]
     pub fn set_flag_state(&mut self, flag: CpuFlag, state: bool) {
-        let register = self.registers.get_register_u32_mut(RegisterId::FL);
+        let register = self.registers.get_register_u32_mut(RegisterId::EFL);
         let flags = utils::set_bit_state(*register.read_unchecked(), flag.into(), state);
         register.write_unchecked(flags);
     }
@@ -1080,15 +1086,15 @@ impl Cpu {
     #[inline(always)]
     pub fn set_segment_registers(&mut self, mem: &MemoryHandler) {
         self.registers
-            .get_register_u32_mut(RegisterId::SS)
+            .get_register_u32_mut(RegisterId::ESS)
             .write_unchecked(mem.stack_segment_start as u32);
 
         self.registers
-            .get_register_u32_mut(RegisterId::CS)
+            .get_register_u32_mut(RegisterId::ECS)
             .write_unchecked(mem.code_segment_start as u32);
 
         self.registers
-            .get_register_u32_mut(RegisterId::DS)
+            .get_register_u32_mut(RegisterId::EDS)
             .write_unchecked(mem.data_segment_start as u32);
     }
 
@@ -1571,7 +1577,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0x1),
                     (RegisterId::EAC, 0x3),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
@@ -1589,7 +1595,7 @@ mod tests_cpu {
                     (RegisterId::ER1, u32::MAX),
                     (RegisterId::EAC, 0x1),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::IF]),
                     ),
                 ],
@@ -1601,7 +1607,7 @@ mod tests_cpu {
             TestU32::new(
                 &[AddU32ImmU32Reg(0, RegisterId::ER1)],
                 &[(
-                    RegisterId::FL,
+                    RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
                 None,
@@ -1613,14 +1619,14 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Clear any set flags.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0x2, RegisterId::ER1),
                     AddU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[
                     (RegisterId::ER1, 0x2),
                     (RegisterId::EAC, 0x3),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::PF])),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
                 None,
                 0,
@@ -1631,14 +1637,14 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the parity flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::PF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::PF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x1, RegisterId::ER1),
                     AddU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[
                     (RegisterId::ER1, 0x1),
                     (RegisterId::EAC, 0x2),
-                    (RegisterId::FL, 0x0),
+                    (RegisterId::EFL, 0x0),
                 ],
                 None,
                 0,
@@ -1649,7 +1655,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Clear every flag.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
                     AddU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
@@ -1657,7 +1663,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b0111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::EAC, 0b1000_0000_0000_0000_0000_0000_0000_0000),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
@@ -1670,14 +1676,14 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x1, RegisterId::ER1),
                     AddU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[
                     (RegisterId::ER1, 0x1),
                     (RegisterId::EAC, 0x2),
-                    (RegisterId::FL, 0x0),
+                    (RegisterId::EFL, 0x0),
                 ],
                 None,
                 0,
@@ -1720,7 +1726,7 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x2),
                     (RegisterId::EAC, 0x1),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::IF]),
                     ),
                 ],
@@ -1732,7 +1738,7 @@ mod tests_cpu {
             TestU32::new(
                 &[AddU32RegU32Reg(RegisterId::ER1, RegisterId::ER2)],
                 &[(
-                    RegisterId::FL,
+                    RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
                 None,
@@ -1744,7 +1750,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Clear every flag.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0x2, RegisterId::ER1),
                     MovU32ImmU32Reg(0x1, RegisterId::ER2),
                     AddU32RegU32Reg(RegisterId::ER1, RegisterId::ER2),
@@ -1753,7 +1759,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0x2),
                     (RegisterId::ER2, 0x1),
                     (RegisterId::EAC, 0x3),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::PF])),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
                 None,
                 0,
@@ -1764,14 +1770,14 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the parity flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::PF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::PF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x1, RegisterId::ER1),
                     AddU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[
                     (RegisterId::ER1, 0x1),
                     (RegisterId::EAC, 0x2),
-                    (RegisterId::FL, 0x0),
+                    (RegisterId::EFL, 0x0),
                 ],
                 None,
                 0,
@@ -1782,7 +1788,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Clear every flag.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
                     MovU32ImmU32Reg(0x1, RegisterId::ER2),
                     AddU32RegU32Reg(RegisterId::ER1, RegisterId::ER2),
@@ -1792,7 +1798,7 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x1),
                     (RegisterId::EAC, 0b1000_0000_0000_0000_0000_0000_0000_0000),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
@@ -1805,7 +1811,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x1, RegisterId::ER1),
                     MovU32ImmU32Reg(0x1, RegisterId::ER2),
                     AddU32RegU32Reg(RegisterId::ER1, RegisterId::ER2),
@@ -1814,7 +1820,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0x1),
                     (RegisterId::ER2, 0x1),
                     (RegisterId::EAC, 0x2),
-                    (RegisterId::FL, 0x0),
+                    (RegisterId::EFL, 0x0),
                 ],
                 None,
                 0,
@@ -1850,7 +1856,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0x2),
                     (RegisterId::EAC, 0x3),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
@@ -1862,7 +1868,7 @@ mod tests_cpu {
             TestU32::new(
                 &[SubU32ImmU32Reg(0, RegisterId::ER1)],
                 &[(
-                    RegisterId::FL,
+                    RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
                 None,
@@ -1874,14 +1880,14 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Clear every flag.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0x4, RegisterId::ER1),
                     SubU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[
                     (RegisterId::ER1, 0x4),
                     (RegisterId::EAC, 0x3),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::PF])),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
                 None,
                 0,
@@ -1892,14 +1898,14 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the parity flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::PF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::PF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x2, RegisterId::ER1),
                     SubU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[
                     (RegisterId::ER1, 0x2),
                     (RegisterId::EAC, 0x1),
-                    (RegisterId::FL, 0x0),
+                    (RegisterId::EFL, 0x0),
                 ],
                 None,
                 0,
@@ -1910,14 +1916,14 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Clear any set flags.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
                     SubU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::EAC, 0b1111_1111_1111_1111_1111_1111_1111_1110),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::SF])),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::SF])),
                 ],
                 None,
                 0,
@@ -1928,14 +1934,14 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x2, RegisterId::ER1),
                     SubU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[
                     (RegisterId::ER1, 0x2),
                     (RegisterId::EAC, 0x1),
-                    (RegisterId::FL, 0x0),
+                    (RegisterId::EFL, 0x0),
                 ],
                 None,
                 0,
@@ -1971,7 +1977,7 @@ mod tests_cpu {
                     (RegisterId::ER1, u32::MAX),
                     (RegisterId::EAC, 0x3),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
@@ -1983,7 +1989,7 @@ mod tests_cpu {
             TestU32::new(
                 &[SubU32RegU32Imm(RegisterId::ER1, 0)],
                 &[(
-                    RegisterId::FL,
+                    RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
                 None,
@@ -1995,14 +2001,14 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Clear every flag.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0x1, RegisterId::ER1),
                     SubU32RegU32Imm(RegisterId::ER1, 0x4),
                 ],
                 &[
                     (RegisterId::ER1, 0x1),
                     (RegisterId::EAC, 0x3),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::PF])),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
                 None,
                 0,
@@ -2013,14 +2019,14 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the parity flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::PF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::PF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x1, RegisterId::ER1),
                     SubU32RegU32Imm(RegisterId::ER1, 0x2),
                 ],
                 &[
                     (RegisterId::ER1, 0x1),
                     (RegisterId::EAC, 0x1),
-                    (RegisterId::FL, 0x0),
+                    (RegisterId::EFL, 0x0),
                 ],
                 None,
                 0,
@@ -2031,14 +2037,14 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Clear every flag.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0x1, RegisterId::ER1),
                     SubU32RegU32Imm(RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                 ],
                 &[
                     (RegisterId::ER1, 0x1),
                     (RegisterId::EAC, 0b1111_1111_1111_1111_1111_1111_1111_1110),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::SF])),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::SF])),
                 ],
                 None,
                 0,
@@ -2049,14 +2055,14 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x1, RegisterId::ER1),
                     SubU32RegU32Imm(RegisterId::ER1, 0x2),
                 ],
                 &[
                     (RegisterId::ER1, 0x1),
                     (RegisterId::EAC, 0x1),
-                    (RegisterId::FL, 0x0),
+                    (RegisterId::EFL, 0x0),
                 ],
                 None,
                 0,
@@ -2099,7 +2105,7 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x2),
                     (RegisterId::EAC, 0x3),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
@@ -2111,7 +2117,7 @@ mod tests_cpu {
             TestU32::new(
                 &[SubU32RegU32Reg(RegisterId::ER1, RegisterId::ER2)],
                 &[(
-                    RegisterId::FL,
+                    RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
                 None,
@@ -2123,7 +2129,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Clear every flag.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0x1, RegisterId::ER1),
                     MovU32ImmU32Reg(0x4, RegisterId::ER2),
                     SubU32RegU32Reg(RegisterId::ER1, RegisterId::ER2),
@@ -2132,7 +2138,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0x1),
                     (RegisterId::ER2, 0x4),
                     (RegisterId::EAC, 0x3),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::PF])),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
                 None,
                 0,
@@ -2143,7 +2149,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the parity flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::PF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::PF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x1, RegisterId::ER1),
                     MovU32ImmU32Reg(0x2, RegisterId::ER2),
                     SubU32RegU32Reg(RegisterId::ER1, RegisterId::ER2),
@@ -2152,7 +2158,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0x1),
                     (RegisterId::ER2, 0x2),
                     (RegisterId::EAC, 0x1),
-                    (RegisterId::FL, 0x0),
+                    (RegisterId::EFL, 0x0),
                 ],
                 None,
                 0,
@@ -2163,7 +2169,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Clear every flag.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0x1, RegisterId::ER1),
                     MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER2),
                     SubU32RegU32Reg(RegisterId::ER1, RegisterId::ER2),
@@ -2172,7 +2178,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0x1),
                     (RegisterId::ER2, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::EAC, 0b1111_1111_1111_1111_1111_1111_1111_1110),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::SF])),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::SF])),
                 ],
                 None,
                 0,
@@ -2183,7 +2189,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x1, RegisterId::ER1),
                     MovU32ImmU32Reg(0x2, RegisterId::ER2),
                     SubU32RegU32Reg(RegisterId::ER1, RegisterId::ER2),
@@ -2192,7 +2198,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0x1),
                     (RegisterId::ER2, 0x2),
                     (RegisterId::EAC, 0x1),
-                    (RegisterId::FL, 0x0),
+                    (RegisterId::EFL, 0x0),
                 ],
                 None,
                 0,
@@ -2228,7 +2234,7 @@ mod tests_cpu {
                     (RegisterId::ER1, u32::MAX),
                     (RegisterId::EAC, 4294967294),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
@@ -2273,7 +2279,7 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x2),
                     (RegisterId::EAC, 4294967294),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
@@ -2564,7 +2570,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::ER1, 0),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[
                             CpuFlag::ZF,
                             CpuFlag::OF,
@@ -2582,13 +2588,13 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Clear every flag.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0x2, RegisterId::ER1),
                     IncU32Reg(RegisterId::ER1),
                 ],
                 &[
                     (RegisterId::ER1, 0x3),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::PF])),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
                 None,
                 0,
@@ -2599,10 +2605,10 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the parity flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::PF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::PF]), RegisterId::EFL),
                     IncU32Reg(RegisterId::ER1),
                 ],
-                &[(RegisterId::ER1, 0x1), (RegisterId::FL, 0x0)],
+                &[(RegisterId::ER1, 0x1), (RegisterId::EFL, 0x0)],
                 None,
                 0,
                 false,
@@ -2612,14 +2618,14 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Clear any set flags.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
                     IncU32Reg(RegisterId::ER1),
                 ],
                 &[
                     (RegisterId::ER1, 0b1000_0000_0000_0000_0000_0000_0000_0000),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
@@ -2632,10 +2638,10 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::EFL),
                     IncU32Reg(RegisterId::ER1),
                 ],
-                &[(RegisterId::ER1, 0x1), (RegisterId::FL, 0x0)],
+                &[(RegisterId::ER1, 0x1), (RegisterId::EFL, 0x0)],
                 None,
                 0,
                 false,
@@ -2658,7 +2664,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::ER1, 0x0),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
@@ -2672,7 +2678,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::ER1, u32::MAX),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[
                             CpuFlag::SF,
                             CpuFlag::OF,
@@ -2690,13 +2696,13 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Clear any set flags.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0x4, RegisterId::ER1),
                     DecU32Reg(RegisterId::ER1),
                 ],
                 &[
                     (RegisterId::ER1, 0x3),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::PF])),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
                 None,
                 0,
@@ -2707,11 +2713,11 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the parity flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::PF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::PF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x3, RegisterId::ER1),
                     DecU32Reg(RegisterId::ER1),
                 ],
-                &[(RegisterId::ER1, 0x2), (RegisterId::FL, 0x0)],
+                &[(RegisterId::ER1, 0x2), (RegisterId::EFL, 0x0)],
                 None,
                 0,
                 false,
@@ -2721,13 +2727,13 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Clear every flag.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
                     DecU32Reg(RegisterId::ER1),
                 ],
                 &[
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::SF])),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::SF])),
                 ],
                 None,
                 0,
@@ -2738,11 +2744,11 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x2, RegisterId::ER1),
                     DecU32Reg(RegisterId::ER1),
                 ],
-                &[(RegisterId::ER1, 0x1), (RegisterId::FL, 0x0)],
+                &[(RegisterId::ER1, 0x1), (RegisterId::EFL, 0x0)],
                 None,
                 0,
                 false,
@@ -2788,7 +2794,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0x2),
                     (RegisterId::EAC, 0x0),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
@@ -2803,7 +2809,7 @@ mod tests_cpu {
                     AndU32ImmU32Reg(0x3, RegisterId::ER1),
                 ],
                 &[(
-                    RegisterId::FL,
+                    RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
                 None,
@@ -2815,14 +2821,14 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Clear any set flags.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0x3, RegisterId::ER1),
                     AndU32ImmU32Reg(0x3, RegisterId::ER1),
                 ],
                 &[
                     (RegisterId::ER1, 0x3),
                     (RegisterId::EAC, 0x3),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::PF])),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
                 None,
                 0,
@@ -2833,14 +2839,14 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the parity flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::PF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::PF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x3, RegisterId::ER1),
                     AndU32ImmU32Reg(0x2, RegisterId::ER1),
                 ],
                 &[
                     (RegisterId::ER1, 0x3),
                     (RegisterId::EAC, 0x2),
-                    (RegisterId::FL, 0x0),
+                    (RegisterId::EFL, 0x0),
                 ],
                 None,
                 0,
@@ -2851,7 +2857,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Clear every flag.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
                     AndU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
                 ],
@@ -2859,7 +2865,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::EAC, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
@@ -2872,14 +2878,14 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x2, RegisterId::ER1),
                     AndU32ImmU32Reg(0x2, RegisterId::ER1),
                 ],
                 &[
                     (RegisterId::ER1, 0x2),
                     (RegisterId::EAC, 0x2),
-                    (RegisterId::FL, 0x0),
+                    (RegisterId::EFL, 0x0),
                 ],
                 None,
                 0,
@@ -2916,7 +2922,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1000),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
@@ -2935,7 +2941,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[
                             CpuFlag::SF,
                             CpuFlag::CF,
@@ -2956,7 +2962,7 @@ mod tests_cpu {
                     LeftShiftU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(
-                    RegisterId::FL,
+                    RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
                 None,
@@ -2968,13 +2974,13 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the overflow flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::OF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::OF]), RegisterId::EFL),
                     // This will unset the overflow flag and set the zero flag instead.
                     MovU32ImmU32Reg(0x0, RegisterId::ER1),
                     LeftShiftU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(
-                    RegisterId::FL,
+                    RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                 )],
                 None,
@@ -2995,11 +3001,11 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the parity flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::PF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::PF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x1, RegisterId::ER1),
                     LeftShiftU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
-                &[(RegisterId::ER1, 0x2), (RegisterId::FL, 0x0)],
+                &[(RegisterId::ER1, 0x2), (RegisterId::EFL, 0x0)],
                 None,
                 0,
                 false,
@@ -3021,14 +3027,14 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Clear every flag.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0b0100_0000_0000_0000_0000_0000_0000_0000, RegisterId::ER1),
                     LeftShiftU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[
                     (RegisterId::ER1, 0b1000_0000_0000_0000_0000_0000_0000_0000),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
@@ -3041,11 +3047,11 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x1, RegisterId::ER1),
                     LeftShiftU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
-                &[(RegisterId::ER1, 0x2), (RegisterId::FL, 0x0)],
+                &[(RegisterId::ER1, 0x2), (RegisterId::EFL, 0x0)],
                 None,
                 0,
                 false,
@@ -3084,7 +3090,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1000),
                     (RegisterId::ER2, 0x3),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
@@ -3105,7 +3111,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
                     (RegisterId::ER2, 0x1),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[
                             CpuFlag::SF,
                             CpuFlag::OF,
@@ -3130,7 +3136,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
                     (RegisterId::ER2, 0x1),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[
                             CpuFlag::SF,
                             CpuFlag::OF,
@@ -3154,7 +3160,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::ER2, 0x1),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
@@ -3167,7 +3173,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the overflow flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::OF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::OF]), RegisterId::EFL),
                     // This will unset the overflow flag and set the zero flag instead.
                     MovU32ImmU32Reg(0x0, RegisterId::ER1),
                     MovU32ImmU32Reg(0x1, RegisterId::ER2),
@@ -3176,7 +3182,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::ER2, 0x1),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                     ),
                 ],
@@ -3213,7 +3219,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Clear any set flags.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0b0100_0000_0000_0000_0000_0000_0000_0000, RegisterId::ER1),
                     MovU32ImmU32Reg(0x1, RegisterId::ER2),
                     LeftShiftU32RegU32Reg(RegisterId::ER2, RegisterId::ER1),
@@ -3222,7 +3228,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b1000_0000_0000_0000_0000_0000_0000_0000),
                     (RegisterId::ER2, 0x1),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
@@ -3235,7 +3241,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x1, RegisterId::ER1),
                     MovU32ImmU32Reg(0x1, RegisterId::ER2),
                     LeftShiftU32RegU32Reg(RegisterId::ER2, RegisterId::ER1),
@@ -3243,7 +3249,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::ER1, 0x2),
                     (RegisterId::ER2, 0x1),
-                    (RegisterId::FL, 0x0),
+                    (RegisterId::EFL, 0x0),
                 ],
                 None,
                 0,
@@ -3278,7 +3284,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1101),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::IF]),
                     ),
                 ],
@@ -3294,7 +3300,7 @@ mod tests_cpu {
                     ArithLeftShiftU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(
-                    RegisterId::FL,
+                    RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
                 None,
@@ -3318,14 +3324,14 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Clear any set flags.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0b0100_0000_0000_0000_0000_0000_0000_0000, RegisterId::ER1),
                     ArithLeftShiftU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[
                     (RegisterId::ER1, 0b1000_0000_0000_0000_0000_0000_0000_0000),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
@@ -3338,11 +3344,11 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x1, RegisterId::ER1),
                     ArithLeftShiftU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
-                &[(RegisterId::ER1, 0x2), (RegisterId::FL, 0x0)],
+                &[(RegisterId::ER1, 0x2), (RegisterId::EFL, 0x0)],
                 None,
                 0,
                 false,
@@ -3379,7 +3385,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1101),
                     (RegisterId::ER2, 0x1),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::IF]),
                     ),
                 ],
@@ -3398,7 +3404,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::ER2, 0x1),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
@@ -3423,7 +3429,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Clear any set flags.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0b0100_0000_0000_0000_0000_0000_0000_0000, RegisterId::ER1),
                     MovU32ImmU32Reg(0x1, RegisterId::ER2),
                     ArithLeftShiftU32RegU32Reg(RegisterId::ER2, RegisterId::ER1),
@@ -3432,7 +3438,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b1000_0000_0000_0000_0000_0000_0000_0000),
                     (RegisterId::ER2, 0x1),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
@@ -3445,7 +3451,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x1, RegisterId::ER1),
                     MovU32ImmU32Reg(0x1, RegisterId::ER2),
                     ArithLeftShiftU32RegU32Reg(RegisterId::ER2, RegisterId::ER1),
@@ -3453,7 +3459,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::ER1, 0x2),
                     (RegisterId::ER2, 0x1),
-                    (RegisterId::FL, 0x0),
+                    (RegisterId::EFL, 0x0),
                 ],
                 None,
                 0,
@@ -3485,7 +3491,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the overflow flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::OF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::OF]), RegisterId::EFL),
                     // Execute the test instruction.
                     MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
                     RightShiftU32ImmU32Reg(0x1, RegisterId::ER1),
@@ -3493,7 +3499,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::ER1, 0b0011_1111_1111_1111_1111_1111_1111_1111),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::PF]),
                     ),
                 ],
@@ -3507,14 +3513,14 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the overflow flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::OF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::OF]), RegisterId::EFL),
                     // Execute the test instruction.
                     MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1110, RegisterId::ER1),
                     RightShiftU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[
                     (RegisterId::ER1, 0b0011_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::PF])),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
                 None,
                 0,
@@ -3528,7 +3534,7 @@ mod tests_cpu {
                     RightShiftU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(
-                    RegisterId::FL,
+                    RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
                 None,
@@ -3561,14 +3567,14 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x1, RegisterId::ER1),
                     RightShiftU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[
                     (RegisterId::ER1, 0x0),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::CF, CpuFlag::PF]),
                     ),
                 ],
@@ -3603,7 +3609,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the overflow flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::OF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::OF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x1, RegisterId::ER2),
                     // Execute the test instruction.
                     MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
@@ -3613,7 +3619,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b0011_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::ER2, 0x1),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::PF]),
                     ),
                 ],
@@ -3627,7 +3633,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the overflow flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::OF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::OF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x1, RegisterId::ER2),
                     // Execute the test instruction.
                     MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1110, RegisterId::ER1),
@@ -3636,7 +3642,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::ER1, 0b0011_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::ER2, 0x1),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::PF])),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
                 None,
                 0,
@@ -3653,7 +3659,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::ER2, 0x1),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
@@ -3714,7 +3720,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::ER1, 0b1011_1111_1111_1111_1111_1111_1111_1111),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
@@ -3730,7 +3736,7 @@ mod tests_cpu {
                     ArithRightShiftU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(
-                    RegisterId::FL,
+                    RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
                 None,
@@ -3754,14 +3760,14 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Clear every flag.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0b0000_0000_0000_0000_0000_0000_0000_0001, RegisterId::ER1),
                     ArithRightShiftU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[
                     (RegisterId::ER1, 0b1000_0000_0000_0000_0000_0000_0000_0000),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
@@ -3774,11 +3780,11 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x2, RegisterId::ER1),
                     ArithRightShiftU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
-                &[(RegisterId::ER1, 0x1), (RegisterId::FL, 0x0)],
+                &[(RegisterId::ER1, 0x1), (RegisterId::EFL, 0x0)],
                 None,
                 0,
                 false,
@@ -3815,7 +3821,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b1011_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::ER2, 0x1),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
@@ -3834,7 +3840,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::ER2, 0x1),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
@@ -3859,7 +3865,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Clear every flag.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0b0000_0000_0000_0000_0000_0000_0000_0001, RegisterId::ER1),
                     MovU32ImmU32Reg(0x1, RegisterId::ER2),
                     ArithRightShiftU32RegU32Reg(RegisterId::ER2, RegisterId::ER1),
@@ -3868,7 +3874,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b1000_0000_0000_0000_0000_0000_0000_0000),
                     (RegisterId::ER2, 0x1),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
@@ -3881,7 +3887,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x2, RegisterId::ER1),
                     MovU32ImmU32Reg(0x1, RegisterId::ER2),
                     ArithRightShiftU32RegU32Reg(RegisterId::ER2, RegisterId::ER1),
@@ -3889,7 +3895,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::ER1, 0x1),
                     (RegisterId::ER2, 0x1),
-                    (RegisterId::FL, 0x0),
+                    (RegisterId::EFL, 0x0),
                 ],
                 None,
                 0,
@@ -4652,7 +4658,7 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x4),
                     (RegisterId::ER3, 0b0000_1111_1111_1111_1111_1111_1111_1111),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
@@ -4672,7 +4678,7 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x18),
                     (RegisterId::ER3, 0b0000_0000_0000_0000_0000_0000_1111_1111),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
@@ -4692,7 +4698,7 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x19),
                     (RegisterId::ER3, 0b0000_0000_0000_0000_0000_0000_0111_1111),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
@@ -4724,7 +4730,7 @@ mod tests_cpu {
                     ZeroHighBitsByIndexU32Reg(RegisterId::ER2, RegisterId::ER1, RegisterId::ER3),
                 ],
                 &[(
-                    RegisterId::FL,
+                    RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
                 )],
                 None,
@@ -4735,14 +4741,14 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the overflow flag state.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::OF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::OF]), RegisterId::EFL),
                     ZeroHighBitsByIndexU32Reg(
                         RegisterId::ER1, // Already has the value of 0.
                         RegisterId::ER2, // Already has the value of 0.
                         RegisterId::ER3,
                     ),
                 ],
-                &[(RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::ZF]))],
+                &[(RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::ZF]))],
                 None,
                 0,
                 false,
@@ -4767,7 +4773,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Clear every flag.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
                     MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER3),
                     ZeroHighBitsByIndexU32Reg(
@@ -4780,7 +4786,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::ER3, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::CF]),
                     ),
                 ],
@@ -4793,7 +4799,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
                     MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER3),
                     ZeroHighBitsByIndexU32Reg(
@@ -4805,7 +4811,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::ER1, 0b0111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::ER3, 0b0111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::CF])),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
                 ],
                 None,
                 0,
@@ -4830,7 +4836,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::ER2, 0b0000_1111_1111_1111_1111_1111_1111_1111),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
@@ -4848,7 +4854,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::ER2, 0b0000_0000_0000_0000_0000_0000_1111_1111),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
@@ -4866,7 +4872,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::ER2, 0b0000_0000_0000_0000_0000_0000_0111_1111),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
@@ -4896,7 +4902,7 @@ mod tests_cpu {
                     RegisterId::ER2,
                 )],
                 &[(
-                    RegisterId::FL,
+                    RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
                 )],
                 None,
@@ -4907,14 +4913,14 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the overflow flag state.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::OF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::OF]), RegisterId::EFL),
                     ZeroHighBitsByIndexU32RegU32Imm(
                         0x0,
                         RegisterId::ER1,
                         RegisterId::ER2, // Already has the value of 0.
                     ),
                 ],
-                &[(RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::ZF]))],
+                &[(RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::ZF]))],
                 None,
                 0,
                 false,
@@ -4936,7 +4942,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Clear every flag.
-                    MovU32ImmU32Reg(0x0, RegisterId::FL),
+                    MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
                     MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER2),
                     ZeroHighBitsByIndexU32RegU32Imm(0x0, RegisterId::ER1, RegisterId::ER2),
@@ -4945,7 +4951,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::ER2, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::CF]),
                     ),
                 ],
@@ -4958,7 +4964,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::FL),
+                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
                     MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER2),
                     ZeroHighBitsByIndexU32RegU32Imm(0x0, RegisterId::ER1, RegisterId::ER2),
@@ -4966,7 +4972,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::ER1, 0b0111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::ER2, 0b0111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::CF])),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
                 ],
                 None,
                 0,
@@ -4990,7 +4996,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
@@ -5033,7 +5039,7 @@ mod tests_cpu {
                     BitTestU32Mem(0x0, 0x0),
                 ],
                 &[(
-                    RegisterId::FL,
+                    RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
                 )],
                 Some(vec![
@@ -5089,7 +5095,7 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF])),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF])),
                 ],
                 None,
                 0,
@@ -5137,7 +5143,7 @@ mod tests_cpu {
                     ),
                     BitTestResetU32Mem(0x0, 0x0),
                 ],
-                &[(RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]))],
+                &[(RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]))],
                 Some(vec![
                     254, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -5194,7 +5200,7 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF])),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF])),
                 ],
                 None,
                 0,
@@ -5240,7 +5246,7 @@ mod tests_cpu {
                     ),
                     BitTestSetU32Mem(0x0, 0x0),
                 ],
-                &[(RegisterId::FL, CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]))],
+                &[(RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]))],
                 Some(vec![
                     255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -5320,7 +5326,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::ER2, 0x20),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
                     ),
                 ],
@@ -5375,7 +5381,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::ER1, 0x20),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
                     ),
                 ],
@@ -5423,7 +5429,7 @@ mod tests_cpu {
             TestU32::new(
                 &[BitScanReverseU32RegMemU32(RegisterId::ER1, 0x0)],
                 &[(
-                    RegisterId::FL,
+                    RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
                 )],
                 Some(vec![
@@ -5480,7 +5486,7 @@ mod tests_cpu {
             TestU32::new(
                 &[BitScanReverseU32MemU32Mem(0x0, 0x4)],
                 &[(
-                    RegisterId::FL,
+                    RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
                 )],
                 Some(vec![
@@ -5535,7 +5541,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::ER2, 0x20),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
                     ),
                 ],
@@ -5590,7 +5596,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::ER1, 0x20),
                     (
-                        RegisterId::FL,
+                        RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
                     ),
                 ],
@@ -5638,7 +5644,7 @@ mod tests_cpu {
             TestU32::new(
                 &[BitScanForwardU32RegMemU32(RegisterId::ER1, 0x0)],
                 &[(
-                    RegisterId::FL,
+                    RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
                 )],
                 Some(vec![
@@ -5695,7 +5701,7 @@ mod tests_cpu {
             TestU32::new(
                 &[BitScanForwardU32MemU32Mem(0x0, 0x4)],
                 &[(
-                    RegisterId::FL,
+                    RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
                 )],
                 Some(vec![
@@ -5771,6 +5777,44 @@ mod tests_cpu {
         });
     }
 
+    /// Test the pop to u32 register instruction.
+    #[test]
+    fn test_pop_u32_reg() {
+        let tests = [
+            TestU32::new(
+                &[PushU32Imm(0x123), PopU32ImmU32Reg(RegisterId::ER1)],
+                &[(RegisterId::ER1, 0x123)],
+                None,
+                2,
+                false,
+                "POP - failed to execute POP instruction",
+            ),
+            TestU32::new(
+                &[
+                    PushU32Imm(0x123),
+                    PushU32Imm(0x321),
+                    PopU32ImmU32Reg(RegisterId::ER1),
+                    PopU32ImmU32Reg(RegisterId::ER2),
+                ],
+                &[(RegisterId::ER1, 0x321), (RegisterId::ER1, 0x321)],
+                None,
+                2,
+                false,
+                "POP - failed to execute POP instruction",
+            ),
+            TestU32::new(
+                &[PopU32ImmU32Reg(RegisterId::ER1)],
+                &[],
+                None,
+                2,
+                true,
+                "POP - failed to execute POP instruction",
+            ),
+        ];
+
+        TestsU32::new(&tests).run_all();
+    }
+
     /// Test the absolute jump by immediate address instruction.
     #[test]
     fn test_jump_absolute_addr() {
@@ -5836,7 +5880,7 @@ mod tests_cpu {
                     // to the start of the second move instruction.
                     //
                     // We expect that the first move instruction will be skipped entirely.
-                    AddU32ImmU32Reg(23, RegisterId::CS),
+                    AddU32ImmU32Reg(23, RegisterId::ECS),
                     JumpAbsU32Reg(RegisterId::EAC),
                     // This instruction should be skipped, so R1 should remain at the default value of 0.
                     MovU32ImmU32Reg(0xf, RegisterId::ER1),

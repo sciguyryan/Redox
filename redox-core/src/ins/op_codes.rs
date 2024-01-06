@@ -105,6 +105,8 @@ pub enum OpCode {
     ZeroHighBitsByIndexU32RegU32Imm,
     /// Push a u32 immediate value onto the stack.
     PushU32Imm,
+    /// Pop a u32 value from the stack to a u32 register.
+    PopU32ImmU32Reg,
 
     /******** [Logic Instructions] ********/
     /// Test the state of a bit from a u32 register. The CF flag will be set to the state of the bit.
@@ -206,6 +208,7 @@ impl From<Instruction> for OpCode {
                 OpCode::ZeroHighBitsByIndexU32RegU32Imm
             }
             Instruction::PushU32Imm(_) => OpCode::PushU32Imm,
+            Instruction::PopU32ImmU32Reg(_) => OpCode::PopU32ImmU32Reg,
 
             /******** [Logic Instructions] ********/
             Instruction::BitTestU32Reg(_, _) => OpCode::BitTestU32Reg,

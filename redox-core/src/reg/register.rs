@@ -89,7 +89,7 @@ impl RegisterU32 {
     pub fn get_flags_register_string(&self) -> String {
         let mut flags = String::new();
 
-        if self.id == RegisterId::FL {
+        if self.id == RegisterId::EFL {
             let states: Vec<String> = CpuFlag::iterator()
                 .map(|flag_type| {
                     let is_set = if utils::is_bit_set(self.value, (*flag_type) as u8) {
