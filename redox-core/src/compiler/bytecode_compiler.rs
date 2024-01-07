@@ -41,7 +41,7 @@ impl Compiler {
     /// A vector of u8 bytes containing the compiled data in byte form.
     fn compile_instruction(&mut self, instruction: &Instruction) {
         // First, we push the bytes for the opcode.
-        self.write_opcode(OpCode::from(*instruction));
+        self.write_opcode(OpCode::from(instruction.clone()));
 
         // Now we need to encode the instruction argument bytes.
         // This is done based on the type and order of the arguments.
@@ -158,6 +158,11 @@ impl Compiler {
             | Instruction::Ret
             | Instruction::Mret
             | Instruction::Hlt => {}
+
+            /* This pseudo-instruction should -NEVER- be constructed. */
+            Instruction::Label(_) => {
+                unreachable!();
+            }
 
             /* This pseudo-instruction should -NEVER- be constructed, outside of tests. */
             Instruction::Unknown(imm) => {
@@ -327,8 +332,8 @@ mod tests_compiler {
                 OpCode::Mret => Instruction::Mret,
                 OpCode::Hlt => Instruction::Hlt,
 
-                // We don't want to test constructing this instruction.
-                OpCode::Unknown => continue,
+                // We don't want to test constructing these instructions.
+                OpCode::Label | OpCode::Unknown => continue,
             };
 
             instructions_in.push(ins);

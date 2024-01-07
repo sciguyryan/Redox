@@ -146,8 +146,10 @@ pub enum OpCode {
     /// Halt the execution of the virtual machine.
     Hlt = 32767,
 
-    // Note - u32::MAX - 1 should never be assigned as it is used in various tests as an invalid opcode ID.
-    /// A placeholder in instances where the opcode isn't recognized. This should never be constructed directly.
+    // Note - u32::MAX - 2 should never be assigned as it is used in various tests as an invalid opcode ID.
+    /// A placeholder opcode for labels. These do not directly compile to anything and are intended on being a hint when compiling. This should never be constructed directly.
+    Label = u32::MAX - 1,
+    /// A placeholder for instances where the opcode isn't recognized. This should never be constructed directly.
     #[default]
     Unknown = u32::MAX,
 }
@@ -230,6 +232,7 @@ impl From<Instruction> for OpCode {
             Instruction::Ret => OpCode::Ret,
             Instruction::Mret => OpCode::Mret,
             Instruction::Hlt => OpCode::Hlt,
+            Instruction::Label(_) => OpCode::Label,
             Instruction::Unknown(_) => OpCode::Unknown,
         }
     }
@@ -257,7 +260,7 @@ mod tests_opcodes {
         // Ensure that each instruction produces the same opcode back.
         for (op, ins) in opcodes.iter().zip(instructions.iter()) {
             // Get the opcode from the instruction.
-            let op_from_ins: OpCode = (*ins).into();
+            let op_from_ins: OpCode = ins.clone().into();
             if op_from_ins != *op {
                 eprintln!("instruction {ins} has an opcode mismatch - expected {op_from_ins:?} but got {:?}", *op);
                 success = false;

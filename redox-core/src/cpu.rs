@@ -1108,6 +1108,9 @@ impl Cpu {
             Hlt => {
                 self.set_halted(true);
             }
+            Label(_) => {
+                unreachable!("attempted to use a label in an invalid context");
+            }
             Unknown(id) => {
                 unreachable!("attempted to run an unrecognized instruction: {id}");
             }
