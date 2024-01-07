@@ -979,7 +979,20 @@ impl MemoryHandler {
     /// * `cursor` - A mutable reference to the cursor, which specifies the starting position within the slice.
     #[inline]
     pub fn read_u32(bytes: &[u8], cursor: &mut usize) -> u32 {
-        let value = u32::from_le_bytes(bytes[*cursor..(*cursor + 4)].try_into().expect(""));
+        assert!(bytes.len() >= *cursor + 4);
+
+        // A slight optimization. Since we have asserted that we will always
+        // have sufficient elements in order to build the u32 value.
+        // Note that this works with little-Endian but would need to be adjusted
+        // should big-Endian be supported natively.
+        let value = unsafe {
+            std::mem::transmute::<[u8; 4], u32>([
+                *bytes.get_unchecked(*cursor),
+                *bytes.get_unchecked(*cursor + 1),
+                *bytes.get_unchecked(*cursor + 2),
+                *bytes.get_unchecked(*cursor + 3),
+            ])
+        };
 
         *cursor += 4;
 

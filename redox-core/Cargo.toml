@@ -23,13 +23,7 @@ strum.workspace = true
 strum_macros.workspace = true
 
 [dev-dependencies]
-divan.workspace = true
 
 [features]
 default = ["stack-type-hints"]
 stack-type-hints = []
-instruction-caching = []
-
-[[bench]]
-name = "benchmarks"
-harness = false
