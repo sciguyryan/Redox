@@ -611,7 +611,7 @@ impl Cpu {
     /// # Arguments
     ///
     /// * `mem` - The [`Memory`] connected to this CPU instance.
-    fn pop_state(&mut self, mem: &mut MemoryHandler) {
+    pub(crate) fn pop_state(&mut self, mem: &mut MemoryHandler) {
         let privilege = PrivilegeLevel::Machine;
 
         // NOTE - Remember that the states need to be popped in the reverse order!
@@ -632,7 +632,7 @@ impl Cpu {
     /// # Arguments
     ///
     /// * `mem` - The [`Memory`] connected to this CPU instance.
-    fn push_state(&mut self, mem: &mut MemoryHandler) {
+    pub(crate) fn push_state(&mut self, mem: &mut MemoryHandler) {
         let privilege = PrivilegeLevel::Machine;
 
         // Push the u32 data registers to the stack.
@@ -1356,7 +1356,7 @@ mod tests_cpu {
         vm::VirtualMachine,
     };
 
-    use super::{Cpu, CpuFlag};
+    use super::{Cpu, CpuFlag, PRESERVE_REGISTERS_F32, PRESERVE_REGISTERS_U32};
 
     struct TestsU32 {
         tests: Vec<TestU32>,
@@ -1560,6 +1560,52 @@ mod tests_cpu {
                 self.should_panic, self.fail_message
             )
         }
+    }
+
+    /// Test the pop and push of the CPU state.
+    #[test]
+    fn test_push_pop_state() {
+        // Build the virtual machine instance.
+        let mut vm = VirtualMachine::new(100, &[], &[], 30 * mem::memory_handler::BYTES_IN_U32);
+
+        for (id, reg) in PRESERVE_REGISTERS_U32.iter().enumerate() {
+            vm.cpu
+                .registers
+                .get_register_u32_mut(*reg)
+                .write_unchecked((id + 1) as u32);
+        }
+        for (id, reg) in PRESERVE_REGISTERS_F32.iter().enumerate() {
+            vm.cpu
+                .registers
+                .get_register_f32_mut(*reg)
+                .write_unchecked((id + 1) as f32);
+        }
+
+        // Keep a copy of the registers struct.
+        let reference_registers = vm.cpu.registers.clone();
+
+        // Store the state.
+        vm.cpu.push_state(&mut vm.mem);
+
+        // Reset the registers.
+        for reg in PRESERVE_REGISTERS_U32 {
+            vm.cpu
+                .registers
+                .get_register_u32_mut(reg)
+                .write_unchecked(0);
+        }
+        for reg in PRESERVE_REGISTERS_F32 {
+            vm.cpu
+                .registers
+                .get_register_f32_mut(reg)
+                .write_unchecked(0f32);
+        }
+
+        // Restore the state.
+        vm.cpu.pop_state(&mut vm.mem);
+
+        // Our registers should now match the copy we made earlier.
+        assert_eq!(reference_registers, vm.cpu.registers);
     }
 
     /// Test the parity checking.

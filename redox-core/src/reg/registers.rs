@@ -127,7 +127,7 @@ macro_rules! register_f32 {
     }};
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Registers {
     /// A hashmap of the u32 registers.
     pub registers_u32: HashMap<RegisterId, RegisterU32>,
