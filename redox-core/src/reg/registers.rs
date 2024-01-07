@@ -43,7 +43,7 @@ pub enum RegisterId {
     ER8,
 
     /// Float data register 1.
-    F1,
+    FR1,
 
     // [ System Registers ] //
     /// Accumulator register.
@@ -85,7 +85,7 @@ impl Display for RegisterId {
             RegisterId::ER6 => "ER6",
             RegisterId::ER7 => "ER7",
             RegisterId::ER8 => "ER8",
-            RegisterId::F1 => "F1",
+            RegisterId::FR1 => "F1",
             RegisterId::EAC => "EAC",
 
             RegisterId::EIP => "EIP",
@@ -196,9 +196,23 @@ impl Registers {
             ]),
             registers_f32: HashMap::from([
                 // [ User Registers ] //
-                register_f32!(RegisterId::F1, &rw, 0f32),
+                register_f32!(RegisterId::FR1, &rw, 0f32),
             ]),
         }
+    }
+
+    /// Get a reference to a specific f32 register.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - The [`RegisterId`] for the register in question.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the specific [`RegisterF32`] instance.
+    #[inline(always)]
+    pub fn get_register_f32(&self, id: RegisterId) -> &RegisterF32 {
+        self.registers_f32.get(&id).expect("failed to get register")
     }
 
     /// Get a reference to a specific u32 register.
@@ -213,6 +227,22 @@ impl Registers {
     #[inline(always)]
     pub fn get_register_u32(&self, id: RegisterId) -> &RegisterU32 {
         self.registers_u32.get(&id).expect("failed to get register")
+    }
+
+    /// Get a mutable reference to a specific f32 register.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - The [`RegisterId`] for the register in question.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the specific [`RegisterF32`] instance.
+    #[inline(always)]
+    pub fn get_register_f32_mut(&mut self, id: RegisterId) -> &mut RegisterF32 {
+        self.registers_f32
+            .get_mut(&id)
+            .expect("failed to get register")
     }
 
     /// Get a mutable reference to a specific u32 register.

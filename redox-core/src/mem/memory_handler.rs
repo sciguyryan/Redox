@@ -189,11 +189,25 @@ impl MemoryHandler {
         self.mapped_memory.len() - 1
     }
 
+    /// Can we pop a f32 value from the stack?
+    #[inline(always)]
+    pub fn can_pop_f32(&self) -> bool {
+        self.stack_pointer >= self.stack_segment_start
+            && self.stack_pointer + 4 <= self.stack_segment_end
+    }
+
     /// Can we pop a u32 value from the stack?
     #[inline(always)]
     pub fn can_pop_u32(&self) -> bool {
         self.stack_pointer >= self.stack_segment_start
             && self.stack_pointer + 4 <= self.stack_segment_end
+    }
+
+    /// Can we push a f32 value onto the stack?
+    #[inline(always)]
+    pub fn can_push_f32(&self) -> bool {
+        self.stack_pointer - 4 >= self.stack_segment_start
+            && self.stack_pointer <= self.stack_segment_end
     }
 
     /// Can we push a u32 value onto the stack?
@@ -761,6 +775,26 @@ impl MemoryHandler {
             .expect("failed to get physical RAM memory segment")
     }
 
+    /// Attempt to read a f32 value from memory.
+    ///
+    /// # Arguments
+    ///
+    /// * `pos` - The starting position of the bytes in memory.
+    ///
+    /// # Returns
+    ///
+    /// A f32 from the specified memory address.
+    pub fn get_f32(&self, pos: usize) -> f32 {
+        // TODO - this could probably be optimized like read_u32, if needed.
+
+        let bytes: [u8; 4] = self
+            .get_range_ptr(pos, 4)
+            .try_into()
+            .expect("failed to create a f32 from memory bytes");
+
+        f32::from_le_bytes(bytes)
+    }
+
     /// Attempt to read a u32 value from memory.
     ///
     /// # Arguments
@@ -771,6 +805,8 @@ impl MemoryHandler {
     ///
     /// A u32 from the specified memory address.
     pub fn get_u32(&self, pos: usize) -> u32 {
+        // TODO - this could probably be optimized like read_u32, if needed.
+
         let bytes: [u8; 4] = self
             .get_range_ptr(pos, 4)
             .try_into()
@@ -893,6 +929,25 @@ impl MemoryHandler {
         }
     }
 
+    /// Attempt to pop a f32 value from the stack.
+    #[inline]
+    pub fn pop_f32(&mut self) -> f32 {
+        let value_start_pos = self.stack_pointer;
+        assert!(
+            self.can_pop_f32(),
+            "insufficient space on the stack to pop a f32 value"
+        );
+
+        // Read the value from the stack.
+        let result = self.get_f32(value_start_pos);
+        self.pop_type_hint();
+
+        // Update the stack pointer.
+        self.stack_pointer = value_start_pos + 4;
+
+        result
+    }
+
     /// Attempt to pop a u32 value from the stack.
     #[inline]
     pub fn pop_u32(&mut self) -> u32 {
@@ -927,6 +982,36 @@ impl MemoryHandler {
         {
             self.stack_type_hints.push(hint);
         }
+    }
+
+    /// Attempt to push a f32 value onto the stack.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The f32 value to be pushed onto the stack.
+    ///
+    /// # Notes
+    ///
+    /// This method will automatically keep track of the stack pointer as held within
+    /// the memory object, but the CPU registers **must** be updated separately or
+    /// they will fall out of sync.
+    #[inline]
+    pub fn push_f32(&mut self, value: f32) {
+        assert!(
+            self.can_push_f32(),
+            "insufficient space on the stack to push a onto f32 value"
+        );
+
+        // This needs to be 3 (not 4) since we are working from the basis that this
+        // will add a value to the last index. 0 to 3 is 4 positions.
+        let value_start_pos = self.stack_pointer - 4;
+
+        // Push the value to the stack.
+        self.set_f32(value_start_pos, value);
+        self.push_type_hint(StackTypeHint::F32);
+
+        // Update the stack pointer.
+        self.stack_pointer = value_start_pos;
     }
 
     /// Attempt to push a u32 value onto the stack.
@@ -1052,6 +1137,17 @@ impl MemoryHandler {
         // This is safe since we have checked that the range is completely
         // contained within the specific memory segment.
         segment.data[start..end].copy_from_slice(values);
+    }
+
+    /// Write a f32 value into memory.
+    ///
+    /// # Arguments
+    ///
+    /// * `pos` - The position of the first byte to be written into memory.
+    /// * `value` - The value to be written into memory.
+    #[inline]
+    pub fn set_f32(&mut self, pos: usize, value: f32) {
+        self.set_range(pos, &f32::to_le_bytes(value));
     }
 
     /// Write a u32 value into memory.

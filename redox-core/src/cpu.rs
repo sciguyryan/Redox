@@ -12,6 +12,40 @@ use crate::{
     utils,
 };
 
+/// A list of f32 registers to be preserved when entering a subroutine. Use when storing state.
+const PRESERVE_REGISTERS_F32: [RegisterId; 1] = [RegisterId::FR1];
+
+/// A reversed list of f32 registers to be preserved when entering a subroutine. Use when restoring state.
+const PRESERVE_REGISTERS_F32_REV: [RegisterId; 1] = [RegisterId::FR1];
+
+/// A list of u32 registers to be preserved when entering a subroutine. Use when storing state.
+const PRESERVE_REGISTERS_U32: [RegisterId; 10] = [
+    RegisterId::ER1,
+    RegisterId::ER2,
+    RegisterId::ER3,
+    RegisterId::ER4,
+    RegisterId::ER5,
+    RegisterId::ER6,
+    RegisterId::ER7,
+    RegisterId::ER8,
+    RegisterId::EIP,
+    RegisterId::EBP,
+];
+
+/// A reversed list of u32 registers to be preserved when entering a subroutine. Use when restoring state.
+const PRESERVE_REGISTERS_U32_REV: [RegisterId; 10] = [
+    RegisterId::EBP,
+    RegisterId::EIP,
+    RegisterId::ER8,
+    RegisterId::ER7,
+    RegisterId::ER6,
+    RegisterId::ER5,
+    RegisterId::ER4,
+    RegisterId::ER3,
+    RegisterId::ER2,
+    RegisterId::ER1,
+];
+
 /// The mask to get only the lowest 8 bits of a u32 value.
 const U32_LOW_BYTE_MASK: u32 = 0xff;
 
@@ -570,6 +604,61 @@ impl Cpu {
 
         // Write the value to the output register.
         self.write_reg_u32(out_reg, final_value, privilege);
+    }
+
+    /// Pop the relevant processor register states from the stack.
+    ///
+    /// # Arguments
+    ///
+    /// * `mem` - The [`Memory`] connected to this CPU instance.
+    fn pop_state(&mut self, mem: &mut MemoryHandler) {
+        let privilege = PrivilegeLevel::Machine;
+
+        // NOTE - Remember that the states need to be popped in the reverse order!
+
+        // Pop the f32 data registers from the stack.
+        for reg in PRESERVE_REGISTERS_F32_REV {
+            self.write_reg_f32(&reg, mem.pop_f32(), &privilege);
+        }
+
+        // Next, pop the the u32 data registers from the stack.
+        for reg in PRESERVE_REGISTERS_U32_REV {
+            self.write_reg_u32(&reg, mem.pop_u32(), &privilege);
+        }
+    }
+
+    /// Push the relevant processor register states to the stack.
+    ///
+    /// # Arguments
+    ///
+    /// * `mem` - The [`Memory`] connected to this CPU instance.
+    fn push_state(&mut self, mem: &mut MemoryHandler) {
+        let privilege = PrivilegeLevel::Machine;
+
+        // Push the u32 data registers to the stack.
+        for reg in PRESERVE_REGISTERS_U32 {
+            mem.push_u32(self.read_reg_u32(&reg, &privilege));
+        }
+
+        // Next, push the f32 data registers to the stack.
+        for reg in PRESERVE_REGISTERS_F32 {
+            mem.push_f32(self.read_reg_f32(&reg, &privilege));
+        }
+    }
+
+    /// Get the value of a specific f32 register.
+    ///
+    /// # Arguments
+    ///
+    /// * `reg` - Reference to the [`RegisterId`] for the register in question.
+    /// * `privilege` - The [`PrivilegeLevel`] with which the read request should be processed.
+    ///
+    /// # Returns
+    ///
+    /// The f32 value of the register.
+    #[inline(always)]
+    fn read_reg_f32(&self, reg: &RegisterId, privilege: &PrivilegeLevel) -> f32 {
+        *self.registers.get_register_f32(*reg).read(privilege)
     }
 
     /// Get the value of a specific u32 register.
@@ -1152,7 +1241,21 @@ impl Cpu {
             .write_unchecked(value);
     }
 
-    /// Get the value of a specific u32 register.
+    /// Set the value of a specific f32 register.
+    ///
+    /// # Arguments
+    ///
+    /// * `reg` - Reference to the [`RegisterId`] for the register in question.
+    /// * `new_val` - The new value of the register.
+    /// * `privilege` - The [`PrivilegeLevel`] with which the read request should be processed.
+    #[inline(always)]
+    fn write_reg_f32(&mut self, reg: &RegisterId, new_val: f32, privilege: &PrivilegeLevel) {
+        self.registers
+            .get_register_f32_mut(*reg)
+            .write(new_val, privilege);
+    }
+
+    /// Set the value of a specific u32 register.
     ///
     /// # Arguments
     ///
