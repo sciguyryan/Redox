@@ -69,8 +69,11 @@ pub struct MemoryHandler {
     pub stack_segment_start: usize,
     /// The end address of the stack segment.
     pub stack_segment_end: usize,
+
     /// The current stack pointer.
     stack_pointer: usize,
+    /// The size of the current stack frame.
+    pub stack_frame_size: u32,
 }
 
 impl MemoryHandler {
@@ -128,6 +131,7 @@ impl MemoryHandler {
             stack_segment_start,
             stack_segment_end,
             stack_pointer: stack_segment_end,
+            stack_frame_size: 0,
         };
 
         // Insert the physical RAM memory-mapped segments that
@@ -935,19 +939,6 @@ impl MemoryHandler {
         self.get_ram_storage().len()
     }
 
-    /// Attempt to pop a [`StackTypeHint`] from the stack hint list.
-    ///
-    /// # Note
-    ///
-    /// This function will do nothing if stack type hints are disabled.
-    #[inline]
-    fn pop_type_hint(&mut self) {
-        #[cfg(feature = "stack-type-hints")]
-        {
-            self.stack_type_hints.pop();
-        }
-    }
-
     /// Attempt to pop a f32 value from the stack.
     #[inline]
     pub fn pop_f32(&mut self) -> f32 {
@@ -964,7 +955,40 @@ impl MemoryHandler {
         // Update the stack pointer.
         self.stack_pointer = value_start_pos + 4;
 
+        // Update the frame size indicator.
+        self.stack_frame_size -= 4;
+
         result
+    }
+
+    #[inline]
+    pub fn pop_top(&mut self, count: usize) {
+        for i in 0..count {
+            match self.stack_type_hints.get(i) {
+                Some(hint) => match hint {
+                    StackTypeHint::F32 => {
+                        self.pop_f32();
+                    }
+                    StackTypeHint::U32 => {
+                        self.pop_u32();
+                    }
+                    StackTypeHint::U8 => {
+                        todo!();
+                    }
+                },
+                None => panic!("failed to pop entry from the stack - no entry was found"),
+            }
+        }
+    }
+
+    /// Attempt to pop a [`StackTypeHint`] from the stack hint list.
+    ///
+    /// # Note
+    ///
+    /// This function will do nothing if stack type hints are disabled.
+    #[inline]
+    fn pop_type_hint(&mut self) {
+        self.stack_type_hints.pop();
     }
 
     /// Attempt to pop a u32 value from the stack.
@@ -983,24 +1007,19 @@ impl MemoryHandler {
         // Update the stack pointer.
         self.stack_pointer = value_start_pos + 4;
 
-        result
-    }
-
-    /// Attempt to push a [`StackTypeHint`] onto the stack hint list.
-    ///
-    /// # Arguments
-    ///
-    /// * `hint` - The [`StackTypeHint`] to be added to the hit list.
-    ///
-    /// # Note
-    ///
-    /// This function will do nothing if stack type hints are disabled.
-    #[inline]
-    fn push_type_hint(&mut self, hint: StackTypeHint) {
-        #[cfg(feature = "stack-type-hints")]
+        // Update the frame size indicator/
+        // A little hackery to ensure we don't assert in debug builds in
+        // instances where the stack size is zero, something that can occur during a subroutine call.
+        #[cfg(debug_assertions)]
         {
-            self.stack_type_hints.push(hint);
+            self.stack_frame_size = self.stack_frame_size.wrapping_sub(4);
         }
+        #[cfg(not(debug_assertions))]
+        {
+            self.stack_frame_size -= 4;
+        }
+
+        result
     }
 
     /// Attempt to push a f32 value onto the stack.
@@ -1031,6 +1050,23 @@ impl MemoryHandler {
 
         // Update the stack pointer.
         self.stack_pointer = value_start_pos;
+
+        // Update the frame size indicator.
+        self.stack_frame_size += 4;
+    }
+
+    /// Attempt to push a [`StackTypeHint`] onto the stack hint list.
+    ///
+    /// # Arguments
+    ///
+    /// * `hint` - The [`StackTypeHint`] to be added to the hit list.
+    ///
+    /// # Note
+    ///
+    /// This function will do nothing if stack type hints are disabled.
+    #[inline]
+    fn push_type_hint(&mut self, hint: StackTypeHint) {
+        self.stack_type_hints.push(hint);
     }
 
     /// Attempt to push a u32 value onto the stack.
@@ -1061,6 +1097,11 @@ impl MemoryHandler {
 
         // Update the stack pointer.
         self.stack_pointer = value_start_pos;
+
+        eprintln!("memory_handler.rs - push_u32 {} - value = {value}", self.stack_frame_size);
+
+        // Update the frame size indicator.
+        self.stack_frame_size += 4;
     }
 
     /// Attempt to read a [`RegisterId`] from a memory slice.
@@ -1202,35 +1243,34 @@ impl MemoryHandler {
     pub fn print_stack(&self) {
         let mut table = Table::new();
 
-        if cfg!(feature = "stack-type-hints") {
-            if self.stack_type_hints.is_empty() {
-                println!("The stack is currently empty.");
-                return;
-            }
-
-            table.add_row(row!["Index", "Value", "Type"]);
-
-            // We will walk backwards up the stack.
-            // In the stack a lower index represents a value that has been more recently added to the stack.
-            let mut current_pos = self.stack_segment_end;
-
-            for (id, hint) in self.stack_type_hints.iter().enumerate() {
-                match *hint {
-                    StackTypeHint::F32 => todo!(),
-                    StackTypeHint::U32 => {
-                        let value = self.get_u32(current_pos - 4);
-                        table.add_row(row![id, format!("{value}"), "u32"]);
-                        current_pos -= 4;
-                    }
-                    StackTypeHint::U8 => todo!(),
-                }
-            }
-
-            table.printstd();
-        } else {
-            println!("WARNING: stack type hints are disabled. A raw view of stack memory will be displayed.");
-            println!("{:?}", self.get_stack_segment_storage());
+        if self.stack_type_hints.is_empty() {
+            println!("The stack is currently empty.");
+            return;
         }
+
+        table.add_row(row!["Index", "Value", "Type"]);
+
+        // We will walk backwards up the stack.
+        // In the stack a lower index represents a value that has been more recently added to the stack.
+        let mut current_pos = self.stack_segment_end;
+
+        for (id, hint) in self.stack_type_hints.iter().enumerate() {
+            match *hint {
+                StackTypeHint::F32 => {
+                    let value = self.get_f32(current_pos - 4);
+                    table.add_row(row![id, format!("{value}"), "f32"]);
+                    current_pos -= 4;
+                }
+                StackTypeHint::U32 => {
+                    let value = self.get_u32(current_pos - 4);
+                    table.add_row(row![id, format!("{value}"), "u32"]);
+                    current_pos -= 4;
+                }
+                StackTypeHint::U8 => todo!(),
+            }
+        }
+
+        table.printstd();
     }
 }
 

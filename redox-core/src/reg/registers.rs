@@ -51,8 +51,8 @@ pub enum RegisterId {
     EAC,
     /// Instruction pointer register.
     EIP,
-    /// Stack frame base pointer.
-    EBP,
+    /// Stack frame pointer.
+    EFP,
     /// Stack pointer register.
     ESP,
     /// CPU flags register.
@@ -86,7 +86,7 @@ impl Display for RegisterId {
             RegisterId::EAC => "EAC",
 
             RegisterId::EIP => "EIP",
-            RegisterId::EBP => "EBP",
+            RegisterId::EFP => "EFP",
             RegisterId::ESP => "ESP",
 
             RegisterId::EFL => "EFL",
@@ -175,7 +175,7 @@ impl Registers {
                 // [ System Registers ] //
                 register_u32!(RegisterId::EAC, &rw, 0),
                 register_u32!(RegisterId::EIP, &rw, BOOT_MEMORY_START as u32),
-                register_u32!(RegisterId::EBP, &prpw, 0),
+                register_u32!(RegisterId::EFP, &prpw, 0),
                 register_u32!(RegisterId::ESP, &prpw, 0),
                 register_u32!(RegisterId::EFL, &rpw, 0),
                 register_u32!(RegisterId::EPC, &rpw, 0),

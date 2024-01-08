@@ -4,6 +4,7 @@ use redox_core::{
     compiler::bytecode_compiler::Compiler,
     ins::instruction::Instruction,
     mem,
+    reg::registers::RegisterId,
     vm::{self, VirtualMachine},
 };
 
@@ -60,10 +61,40 @@ use std::time::Instant;
     );
 }*/
 
+fn testing_calls() {
+    let instructions = &[
+        // The number of arguments for the subroutine.
+        Instruction::PushU32Imm(3), // Starts at 100. Length = 8. This should remain in place.
+        Instruction::PushU32Imm(2), // Starts at 108. Length = 8. Subroutine argument 1.
+        Instruction::PushU32Imm(1), // Starts at 116. Length = 8. The number of arguments.
+        Instruction::Call(136, 0),  // Starts at 124. Length = 8.
+        Instruction::Hlt,           // Starts at 132. Length = 4.
+        // FUNC_AAAA - Subroutine starts here.
+        Instruction::Nop, // Starts at 136. Length = 4.
+        Instruction::PushU32Imm(10), // Starts at 140. Length = 8.
+        Instruction::PopU32ImmU32Reg(RegisterId::ER1), // Starts at 148. Length = 5.
+        Instruction::Ret, // Starts at 156. Length = 8.
+    ];
+
+    let mut compiler = Compiler::new();
+    let data = compiler.compile(instructions);
+
+    let mut vm = VirtualMachine::new(100, data, &[], 150 * mem::memory_handler::BYTES_IN_U32);
+
+    vm.run();
+
+    vm.mem.print_stack();
+    println!();
+    vm.cpu.registers.print_registers();
+}
+
 fn main() {
     if cfg!(target_endian = "big") {
         panic!("currently unsupported");
     }
+
+    //testing_calls();
+    //return;
 
     let instructions = &[
         Instruction::PushU32Imm(1234),
@@ -106,7 +137,7 @@ fn main() {
     println!("Code successfully executed in {elapsed} ns!");
     println!();
     println!("Machine Mode? {}", vm.cpu.is_machine_mode);
-    println!("Stack Frame Size: {}", vm.cpu.get_stack_frame_size());
+    println!("Stack Frame Size: {}", vm.mem.stack_frame_size);
     println!();
 
     println!("----------[Registers]----------");

@@ -19,7 +19,7 @@ const PRESERVE_REGISTERS_F32: [RegisterId; 1] = [RegisterId::FR1];
 const PRESERVE_REGISTERS_F32_REV: [RegisterId; 1] = [RegisterId::FR1];
 
 /// A list of u32 registers to be preserved when entering a subroutine. Use when storing state.
-const PRESERVE_REGISTERS_U32: [RegisterId; 10] = [
+const PRESERVE_REGISTERS_U32: [RegisterId; 9] = [
     RegisterId::ER1,
     RegisterId::ER2,
     RegisterId::ER3,
@@ -29,12 +29,10 @@ const PRESERVE_REGISTERS_U32: [RegisterId; 10] = [
     RegisterId::ER7,
     RegisterId::ER8,
     RegisterId::EIP,
-    RegisterId::EBP,
 ];
 
 /// A reversed list of u32 registers to be preserved when entering a subroutine. Use when restoring state.
-const PRESERVE_REGISTERS_U32_REV: [RegisterId; 10] = [
-    RegisterId::EBP,
+const PRESERVE_REGISTERS_U32_REV: [RegisterId; 9] = [
     RegisterId::EIP,
     RegisterId::ER8,
     RegisterId::ER7,
@@ -166,18 +164,6 @@ impl Cpu {
             .read_unchecked() as usize;
 
         mem.get_instruction(ip)
-    }
-
-    /// Get the size of the current stack frame.
-    #[inline(always)]
-    pub fn get_stack_frame_size(&self) -> u32 {
-        self.registers
-            .get_register_u32(RegisterId::EBP)
-            .read_unchecked()
-            - self
-                .registers
-                .get_register_u32(RegisterId::ESP)
-                .read_unchecked()
     }
 
     /// Get the value of the stack pointer (SP) register.
@@ -611,12 +597,39 @@ impl Cpu {
     /// # Arguments
     ///
     /// * `mem` - The [`Memory`] connected to this CPU instance.
-    pub(crate) fn pop_state(&mut self, mem: &mut MemoryHandler) {
+    #[inline]
+    pub fn pop_state(&mut self, mem: &mut MemoryHandler) {
         let privilege = PrivilegeLevel::Machine;
 
         // NOTE - Remember that the states need to be popped in the reverse order!
 
-        // Pop the f32 data registers from the stack.
+        // First, get the current frame pointer.
+        let frame_pointer = *self
+            .registers
+            .get_register_u32(RegisterId::EFP)
+            .read_unchecked();
+
+        // Next, reset the stack pointer to the address of the frame pointer.
+        // Any stack entries higher in the stack can be disregarded as they are out of scope
+        // from this point forward.
+        self.registers
+            .get_register_u32_mut(RegisterId::ESP)
+            .write_unchecked(frame_pointer);
+
+        eprintln!("cpu.rs - pop_state - before first pop");
+        eprintln!("cpu.rs - pop_state - mem.stack_frame_size = {}", mem.stack_frame_size);
+
+        // FIXME
+        //mem.stack_frame_size += 4;
+
+        // Next, pop the old stack frame size.
+        let old_stack_frame_size = mem.pop_u32();
+        mem.stack_frame_size = old_stack_frame_size;
+
+        // We will need to keep this for resetting the frame pointer position below.
+        let stack_frame_size = old_stack_frame_size;
+
+        // Next, pop the f32 data registers from the stack.
         for reg in PRESERVE_REGISTERS_F32_REV {
             self.write_reg_f32(&reg, mem.pop_f32(), &privilege);
         }
@@ -625,6 +638,16 @@ impl Cpu {
         for reg in PRESERVE_REGISTERS_U32_REV {
             self.write_reg_u32(&reg, mem.pop_u32(), &privilege);
         }
+
+        // Next, clear the arguments from the stack.
+        let arg_count = mem.pop_u32();
+        mem.pop_top(arg_count as usize);
+
+        // Finally, adjust our frame pointer position to the original frame pointer
+        // address plus the stack frame size.
+        self.registers
+            .get_register_u32_mut(RegisterId::EFP)
+            .write_unchecked(frame_pointer + stack_frame_size);
     }
 
     /// Push the relevant processor register states to the stack.
@@ -632,10 +655,11 @@ impl Cpu {
     /// # Arguments
     ///
     /// * `mem` - The [`Memory`] connected to this CPU instance.
-    pub(crate) fn push_state(&mut self, mem: &mut MemoryHandler) {
+    #[inline]
+    pub fn push_state(&mut self, mem: &mut MemoryHandler) {
         let privilege = PrivilegeLevel::Machine;
 
-        // Push the u32 data registers to the stack.
+        // First, push the u32 data registers to the stack.
         for reg in PRESERVE_REGISTERS_U32 {
             mem.push_u32(self.read_reg_u32(&reg, &privilege));
         }
@@ -644,6 +668,20 @@ impl Cpu {
         for reg in PRESERVE_REGISTERS_F32 {
             mem.push_f32(self.read_reg_f32(&reg, &privilege));
         }
+
+        // Next, push the current stack frame size.
+        mem.push_u32(mem.stack_frame_size);
+
+        eprintln!("cpu.rs - push_state - stack_frame_size = {}", mem.stack_frame_size);
+
+        // Next, update the stack frame pointer to be the current stack pointer location.
+        let stack_pointer = self.get_stack_pointer();
+        self.registers
+            .get_register_u32_mut(RegisterId::EFP)
+            .write_unchecked(stack_pointer);
+
+        // Finally, reset the stack frame size so we can track the new frame.
+        mem.stack_frame_size = 0;
     }
 
     /// Get the value of a specific f32 register.
@@ -888,10 +926,28 @@ impl Cpu {
 
             /******** [Branching Instructions] ********/
             Call(addr, _uid) => {
-                todo!();
+                // We need to force the IP to update -before- we store the state
+                // this is because we don't want to jump to the start of this instruction
+                // when we return from the subroutine.
+                // We can't do this at the usual place (at the end of this method) because that will
+                // impact the offset at the call destination instead.
+                self.increment_ip_register(instruction.get_total_instruction_size());
+
+                // Store the current stack frame state.
+                self.push_state(mem);
+
+                // Jump to the subroutine.
+                self.set_instruction_pointer(*addr);
+
+                // We don't want to update the IP register here.
+                skip_ip_update = true;
             }
             Ret => {
-                todo!();
+                // Restore the state of the last stack frame.
+                self.pop_state(mem);
+
+                // We don't want to update the IP register here.
+                skip_ip_update = true;
             }
             Int(_addr) => {
                 todo!();
@@ -1219,18 +1275,6 @@ impl Cpu {
         self.set_flag_state(CpuFlag::PF, Cpu::calculate_lowest_byte_parity(value));
     }
 
-    /// Update the (stack frame) base pointer (BP) register.
-    ///
-    /// # Arguments
-    ///
-    /// * `value` - The new value of the base pointer register.
-    #[inline(always)]
-    pub fn set_stack_frame_base_pointer(&mut self, value: u32) {
-        self.registers
-            .get_register_u32_mut(RegisterId::EBP)
-            .write_unchecked(value);
-    }
-
     // Update the stack pointer (SP) register.
     ///
     /// # Arguments
@@ -1371,7 +1415,7 @@ mod tests_cpu {
         vm::VirtualMachine,
     };
 
-    use super::{Cpu, CpuFlag, PRESERVE_REGISTERS_F32, PRESERVE_REGISTERS_U32};
+    use super::{Cpu, CpuFlag};
 
     struct TestsU32 {
         tests: Vec<TestU32>,
@@ -1580,47 +1624,62 @@ mod tests_cpu {
     /// Test the pop and push of the CPU state.
     #[test]
     fn test_push_pop_state() {
-        // Build the virtual machine instance.
-        let mut vm = VirtualMachine::new(100, &[], &[], 30 * mem::memory_handler::BYTES_IN_U32);
+        let test_registers = [
+            (RegisterId::ER1, 1),
+            (RegisterId::ER2, 2),
+            (RegisterId::ER3, 3),
+            (RegisterId::ER4, 4),
+            (RegisterId::ER5, 5),
+            (RegisterId::ER6, 6),
+            (RegisterId::ER7, 7),
+            (RegisterId::ER8, 8),
+            (RegisterId::EPC, 0xdeafbeef),
+        ];
 
-        for (id, reg) in PRESERVE_REGISTERS_U32.iter().enumerate() {
-            vm.cpu
-                .registers
-                .get_register_u32_mut(*reg)
-                .write_unchecked((id + 1) as u32);
+        let instructions = &[
+            Instruction::MovU32ImmU32Reg(test_registers[0].1, test_registers[0].0), // Starts at 100. Length = 9.
+            Instruction::MovU32ImmU32Reg(test_registers[1].1, test_registers[1].0), // Starts at 109. Length = 9.
+            Instruction::MovU32ImmU32Reg(test_registers[2].1, test_registers[2].0), // Starts at 118. Length = 9.
+            Instruction::MovU32ImmU32Reg(test_registers[3].1, test_registers[3].0), // Starts at 127. Length = 9.
+            Instruction::MovU32ImmU32Reg(test_registers[4].1, test_registers[4].0), // Starts at 136. Length = 9.
+            Instruction::MovU32ImmU32Reg(test_registers[5].1, test_registers[5].0), // Starts at 145. Length = 9.
+            Instruction::MovU32ImmU32Reg(test_registers[6].1, test_registers[6].0), // Starts at 154. Length = 9.
+            Instruction::MovU32ImmU32Reg(test_registers[7].1, test_registers[7].0), // Starts at 163. Length = 9.
+            // The number of arguments for the subroutine.
+            Instruction::PushU32Imm(0), // Starts at 172. Length = 8. The number of arguments.
+            Instruction::Call(192, 0),  // Starts at 180. Length = 8.
+            Instruction::Hlt,           // Starts at 188. Length = 4.
+            // FUNC_AAAA - Subroutine starts here.
+            Instruction::MovU32ImmU32Reg(0, RegisterId::ER1), // Starts at 192.
+            Instruction::MovU32ImmU32Reg(0, RegisterId::ER2),
+            Instruction::MovU32ImmU32Reg(0, RegisterId::ER3),
+            Instruction::MovU32ImmU32Reg(0, RegisterId::ER4),
+            Instruction::MovU32ImmU32Reg(0, RegisterId::ER5),
+            Instruction::MovU32ImmU32Reg(0, RegisterId::ER6),
+            Instruction::MovU32ImmU32Reg(0, RegisterId::ER7),
+            Instruction::MovU32ImmU32Reg(0, RegisterId::ER8),
+            // This will ensure the subroutine was executed. We have to adjust it for the changes
+            // in the PC register.
+            Instruction::MovU32ImmU32Reg(test_registers[8].1 - 3, test_registers[8].0),
+            Instruction::Ret,
+        ];
+
+        let mut compiler = Compiler::new();
+        let data = compiler.compile(instructions);
+
+        let mut vm = VirtualMachine::new(
+            100,
+            data,
+            &[],
+            crate::vm::U32_STACK_CAPACITY * mem::memory_handler::BYTES_IN_U32,
+        );
+
+        vm.run();
+
+        // Check the registers were correctly set and restored.
+        for (id, value) in test_registers {
+            assert_eq!(*vm.cpu.registers.get_register_u32(id).read_unchecked(), value);
         }
-        for (id, reg) in PRESERVE_REGISTERS_F32.iter().enumerate() {
-            vm.cpu
-                .registers
-                .get_register_f32_mut(*reg)
-                .write_unchecked((id + 1) as f32);
-        }
-
-        // Keep a copy of the registers struct.
-        let reference_registers = vm.cpu.registers.clone();
-
-        // Store the state.
-        vm.cpu.push_state(&mut vm.mem);
-
-        // Reset the registers.
-        for reg in PRESERVE_REGISTERS_U32 {
-            vm.cpu
-                .registers
-                .get_register_u32_mut(reg)
-                .write_unchecked(0);
-        }
-        for reg in PRESERVE_REGISTERS_F32 {
-            vm.cpu
-                .registers
-                .get_register_f32_mut(reg)
-                .write_unchecked(0f32);
-        }
-
-        // Restore the state.
-        vm.cpu.pop_state(&mut vm.mem);
-
-        // Our registers should now match the copy we made earlier.
-        assert_eq!(reference_registers, vm.cpu.registers);
     }
 
     /// Test the parity checking.
