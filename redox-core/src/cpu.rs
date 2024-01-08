@@ -887,6 +887,9 @@ impl Cpu {
             }
 
             /******** [Branching Instructions] ********/
+            Ret => {
+                todo!();
+            }
             Int(_addr) => {
                 todo!();
             }
@@ -1099,9 +1102,6 @@ impl Cpu {
             }
 
             /******** [Special Instructions] ********/
-            Ret => {
-                todo!();
-            }
             Mret => {
                 self.set_machine_mode(false);
             }

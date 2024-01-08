@@ -65,6 +65,8 @@ pub enum OpCode {
     ArithRightShiftU32RegU32Reg,
 
     /******** [Branching Instructions] ********/
+    /// Return from a subroutine.
+    Ret,
     Int,
     IntRet,
     /// Unconditional jump to a specified address.
@@ -139,12 +141,10 @@ pub enum OpCode {
     BitScanForwardU32MemU32Mem,
 
     /******** [Special Instructions] ********/
-    /// Return from a subroutine.
-    Ret = 32765,
     /// Machine return - downgrade the privilege level of the processor.
-    Mret = 32766,
+    Mret = 65534,
     /// Halt the execution of the virtual machine.
-    Hlt = 32767,
+    Hlt = 65535,
 
     // Anything above u32::MAX - 10 (0xfffffff5) is an invalid opcode. These are reserved for future or special use.
     Reserved1 = u32::MAX - 10,
@@ -198,6 +198,7 @@ impl From<Instruction> for OpCode {
             Instruction::ArithRightShiftU32RegU32Reg(_, _) => OpCode::ArithRightShiftU32RegU32Reg,
 
             /******** [Branching Instructions] ********/
+            Instruction::Ret => OpCode::Ret,
             Instruction::Int(_) => OpCode::Int,
             Instruction::IntRet => OpCode::IntRet,
             Instruction::JumpAbsU32Imm(_) => OpCode::JumpAbsU32Imm,
@@ -239,7 +240,6 @@ impl From<Instruction> for OpCode {
             Instruction::BitScanForwardU32MemU32Mem(_, _) => OpCode::BitScanForwardU32MemU32Mem,
 
             /******** [Special Instructions] ********/
-            Instruction::Ret => OpCode::Ret,
             Instruction::Mret => OpCode::Mret,
             Instruction::Hlt => OpCode::Hlt,
 

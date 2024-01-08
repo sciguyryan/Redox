@@ -284,6 +284,7 @@ mod tests_compiler {
                 OpCode::ArithRightShiftU32RegU32Reg => {
                     Instruction::ArithRightShiftU32RegU32Reg(ER2, ER3)
                 }
+                OpCode::Ret => Instruction::Ret,
                 OpCode::Int => Instruction::Int(0xdeadbeef),
                 OpCode::IntRet => Instruction::IntRet,
                 OpCode::JumpAbsU32Imm => Instruction::JumpAbsU32Imm(0xdeadbeef),
@@ -337,7 +338,6 @@ mod tests_compiler {
                 OpCode::BitScanForwardU32MemU32Mem => {
                     Instruction::BitScanForwardU32MemU32Mem(0x123, 0x321)
                 }
-                OpCode::Ret => Instruction::Ret,
                 OpCode::Mret => Instruction::Mret,
                 OpCode::Hlt => Instruction::Hlt,
 

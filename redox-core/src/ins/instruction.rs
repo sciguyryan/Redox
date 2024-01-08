@@ -77,6 +77,8 @@ pub enum Instruction {
     ArithRightShiftU32RegU32Reg(RegisterId, RegisterId),
 
     /******** [Branching Instructions] ********/
+    /// Return from a subroutine.
+    Ret,
     Int(u32),
     IntRet,
     /// Unconditional jump to a specified address.
@@ -147,8 +149,6 @@ pub enum Instruction {
     BitScanForwardU32MemU32Mem(u32, u32),
 
     /******** [Special Instructions] ********/
-    /// Return from a subroutine.
-    Ret,
     /// Machine return - downgrade the privilege level of the processor.
     Mret,
     /// Halt the execution of the processor.
@@ -255,6 +255,7 @@ impl Display for Instruction {
             }
 
             /******** [Branching Instructions] ********/
+            Instruction::Ret => String::from("ret"),
             Instruction::Int(addr) => {
                 format!("int ${addr:04x}")
             }
@@ -367,7 +368,6 @@ impl Display for Instruction {
             }
 
             /******** [Special Instructions] ********/
-            Instruction::Ret => String::from("ret"),
             Instruction::Mret => String::from("mret"),
             Instruction::Hlt => String::from("hlt"),
 
@@ -444,6 +444,7 @@ impl Instruction {
             OpCode::ArithRightShiftU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Branching Instructions] ********/
+            OpCode::Ret => 0,
             OpCode::Int => ARG_U32_IMM_SIZE,
             OpCode::IntRet => 0,
             OpCode::JumpAbsU32Imm => ARG_U32_IMM_SIZE,
@@ -487,7 +488,7 @@ impl Instruction {
             OpCode::BitScanForwardU32MemU32Mem => ARG_MEM_ADDR_SIZE + ARG_MEM_ADDR_SIZE,
 
             /******** [Special Instructions] ********/
-            OpCode::Ret | OpCode::Mret | OpCode::Hlt => 0,
+            OpCode::Mret | OpCode::Hlt => 0,
 
             /******** [Reserved Instructions] ********/
             OpCode::Reserved1

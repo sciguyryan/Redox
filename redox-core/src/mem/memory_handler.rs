@@ -461,6 +461,7 @@ impl MemoryHandler {
             }
 
             /******** [Branching Instructions] ********/
+            Ret => Instruction::Ret,
             Int => {
                 let addr = Self::read_u32(arg_bytes, &mut cursor);
 
@@ -656,7 +657,6 @@ impl MemoryHandler {
             }
 
             /******** [Special Instructions] ********/
-            Ret => Instruction::Ret,
             Mret => Instruction::Mret,
             Hlt => Instruction::Hlt,
 
