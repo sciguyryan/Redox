@@ -887,6 +887,9 @@ impl Cpu {
             }
 
             /******** [Branching Instructions] ********/
+            Call(addr, _uid) => {
+                todo!();
+            }
             Ret => {
                 todo!();
             }

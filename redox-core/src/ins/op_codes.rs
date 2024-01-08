@@ -65,6 +65,8 @@ pub enum OpCode {
     ArithRightShiftU32RegU32Reg,
 
     /******** [Branching Instructions] ********/
+    /// Call a subroutine.
+    Call,
     /// Return from a subroutine.
     Ret,
     Int,
@@ -198,6 +200,7 @@ impl From<Instruction> for OpCode {
             Instruction::ArithRightShiftU32RegU32Reg(_, _) => OpCode::ArithRightShiftU32RegU32Reg,
 
             /******** [Branching Instructions] ********/
+            Instruction::Call(_, _) => OpCode::Call,
             Instruction::Ret => OpCode::Ret,
             Instruction::Int(_) => OpCode::Int,
             Instruction::IntRet => OpCode::IntRet,

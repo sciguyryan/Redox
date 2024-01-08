@@ -77,6 +77,8 @@ pub enum Instruction {
     ArithRightShiftU32RegU32Reg(RegisterId, RegisterId),
 
     /******** [Branching Instructions] ********/
+    /// Call a subroutine.
+    Call(u32, u32),
     /// Return from a subroutine.
     Ret,
     Int(u32),
@@ -255,12 +257,17 @@ impl Display for Instruction {
             }
 
             /******** [Branching Instructions] ********/
+            Instruction::Call(addr, _uid) => {
+                // TODO - apply labels to these jumps - either dynamically generated or via binary file metadata.
+                format!("call ${addr:04x}")
+            }
             Instruction::Ret => String::from("ret"),
             Instruction::Int(addr) => {
                 format!("int ${addr:04x}")
             }
             Instruction::IntRet => String::from("intret"),
             Instruction::JumpAbsU32Imm(addr, _uid) => {
+                // TODO - apply labels to these jumps - either dynamically generated or via binary file metadata.
                 format!("jmp ${addr:04x}")
             }
             Instruction::JumpAbsU32Reg(reg) => {
@@ -444,10 +451,11 @@ impl Instruction {
             OpCode::ArithRightShiftU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Branching Instructions] ********/
+            OpCode::Call => ARG_MEM_ADDR_SIZE,
             OpCode::Ret => 0,
-            OpCode::Int => ARG_U32_IMM_SIZE,
+            OpCode::Int => ARG_MEM_ADDR_SIZE,
             OpCode::IntRet => 0,
-            OpCode::JumpAbsU32Imm => ARG_U32_IMM_SIZE,
+            OpCode::JumpAbsU32Imm => ARG_MEM_ADDR_SIZE,
             OpCode::JumpAbsU32Reg => ARG_REG_ID_SIZE,
 
             /******** [Data Instructions] ********/
