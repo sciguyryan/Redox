@@ -82,7 +82,7 @@ pub enum Instruction {
     Int(u32),
     IntRet,
     /// Unconditional jump to a specified address.
-    JumpAbsU32Imm(u32),
+    JumpAbsU32Imm(u32, u32),
     /// Unconditional jump to an address as specified by a u32 register.
     JumpAbsU32Reg(RegisterId),
 
@@ -260,7 +260,7 @@ impl Display for Instruction {
                 format!("int ${addr:04x}")
             }
             Instruction::IntRet => String::from("intret"),
-            Instruction::JumpAbsU32Imm(addr) => {
+            Instruction::JumpAbsU32Imm(addr, _uid) => {
                 format!("jmp ${addr:04x}")
             }
             Instruction::JumpAbsU32Reg(reg) => {

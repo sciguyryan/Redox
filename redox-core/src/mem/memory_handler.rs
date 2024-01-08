@@ -471,7 +471,7 @@ impl MemoryHandler {
             JumpAbsU32Imm => {
                 let addr = Self::read_u32(arg_bytes, &mut cursor);
 
-                Instruction::JumpAbsU32Imm(addr)
+                Instruction::JumpAbsU32Imm(addr, 0)
             }
             JumpAbsU32Reg => {
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);

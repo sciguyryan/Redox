@@ -896,7 +896,7 @@ impl Cpu {
             IntRet => {
                 todo!();
             }
-            JumpAbsU32Imm(addr) => {
+            JumpAbsU32Imm(addr, _id) => {
                 // jmp 0xaaaa
                 // Set the instruction pointer to the jump address.
                 self.set_instruction_pointer(*addr);
@@ -5993,7 +5993,7 @@ mod tests_cpu {
                     // start of the second move instruction.
                     //
                     // We expect that the first move instruction will be skipped entirely.
-                    JumpAbsU32Imm(117),
+                    JumpAbsU32Imm(117, 0),
                     // This instruction should be skipped, so R1 should remain at the default value of 0.
                     MovU32ImmU32Reg(0xf, RegisterId::ER1),
                     // The jump should start execution here.
@@ -6006,7 +6006,7 @@ mod tests_cpu {
                 "JMP - failed to execute JMP instruction",
             ),
             TestU32::new(
-                &[JumpAbsU32Imm(u32::MAX)],
+                &[JumpAbsU32Imm(u32::MAX, 0)],
                 &[],
                 None,
                 0,

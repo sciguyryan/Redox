@@ -201,7 +201,7 @@ impl From<Instruction> for OpCode {
             Instruction::Ret => OpCode::Ret,
             Instruction::Int(_) => OpCode::Int,
             Instruction::IntRet => OpCode::IntRet,
-            Instruction::JumpAbsU32Imm(_) => OpCode::JumpAbsU32Imm,
+            Instruction::JumpAbsU32Imm(_, _) => OpCode::JumpAbsU32Imm,
             Instruction::JumpAbsU32Reg(_) => OpCode::JumpAbsU32Reg,
 
             /******** [Data Instructions] ********/
