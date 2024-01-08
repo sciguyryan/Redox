@@ -6,8 +6,8 @@ default-members = ["redox-terminal", "redox-core"]
 
 [workspace.dependencies]
 bitflags = "2.4.1"
-divan = "0.1.8"
 float-cmp = "0.9.0"
+hashbrown = "0.14.3"
 num-traits = "0.2.17"
 num-derive = "0.4.1"
 once_cell = "1.19.0"

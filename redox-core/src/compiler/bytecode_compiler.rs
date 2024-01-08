@@ -151,8 +151,7 @@ impl Compiler {
             }
 
             /******** [u32 immediate and special u32 value] ********/
-            Instruction::Call(addr, _uid)
-            | Instruction::JumpAbsU32Imm(addr, _uid) => {
+            Instruction::Call(addr, _uid) | Instruction::JumpAbsU32Imm(addr, _uid) => {
                 self.write_u32(addr);
             }
 

@@ -73,12 +73,12 @@ fn main() {
 
     /*let instructions = &[
         // We expect that the first move instruction will be skipped entirely.
-        Instruction::AddU32ImmU32Reg(23, RegisterId::CS), // 9
-        Instruction::JumpAbsU32Reg(RegisterId::AC), // 5
-        // This instruction should be skipped, so R1 should remain at the default value of 0.
-        Instruction::MovU32ImmU32Reg(0xf, RegisterId::R1), // 9
+        Instruction::AddU32ImmU32Reg(23, RegisterId::ECS), // 9
+        Instruction::JumpAbsU32Reg(RegisterId::EAC), // 5
+        // This instruction should be skipped, so ER1 should remain at the default value of 0.
+        Instruction::MovU32ImmU32Reg(0xf, RegisterId::ER1), // 9
         // The jump should start execution here.
-        Instruction::MovU32ImmU32Reg(0xa, RegisterId::R2),
+        Instruction::MovU32ImmU32Reg(0xa, RegisterId::ER2),
         Instruction::Hlt,
     ];*/
 

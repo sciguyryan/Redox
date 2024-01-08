@@ -1356,8 +1356,9 @@ impl From<CpuFlag> for u8 {
 
 #[cfg(test)]
 mod tests_cpu {
+    use hashbrown::HashMap;
     use prettytable::{row, Table};
-    use std::{collections::HashMap, panic};
+    use std::panic;
 
     use crate::{
         compiler::bytecode_compiler::Compiler,

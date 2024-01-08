@@ -1,7 +1,8 @@
 use core::fmt;
+use hashbrown::HashMap;
 use num_derive::FromPrimitive;
 use prettytable::{row, Table};
-use std::{collections::HashMap, fmt::Display};
+use std::fmt::Display;
 
 use crate::boot_rom::BOOT_MEMORY_START;
 
@@ -68,10 +69,6 @@ pub enum RegisterId {
     ECS,
     /// Data segment register.
     EDS,
-
-    // [ Test Registers ] //
-    #[cfg(test)]
-    TEST0,
 }
 
 impl Display for RegisterId {
@@ -99,9 +96,6 @@ impl Display for RegisterId {
             RegisterId::ESS => "ESS",
             RegisterId::ECS => "ECS",
             RegisterId::EDS => "EDS",
-
-            #[cfg(test)]
-            RegisterId::TEST0 => "TEST0",
         };
         write!(f, "{printable}")
     }
@@ -190,9 +184,6 @@ impl Registers {
                 register_u32!(RegisterId::ESS, &rpw, 0),
                 register_u32!(RegisterId::ECS, &rpw, 0),
                 register_u32!(RegisterId::EDS, &rpw, 0),
-                // [ Test Registers ] //
-                #[cfg(test)]
-                register_u32!(RegisterId::TEST0, &prpw, 0),
             ]),
             registers_f32: HashMap::from([
                 // [ User Registers ] //
