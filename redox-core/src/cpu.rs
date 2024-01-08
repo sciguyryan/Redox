@@ -1108,11 +1108,19 @@ impl Cpu {
             Hlt => {
                 self.set_halted(true);
             }
+
+            /******** [Reserved Instructions] ********/
+            Reserved1 | Reserved2 | Reserved3 | Reserved4 | Reserved5 | Reserved6 | Reserved7
+            | Reserved8 | Reserved9 => {
+                unreachable!("attempted to use a reserved instruction");
+            }
+
+            /******** [Pseudo Instructions] ********/
             Label(_) => {
-                unreachable!("attempted to use a label in an invalid context");
+                unreachable!("attempted to use label pseudo instruction");
             }
             Unknown(id) => {
-                unreachable!("attempted to run an unrecognized instruction: {id}");
+                panic!("attempted to run an unrecognized instruction: {id}");
             }
         };
 
@@ -1701,19 +1709,17 @@ mod tests_cpu {
         });
     }
 
-    /// Test the unrecognized instruction.
+    /// Testing the use of unrecognized instruction.
     #[test]
+    #[should_panic]
     fn test_invalid_instruction() {
-        let tests = [TestU32::new(
-            &[Unknown(0xabc)],
-            &[],
-            None,
-            0,
-            true,
-            "Unknown Opcode - succeeded in executing an unrecognized opcode",
-        )];
+        // The following is an invalid opcode.
+        let compiled = (u32::MAX - 11).to_le_bytes();
 
-        TestsU32::new(&tests).run_all();
+        // Build a virtual machine instance.
+        let mut vm = VirtualMachine::new(100, &compiled, &[], 0);
+
+        vm.run();
     }
 
     /// Test the add u32 immediate to u32 register instruction.

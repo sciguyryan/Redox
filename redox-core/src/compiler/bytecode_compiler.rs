@@ -41,7 +41,7 @@ impl Compiler {
     /// A vector of u8 bytes containing the compiled data in byte form.
     fn compile_instruction(&mut self, instruction: &Instruction) {
         // First, we push the bytes for the opcode.
-        self.write_opcode(OpCode::from(instruction.clone()));
+        self.write_opcode(OpCode::from(*instruction));
 
         // Now we need to encode the instruction argument bytes.
         // This is done based on the type and order of the arguments.
@@ -159,18 +159,27 @@ impl Compiler {
             | Instruction::Mret
             | Instruction::Hlt => {}
 
-            /* This pseudo-instruction should -NEVER- be constructed. */
+            /* These instructions are reserved for future use and shouldn't be constructed. */
+            Instruction::Reserved1
+            | Instruction::Reserved2
+            | Instruction::Reserved3
+            | Instruction::Reserved4
+            | Instruction::Reserved5
+            | Instruction::Reserved6
+            | Instruction::Reserved7
+            | Instruction::Reserved8
+            | Instruction::Reserved9 => {
+                unreachable!();
+            }
+
+            /* This pseudo-instruction shouldn't be constructed and exists as a compiler hint. */
             Instruction::Label(_) => {
                 unreachable!();
             }
 
-            /* This pseudo-instruction should -NEVER- be constructed, outside of tests. */
+            /* This pseudo-instruction shouldn't be constructed and exists to preserve the provided opcode when debugging. */
             Instruction::Unknown(imm) => {
-                if cfg!(not(test)) {
-                    unreachable!();
-                }
-
-                self.write_u32(imm);
+                unreachable!("invalid opcode id {imm}");
             }
         }
     }
@@ -333,7 +342,17 @@ mod tests_compiler {
                 OpCode::Hlt => Instruction::Hlt,
 
                 // We don't want to test constructing these instructions.
-                OpCode::Label | OpCode::Unknown => continue,
+                OpCode::Reserved1
+                | OpCode::Reserved2
+                | OpCode::Reserved3
+                | OpCode::Reserved4
+                | OpCode::Reserved5
+                | OpCode::Reserved6
+                | OpCode::Reserved7
+                | OpCode::Reserved8
+                | OpCode::Reserved9
+                | OpCode::Label
+                | OpCode::Unknown => continue,
             };
 
             instructions_in.push(ins);

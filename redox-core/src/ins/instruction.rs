@@ -18,7 +18,7 @@ const ARG_MEM_ADDR_SIZE: usize = 4;
 /// The size of a register ID argument, in bytes.
 const ARG_REG_ID_SIZE: usize = 1;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[cfg_attr(test, derive(EnumIter))]
 pub enum Instruction {
     /// No operation.
@@ -153,8 +153,21 @@ pub enum Instruction {
     Mret,
     /// Halt the execution of the processor.
     Hlt,
+
+    /******** [Reserved Instructions] ********/
+    Reserved1,
+    Reserved2,
+    Reserved3,
+    Reserved4,
+    Reserved5,
+    Reserved6,
+    Reserved7,
+    Reserved8,
+    Reserved9,
+
+    /******** [Pseudo Instructions] ********/
     /// A placeholder opcode for labels. These do not directly compile to anything and are intended on being a hint when compiling. This should never be constructed directly.
-    Label(String),
+    Label(usize),
     /// A placeholder for instances where the opcode isn't recognized. This should never be constructed directly.
     Unknown(u32),
 }
@@ -357,7 +370,20 @@ impl Display for Instruction {
             Instruction::Ret => String::from("ret"),
             Instruction::Mret => String::from("mret"),
             Instruction::Hlt => String::from("hlt"),
-            Instruction::Label(_) => unreachable!("attempted to use label in an invalid context"),
+
+            /******** [Reserved Instructions] ********/
+            Instruction::Reserved1
+            | Instruction::Reserved2
+            | Instruction::Reserved3
+            | Instruction::Reserved4
+            | Instruction::Reserved5
+            | Instruction::Reserved6
+            | Instruction::Reserved7
+            | Instruction::Reserved8
+            | Instruction::Reserved9 => unreachable!("attempted to use a reserved instruction"),
+
+            /******** [Pseudo Instructions] ********/
+            Instruction::Label(_) => unreachable!("attempted to use label pseudo instruction"),
             Instruction::Unknown(id) => format!("UNKNOWN! ID = {id:04x}"),
         };
         write!(f, "{asm_format}")
@@ -372,7 +398,7 @@ impl Instruction {
     /// A usize giving the expected argument size, in bytes.
     #[inline(always)]
     pub fn get_instruction_arg_size(&self) -> usize {
-        Instruction::get_instruction_arg_size_from_op(self.clone().into())
+        Instruction::get_instruction_arg_size_from_op((*self).into())
     }
 
     /// Get the expected argument size of an [`OpCode`], in bytes.
@@ -461,11 +487,21 @@ impl Instruction {
             OpCode::BitScanForwardU32MemU32Mem => ARG_MEM_ADDR_SIZE + ARG_MEM_ADDR_SIZE,
 
             /******** [Special Instructions] ********/
-            OpCode::Ret => 0,
-            OpCode::Mret => 0,
-            OpCode::Hlt => 0,
-            OpCode::Label => 0,
-            OpCode::Unknown => 0,
+            OpCode::Ret | OpCode::Mret | OpCode::Hlt => 0,
+
+            /******** [Reserved Instructions] ********/
+            OpCode::Reserved1
+            | OpCode::Reserved2
+            | OpCode::Reserved3
+            | OpCode::Reserved4
+            | OpCode::Reserved5
+            | OpCode::Reserved6
+            | OpCode::Reserved7
+            | OpCode::Reserved8
+            | OpCode::Reserved9 => 0,
+
+            /******** [Pseudo Instructions] ********/
+            OpCode::Label | OpCode::Unknown => 0,
         }
     }
 

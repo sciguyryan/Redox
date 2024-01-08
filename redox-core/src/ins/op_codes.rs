@@ -146,12 +146,22 @@ pub enum OpCode {
     /// Halt the execution of the virtual machine.
     Hlt = 32767,
 
-    // Note - u32::MAX - 2 should never be assigned as it is used in various tests as an invalid opcode ID.
-    /// A placeholder opcode for labels. These do not directly compile to anything and are intended on being a hint when compiling. This should never be constructed directly.
-    Label = u32::MAX - 1,
+    // Anything above u32::MAX - 10 (0xfffffff5) is an invalid opcode. These are reserved for future or special use.
+    Reserved1 = u32::MAX - 10,
+    Reserved2,
+    Reserved3,
+    Reserved4,
+    Reserved5,
+    Reserved6,
+    Reserved7,
+    Reserved8,
+    Reserved9,
+
+    /// A placeholder opcode for labels. These do not directly compile to anything and are for used for computing jumps. This should never be constructed directly.
+    Label,
     /// A placeholder for instances where the opcode isn't recognized. This should never be constructed directly.
     #[default]
-    Unknown = u32::MAX,
+    Unknown,
 }
 
 impl From<Instruction> for OpCode {
@@ -232,6 +242,19 @@ impl From<Instruction> for OpCode {
             Instruction::Ret => OpCode::Ret,
             Instruction::Mret => OpCode::Mret,
             Instruction::Hlt => OpCode::Hlt,
+
+            /******** [Reserved Instructions] ********/
+            Instruction::Reserved1 => OpCode::Reserved1,
+            Instruction::Reserved2 => OpCode::Reserved2,
+            Instruction::Reserved3 => OpCode::Reserved3,
+            Instruction::Reserved4 => OpCode::Reserved4,
+            Instruction::Reserved5 => OpCode::Reserved5,
+            Instruction::Reserved6 => OpCode::Reserved6,
+            Instruction::Reserved7 => OpCode::Reserved7,
+            Instruction::Reserved8 => OpCode::Reserved8,
+            Instruction::Reserved9 => OpCode::Reserved9,
+
+            /******** [Pseudo Instructions] ********/
             Instruction::Label(_) => OpCode::Label,
             Instruction::Unknown(_) => OpCode::Unknown,
         }
@@ -260,7 +283,7 @@ mod tests_opcodes {
         // Ensure that each instruction produces the same opcode back.
         for (op, ins) in opcodes.iter().zip(instructions.iter()) {
             // Get the opcode from the instruction.
-            let op_from_ins: OpCode = ins.clone().into();
+            let op_from_ins: OpCode = (*ins).into();
             if op_from_ins != *op {
                 eprintln!("instruction {ins} has an opcode mismatch - expected {op_from_ins:?} but got {:?}", *op);
                 success = false;

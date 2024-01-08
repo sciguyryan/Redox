@@ -30,7 +30,7 @@ mod tests_compiler {
     /// Test decompiling with invalid opcode, generating a special Unknown instruction.
     #[test]
     fn test_decompile_invalid_opcode_preserve() {
-        let id = u32::MAX - 2;
+        let id = u32::MAX - 11;
         let result = Decompiler::decompile(&id.to_le_bytes());
 
         assert_eq!(result, vec![Instruction::Unknown(id)]);

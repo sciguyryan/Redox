@@ -238,10 +238,9 @@ impl MemoryHandler {
         let mut cursor = start;
         while cursor < end {
             let ins = self.get_instruction(cursor);
-            let size = ins.get_total_instruction_size();
             instructions.push(ins);
 
-            cursor += size;
+            cursor += ins.get_total_instruction_size();
         }
 
         instructions
@@ -660,6 +659,19 @@ impl MemoryHandler {
             Ret => Instruction::Ret,
             Mret => Instruction::Mret,
             Hlt => Instruction::Hlt,
+
+            /******** [Reserved Instructions] ********/
+            OpCode::Reserved1 => Instruction::Reserved1,
+            OpCode::Reserved2 => Instruction::Reserved2,
+            OpCode::Reserved3 => Instruction::Reserved3,
+            OpCode::Reserved4 => Instruction::Reserved4,
+            OpCode::Reserved5 => Instruction::Reserved5,
+            OpCode::Reserved6 => Instruction::Reserved6,
+            OpCode::Reserved7 => Instruction::Reserved7,
+            OpCode::Reserved8 => Instruction::Reserved8,
+            OpCode::Reserved9 => Instruction::Reserved9,
+
+            /******** [Pseudo Instructions] ********/
             Label => unreachable!("invalid use of reserved opcode"),
             Unknown => Instruction::Unknown(opcode_id),
         }
@@ -1490,7 +1502,7 @@ mod tests_memory {
     #[test]
     fn test_assert_invalid_opcode_id_preserve() {
         // This will generate an invalid opcode ID.
-        let id = u32::MAX - 2;
+        let id = u32::MAX - 11;
 
         // Load the fake data into memory.
         let ram = MemoryHandler::new(100, &id.to_le_bytes(), &[], 0);
