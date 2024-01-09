@@ -169,11 +169,7 @@ impl Cpu {
             .get_register_u32(RegisterId::EIP)
             .read_unchecked() as usize;
 
-        let ins = mem.get_instruction(ip);
-
-        eprintln!("cpu.rs - fetch_decode_next_instruction - ip = {ip} ins = {ins}");
-
-        ins
+        mem.get_instruction(ip)
     }
 
     /// Get the value of the stack pointer (SP) register.
@@ -627,12 +623,6 @@ impl Cpu {
             .get_register_u32_mut(RegisterId::ESP)
             .write_unchecked(frame_pointer);
 
-        eprintln!("cpu.rs - pop_state - before first pop");
-        eprintln!(
-            "cpu.rs - pop_state - mem.stack_frame_size = {}",
-            mem.stack_frame_size
-        );
-
         // Next, pop the old stack frame size.
         let old_stack_frame_size = mem.pop_u32();
         mem.stack_frame_size = old_stack_frame_size;
@@ -686,11 +676,6 @@ impl Cpu {
 
         // Next, push the current stack frame size.
         mem.push_u32(mem.stack_frame_size);
-
-        eprintln!(
-            "cpu.rs - push_state - stack_frame_size = {}",
-            mem.stack_frame_size
-        );
 
         // Next, update the stack frame pointer to be the current stack pointer location.
         let stack_pointer = self.get_stack_pointer();
@@ -1641,7 +1626,7 @@ mod tests_cpu {
 
     /// Test the call and return instructions, simple non-nested test.
     #[test]
-    fn test_call_return_simple() {
+    fn test_call_return_u32_simple() {
         let test_registers = [
             (RegisterId::ER2, 2),
             (RegisterId::ER3, 3),
@@ -1699,7 +1684,7 @@ mod tests_cpu {
 
     /// Test the call and return instructions, nested test.
     #[test]
-    fn test_call_return_nested() {
+    fn test_call_return_u32_nested() {
         let instructions = &[
             Instruction::PushU32Imm(3), // Starts at 100. Length = 8. This should remain in place.
             Instruction::PushU32Imm(2), // Starts at 108. Length = 8. Subroutine argument 1.

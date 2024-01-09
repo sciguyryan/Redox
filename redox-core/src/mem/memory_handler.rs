@@ -1097,11 +1097,6 @@ impl MemoryHandler {
         // Update the stack pointer.
         self.stack_pointer = value_start_pos;
 
-        eprintln!(
-            "memory_handler.rs - push_u32 {} - value = {value}",
-            self.stack_frame_size
-        );
-
         // Update the frame size indicator.
         self.stack_frame_size += 4;
     }
