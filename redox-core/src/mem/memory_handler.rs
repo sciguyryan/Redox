@@ -972,6 +972,11 @@ impl MemoryHandler {
         result
     }
 
+    /// Attempt to pop a certain number of f32 values from the top of the stack.
+    ///
+    /// # Arguments
+    ///
+    /// * `count` - The number of f32 values to push from the top of the stack.
     #[inline]
     pub fn pop_top_f32(&mut self, count: usize) {
         for _ in 0..count {
@@ -979,6 +984,11 @@ impl MemoryHandler {
         }
     }
 
+    /// Attempt to pop a certain number of u32 values from the top of the stack.
+    ///
+    /// # Arguments
+    ///
+    /// * `count` - The number of u32 values to push from the top of the stack.
     #[inline]
     pub fn pop_top_u32(&mut self, count: usize) {
         for _ in 0..count {
@@ -993,7 +1003,10 @@ impl MemoryHandler {
     /// This function will do nothing if stack type hints are disabled.
     #[inline]
     fn pop_type_hint(&mut self) {
-        self.debug_stack_type_hints.pop();
+        #[cfg(feature = "stack-type-hints")]
+        {
+            self.debug_stack_type_hints.pop();
+        }
     }
 
     /// Attempt to pop a u32 value from the stack.
