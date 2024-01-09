@@ -958,7 +958,16 @@ impl MemoryHandler {
         self.stack_pointer = value_start_pos + 4;
 
         // Update the frame size indicator.
-        self.stack_frame_size -= 4;
+        // A little hackery to ensure we don't assert in debug builds in
+        // instances where the stack size is zero, something that can occur during a subroutine call.
+        #[cfg(debug_assertions)]
+        {
+            self.stack_frame_size = self.stack_frame_size.wrapping_sub(4);
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            self.stack_frame_size -= 4;
+        }
 
         result
     }
@@ -1003,7 +1012,7 @@ impl MemoryHandler {
         // Update the stack pointer.
         self.stack_pointer = value_start_pos + 4;
 
-        // Update the frame size indicator/
+        // Update the frame size indicator.
         // A little hackery to ensure we don't assert in debug builds in
         // instances where the stack size is zero, something that can occur during a subroutine call.
         #[cfg(debug_assertions)]
@@ -1036,8 +1045,6 @@ impl MemoryHandler {
             "insufficient space on the stack to push a onto f32 value"
         );
 
-        // This needs to be 3 (not 4) since we are working from the basis that this
-        // will add a value to the last index. 0 to 3 is 4 positions.
         let value_start_pos = self.stack_pointer - 4;
 
         // Push the value to the stack.
@@ -1086,8 +1093,6 @@ impl MemoryHandler {
             "insufficient space on the stack to push a onto u32 value"
         );
 
-        // This needs to be 3 (not 4) since we are working from the basis that this
-        // will add a value to the last index. 0 to 3 is 4 positions.
         let value_start_pos = self.stack_pointer - 4;
 
         // Push the value to the stack.
