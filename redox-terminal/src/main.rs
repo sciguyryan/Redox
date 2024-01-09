@@ -61,46 +61,10 @@ use std::time::Instant;
     );
 }*/
 
-fn testing_calls() {
-    let instructions = &[
-        // The number of arguments for the subroutine.
-        Instruction::PushU32Imm(3), // Starts at 100. Length = 8. This should remain in place.
-        Instruction::PushU32Imm(2), // Starts at 108. Length = 8. Subroutine argument 1.
-        Instruction::PushU32Imm(1), // Starts at 116. Length = 8. The number of arguments.
-        Instruction::CallU32Imm(136, 0), // Starts at 124. Length = 8.
-        Instruction::Hlt, // Starts at 132. Length = 4.
-
-        // FUNC_AAAA - Subroutine starts here.
-        Instruction::PushU32Imm(0), // Starts at 136. Length = 8. The number of arguments.
-        Instruction::CallU32Imm(165, 0), // Starts at 144. Length = 8.
-        Instruction::AddU32ImmU32Reg(5, RegisterId::ER1), // Starts at 152. Length = 9.
-        Instruction::RetArgsU32, // Starts at 161. Length = 4.
-
-        // FUNC_BBBB - Subroutine starts here.
-        Instruction::PushU32Imm(100), // Starts at 165. Length = 8.
-        Instruction::PopU32ImmU32Reg(RegisterId::ER1), // Starts at 173. Length = 5.
-        Instruction::RetArgsU32, // Starts at 178. Length = 4.
-    ];
-
-    let mut compiler = Compiler::new();
-    let data = compiler.compile(instructions);
-
-    let mut vm = VirtualMachine::new(100, data, &[], 150 * mem::memory_handler::BYTES_IN_U32);
-
-    vm.run();
-
-    vm.mem.print_stack();
-    println!();
-    vm.cpu.registers.print_registers();
-}
-
 fn main() {
     if cfg!(target_endian = "big") {
         panic!("currently unsupported");
     }
-
-    testing_calls();
-    return;
 
     let instructions = &[
         Instruction::PushU32Imm(1234),

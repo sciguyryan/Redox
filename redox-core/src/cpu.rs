@@ -1639,9 +1639,9 @@ mod tests_cpu {
         }
     }
 
-    /// Test the pop and push of the CPU state.
+    /// Test the call and return instructions, simple non-nested test.
     #[test]
-    fn test_push_pop_state() {
+    fn test_call_return_simple() {
         let test_registers = [
             (RegisterId::ER2, 2),
             (RegisterId::ER3, 3),
@@ -1650,7 +1650,9 @@ mod tests_cpu {
             (RegisterId::ER6, 6),
             (RegisterId::ER7, 7),
             (RegisterId::ER8, 8),
-            (RegisterId::EPC, 0xdeafbeef),
+            // This register is preserved across frames and is used as a
+            // subroutine return value register.
+            (RegisterId::ER1, 0xdeafbeef),
         ];
 
         let instructions = &[
@@ -1663,7 +1665,7 @@ mod tests_cpu {
             Instruction::MovU32ImmU32Reg(test_registers[6].1, test_registers[6].0), // Starts at 154. Length = 9.
             // The number of arguments for the subroutine.
             Instruction::PushU32Imm(0), // Starts at 163. Length = 8. The number of arguments.
-            Instruction::CallU32Imm(192, 0), // Starts at 171. Length = 8.
+            Instruction::CallU32Imm(183, 0), // Starts at 171. Length = 8.
             Instruction::Hlt,           // Starts at 179. Length = 4.
             // FUNC_AAAA - Subroutine starts here.
             Instruction::MovU32ImmU32Reg(0, RegisterId::ER2), // Starts at 183.
@@ -1673,21 +1675,16 @@ mod tests_cpu {
             Instruction::MovU32ImmU32Reg(0, RegisterId::ER6),
             Instruction::MovU32ImmU32Reg(0, RegisterId::ER7),
             Instruction::MovU32ImmU32Reg(0, RegisterId::ER8),
-            // This will ensure the subroutine was executed. We have to adjust it for the changes
-            // in the PC register.
-            Instruction::MovU32ImmU32Reg(test_registers[7].1 - 3, test_registers[7].0),
+            // This will ensure the subroutine was executed since this register is preserved
+            // across stack frames.
+            Instruction::MovU32ImmU32Reg(test_registers[7].1, test_registers[7].0),
             Instruction::RetArgsU32,
         ];
 
         let mut compiler = Compiler::new();
         let data = compiler.compile(instructions);
 
-        let mut vm = VirtualMachine::new(
-            100,
-            data,
-            &[],
-            crate::vm::U32_STACK_CAPACITY * mem::memory_handler::BYTES_IN_U32,
-        );
+        let mut vm = VirtualMachine::new(100, data, &[], 30 * mem::memory_handler::BYTES_IN_U32);
 
         vm.run();
 
@@ -1698,6 +1695,51 @@ mod tests_cpu {
                 value
             );
         }
+    }
+
+    /// Test the call and return instructions, nested test.
+    #[test]
+    fn test_call_return_nested() {
+        let instructions = &[
+            Instruction::PushU32Imm(3), // Starts at 100. Length = 8. This should remain in place.
+            Instruction::PushU32Imm(2), // Starts at 108. Length = 8. Subroutine argument 1.
+            Instruction::PushU32Imm(1), // Starts at 116. Length = 8. The number of arguments.
+            Instruction::CallU32Imm(136, 0), // Starts at 124. Length = 8.
+            Instruction::Hlt,           // Starts at 132. Length = 4.
+            // FUNC_AAAA - Subroutine 1 starts here.
+            Instruction::PushU32Imm(0), // Starts at 136. Length = 8. The number of arguments.
+            Instruction::CallU32Imm(165, 0), // Starts at 144. Length = 8.
+            Instruction::AddU32ImmU32Reg(5, RegisterId::ER1), // Starts at 152. Length = 9.
+            Instruction::RetArgsU32,    // Starts at 161. Length = 4.
+            // FUNC_BBBB - Subroutine 2 starts here.
+            Instruction::PushU32Imm(100), // Starts at 165. Length = 8. This should NOT be preserved.
+            Instruction::PopU32ImmU32Reg(RegisterId::ER1), // Starts at 173. Length = 5.
+            Instruction::RetArgsU32,      // Starts at 178. Length = 4.
+        ];
+
+        let mut compiler = Compiler::new();
+        let data = compiler.compile(instructions);
+
+        let mut vm = VirtualMachine::new(100, data, &[], 30 * mem::memory_handler::BYTES_IN_U32);
+
+        vm.run();
+
+        // The first subroutine should set the value of the EAC register to 100.
+        // The second subroutine should add 5 to the value of EAC and set the accumulator
+        // to the resulting value.
+        assert_eq!(
+            *vm.cpu
+                .registers
+                .get_register_u32(RegisterId::EAC)
+                .read_unchecked(),
+            105
+        );
+
+        // There should be one entry on the stack.
+        assert_eq!(vm.mem.pop_u32(), 3);
+
+        // The stack should now be empty.
+        assert_eq!(vm.mem.stack_frame_size, 0);
     }
 
     /// Test the parity checking.
