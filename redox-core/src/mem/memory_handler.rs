@@ -21,7 +21,6 @@ pub const RAM_SEGMENT_NAME: &str = "ram";
 pub enum StackArgType {
     F32,
     U32,
-    U8,
 }
 
 /*
@@ -683,8 +682,7 @@ impl MemoryHandler {
             OpCode::Reserved9 => Instruction::Reserved9,
 
             /******** [Pseudo Instructions] ********/
-            Label => unreachable!("invalid use of reserved opcode"),
-            Unknown => Instruction::Unknown(opcode_id),
+            Label | Unknown => Instruction::Unknown(opcode_id),
         }
     }
 
@@ -810,14 +808,24 @@ impl MemoryHandler {
     ///
     /// A f32 from the specified memory address.
     pub fn get_f32(&self, pos: usize) -> f32 {
-        // TODO - this could probably be optimized like read_u32, if needed.
+        // We don't need to assert here since the following method will
+        // panic if we aren't able to read the requested number of bytes.
+        let bytes = self.get_range_ptr(pos, 4);
 
-        let bytes: [u8; 4] = self
-            .get_range_ptr(pos, 4)
-            .try_into()
-            .expect("failed to create a f32 from memory bytes");
+        // A slight optimization. Since we have asserted that we will always
+        // have sufficient elements in order to build the f32 value.
+        // Note that this works with little-Endian and would need to be adjusted
+        // should big-Endian be supported natively.
+        let value = unsafe {
+            std::mem::transmute::<[u8; 4], f32>([
+                *bytes.get_unchecked(0),
+                *bytes.get_unchecked(1),
+                *bytes.get_unchecked(2),
+                *bytes.get_unchecked(3),
+            ])
+        };
 
-        f32::from_le_bytes(bytes)
+        value
     }
 
     /// Attempt to read a u32 value from memory.
@@ -830,14 +838,24 @@ impl MemoryHandler {
     ///
     /// A u32 from the specified memory address.
     pub fn get_u32(&self, pos: usize) -> u32 {
-        // TODO - this could probably be optimized like read_u32, if needed.
+        // We don't need to assert here since the following method will
+        // panic if we aren't able to read the requested number of bytes.
+        let bytes = self.get_range_ptr(pos, 4);
 
-        let bytes: [u8; 4] = self
-            .get_range_ptr(pos, 4)
-            .try_into()
-            .expect("failed to create a u32 from memory bytes");
+        // A slight optimization. Since we have asserted that we will always
+        // have sufficient elements in order to build the u32 value.
+        // Note that this works with little-Endian and would need to be adjusted
+        // should big-Endian be supported natively.
+        let value = unsafe {
+            std::mem::transmute::<[u8; 4], u32>([
+                *bytes.get_unchecked(0),
+                *bytes.get_unchecked(1),
+                *bytes.get_unchecked(2),
+                *bytes.get_unchecked(3),
+            ])
+        };
 
-        u32::from_le_bytes(bytes)
+        value
     }
 
     /// Attempt to get a pointer to a range of bytes within memory.
@@ -1131,6 +1149,34 @@ impl MemoryHandler {
             .expect("failed to read register ID from memory")
     }
 
+    /// Attempt to read a f32 value from a memory slice.
+    ///
+    /// # Arguments
+    ///
+    /// * `bytes` - A slice of u8 values from which the f32 should be extracted.
+    /// * `cursor` - A mutable reference to the cursor, which specifies the starting position within the slice.
+    #[inline]
+    pub fn read_f32(bytes: &[u8], cursor: &mut usize) -> f32 {
+        assert!(bytes.len() >= *cursor + 4);
+
+        // A slight optimization. Since we have asserted that we will always
+        // have sufficient elements in order to build the f32 value.
+        // Note that this works with little-Endian and would need to be adjusted
+        // should big-Endian be supported natively.
+        let value = unsafe {
+            std::mem::transmute::<[u8; 4], f32>([
+                *bytes.get_unchecked(*cursor),
+                *bytes.get_unchecked(*cursor + 1),
+                *bytes.get_unchecked(*cursor + 2),
+                *bytes.get_unchecked(*cursor + 3),
+            ])
+        };
+
+        *cursor += 4;
+
+        value
+    }
+
     /// Attempt to read a u32 value from a memory slice.
     ///
     /// # Arguments
@@ -1143,7 +1189,7 @@ impl MemoryHandler {
 
         // A slight optimization. Since we have asserted that we will always
         // have sufficient elements in order to build the u32 value.
-        // Note that this works with little-Endian but would need to be adjusted
+        // Note that this works with little-Endian and would need to be adjusted
         // should big-Endian be supported natively.
         let value = unsafe {
             std::mem::transmute::<[u8; 4], u32>([
@@ -1272,14 +1318,17 @@ impl MemoryHandler {
 
             for (id, hint) in self.debug_stack_type_hints.iter().enumerate() {
                 match *hint {
-                    StackArgType::F32 => todo!(),
+                    StackArgType::F32 => {
+                        let value = self.get_f32(current_pos - 4);
+                        table.add_row(row![id, format!("{value}"), "f32"]);
+                    }
                     StackArgType::U32 => {
                         let value = self.get_u32(current_pos - 4);
                         table.add_row(row![id, format!("{value}"), "u32"]);
-                        current_pos -= 4;
                     }
-                    StackArgType::U8 => todo!(),
                 }
+
+                current_pos -= 4;
             }
 
             table.printstd();

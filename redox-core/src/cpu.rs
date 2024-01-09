@@ -638,7 +638,6 @@ impl Cpu {
         match arg_types {
             StackArgType::F32 => mem.pop_top_f32(arg_count),
             StackArgType::U32 => mem.pop_top_u32(arg_count),
-            StackArgType::U8 => todo!(),
         }
 
         // Finally, adjust our frame pointer position to the original frame pointer
@@ -944,11 +943,13 @@ impl Cpu {
 
             /******** [Branching Instructions] ********/
             CallU32Imm(addr, _uid) => {
-                // We need to force the IP to update -before- we store the state
+                // call 0xdeafbeef
+                // call label:
+                // We need to force the IP to update -before- we store the stack frame
                 // this is because we don't want to jump to the start of this instruction
                 // when we return from the subroutine.
-                // We can't do this at the usual place (at the end of this method) because that will
-                // impact the offset at the call destination instead.
+                // We can't do this at the usual point because that will impact the offset
+                // at the call destination instead.
                 self.increment_ip_register(instruction.get_total_instruction_size());
 
                 // Store the current stack frame state.
@@ -961,6 +962,7 @@ impl Cpu {
                 skip_ip_update = true;
             }
             RetArgsU32 => {
+                // iret
                 // Restore the state of the last stack frame.
                 self.pop_state(mem, StackArgType::U32);
 
