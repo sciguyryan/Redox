@@ -45,6 +45,8 @@ pub enum RegisterId {
 
     /// Float data register 1.
     FR1,
+    /// Float data register 2.
+    FR2,
 
     // [ System Registers ] //
     /// Accumulator register.
@@ -82,7 +84,8 @@ impl Display for RegisterId {
             RegisterId::ER6 => "ER6",
             RegisterId::ER7 => "ER7",
             RegisterId::ER8 => "ER8",
-            RegisterId::FR1 => "F1",
+            RegisterId::FR1 => "FR1",
+            RegisterId::FR2 => "FR2",
             RegisterId::EAC => "EAC",
 
             RegisterId::EIP => "EIP",
@@ -188,6 +191,7 @@ impl Registers {
             registers_f32: HashMap::from([
                 // [ User Registers ] //
                 register_f32!(RegisterId::FR1, &rw, 0f32),
+                register_f32!(RegisterId::FR2, &rw, 0f32),
             ]),
         }
     }

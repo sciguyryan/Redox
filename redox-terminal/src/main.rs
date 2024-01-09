@@ -67,13 +67,13 @@ fn testing_calls() {
         Instruction::PushU32Imm(3), // Starts at 100. Length = 8. This should remain in place.
         Instruction::PushU32Imm(2), // Starts at 108. Length = 8. Subroutine argument 1.
         Instruction::PushU32Imm(1), // Starts at 116. Length = 8. The number of arguments.
-        Instruction::Call(136, 0),  // Starts at 124. Length = 8.
+        Instruction::CallU32Imm(136, 0), // Starts at 124. Length = 8.
         Instruction::Hlt,           // Starts at 132. Length = 4.
         // FUNC_AAAA - Subroutine starts here.
-        Instruction::Nop, // Starts at 136. Length = 4.
-        Instruction::PushU32Imm(10), // Starts at 140. Length = 8.
+        Instruction::Nop,                              // Starts at 136. Length = 4.
+        Instruction::PushU32Imm(10),                   // Starts at 140. Length = 8.
         Instruction::PopU32ImmU32Reg(RegisterId::ER1), // Starts at 148. Length = 5.
-        Instruction::Ret, // Starts at 156. Length = 8.
+        Instruction::RetArgsU32,                       // Starts at 156. Length = 8.
     ];
 
     let mut compiler = Compiler::new();
@@ -93,8 +93,8 @@ fn main() {
         panic!("currently unsupported");
     }
 
-    //testing_calls();
-    //return;
+    testing_calls();
+    return;
 
     let instructions = &[
         Instruction::PushU32Imm(1234),

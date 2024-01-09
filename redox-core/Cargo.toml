@@ -26,4 +26,5 @@ strum_macros.workspace = true
 [dev-dependencies]
 
 [features]
-default = []
+default = ["stack-type-hints"]
+stack-type-hints = []

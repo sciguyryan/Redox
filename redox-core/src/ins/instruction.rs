@@ -77,10 +77,10 @@ pub enum Instruction {
     ArithRightShiftU32RegU32Reg(RegisterId, RegisterId),
 
     /******** [Branching Instructions] ********/
-    /// Call a subroutine.
-    Call(u32, u32),
-    /// Return from a subroutine.
-    Ret,
+    /// Call a subroutine by a provided u32 immediate address.
+    CallU32Imm(u32, u32),
+    /// Return from a subroutine with zero or more u32 arguments supplied.
+    RetArgsU32,
     Int(u32),
     IntRet,
     /// Unconditional jump to a specified address.
@@ -257,11 +257,11 @@ impl Display for Instruction {
             }
 
             /******** [Branching Instructions] ********/
-            Instruction::Call(addr, _uid) => {
+            Instruction::CallU32Imm(addr, _uid) => {
                 // TODO - apply labels to these jumps - either dynamically generated or via binary file metadata.
                 format!("call ${addr:04x}")
             }
-            Instruction::Ret => String::from("ret"),
+            Instruction::RetArgsU32 => String::from("iret"),
             Instruction::Int(addr) => {
                 format!("int ${addr:04x}")
             }
@@ -451,7 +451,7 @@ impl Instruction {
             OpCode::ArithRightShiftU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Branching Instructions] ********/
-            OpCode::Call => ARG_MEM_ADDR_SIZE,
+            OpCode::CallU32Imm => ARG_MEM_ADDR_SIZE,
             OpCode::Ret => 0,
             OpCode::Int => ARG_MEM_ADDR_SIZE,
             OpCode::IntRet => 0,

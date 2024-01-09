@@ -151,14 +151,14 @@ impl Compiler {
             }
 
             /******** [u32 immediate and special u32 value] ********/
-            Instruction::Call(addr, _uid) | Instruction::JumpAbsU32Imm(addr, _uid) => {
+            Instruction::CallU32Imm(addr, _uid) | Instruction::JumpAbsU32Imm(addr, _uid) => {
                 self.write_u32(addr);
             }
 
             /******** [No Arguments] ********/
             Instruction::Nop
             | Instruction::IntRet
-            | Instruction::Ret
+            | Instruction::RetArgsU32
             | Instruction::Mret
             | Instruction::Hlt => {}
 
@@ -287,8 +287,8 @@ mod tests_compiler {
                 OpCode::ArithRightShiftU32RegU32Reg => {
                     Instruction::ArithRightShiftU32RegU32Reg(ER2, ER3)
                 }
-                OpCode::Call => Instruction::Call(0xdeafbeed, 0),
-                OpCode::Ret => Instruction::Ret,
+                OpCode::CallU32Imm => Instruction::CallU32Imm(0xdeafbeed, 0),
+                OpCode::Ret => Instruction::RetArgsU32,
                 OpCode::Int => Instruction::Int(0xdeadbeef),
                 OpCode::IntRet => Instruction::IntRet,
                 OpCode::JumpAbsU32Imm => Instruction::JumpAbsU32Imm(0xdeadbeef, 0),
