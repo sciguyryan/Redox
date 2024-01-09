@@ -4,6 +4,7 @@ use redox_core::{
     compiler::bytecode_compiler::Compiler,
     ins::instruction::Instruction,
     mem,
+    reg::registers::RegisterId,
     vm::{self, VirtualMachine},
 };
 

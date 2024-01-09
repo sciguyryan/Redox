@@ -79,7 +79,7 @@ pub enum Instruction {
     /******** [Branching Instructions] ********/
     /// Call a subroutine by a provided u32 immediate address.
     CallU32Imm(u32, u32),
-    /// Return from a subroutine with zero or more u32 arguments supplied.
+    /// Return from a subroutine that had zero or more u32 arguments supplied.
     RetArgsU32,
     Int(u32),
     IntRet,
@@ -452,7 +452,7 @@ impl Instruction {
 
             /******** [Branching Instructions] ********/
             OpCode::CallU32Imm => ARG_MEM_ADDR_SIZE,
-            OpCode::Ret => 0,
+            OpCode::RetArgsU32 => 0,
             OpCode::Int => ARG_MEM_ADDR_SIZE,
             OpCode::IntRet => 0,
             OpCode::JumpAbsU32Imm => ARG_MEM_ADDR_SIZE,

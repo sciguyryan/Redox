@@ -472,7 +472,7 @@ impl MemoryHandler {
 
                 Instruction::CallU32Imm(addr, 0)
             }
-            Ret => Instruction::RetArgsU32,
+            RetArgsU32 => Instruction::RetArgsU32,
             Int => {
                 let addr = Self::read_u32(arg_bytes, &mut cursor);
 

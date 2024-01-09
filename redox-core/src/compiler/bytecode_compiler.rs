@@ -288,7 +288,7 @@ mod tests_compiler {
                     Instruction::ArithRightShiftU32RegU32Reg(ER2, ER3)
                 }
                 OpCode::CallU32Imm => Instruction::CallU32Imm(0xdeafbeed, 0),
-                OpCode::Ret => Instruction::RetArgsU32,
+                OpCode::RetArgsU32 => Instruction::RetArgsU32,
                 OpCode::Int => Instruction::Int(0xdeadbeef),
                 OpCode::IntRet => Instruction::IntRet,
                 OpCode::JumpAbsU32Imm => Instruction::JumpAbsU32Imm(0xdeadbeef, 0),

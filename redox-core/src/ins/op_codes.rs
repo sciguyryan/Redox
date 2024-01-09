@@ -67,8 +67,8 @@ pub enum OpCode {
     /******** [Branching Instructions] ********/
     /// Call a subroutine by a provided u32 immediate address.
     CallU32Imm,
-    /// Return from a subroutine.
-    Ret,
+    /// Return from a subroutine that had zero or more u32 arguments supplied.
+    RetArgsU32,
     Int,
     IntRet,
     /// Unconditional jump to a specified address.
@@ -201,7 +201,7 @@ impl From<Instruction> for OpCode {
 
             /******** [Branching Instructions] ********/
             Instruction::CallU32Imm(_, _) => OpCode::CallU32Imm,
-            Instruction::RetArgsU32 => OpCode::Ret,
+            Instruction::RetArgsU32 => OpCode::RetArgsU32,
             Instruction::Int(_) => OpCode::Int,
             Instruction::IntRet => OpCode::IntRet,
             Instruction::JumpAbsU32Imm(_, _) => OpCode::JumpAbsU32Imm,
