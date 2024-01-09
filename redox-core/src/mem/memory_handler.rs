@@ -243,9 +243,10 @@ impl MemoryHandler {
         let mut cursor = start;
         while cursor < end {
             let ins = self.get_instruction(cursor);
-            instructions.push(ins);
+            let size = ins.get_total_instruction_size();
 
-            cursor += ins.get_total_instruction_size();
+            instructions.push(ins);
+            cursor += size;
         }
 
         instructions
@@ -469,12 +470,12 @@ impl MemoryHandler {
             CallU32Imm => {
                 let addr = Self::read_u32(arg_bytes, &mut cursor);
 
-                Instruction::CallU32Imm(addr, 0)
+                Instruction::CallU32Imm(addr)
             }
             CallU32Reg => {
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::CallU32Reg(reg, 0)
+                Instruction::CallU32Reg(reg)
             }
             RetArgsU32 => Instruction::RetArgsU32,
             Int => {
@@ -486,7 +487,7 @@ impl MemoryHandler {
             JumpAbsU32Imm => {
                 let addr = Self::read_u32(arg_bytes, &mut cursor);
 
-                Instruction::JumpAbsU32Imm(addr, 0)
+                Instruction::JumpAbsU32Imm(addr)
             }
             JumpAbsU32Reg => {
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);

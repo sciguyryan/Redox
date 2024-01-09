@@ -4,7 +4,7 @@ use crate::{
 };
 
 pub struct Compiler {
-    /// A vector containing all of the compiled bytecode.
+    /// A vector containing the compiled bytecode.
     bytes: Vec<u8>,
 }
 
@@ -41,7 +41,7 @@ impl Compiler {
     /// A vector of u8 bytes containing the compiled data in byte form.
     fn compile_instruction(&mut self, instruction: &Instruction) {
         // First, we push the bytes for the opcode.
-        self.write_opcode(OpCode::from(*instruction));
+        self.write_opcode(OpCode::from(instruction));
 
         // Now we need to encode the instruction argument bytes.
         // This is done based on the type and order of the arguments.
@@ -107,7 +107,10 @@ impl Compiler {
             }
 
             /******** [u32 immediate] ********/
-            Instruction::Int(imm) | Instruction::PushU32Imm(imm) => {
+            Instruction::Int(imm)
+            | Instruction::PushU32Imm(imm)
+            | Instruction::CallU32Imm(imm)
+            | Instruction::JumpAbsU32Imm(imm) => {
                 self.write_u32(imm);
             }
 
@@ -132,7 +135,8 @@ impl Compiler {
             | Instruction::IncU32Reg(reg)
             | Instruction::DecU32Reg(reg)
             | Instruction::JumpAbsU32Reg(reg)
-            | Instruction::PopU32ImmU32Reg(reg) => {
+            | Instruction::PopU32ImmU32Reg(reg)
+            | Instruction::CallU32Reg(reg) => {
                 self.write_register_id(&reg);
             }
 
@@ -148,16 +152,6 @@ impl Compiler {
                 self.write_u32(imm);
                 self.write_register_id(&reg_1);
                 self.write_register_id(&reg_2);
-            }
-
-            /******** [u32 immediate and special u32 value] ********/
-            Instruction::CallU32Imm(addr, _uid) | Instruction::JumpAbsU32Imm(addr, _uid) => {
-                self.write_u32(addr);
-            }
-
-            /******** [u32 register and special u32 value] ********/
-            Instruction::CallU32Reg(reg, _uid) => {
-                self.write_register_id(&reg);
             }
 
             /******** [No Arguments] ********/
@@ -292,12 +286,12 @@ mod tests_compiler {
                 OpCode::ArithRightShiftU32RegU32Reg => {
                     Instruction::ArithRightShiftU32RegU32Reg(ER2, ER3)
                 }
-                OpCode::CallU32Imm => Instruction::CallU32Imm(0xdeafbeed, 0),
-                OpCode::CallU32Reg => Instruction::CallU32Reg(RegisterId::ER2, 0),
+                OpCode::CallU32Imm => Instruction::CallU32Imm(0xdeafbeed),
+                OpCode::CallU32Reg => Instruction::CallU32Reg(RegisterId::ER2),
                 OpCode::RetArgsU32 => Instruction::RetArgsU32,
                 OpCode::Int => Instruction::Int(0xdeadbeef),
                 OpCode::IntRet => Instruction::IntRet,
-                OpCode::JumpAbsU32Imm => Instruction::JumpAbsU32Imm(0xdeadbeef, 0),
+                OpCode::JumpAbsU32Imm => Instruction::JumpAbsU32Imm(0xdeadbeef),
                 OpCode::JumpAbsU32Reg => Instruction::JumpAbsU32Reg(ER1),
                 OpCode::SwapU32RegU32Reg => Instruction::SwapU32RegU32Reg(ER2, ER3),
                 OpCode::MovU32ImmU32Reg => Instruction::MovU32ImmU32Reg(0x123, ER2),

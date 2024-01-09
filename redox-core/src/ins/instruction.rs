@@ -18,7 +18,7 @@ const ARG_MEM_ADDR_SIZE: usize = 4;
 /// The size of a register ID argument, in bytes.
 const ARG_REG_ID_SIZE: usize = 1;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(test, derive(EnumIter))]
 pub enum Instruction {
     /// No operation.
@@ -78,15 +78,15 @@ pub enum Instruction {
 
     /******** [Branching Instructions] ********/
     /// Call a subroutine by a provided u32 immediate address.
-    CallU32Imm(u32, u32),
+    CallU32Imm(u32),
     /// Call a subroutine by the address as specified by a u32 register.
-    CallU32Reg(RegisterId, u32),
+    CallU32Reg(RegisterId),
     /// Return from a subroutine that had zero or more u32 arguments supplied.
     RetArgsU32,
     Int(u32),
     IntRet,
     /// Unconditional jump to a specified address.
-    JumpAbsU32Imm(u32, u32),
+    JumpAbsU32Imm(u32),
     /// Unconditional jump to an address as specified by a u32 register.
     JumpAbsU32Reg(RegisterId),
 
@@ -171,7 +171,7 @@ pub enum Instruction {
 
     /******** [Pseudo Instructions] ********/
     /// A placeholder opcode for labels. These do not directly compile to anything and are intended on being a hint when compiling. This should never be constructed directly.
-    Label(usize),
+    Label(String),
     /// A placeholder for instances where the opcode isn't recognized. This should never be constructed directly.
     Unknown(u32),
 }
@@ -179,7 +179,7 @@ pub enum Instruction {
 impl Display for Instruction {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         // NOTE: square brackets are used to indicate we are working with an address.
-        let asm_format = match *self {
+        let asm_format = match self {
             Instruction::Nop => String::from("nop"),
 
             /******** [Arithmetic Instructions] ********/
@@ -259,11 +259,11 @@ impl Display for Instruction {
             }
 
             /******** [Branching Instructions] ********/
-            Instruction::CallU32Imm(addr, _uid) => {
+            Instruction::CallU32Imm(addr) => {
                 // TODO - apply labels to these jumps - either dynamically generated or via binary file metadata.
                 format!("call ${addr:08x}")
             }
-            Instruction::CallU32Reg(reg, _uid) => {
+            Instruction::CallU32Reg(reg) => {
                 format!("call %{reg}")
             }
             Instruction::RetArgsU32 => String::from("iret"),
@@ -271,7 +271,7 @@ impl Display for Instruction {
                 format!("int ${addr:08x}")
             }
             Instruction::IntRet => String::from("intret"),
-            Instruction::JumpAbsU32Imm(addr, _uid) => {
+            Instruction::JumpAbsU32Imm(addr) => {
                 // TODO - apply labels to these jumps - either dynamically generated or via binary file metadata.
                 format!("jmp ${addr:08x}")
             }
@@ -303,19 +303,19 @@ impl Display for Instruction {
             }
             Instruction::MovU32ImmMemExpr(imm, expr) => {
                 let mut decoder = MoveExpressionHandler::new();
-                decoder.unpack(expr);
+                decoder.unpack(*expr);
 
                 format!("mov.c ${imm:08x}, [{decoder}]")
             }
             Instruction::MovMemExprU32Reg(expr, reg) => {
                 let mut decoder = MoveExpressionHandler::new();
-                decoder.unpack(expr);
+                decoder.unpack(*expr);
 
                 format!("mov.c [{decoder}], %{reg}")
             }
             Instruction::MovU32RegMemExpr(reg, expr) => {
                 let mut decoder = MoveExpressionHandler::new();
-                decoder.unpack(expr);
+                decoder.unpack(*expr);
 
                 format!("mov.c %{reg}, [{decoder}]")
             }
@@ -413,7 +413,7 @@ impl Instruction {
     /// A usize giving the expected argument size, in bytes.
     #[inline(always)]
     pub fn get_instruction_arg_size(&self) -> usize {
-        Instruction::get_instruction_arg_size_from_op((*self).into())
+        Instruction::get_instruction_arg_size_from_op(self.into())
     }
 
     /// Get the expected argument size of an [`OpCode`], in bytes.

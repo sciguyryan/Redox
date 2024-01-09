@@ -168,8 +168,8 @@ pub enum OpCode {
     Unknown,
 }
 
-impl From<Instruction> for OpCode {
-    fn from(val: Instruction) -> Self {
+impl From<&Instruction> for OpCode {
+    fn from(val: &Instruction) -> Self {
         match val {
             Instruction::Nop => OpCode::Nop,
 
@@ -202,12 +202,12 @@ impl From<Instruction> for OpCode {
             Instruction::ArithRightShiftU32RegU32Reg(_, _) => OpCode::ArithRightShiftU32RegU32Reg,
 
             /******** [Branching Instructions] ********/
-            Instruction::CallU32Imm(_, _) => OpCode::CallU32Imm,
-            Instruction::CallU32Reg(_, _) => OpCode::CallU32Reg,
+            Instruction::CallU32Imm(_) => OpCode::CallU32Imm,
+            Instruction::CallU32Reg(_) => OpCode::CallU32Reg,
             Instruction::RetArgsU32 => OpCode::RetArgsU32,
             Instruction::Int(_) => OpCode::Int,
             Instruction::IntRet => OpCode::IntRet,
-            Instruction::JumpAbsU32Imm(_, _) => OpCode::JumpAbsU32Imm,
+            Instruction::JumpAbsU32Imm(_) => OpCode::JumpAbsU32Imm,
             Instruction::JumpAbsU32Reg(_) => OpCode::JumpAbsU32Reg,
 
             /******** [Data Instructions] ********/
@@ -289,7 +289,7 @@ mod tests_opcodes {
         // Ensure that each instruction produces the same opcode back.
         for (op, ins) in opcodes.iter().zip(instructions.iter()) {
             // Get the opcode from the instruction.
-            let op_from_ins: OpCode = (*ins).into();
+            let op_from_ins: OpCode = ins.into();
             if op_from_ins != *op {
                 eprintln!("instruction {ins} has an opcode mismatch - expected {op_from_ins:?} but got {:?}", *op);
                 success = false;

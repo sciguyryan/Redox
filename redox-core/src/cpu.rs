@@ -968,7 +968,7 @@ impl Cpu {
             }
 
             /******** [Branching Instructions] ********/
-            CallU32Imm(addr, _uid) => {
+            CallU32Imm(addr) => {
                 // call 0xdeafbeef
                 // call :label
                 self.perform_call_jump(mem, *addr, instruction);
@@ -976,7 +976,7 @@ impl Cpu {
                 // We don't want to update the IP register here.
                 skip_ip_update = true;
             }
-            CallU32Reg(reg, _uid) => {
+            CallU32Reg(reg) => {
                 // call %reg
                 // Get the value of the register.
                 let addr = self.read_reg_u32(reg, privilege);
@@ -999,7 +999,7 @@ impl Cpu {
             IntRet => {
                 todo!();
             }
-            JumpAbsU32Imm(addr, _id) => {
+            JumpAbsU32Imm(addr) => {
                 // jmp 0xaaaa
                 // jmp :label
                 // Set the instruction pointer to the jump address.
@@ -1687,7 +1687,7 @@ mod tests_cpu {
             Instruction::PushU32Imm(3), // Starts at 109. Length = 8. This should remain in place.
             Instruction::PushU32Imm(2), // Starts at 117. Length = 8. Subroutine argument 1.
             Instruction::PushU32Imm(1), // Starts at 125. Length = 8. The number of arguments.
-            Instruction::CallU32Reg(RegisterId::ER8, 0), // Starts at 133. Length = 5.
+            Instruction::CallU32Reg(RegisterId::ER8), // Starts at 133. Length = 5.
             Instruction::AddU32ImmU32Reg(100, RegisterId::ER1), // Starts at 138. Length = 9.
             Instruction::Hlt,           // Starts at 147. Length = 4.
             // FUNC_AAAA - Subroutine starts here.
@@ -1746,7 +1746,7 @@ mod tests_cpu {
             Instruction::MovU32ImmU32Reg(test_registers[6].1, test_registers[6].0), // Starts at 154. Length = 9.
             // The number of arguments for the subroutine.
             Instruction::PushU32Imm(0), // Starts at 163. Length = 8. The number of arguments.
-            Instruction::CallU32Imm(183, 0), // Starts at 171. Length = 8.
+            Instruction::CallU32Imm(183), // Starts at 171. Length = 8.
             Instruction::Hlt,           // Starts at 179. Length = 4.
             // FUNC_AAAA - Subroutine starts here.
             Instruction::MovU32ImmU32Reg(0, RegisterId::ER2), // Starts at 183.
@@ -1782,11 +1782,11 @@ mod tests_cpu {
             Instruction::PushU32Imm(3), // Starts at 100. Length = 8. This should remain in place.
             Instruction::PushU32Imm(2), // Starts at 108. Length = 8. Subroutine argument 1.
             Instruction::PushU32Imm(1), // Starts at 116. Length = 8. The number of arguments.
-            Instruction::CallU32Imm(136, 0), // Starts at 124. Length = 8.
+            Instruction::CallU32Imm(136), // Starts at 124. Length = 8.
             Instruction::Hlt,           // Starts at 132. Length = 4.
             // FUNC_AAAA - Subroutine 1 starts here.
             Instruction::PushU32Imm(0), // Starts at 136. Length = 8. The number of arguments.
-            Instruction::CallU32Imm(165, 0), // Starts at 144. Length = 8.
+            Instruction::CallU32Imm(165), // Starts at 144. Length = 8.
             Instruction::AddU32ImmU32Reg(5, RegisterId::ER1), // Starts at 152. Length = 9.
             Instruction::RetArgsU32,    // Starts at 161. Length = 4.
             // FUNC_BBBB - Subroutine 2 starts here.
@@ -6194,7 +6194,7 @@ mod tests_cpu {
                     // start of the second move instruction.
                     //
                     // We expect that the first move instruction will be skipped entirely.
-                    JumpAbsU32Imm(117, 0),
+                    JumpAbsU32Imm(117),
                     // This instruction should be skipped, so R1 should remain at the default value of 0.
                     MovU32ImmU32Reg(0xf, RegisterId::ER1),
                     // The jump should start execution here.
@@ -6207,7 +6207,7 @@ mod tests_cpu {
                 "JMP - failed to execute JMP instruction",
             ),
             TestU32::new(
-                &[JumpAbsU32Imm(u32::MAX, 0)],
+                &[JumpAbsU32Imm(u32::MAX)],
                 &[],
                 None,
                 0,
