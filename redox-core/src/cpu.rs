@@ -169,7 +169,11 @@ impl Cpu {
             .get_register_u32(RegisterId::EIP)
             .read_unchecked() as usize;
 
-        mem.get_instruction(ip)
+        let ins = mem.get_instruction(ip);
+
+        eprintln!("cpu.rs - fetch_decode_next_instruction - ip = {ip} ins = {ins}");
+
+        ins
     }
 
     /// Get the value of the stack pointer (SP) register.
