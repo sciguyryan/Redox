@@ -606,22 +606,15 @@ impl Cpu {
     /// * `arg_types` - The type of arguments passed via the stack.
     #[inline]
     pub fn pop_state(&mut self, mem: &mut MemoryHandler, arg_types: StackArgType) {
-        let privilege = PrivilegeLevel::Machine;
-
         // NOTE - remember that the states need to be popped in the reverse order!
 
         // First, get the current frame pointer.
-        let frame_pointer = *self
-            .registers
-            .get_register_u32(RegisterId::EFP)
-            .read_unchecked();
+        let frame_pointer = self.read_reg_u32_unchecked(&RegisterId::EFP);
 
         // Next, reset the stack pointer to the address of the frame pointer.
         // Any stack entries higher in the stack can be disregarded as they are out of scope
         // from this point forward.
-        self.registers
-            .get_register_u32_mut(RegisterId::ESP)
-            .write_unchecked(frame_pointer);
+        self.write_reg_u32_unchecked(&RegisterId::ESP, frame_pointer);
 
         // Next, pop the old stack frame size.
         let old_stack_frame_size = mem.pop_u32();
@@ -632,12 +625,12 @@ impl Cpu {
 
         // Next, pop the f32 data registers from the stack.
         for reg in PRESERVE_REGISTERS_F32_REV {
-            self.write_reg_f32(&reg, mem.pop_f32(), &privilege);
+            self.write_reg_f32_unchecked(&reg, mem.pop_f32());
         }
 
         // Next, pop the the u32 data registers from the stack.
         for reg in PRESERVE_REGISTERS_U32_REV {
-            self.write_reg_u32(&reg, mem.pop_u32(), &privilege);
+            self.write_reg_u32_unchecked(&reg, mem.pop_u32());
         }
 
         // Next, clear the arguments from the stack.
@@ -650,9 +643,7 @@ impl Cpu {
 
         // Finally, adjust our frame pointer position to the original frame pointer
         // address plus the stack frame size.
-        self.registers
-            .get_register_u32_mut(RegisterId::EFP)
-            .write_unchecked(frame_pointer + stack_frame_size);
+        self.write_reg_u32_unchecked(&RegisterId::EFP, frame_pointer + stack_frame_size);
     }
 
     /// Push the relevant processor register states to the stack.
@@ -662,26 +653,21 @@ impl Cpu {
     /// * `mem` - The [`Memory`] connected to this CPU instance.
     #[inline]
     pub fn push_state(&mut self, mem: &mut MemoryHandler) {
-        let privilege = PrivilegeLevel::Machine;
-
         // First, push the u32 data registers to the stack.
         for reg in PRESERVE_REGISTERS_U32 {
-            mem.push_u32(self.read_reg_u32(&reg, &privilege));
+            mem.push_u32(self.read_reg_u32_unchecked(&reg));
         }
 
         // Next, push the f32 data registers to the stack.
         for reg in PRESERVE_REGISTERS_F32 {
-            mem.push_f32(self.read_reg_f32(&reg, &privilege));
+            mem.push_f32(self.read_reg_f32_unchecked(&reg));
         }
 
         // Next, push the current stack frame size.
         mem.push_u32(mem.stack_frame_size);
 
         // Next, update the stack frame pointer to be the current stack pointer location.
-        let stack_pointer = self.get_stack_pointer();
-        self.registers
-            .get_register_u32_mut(RegisterId::EFP)
-            .write_unchecked(stack_pointer);
+        self.write_reg_u32_unchecked(&RegisterId::EFP, self.get_stack_pointer());
 
         // Finally, reset the stack frame size so we can track the new frame.
         mem.stack_frame_size = 0;
@@ -698,8 +684,23 @@ impl Cpu {
     ///
     /// The f32 value of the register.
     #[inline(always)]
+    #[allow(dead_code)]
     fn read_reg_f32(&self, reg: &RegisterId, privilege: &PrivilegeLevel) -> f32 {
         *self.registers.get_register_f32(*reg).read(privilege)
+    }
+
+    /// Get the value of a specific f32 register, without privilege checking.
+    ///
+    /// # Arguments
+    ///
+    /// * `reg` - Reference to the [`RegisterId`] for the register in question.
+    ///
+    /// # Returns
+    ///
+    /// The f32 value of the register.
+    #[inline(always)]
+    fn read_reg_f32_unchecked(&self, reg: &RegisterId) -> f32 {
+        *self.registers.get_register_f32(*reg).read_unchecked()
     }
 
     /// Get the value of a specific u32 register.
@@ -715,6 +716,20 @@ impl Cpu {
     #[inline(always)]
     fn read_reg_u32(&self, reg: &RegisterId, privilege: &PrivilegeLevel) -> u32 {
         *self.registers.get_register_u32(*reg).read(privilege)
+    }
+
+    /// Get the value of a specific u32 register, without privilege checking.
+    ///
+    /// # Arguments
+    ///
+    /// * `reg` - Reference to the [`RegisterId`] for the register in question.
+    ///
+    /// # Returns
+    ///
+    /// The u32 value of the register.
+    #[inline(always)]
+    fn read_reg_u32_unchecked(&self, reg: &RegisterId) -> u32 {
+        *self.registers.get_register_u32(*reg).read_unchecked()
     }
 
     /// Perform a hard reset on the CPU.
@@ -1225,9 +1240,7 @@ impl Cpu {
     /// * `value` - The new value of the instruction pointer register.
     #[inline(always)]
     pub fn set_instruction_pointer(&mut self, value: u32) {
-        self.registers
-            .get_register_u32_mut(RegisterId::EIP)
-            .write_unchecked(value);
+        self.write_reg_u32_unchecked(&RegisterId::EIP, value);
     }
 
     /// Set the machine mode privilege level of the processor.
@@ -1247,17 +1260,9 @@ impl Cpu {
     /// * `mem` - A reference to the VM [`Memory`] instance.
     #[inline(always)]
     pub fn set_segment_registers(&mut self, mem: &MemoryHandler) {
-        self.registers
-            .get_register_u32_mut(RegisterId::ESS)
-            .write_unchecked(mem.stack_segment_start as u32);
-
-        self.registers
-            .get_register_u32_mut(RegisterId::ECS)
-            .write_unchecked(mem.code_segment_start as u32);
-
-        self.registers
-            .get_register_u32_mut(RegisterId::EDS)
-            .write_unchecked(mem.data_segment_start as u32);
+        self.write_reg_u32_unchecked(&RegisterId::ESS, mem.stack_segment_start as u32);
+        self.write_reg_u32_unchecked(&RegisterId::ECS, mem.code_segment_start as u32);
+        self.write_reg_u32_unchecked(&RegisterId::EDS, mem.data_segment_start as u32);
     }
 
     /// Set the standard CPU flags based on the specified value and overflow.
@@ -1285,9 +1290,7 @@ impl Cpu {
     /// * `value` - The new value of the stack pointer register.
     #[inline(always)]
     pub fn set_stack_pointer(&mut self, value: u32) {
-        self.registers
-            .get_register_u32_mut(RegisterId::ESP)
-            .write_unchecked(value);
+        self.write_reg_u32_unchecked(&RegisterId::ESP, value);
     }
 
     /// Update the u32 accumulator (AC) register.
@@ -1297,9 +1300,7 @@ impl Cpu {
     /// * `value` - The new value of the accumulator register.
     #[inline(always)]
     fn set_u32_accumulator(&mut self, value: u32) {
-        self.registers
-            .get_register_u32_mut(RegisterId::EAC)
-            .write_unchecked(value);
+        self.write_reg_u32_unchecked(&RegisterId::EAC, value);
     }
 
     /// Set the value of a specific f32 register.
@@ -1310,10 +1311,24 @@ impl Cpu {
     /// * `new_val` - The new value of the register.
     /// * `privilege` - The [`PrivilegeLevel`] with which the read request should be processed.
     #[inline(always)]
+    #[allow(dead_code)]
     fn write_reg_f32(&mut self, reg: &RegisterId, new_val: f32, privilege: &PrivilegeLevel) {
         self.registers
             .get_register_f32_mut(*reg)
             .write(new_val, privilege);
+    }
+
+    /// Set the value of a specific f32 register, without privilege checking.
+    ///
+    /// # Arguments
+    ///
+    /// * `reg` - Reference to the [`RegisterId`] for the register in question.
+    /// * `new_val` - The new value of the register.
+    #[inline(always)]
+    fn write_reg_f32_unchecked(&mut self, reg: &RegisterId, new_val: f32) {
+        self.registers
+            .get_register_f32_mut(*reg)
+            .write_unchecked(new_val);
     }
 
     /// Set the value of a specific u32 register.
@@ -1328,6 +1343,19 @@ impl Cpu {
         self.registers
             .get_register_u32_mut(*reg)
             .write(new_val, privilege);
+    }
+
+    /// Set the value of a specific u32 register, without privilege checking.
+    ///
+    /// # Arguments
+    ///
+    /// * `reg` - Reference to the [`RegisterId`] for the register in question.
+    /// * `new_val` - The new value of the register.
+    #[inline(always)]
+    fn write_reg_u32_unchecked(&mut self, reg: &RegisterId, new_val: u32) {
+        self.registers
+            .get_register_u32_mut(*reg)
+            .write_unchecked(new_val);
     }
 }
 
@@ -1579,7 +1607,7 @@ mod tests_cpu {
             self.expected_changed_registers
                 .iter()
                 .for_each(|(id, expected_value)| {
-                    let actual_value = *vm.cpu.registers.get_register_u32(*id).read_unchecked();
+                    let actual_value = vm.cpu.read_reg_u32_unchecked(id);
                     if *expected_value != actual_value {
                         table.add_row(row![
                             id,
@@ -1675,10 +1703,7 @@ mod tests_cpu {
 
         // Check the registers were correctly set and restored.
         for (id, value) in test_registers {
-            assert_eq!(
-                *vm.cpu.registers.get_register_u32(id).read_unchecked(),
-                value
-            );
+            assert_eq!(vm.cpu.read_reg_u32_unchecked(&id), value);
         }
     }
 
