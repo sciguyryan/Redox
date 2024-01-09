@@ -184,40 +184,40 @@ impl Display for Instruction {
 
             /******** [Arithmetic Instructions] ********/
             Instruction::AddU32ImmU32Reg(imm, reg) => {
-                format!("add ${imm:04x}, %{reg}")
+                format!("add ${imm:08x}, %{reg}")
             }
             Instruction::AddU32RegU32Reg(in_reg, out_reg) => {
                 format!("add %{in_reg}, %{out_reg}")
             }
             Instruction::SubU32ImmU32Reg(imm, reg) => {
-                format!("sub ${imm:04x}, %{reg}")
+                format!("sub ${imm:08x}, %{reg}")
             }
             Instruction::SubU32RegU32Imm(reg, imm) => {
-                format!("sub %{reg}, ${imm:04x}")
+                format!("sub %{reg}, ${imm:08x}")
             }
             Instruction::SubU32RegU32Reg(reg_1, reg_2) => {
                 format!("sub %{reg_1}, %{reg_2}")
             }
             Instruction::MulU32ImmU32Reg(imm, reg) => {
-                format!("mul ${imm:04x}, %{reg}")
+                format!("mul ${imm:08x}, %{reg}")
             }
             Instruction::MulU32RegU32Reg(reg_1, reg_2) => {
                 format!("mul %{reg_1}, %{reg_2}")
             }
             Instruction::DivU32ImmU32Reg(imm, reg) => {
-                format!("div ${imm:04x}, %{reg}")
+                format!("div ${imm:08x}, %{reg}")
             }
             Instruction::DivU32RegU32Imm(reg, imm) => {
-                format!("div %{reg}, ${imm:04x}")
+                format!("div %{reg}, ${imm:08x}")
             }
             Instruction::DivU32RegU32Reg(reg_1, reg_2) => {
                 format!("div %{reg_1}, %{reg_2}")
             }
             Instruction::ModU32ImmU32Reg(imm, reg) => {
-                format!("mod ${imm:04x}, %{reg}")
+                format!("mod ${imm:08x}, %{reg}")
             }
             Instruction::ModU32RegU32Imm(reg, imm) => {
-                format!("mod %{reg}, ${imm:04x}")
+                format!("mod %{reg}, ${imm:08x}")
             }
             Instruction::ModU32RegU32Reg(reg_1, reg_2) => {
                 format!("mod %{reg_1}, %{reg_2}")
@@ -229,30 +229,30 @@ impl Display for Instruction {
                 format!("dec %{reg}")
             }
             Instruction::AndU32ImmU32Reg(imm, reg) => {
-                format!("and ${imm:04x}, %{reg}")
+                format!("and ${imm:08x}, %{reg}")
             }
 
             /******** [Bit Operation Instructions] ********/
             Instruction::LeftShiftU32ImmU32Reg(imm, reg) => {
-                format!("shl ${imm:04x}, %{reg}")
+                format!("shl ${imm:08x}, %{reg}")
             }
             Instruction::LeftShiftU32RegU32Reg(shift_reg, reg) => {
                 format!("shl {shift_reg}, %{reg}")
             }
             Instruction::ArithLeftShiftU32ImmU32Reg(imm, reg) => {
-                format!("sal ${imm:04x}, %{reg}")
+                format!("sal ${imm:08x}, %{reg}")
             }
             Instruction::ArithLeftShiftU32RegU32Reg(shift_reg, reg) => {
                 format!("sal {shift_reg}, %{reg}")
             }
             Instruction::RightShiftU32ImmU32Reg(imm, reg) => {
-                format!("shr ${imm:04x}, %{reg}")
+                format!("shr ${imm:08x}, %{reg}")
             }
             Instruction::RightShiftU32RegU32Reg(shift_reg, reg) => {
                 format!("shr %{shift_reg}, %{reg}")
             }
             Instruction::ArithRightShiftU32ImmU32Reg(imm, reg) => {
-                format!("sar ${imm:04x}, %{reg}")
+                format!("sar ${imm:08x}, %{reg}")
             }
             Instruction::ArithRightShiftU32RegU32Reg(shift_reg, reg) => {
                 format!("sar {shift_reg}, %{reg}")
@@ -261,19 +261,19 @@ impl Display for Instruction {
             /******** [Branching Instructions] ********/
             Instruction::CallU32Imm(addr, _uid) => {
                 // TODO - apply labels to these jumps - either dynamically generated or via binary file metadata.
-                format!("call ${addr:04x}")
+                format!("call ${addr:08x}")
             }
             Instruction::CallU32Reg(reg, _uid) => {
                 format!("call %{reg}")
             }
             Instruction::RetArgsU32 => String::from("iret"),
             Instruction::Int(addr) => {
-                format!("int ${addr:04x}")
+                format!("int ${addr:08x}")
             }
             Instruction::IntRet => String::from("intret"),
             Instruction::JumpAbsU32Imm(addr, _uid) => {
                 // TODO - apply labels to these jumps - either dynamically generated or via binary file metadata.
-                format!("jmp ${addr:04x}")
+                format!("jmp ${addr:08x}")
             }
             Instruction::JumpAbsU32Reg(reg) => {
                 format!("jmp %{reg}")
@@ -284,19 +284,19 @@ impl Display for Instruction {
                 format!("swap %{reg_1}, %{reg_2}")
             }
             Instruction::MovU32ImmU32Reg(imm, reg) => {
-                format!("mov ${imm:04x}, %{reg}")
+                format!("mov ${imm:08x}, %{reg}")
             }
             Instruction::MovU32RegU32Reg(in_reg, out_reg) => {
                 format!("mov %{in_reg}, %{out_reg}")
             }
             Instruction::MovU32ImmMemSimple(imm, addr) => {
-                format!("mov.s ${imm:04x}, [${addr:04x}]")
+                format!("mov.s ${imm:08x}, [${addr:08x}]")
             }
             Instruction::MovU32RegMemSimple(reg, addr) => {
-                format!("mov.s %{reg}, [${addr:04x}]")
+                format!("mov.s %{reg}, [${addr:08x}]")
             }
             Instruction::MovMemU32RegSimple(addr, reg) => {
-                format!("mov.s [${addr:04x}], %{reg}")
+                format!("mov.s [${addr:08x}], %{reg}")
             }
             Instruction::MovU32RegPtrU32RegSimple(in_reg, out_reg) => {
                 format!("mov.s [%{in_reg}], %{out_reg}")
@@ -305,7 +305,7 @@ impl Display for Instruction {
                 let mut decoder = MoveExpressionHandler::new();
                 decoder.unpack(expr);
 
-                format!("mov.c ${imm:04x}, [{decoder}]")
+                format!("mov.c ${imm:08x}, [{decoder}]")
             }
             Instruction::MovMemExprU32Reg(expr, reg) => {
                 let mut decoder = MoveExpressionHandler::new();
@@ -329,7 +329,7 @@ impl Display for Instruction {
                 format!("zhbi {index}, %{in_reg}, %{out_reg}")
             }
             Instruction::PushU32Imm(index) => {
-                format!("push ${index:04x}")
+                format!("push ${index:08x}")
             }
             Instruction::PopU32ImmU32Reg(out_reg) => {
                 format!("pop %{out_reg}")
@@ -340,43 +340,43 @@ impl Display for Instruction {
                 format!("bt {bit}, %{reg}")
             }
             Instruction::BitTestU32Mem(bit, addr) => {
-                format!("bt {bit}, [${addr:04x}]")
+                format!("bt {bit}, [${addr:08x}]")
             }
             Instruction::BitTestResetU32Reg(bit, reg) => {
                 format!("btr {bit}, %{reg}")
             }
             Instruction::BitTestResetU32Mem(bit, addr) => {
-                format!("btr {bit}, [${addr:04x}]")
+                format!("btr {bit}, [${addr:08x}]")
             }
             Instruction::BitTestSetU32Reg(bit, reg) => {
                 format!("bts {bit}, %{reg}")
             }
             Instruction::BitTestSetU32Mem(bit, addr) => {
-                format!("bts {bit}, [${addr:04x}]")
+                format!("bts {bit}, [${addr:08x}]")
             }
             Instruction::BitScanReverseU32RegU32Reg(in_reg, out_reg) => {
                 format!("bsr %{in_reg}, %{out_reg}")
             }
             Instruction::BitScanReverseU32MemU32Reg(addr, reg) => {
-                format!("bsr [${addr:04x}], %{reg}")
+                format!("bsr [${addr:08x}], %{reg}")
             }
             Instruction::BitScanReverseU32RegMemU32(reg, out_addr) => {
-                format!("bsr %{reg}, [${out_addr:04x}]")
+                format!("bsr %{reg}, [${out_addr:08x}]")
             }
             Instruction::BitScanReverseU32MemU32Mem(in_addr, out_addr) => {
-                format!("bsr [${in_addr:04x}], [${out_addr:04x}]")
+                format!("bsr [${in_addr:08x}], [${out_addr:08x}]")
             }
             Instruction::BitScanForwardU32RegU32Reg(in_reg, out_reg) => {
                 format!("bsf %{in_reg}, %{out_reg}")
             }
             Instruction::BitScanForwardU32MemU32Reg(addr, reg) => {
-                format!("bsf [${addr:04x}], %{reg}")
+                format!("bsf [${addr:08x}], %{reg}")
             }
             Instruction::BitScanForwardU32RegMemU32(reg, out_addr) => {
-                format!("bsr %{reg}, [${out_addr:04x}]")
+                format!("bsr %{reg}, [${out_addr:08x}]")
             }
             Instruction::BitScanForwardU32MemU32Mem(in_addr, out_addr) => {
-                format!("bsr [${in_addr:04x}], [${out_addr:04x}]")
+                format!("bsr [${in_addr:08x}], [${out_addr:08x}]")
             }
 
             /******** [Special Instructions] ********/
@@ -399,7 +399,7 @@ impl Display for Instruction {
                 // TODO - lookup the specific label by the uid
                 todo!();
             }
-            Instruction::Unknown(id) => format!("UNKNOWN! ID = {id:04x}"),
+            Instruction::Unknown(id) => format!("UNKNOWN! ID = {id:08x}"),
         };
         write!(f, "{asm_format}")
     }

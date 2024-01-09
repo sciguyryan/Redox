@@ -408,13 +408,13 @@ impl Cpu {
     /// # Arguments
     ///
     /// * `mem` - A mutable reference to the virtual machine [`Memory`] instance.
-    /// * `jump_addr` - The call jump address.
+    /// * `addr` - The call jump address.
     /// * `call_instruction` - The instruction that executed the call.
     #[inline(always)]
     fn perform_call_jump(
         &mut self,
         mem: &mut MemoryHandler,
-        jump_addr: u32,
+        addr: u32,
         call_instruction: &Instruction,
     ) {
         // We need to force the IP to update -before- we store the stack frame
@@ -429,7 +429,7 @@ impl Cpu {
 
         // Jump to the subroutine by moving the instruction pointer to the
         // specified location.
-        self.set_instruction_pointer(jump_addr);
+        self.set_instruction_pointer(addr);
     }
 
     /// Perform a right-shift of two u32 values.
@@ -688,7 +688,7 @@ impl Cpu {
             mem.push_f32(self.read_reg_f32_unchecked(&reg));
         }
 
-        // Next, push the current stack frame size.
+        // Next, push the current stack frame size to the stack.
         mem.push_u32(mem.stack_frame_size);
 
         // Next, update the stack frame pointer to be the current stack pointer location.
