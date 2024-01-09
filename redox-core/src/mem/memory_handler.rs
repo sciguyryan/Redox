@@ -471,6 +471,11 @@ impl MemoryHandler {
 
                 Instruction::CallU32Imm(addr, 0)
             }
+            CallU32Reg => {
+                let reg = Self::read_register_id(arg_bytes, &mut cursor);
+
+                Instruction::CallU32Reg(reg, 0)
+            }
             RetArgsU32 => Instruction::RetArgsU32,
             Int => {
                 let addr = Self::read_u32(arg_bytes, &mut cursor);

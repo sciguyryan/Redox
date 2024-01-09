@@ -175,10 +175,7 @@ impl Cpu {
     /// Get the value of the stack pointer (SP) register.
     #[inline(always)]
     pub fn get_stack_pointer(&self) -> u32 {
-        *self
-            .registers
-            .get_register_u32(RegisterId::ESP)
-            .read_unchecked()
+        self.read_reg_u32_unchecked(&RegisterId::ESP)
     }
 
     /// Increment the instruction pointer (IP) register by a specified amount.
@@ -404,6 +401,35 @@ impl Cpu {
         self.set_flag_state(CpuFlag::PF, Cpu::calculate_lowest_byte_parity(final_value));
 
         final_value
+    }
+
+    /// Perform a call jump.
+    ///
+    /// # Arguments
+    ///
+    /// * `mem` - A mutable reference to the virtual machine [`Memory`] instance.
+    /// * `jump_addr` - The call jump address.
+    /// * `call_instruction` - The instruction that executed the call.
+    #[inline(always)]
+    fn perform_call_jump(
+        &mut self,
+        mem: &mut MemoryHandler,
+        jump_addr: u32,
+        call_instruction: &Instruction,
+    ) {
+        // We need to force the IP to update -before- we store the stack frame
+        // this is because we don't want to jump to the start of this instruction
+        // when we return from the subroutine.
+        // We can't do this at the usual point because that will impact the offset
+        // at the call destination instead.
+        self.increment_ip_register(call_instruction.get_total_instruction_size());
+
+        // Store the current stack frame state.
+        self.push_state(mem);
+
+        // Jump to the subroutine by moving the instruction pointer to the
+        // specified location.
+        self.set_instruction_pointer(jump_addr);
     }
 
     /// Perform a right-shift of two u32 values.
@@ -944,19 +970,17 @@ impl Cpu {
             /******** [Branching Instructions] ********/
             CallU32Imm(addr, _uid) => {
                 // call 0xdeafbeef
-                // call label:
-                // We need to force the IP to update -before- we store the stack frame
-                // this is because we don't want to jump to the start of this instruction
-                // when we return from the subroutine.
-                // We can't do this at the usual point because that will impact the offset
-                // at the call destination instead.
-                self.increment_ip_register(instruction.get_total_instruction_size());
+                // call :label
+                self.perform_call_jump(mem, *addr, instruction);
 
-                // Store the current stack frame state.
-                self.push_state(mem);
-
-                // Jump to the subroutine.
-                self.set_instruction_pointer(*addr);
+                // We don't want to update the IP register here.
+                skip_ip_update = true;
+            }
+            CallU32Reg(reg, _uid) => {
+                // call %reg
+                // Get the value of the register.
+                let addr = self.read_reg_u32(reg, privilege);
+                self.perform_call_jump(mem, addr, instruction);
 
                 // We don't want to update the IP register here.
                 skip_ip_update = true;
@@ -977,6 +1001,7 @@ impl Cpu {
             }
             JumpAbsU32Imm(addr, _id) => {
                 // jmp 0xaaaa
+                // jmp :label
                 // Set the instruction pointer to the jump address.
                 self.set_instruction_pointer(*addr);
 
@@ -1652,6 +1677,47 @@ mod tests_cpu {
                 self.should_panic, self.fail_message
             )
         }
+    }
+
+    /// Test the call and return instructions by register pointer instruction.
+    #[test]
+    fn test_call_return_u32_reg() {
+        let instructions = &[
+            Instruction::MovU32ImmU32Reg(151, RegisterId::ER8), // Starts at 100. Length = 9. This should remain in place.
+            Instruction::PushU32Imm(3), // Starts at 109. Length = 8. This should remain in place.
+            Instruction::PushU32Imm(2), // Starts at 117. Length = 8. Subroutine argument 1.
+            Instruction::PushU32Imm(1), // Starts at 125. Length = 8. The number of arguments.
+            Instruction::CallU32Reg(RegisterId::ER8, 0), // Starts at 133. Length = 5.
+            Instruction::AddU32ImmU32Reg(100, RegisterId::ER1), // Starts at 138. Length = 9.
+            Instruction::Hlt,           // Starts at 147. Length = 4.
+            // FUNC_AAAA - Subroutine starts here.
+            Instruction::PushU32Imm(5), // Starts at 151. Length = 8.
+            Instruction::PopU32ImmU32Reg(RegisterId::ER1), // Starts at 159. Length = 5.
+            Instruction::RetArgsU32,    // Starts at 164. Length = 4.
+        ];
+
+        let mut compiler = Compiler::new();
+        let data = compiler.compile(instructions);
+
+        let mut vm = VirtualMachine::new(100, data, &[], 30 * mem::memory_handler::BYTES_IN_U32);
+
+        vm.run();
+
+        // The subroutine should set the value of the ER1 register to 5.
+        // After returning, 100 should be added to the value of ER1, the result moved to the accumulator.
+        assert_eq!(
+            *vm.cpu
+                .registers
+                .get_register_u32(RegisterId::EAC)
+                .read_unchecked(),
+            105
+        );
+
+        // There should be one entry on the stack.
+        assert_eq!(vm.mem.pop_u32(), 3);
+
+        // The stack should now be empty.
+        assert_eq!(vm.mem.stack_frame_size, 0);
     }
 
     /// Test the call and return instructions, simple non-nested test.

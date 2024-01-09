@@ -155,6 +155,11 @@ impl Compiler {
                 self.write_u32(addr);
             }
 
+            /******** [u32 register and special u32 value] ********/
+            Instruction::CallU32Reg(reg, _uid) => {
+                self.write_register_id(&reg);
+            }
+
             /******** [No Arguments] ********/
             Instruction::Nop
             | Instruction::IntRet
@@ -288,6 +293,7 @@ mod tests_compiler {
                     Instruction::ArithRightShiftU32RegU32Reg(ER2, ER3)
                 }
                 OpCode::CallU32Imm => Instruction::CallU32Imm(0xdeafbeed, 0),
+                OpCode::CallU32Reg => Instruction::CallU32Reg(RegisterId::ER2, 0),
                 OpCode::RetArgsU32 => Instruction::RetArgsU32,
                 OpCode::Int => Instruction::Int(0xdeadbeef),
                 OpCode::IntRet => Instruction::IntRet,

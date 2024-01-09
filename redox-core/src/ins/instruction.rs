@@ -79,6 +79,8 @@ pub enum Instruction {
     /******** [Branching Instructions] ********/
     /// Call a subroutine by a provided u32 immediate address.
     CallU32Imm(u32, u32),
+    /// Call a subroutine by the address as specified by a u32 register.
+    CallU32Reg(RegisterId, u32),
     /// Return from a subroutine that had zero or more u32 arguments supplied.
     RetArgsU32,
     Int(u32),
@@ -261,6 +263,9 @@ impl Display for Instruction {
                 // TODO - apply labels to these jumps - either dynamically generated or via binary file metadata.
                 format!("call ${addr:04x}")
             }
+            Instruction::CallU32Reg(reg, _uid) => {
+                format!("call %{reg}")
+            }
             Instruction::RetArgsU32 => String::from("iret"),
             Instruction::Int(addr) => {
                 format!("int ${addr:04x}")
@@ -390,7 +395,10 @@ impl Display for Instruction {
             | Instruction::Reserved9 => unreachable!("attempted to use a reserved instruction"),
 
             /******** [Pseudo Instructions] ********/
-            Instruction::Label(_) => unreachable!("attempted to use label pseudo instruction"),
+            Instruction::Label(_uid) => {
+                // TODO - lookup the specific label by the uid
+                todo!();
+            }
             Instruction::Unknown(id) => format!("UNKNOWN! ID = {id:04x}"),
         };
         write!(f, "{asm_format}")
@@ -452,6 +460,7 @@ impl Instruction {
 
             /******** [Branching Instructions] ********/
             OpCode::CallU32Imm => ARG_MEM_ADDR_SIZE,
+            OpCode::CallU32Reg => ARG_REG_ID_SIZE,
             OpCode::RetArgsU32 => 0,
             OpCode::Int => ARG_MEM_ADDR_SIZE,
             OpCode::IntRet => 0,
