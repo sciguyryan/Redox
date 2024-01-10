@@ -263,22 +263,22 @@ impl Display for Instruction {
             /******** [Branching Instructions] ********/
             Instruction::CallU32Imm(addr) => {
                 // TODO - apply labels to these jumps - either dynamically generated or via binary file metadata.
-                format!("call ${addr:08x}")
+                format!("call [${addr:08x}]")
             }
             Instruction::CallU32Reg(reg) => {
-                format!("call %{reg}")
+                format!("call [%{reg}]")
             }
             Instruction::RetArgsU32 => String::from("iret"),
             Instruction::Int(addr) => {
-                format!("int ${addr:08x}")
+                format!("int ${addr:02x}")
             }
             Instruction::IntRet => String::from("intret"),
             Instruction::JumpAbsU32Imm(addr) => {
                 // TODO - apply labels to these jumps - either dynamically generated or via binary file metadata.
-                format!("jmp ${addr:08x}")
+                format!("jmp [${addr:08x}]")
             }
             Instruction::JumpAbsU32Reg(reg) => {
-                format!("jmp %{reg}")
+                format!("jmp [%{reg}]")
             }
 
             /******** [Data Instructions] ********/
