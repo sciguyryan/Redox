@@ -1056,10 +1056,6 @@ impl Cpu {
                 // jmp :label
                 // Set the instruction pointer to the jump address.
                 self.set_instruction_pointer(*addr);
-
-                // We don't want to update the instruction pointer here since it
-                // would mess with the jump destination.
-                return;
             }
             JumpAbsU32Reg(reg) => {
                 // jmp %cs
@@ -1067,10 +1063,6 @@ impl Cpu {
 
                 // Set the instruction pointer to the jump address.
                 self.set_instruction_pointer(shift_by);
-
-                // We don't want to update the instruction pointer here since it
-                // would mess with the jump destination.
-                return;
             }
 
             /******** [Data Instructions] ********/
