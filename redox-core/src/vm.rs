@@ -17,9 +17,6 @@ pub struct VirtualMachine {
     pub mem: MemoryHandler,
     /// The [`Cpu`] for this virtual machine.
     pub cpu: Cpu,
-
-    /// The default interrupt vector table handlers.
-    default_ivt_handlers: HashMap<u8, u32>,
 }
 
 impl VirtualMachine {
@@ -55,7 +52,6 @@ impl VirtualMachine {
                 stack_segment_size,
             ),
             cpu: Cpu::default(),
-            default_ivt_handlers: HashMap::new(),
         };
 
         // Build and load the boot ROM.
@@ -70,7 +66,11 @@ impl VirtualMachine {
     }
 
     /// Create and load the bootable ROM into memory.
-    fn load_boot_rom(&mut self) -> HashMap<u8, u32> {
+    ///
+    /// # Returns
+    ///
+    /// A hashmap, the key being the interrupt code and the value being the address in memory where the handler is located.
+    fn load_boot_rom(&mut self) -> HashMap<u8, usize> {
         // Create the bootable ROM.
         let (boot_rom, default_ivt_handlers) = BootRom::compile(&self.mem);
 
@@ -89,12 +89,21 @@ impl VirtualMachine {
             .expect("failed to get memory segment")
             .set_contents(&boot_rom);
 
-        // Return the default IVT handlers for further processing.
+        // Return the default IVT handlers.
         default_ivt_handlers
     }
 
-    fn load_default_ivt_handlers(&mut self, handlers: HashMap<u8, u32>) {
-        for (int_code, address) in handlers {}
+    /// Load the specified default interrupt vector table entries into memory.
+    ///
+    /// # Arguments
+    ///
+    /// * `handlers` - A hashmap, the key being the interrupt code and the value being the address in memory where the handler is located.
+    fn load_default_ivt_handlers(&mut self, handlers: HashMap<u8, usize>) {
+        for (int_code, address) in handlers {
+            // Note that the 4 here is because a memory address is 32-bits in size, meaning
+            // that it is 4 bytes in total.
+            self.mem.set_u32((int_code * 4) as usize, address as u32);
+        }
     }
 
     /// Run the virtual machine until completion.

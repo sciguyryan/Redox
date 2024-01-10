@@ -12,8 +12,12 @@ use crate::{
     utils,
 };
 
-// The following is a list of preset interrupts and what they are used for:
-// 0x0 - division by zero - default handler implemented.
+/// Division by zero interrupt - default handler implemented.
+pub const INT_DIVIDE_BY_ZERO: u8 = 0x0;
+/// Single-step interrupt - not yet implemented.
+pub const INT_SINGLE_STEP: u8 = 0x1;
+/// NMI (non-maskable interrupt) - default handler implemented.
+pub const INT_NMI: u8 = 0x2;
 
 /// A list of f32 registers to be preserved when entering a subroutine. Use when storing state.
 ///
@@ -195,26 +199,20 @@ impl Cpu {
     /// * `mem` - The [`MemoryHandler`] connected to this CPU instance.
     /// * `ins` - The [`Instruction`] used to trigger the interrupt.
     #[inline]
-    fn maybe_handle_interrupt(&mut self, int_type: u8, mem: &mut MemoryHandler, ins: &Instruction) {
+    fn handle_interrupt(&mut self, int_type: u8, mem: &mut MemoryHandler, ins: &Instruction) {
         let is_masked = (1 << int_type) & self.read_reg_u32_unchecked(&RegisterId::EIM) == 0;
 
-        // Is this interrupt unmasked?
-        if is_masked {
-            eprintln!("cpu.rs - handle_interrupt - masked");
-
+        // Is this interrupt unmasked? NMI's can't be masked.
+        if int_type != INT_NMI && is_masked {
             // The interrupt is masked, therefore we don't want to do anything here.
             return;
         }
-
-        eprintln!("cpu.rs - handle_interrupt - unmasked");
 
         // Calculate the place within the interrupt vector we need to look.
         let iv_addr = self.interrupt_vector_address + (int_type as u32 * 4);
 
         // Get the handler address from the interrupt vector.
         let iv_handler_addr = mem.get_u32(iv_addr as usize);
-
-        eprintln!("cpu.rs - handle_interrupt - iv_handler_addr = {iv_handler_addr}");
 
         // We will only save state when we are not already in an interrupt handler.
         if !self.is_in_interrupt_handler {
@@ -336,8 +334,8 @@ impl Cpu {
     ///
     /// # Arguments
     ///
-    /// * `value_1` - The first u32 value.
-    /// * `value_2` - The second u32 value.
+    /// * `value` - The first u32 value.
+    /// * `divisor` - The second u32 value.
     ///
     /// # Returns
     ///
@@ -347,10 +345,9 @@ impl Cpu {
     ///
     /// This method affects the following flags: none. All flags are undefined.
     #[inline(always)]
-    fn perform_checked_div_u32(&mut self, value_1: u32, value_2: u32) -> u32 {
+    fn perform_checked_div_u32(&mut self, value: u32, divisor: u32) -> u32 {
         // TODO - when implementing exceptions and interrupts, ensure one is triggered with division by zero.
-
-        value_1.wrapping_div(value_2)
+        value.wrapping_div(divisor)
     }
 
     /// Perform an integer modulo of two u32 values.
@@ -869,8 +866,8 @@ impl Cpu {
 
         let privilege = &self.get_privilege();
 
-        // Should we skip updating the instruction pointer register after this instruction?
-        let mut skip_ip_update = false;
+        // Update the program counter register.
+        self.increment_pc_register();
 
         match instruction {
             Nop => {}
@@ -921,24 +918,48 @@ impl Cpu {
 
                 self.set_u32_accumulator(new_value);
             }
-            DivU32ImmU32Reg(imm, reg) => {
-                let old_value = self.read_reg_u32(reg, privilege);
-                let new_value = self.perform_checked_div_u32(old_value, *imm);
+            DivU32ImmU32Reg(divisor, reg) => {
+                if *divisor > 0 {
+                    let old_value = self.read_reg_u32(reg, privilege);
+                    let new_value = self.perform_checked_div_u32(old_value, *divisor);
 
-                self.set_u32_accumulator(new_value);
+                    self.set_u32_accumulator(new_value);
+                } else {
+                    self.handle_interrupt(0x0, mem, instruction);
+
+                    // We don't want to update the instruction pointer here since it
+                    // would mess with the jump destination.
+                    return;
+                }
             }
-            DivU32RegU32Imm(reg, imm) => {
-                let old_value = self.read_reg_u32(reg, privilege);
-                let new_value = self.perform_checked_div_u32(*imm, old_value);
+            DivU32RegU32Imm(divisor_reg, imm) => {
+                let old_value = self.read_reg_u32(divisor_reg, privilege);
+                if old_value > 0 {
+                    let new_value = self.perform_checked_div_u32(*imm, old_value);
 
-                self.set_u32_accumulator(new_value);
+                    self.set_u32_accumulator(new_value);
+                } else {
+                    self.handle_interrupt(0x0, mem, instruction);
+
+                    // We don't want to update the instruction pointer here since it
+                    // would mess with the jump destination.
+                    return;
+                }
             }
-            DivU32RegU32Reg(reg_1, reg_2) => {
-                let reg_1_val = self.read_reg_u32(reg_1, privilege);
-                let reg_2_val = self.read_reg_u32(reg_2, privilege);
-                let new_value = self.perform_checked_div_u32(reg_2_val, reg_1_val);
+            DivU32RegU32Reg(divisor_reg, reg) => {
+                let divisor_reg_val = self.read_reg_u32(divisor_reg, privilege);
+                if divisor_reg_val > 0 {
+                    let old_value = self.read_reg_u32(reg, privilege);
+                    let new_value = self.perform_checked_div_u32(old_value, divisor_reg_val);
 
-                self.set_u32_accumulator(new_value);
+                    self.set_u32_accumulator(new_value);
+                } else {
+                    self.handle_interrupt(0x0, mem, instruction);
+
+                    // We don't want to update the instruction pointer here since it
+                    // would mess with the jump destination.
+                    return;
+                }
             }
             ModU32ImmU32Reg(imm, reg) => {
                 let reg_val = self.read_reg_u32(reg, privilege);
@@ -1038,8 +1059,9 @@ impl Cpu {
                 // call :label
                 self.perform_call_jump(mem, *addr, instruction);
 
-                // We don't want to update the IP register here.
-                skip_ip_update = true;
+                // We don't want to update the instruction pointer here since it
+                // would mess with the jump destination.
+                return;
             }
             CallU32Reg(reg) => {
                 // call %reg
@@ -1047,28 +1069,36 @@ impl Cpu {
                 let addr = self.read_reg_u32(reg, privilege);
                 self.perform_call_jump(mem, addr, instruction);
 
-                // We don't want to update the IP register here.
-                skip_ip_update = true;
+                // We don't want to update the instruction pointer here since it
+                // would mess with the jump destination.
+                return;
             }
             RetArgsU32 => {
                 // iret
                 // Restore the state of the last stack frame.
                 self.pop_state(mem, StackArgType::U32);
 
-                // We don't want to update the IP register here.
-                skip_ip_update = true;
+                // We don't want to update the instruction pointer here since it
+                // would mess with the jump destination.
+                return;
             }
             Int(int_type) => {
-                // TODO - handle the special pre-set interrupts here.
-
                 // We will only handle interrupts if the interrupt enabled flag is set.
                 if self.is_cpu_flag_set(&CpuFlag::IF) {
-                    self.maybe_handle_interrupt(*int_type, mem, instruction);
+                    self.handle_interrupt(*int_type, mem, instruction);
+
+                    // We don't want to update the instruction pointer here since it
+                    // would mess with the jump destination.
+                    return;
                 }
             }
             IntRet => {
                 self.is_in_interrupt_handler = false;
                 self.set_instruction_pointer(mem.pop_u32());
+
+                // We don't want to update the instruction pointer here since it
+                // would mess with the jump destination.
+                return;
             }
             JumpAbsU32Imm(addr) => {
                 // jmp 0xaaaa
@@ -1076,7 +1106,9 @@ impl Cpu {
                 // Set the instruction pointer to the jump address.
                 self.set_instruction_pointer(*addr);
 
-                skip_ip_update = true;
+                // We don't want to update the instruction pointer here since it
+                // would mess with the jump destination.
+                return;
             }
             JumpAbsU32Reg(reg) => {
                 // jmp %cs
@@ -1085,7 +1117,9 @@ impl Cpu {
                 // Set the instruction pointer to the jump address.
                 self.set_instruction_pointer(shift_by);
 
-                skip_ip_update = true;
+                // We don't want to update the instruction pointer here since it
+                // would mess with the jump destination.
+                return;
             }
 
             /******** [Data Instructions] ********/
@@ -1299,13 +1333,8 @@ impl Cpu {
             }
         };
 
-        self.increment_pc_register();
-
-        // Advance the instruction pointer by the number of bytes used for the instruction,
-        // if we don't need to skip this step.
-        if !skip_ip_update {
-            self.increment_ip_register(instruction.get_total_instruction_size());
-        }
+        // Advance the instruction pointer by the number of bytes used for the instruction.
+        self.increment_ip_register(instruction.get_total_instruction_size());
     }
 
     /// Set the state of the specified CPU flag.
@@ -5469,8 +5498,8 @@ mod tests_cpu {
         let tests = [
             TestU32::new(
                 &[
-                    MovU32ImmMemSimple(0b1111_1111_1111_1111_1111_1111_1111_1111, 0x0),
-                    BitScanReverseU32MemU32Reg(0x0, RegisterId::ER1),
+                    MovU32ImmMemSimple(0b1111_1111_1111_1111_1111_1111_1111_1111, 0x1000),
+                    BitScanReverseU32MemU32Reg(0x1000, RegisterId::ER1),
                 ],
                 &[],
                 0,
@@ -5479,8 +5508,8 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[
-                    MovU32ImmMemSimple(0b0000_1111_1111_1111_1111_1111_1111_1111, 0x0),
-                    BitScanReverseU32MemU32Reg(0x0, RegisterId::ER1),
+                    MovU32ImmMemSimple(0b0000_1111_1111_1111_1111_1111_1111_1111, 0x1000),
+                    BitScanReverseU32MemU32Reg(0x1000, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x4)],
                 0,
@@ -5488,7 +5517,7 @@ mod tests_cpu {
                 "BSR - incorrect result produced from the bit search",
             ),
             TestU32::new(
-                &[BitScanReverseU32MemU32Reg(0x0, RegisterId::ER1)],
+                &[BitScanReverseU32MemU32Reg(0x1000, RegisterId::ER1)],
                 &[
                     (RegisterId::ER1, 0x20),
                     (
@@ -5567,10 +5596,10 @@ mod tests_cpu {
         let tests = [
             TestU32::new(
                 &[
-                    MovU32ImmMemSimple(0b1111_1111_1111_1111_1111_1111_1111_1111, 0x0),
-                    BitScanReverseU32MemU32Mem(0x0, 0x4),
+                    MovU32ImmMemSimple(0b1111_1111_1111_1111_1111_1111_1111_1111, 0x1000),
+                    BitScanReverseU32MemU32Mem(0x1000, 0x1004),
                     // Check that the value was written by reading it back into a register.
-                    MovMemU32RegSimple(0x4, RegisterId::ER8),
+                    MovMemU32RegSimple(0x1004, RegisterId::ER8),
                 ],
                 &[(RegisterId::ER8, 0x0)],
                 0,
@@ -5579,10 +5608,10 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[
-                    MovU32ImmMemSimple(0b0000_1111_1111_1111_1111_1111_1111_1111, 0x0),
-                    BitScanReverseU32MemU32Mem(0x0, 0x4),
+                    MovU32ImmMemSimple(0b0000_1111_1111_1111_1111_1111_1111_1111, 0x1000),
+                    BitScanReverseU32MemU32Mem(0x1000, 0x1004),
                     // Check that the value was written by reading it back into a register.
-                    MovMemU32RegSimple(0x4, RegisterId::ER8),
+                    MovMemU32RegSimple(0x1004, RegisterId::ER8),
                 ],
                 &[(RegisterId::ER8, 0x4)],
                 0,
@@ -5591,9 +5620,9 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[
-                    BitScanReverseU32MemU32Mem(0x0, 0x4),
+                    BitScanReverseU32MemU32Mem(0x1000, 0x1004),
                     // Check that the value was written by reading it back into a register.
-                    MovMemU32RegSimple(0x4, RegisterId::ER8),
+                    MovMemU32RegSimple(0x1004, RegisterId::ER8),
                 ],
                 &[
                     (RegisterId::ER8, 0x20),
@@ -5665,8 +5694,8 @@ mod tests_cpu {
         let tests = [
             TestU32::new(
                 &[
-                    MovU32ImmMemSimple(0b1111_1111_1111_1111_1111_1111_1111_1111, 0x0),
-                    BitScanForwardU32MemU32Reg(0x0, RegisterId::ER1),
+                    MovU32ImmMemSimple(0b1111_1111_1111_1111_1111_1111_1111_1111, 0x1000),
+                    BitScanForwardU32MemU32Reg(0x1000, RegisterId::ER1),
                 ],
                 &[],
                 0,
@@ -5675,8 +5704,8 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[
-                    MovU32ImmMemSimple(0b1111_1111_1111_1111_1111_1111_1111_0000, 0x0),
-                    BitScanForwardU32MemU32Reg(0x0, RegisterId::ER1),
+                    MovU32ImmMemSimple(0b1111_1111_1111_1111_1111_1111_1111_0000, 0x1000),
+                    BitScanForwardU32MemU32Reg(0x1000, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x4)],
                 0,
@@ -5684,7 +5713,7 @@ mod tests_cpu {
                 "BSF - incorrect result produced from the bit search",
             ),
             TestU32::new(
-                &[BitScanForwardU32MemU32Reg(0x0, RegisterId::ER1)],
+                &[BitScanForwardU32MemU32Reg(0x1000, RegisterId::ER1)],
                 &[
                     (RegisterId::ER1, 0x20),
                     (
@@ -5763,10 +5792,10 @@ mod tests_cpu {
         let tests = [
             TestU32::new(
                 &[
-                    MovU32ImmMemSimple(0b1111_1111_1111_1111_1111_1111_1111_1111, 0x0),
-                    BitScanForwardU32MemU32Mem(0x0, 0x4),
+                    MovU32ImmMemSimple(0b1111_1111_1111_1111_1111_1111_1111_1111, 0x1000),
+                    BitScanForwardU32MemU32Mem(0x1000, 0x1004),
                     // Check that the value was written by reading it back into a register.
-                    MovMemU32RegSimple(0x4, RegisterId::ER8),
+                    MovMemU32RegSimple(0x1004, RegisterId::ER8),
                 ],
                 &[(RegisterId::ER8, 0x0)],
                 0,
@@ -5775,10 +5804,10 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[
-                    MovU32ImmMemSimple(0b1111_1111_1111_1111_1111_1111_1111_0000, 0x0),
-                    BitScanForwardU32MemU32Mem(0x0, 0x4),
+                    MovU32ImmMemSimple(0b1111_1111_1111_1111_1111_1111_1111_0000, 0x1000),
+                    BitScanForwardU32MemU32Mem(0x1000, 0x1004),
                     // Check that the value was written by reading it back into a register.
-                    MovMemU32RegSimple(0x4, RegisterId::ER8),
+                    MovMemU32RegSimple(0x1004, RegisterId::ER8),
                 ],
                 &[(RegisterId::ER8, 0x4)],
                 0,
@@ -5787,9 +5816,9 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[
-                    BitScanForwardU32MemU32Mem(0x0, 0x4),
+                    BitScanForwardU32MemU32Mem(0x1000, 0x1004),
                     // Check that the value was written by reading it back into a register.
-                    MovMemU32RegSimple(0x4, RegisterId::ER8),
+                    MovMemU32RegSimple(0x1004, RegisterId::ER8),
                 ],
                 &[
                     (RegisterId::ER8, 0x20),

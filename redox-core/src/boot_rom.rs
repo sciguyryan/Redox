@@ -2,7 +2,7 @@ use hashbrown::HashMap;
 
 use crate::{
     compiler::bytecode_compiler::Compiler,
-    cpu::CpuFlag,
+    cpu::{CpuFlag, INT_DIVIDE_BY_ZERO, INT_NMI},
     ins::instruction::Instruction,
     mem::memory_handler::{MemoryHandler, MEGABYTE},
     reg::registers::RegisterId,
@@ -23,7 +23,7 @@ impl BootRom {
     /// # Arguments
     ///
     /// * `mem` - A reference to the virtual machine's [`MemoryHandler`].
-    pub fn compile(mem: &MemoryHandler) -> (Vec<u8>, HashMap<u8, u32>) {
+    pub fn compile(mem: &MemoryHandler) -> (Vec<u8>, HashMap<u8, usize>) {
         // A set of instructions to setup the virtual machine's CPU.
         let boot_instructions = vec![
             // Set the interrupt mask.
@@ -46,28 +46,44 @@ impl BootRom {
         let mut default_ivt_handlers = HashMap::new();
 
         // Calculate the position of the start of the interrupt vector.
-        let instruction_start_pos = BootRom::total_size_of_instructions(&boot_instructions);
+        let mut next_handler_pos =
+            BOOT_MEMORY_START + BootRom::total_size_of_instructions(&boot_instructions);
 
-        // The first interrupt we want to handle is division by zero, which has the code 0x0.
-        let interrupt_0_instructions = vec![Instruction::Hlt];
-        default_ivt_handlers.insert(0, instruction_start_pos);
+        // NOTE - in the instances where we are building a custom interrupt handler
+        // we would need to use the intret instruction to mark the end of the subroutine.
+        // This isn't technically needed in the ones we are using here since these all
+        // result in the CPU halting, but they've been included just in case I end up
+        // implementing the stepping interrupt.
 
+        // The division by zero interrupt handler.
+        let interrupt_div_zero_handler = vec![Instruction::Hlt, Instruction::IntRet];
+        default_ivt_handlers.insert(INT_DIVIDE_BY_ZERO, next_handler_pos);
+
+        next_handler_pos += BootRom::total_size_of_instructions(&interrupt_div_zero_handler);
+
+        // The non-maskable interrupt (NMI) handler.
+        let interrupt_nmi_handler = vec![Instruction::Hlt, Instruction::IntRet];
+        default_ivt_handlers.insert(INT_NMI, next_handler_pos);
+
+        // Build and compile the final bootable ROM.
         let mut final_instructions = vec![];
         final_instructions.extend_from_slice(&boot_instructions);
-        final_instructions.extend_from_slice(&interrupt_0_instructions);
+        final_instructions.extend_from_slice(&interrupt_div_zero_handler);
+        final_instructions.extend_from_slice(&interrupt_nmi_handler);
 
         let mut compiler = Compiler::new();
         (
-            compiler.compile(&boot_instructions).to_vec(),
+            compiler.compile(&final_instructions).to_vec(),
             default_ivt_handlers,
         )
     }
 
-    fn total_size_of_instructions(instructions: &[Instruction]) -> u32 {
+    /// Compute the total size of an [`Instruction`] slice.
+    fn total_size_of_instructions(instructions: &[Instruction]) -> usize {
         let mut size = 0;
         for ins in instructions {
             size += ins.get_total_instruction_size();
         }
-        size as u32
+        size
     }
 }
