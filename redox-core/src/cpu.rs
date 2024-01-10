@@ -237,14 +237,6 @@ impl Cpu {
             .add_unchecked(amount as u32);
     }
 
-    /// Update the program counter (PC) register.
-    #[inline(always)]
-    fn increment_pc_register(&mut self) {
-        self.registers
-            .get_register_u32_mut(RegisterId::EPC)
-            .increment_unchecked();
-    }
-
     /// Check whether a specific CPU flag is set.
     ///
     /// # Arguments
@@ -865,9 +857,6 @@ impl Cpu {
         use Instruction::*;
 
         let privilege = &self.get_privilege();
-
-        // Update the program counter register.
-        self.increment_pc_register();
 
         match instruction {
             Nop => {}

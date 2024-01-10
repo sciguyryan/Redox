@@ -59,8 +59,6 @@ pub enum RegisterId {
     ESP,
     /// CPU flags register.
     EFL,
-    /// Program counter register.
-    EPC,
     /// Interrupt mask register.
     EIM,
 
@@ -94,7 +92,6 @@ impl Display for RegisterId {
 
             RegisterId::EFL => "EFL",
             RegisterId::EIM => "EIM",
-            RegisterId::EPC => "EPC",
 
             RegisterId::ESS => "ESS",
             RegisterId::ECS => "ECS",
@@ -181,7 +178,6 @@ impl Registers {
                 register_u32!(RegisterId::EFP, &prpw, 0),
                 register_u32!(RegisterId::ESP, &prpw, 0),
                 register_u32!(RegisterId::EFL, &rpw, 0),
-                register_u32!(RegisterId::EPC, &rpw, 0),
                 register_u32!(RegisterId::EIM, &rpw, 0),
                 // [ Segment Registers ] //
                 register_u32!(RegisterId::ESS, &rpw, 0),
