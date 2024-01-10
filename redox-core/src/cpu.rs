@@ -53,6 +53,9 @@ const PRESERVE_REGISTERS_U32_REV: [RegisterId; 8] = [
 /// The mask to get only the lowest 8 bits of a u32 value.
 const U32_LOW_BYTE_MASK: u32 = 0xff;
 
+/// The default interrupt vector address.
+const INTERRUPT_VECTOR_ADDRESS: u32 = 0x0;
+
 pub struct Cpu {
     /// The registers associated with this CPU.
     pub registers: Registers,
@@ -62,15 +65,18 @@ pub struct Cpu {
     pub is_machine_mode: bool,
     /// Is the CPU currently in an interrupt handler?
     pub is_in_interrupt_handler: bool,
+    /// The address of the interrupt vector table.
+    pub interrupt_vector_address: u32,
 }
 
 impl Cpu {
-    pub fn new() -> Self {
+    pub fn new(interrupt_vector_address: u32) -> Self {
         Self {
             registers: Registers::default(),
             is_halted: false,
             is_machine_mode: true,
             is_in_interrupt_handler: false,
+            interrupt_vector_address,
         }
     }
 
@@ -176,6 +182,31 @@ impl Cpu {
     #[inline(always)]
     pub fn get_stack_pointer(&self) -> u32 {
         self.read_reg_u32_unchecked(&RegisterId::ESP)
+    }
+
+    /// Handle a triggered interrupt.
+    ///
+    /// # Arguments
+    ///
+    /// * `int_type` - The type of interrupt to be triggered.
+    /// * `mem` - The [`MemoryHandler`] connected to this CPU instance.
+    #[inline]
+    fn handle_interrupt(&mut self, int_type: u8, mem: &mut MemoryHandler) {
+        let is_unmasked = (1 << int_type) & self.read_reg_u32_unchecked(&RegisterId::EIM);
+
+        // Is this interrupt unmasked?
+        if is_unmasked == 0 {
+            // The interrupt is masked, therefore we don't want to do anything here.
+            return;
+        }
+
+        // Calculate the place within the interrupt vector we need to look.
+        let iv_addr = self.interrupt_vector_address + (int_type as u32 * 4);
+
+        // Get the handler address from the IV.
+        let iv_handler_addr = mem.get_u32(iv_addr as usize);
+
+        panic!("{iv_handler_addr}");
     }
 
     /// Increment the instruction pointer (IP) register by a specified amount.
@@ -797,7 +828,7 @@ impl Cpu {
     ///
     /// # Arguments
     ///
-    /// * `mem` - The [`Memory`] connected to this CPU instance.
+    /// * `mem` - The [`MemoryHandler`] connected to this CPU instance.
     /// * `instruction` - An [`Instruction`] instance to be executed.
     fn run_instruction(&mut self, mem: &mut MemoryHandler, instruction: &Instruction) {
         use Instruction::*;
@@ -993,8 +1024,8 @@ impl Cpu {
                 // We don't want to update the IP register here.
                 skip_ip_update = true;
             }
-            Int(_addr) => {
-                todo!();
+            Int(int_type) => {
+                self.handle_interrupt(*int_type, mem);
             }
             IntRet => {
                 todo!();
@@ -1388,7 +1419,7 @@ impl Cpu {
 
 impl Default for Cpu {
     fn default() -> Self {
-        Self::new()
+        Self::new(INTERRUPT_VECTOR_ADDRESS)
     }
 }
 
@@ -1470,7 +1501,7 @@ mod tests_cpu {
         },
         mem,
         reg::registers::RegisterId,
-        vm::VirtualMachine,
+        vm::{self, VirtualMachine},
     };
 
     use super::{Cpu, CpuFlag};
@@ -1514,10 +1545,6 @@ mod tests_cpu {
         pub instructions: Vec<Instruction>,
         /// A [`HashMap`] containing [`RegisterId`] and the expected value of the register after execution.
         pub expected_changed_registers: HashMap<RegisterId, u32>,
-        // An option containing a vector of bytes representing the expected user segment memory contents after execution, if specified.
-        pub expected_user_seg_contents: Option<Vec<u8>>,
-        /// The capacity of the user memory segment, in bytes.
-        pub user_seg_capacity_bytes: usize,
         /// The capacity of the stack memory segment, in bytes.
         pub stack_seg_capacity_u32: usize,
         /// A boolean indicating whether the test should panic or not.
@@ -1527,13 +1554,12 @@ mod tests_cpu {
     }
 
     impl TestU32 {
-        /// Create a new [`TestEntryU32Standard`] instance.
+        /// Create a new [`TestU32`] instance.
         ///
         /// # Arguments
         ///
         /// * `instructions` - A slice of [`Instruction`]s to be executed.
         /// * `expected_registers` - A slice of a tuple containing the [`RegisterId`] and the expected value of the register after execution.
-        /// * `expected_user_seg_contents` - An option containing a vector of bytes representing the expected user segment memory contents after execution, if specified.
         /// * `stack_seg_capacity_u32` - The capacity of the stack memory segment, in bytes.
         /// * `should_panic` - A boolean indicating whether the test should panic or not.
         /// * `fail_message` - A string slice that provides the message to be displayed if the test fails.
@@ -1545,7 +1571,6 @@ mod tests_cpu {
         fn new(
             instructions: &[Instruction],
             expected_registers: &[(RegisterId, u32)],
-            expected_user_seg_contents: Option<Vec<u8>>,
             stack_seg_capacity_u32: usize,
             should_panic: bool,
             fail_message: &str,
@@ -1564,14 +1589,9 @@ mod tests_cpu {
                 changed_registers.insert(*id, *value);
             }
 
-            let (user_segment_memory_capacity, user_segment_contents) =
-                expected_user_seg_contents.map_or_else(|| (100, None), |v| (v.len(), Some(v)));
-
             Self {
                 instructions: instructions_vec,
                 expected_changed_registers: changed_registers,
-                user_seg_capacity_bytes: user_segment_memory_capacity,
-                expected_user_seg_contents: user_segment_contents,
                 stack_seg_capacity_u32,
                 should_panic,
                 fail_message: fail_message.to_string(),
@@ -1596,7 +1616,7 @@ mod tests_cpu {
             let result = panic::catch_unwind(|| {
                 // Build the virtual machine instance.
                 let mut vm = VirtualMachine::new(
-                    self.user_seg_capacity_bytes,
+                    vm::MIN_USER_SEGMENT_SIZE,
                     compiled,
                     &[],
                     self.stack_seg_capacity_u32 * mem::memory_handler::BYTES_IN_U32,
@@ -1651,17 +1671,6 @@ mod tests_cpu {
                 panic!("{}", self.fail_message(id, false));
             }
 
-            // Check the user memory segment matches what we expect too, if
-            // it has been specified in the test parameters.
-            if let Some(contents) = &self.expected_user_seg_contents {
-                assert_eq!(
-                    vm.mem.get_user_segment_storage(),
-                    *contents,
-                    "{}",
-                    self.fail_message(id, false)
-                );
-            }
-
             Some(vm)
         }
 
@@ -1682,24 +1691,31 @@ mod tests_cpu {
     /// Test the call and return instructions by register pointer instruction.
     #[test]
     fn test_call_return_u32_reg() {
+        let base_offset = vm::MIN_USER_SEGMENT_SIZE as u32;
+
         let instructions = &[
-            Instruction::MovU32ImmU32Reg(151, RegisterId::ER8), // Starts at 100. Length = 9. This should remain in place.
-            Instruction::PushU32Imm(3), // Starts at 109. Length = 8. This should remain in place.
-            Instruction::PushU32Imm(2), // Starts at 117. Length = 8. Subroutine argument 1.
-            Instruction::PushU32Imm(1), // Starts at 125. Length = 8. The number of arguments.
-            Instruction::CallU32Reg(RegisterId::ER8), // Starts at 133. Length = 5.
-            Instruction::AddU32ImmU32Reg(100, RegisterId::ER1), // Starts at 138. Length = 9.
-            Instruction::Hlt,           // Starts at 147. Length = 4.
+            Instruction::MovU32ImmU32Reg(base_offset + 51, RegisterId::ER8), // Starts at [base]. Length = 9. This should remain in place.
+            Instruction::PushU32Imm(3), // Starts at [base + 9]. Length = 8. This should remain in place.
+            Instruction::PushU32Imm(2), // Starts at [base + 17]. Length = 8. Subroutine argument 1.
+            Instruction::PushU32Imm(1), // Starts at [base + 25]. Length = 8. The number of arguments.
+            Instruction::CallU32Reg(RegisterId::ER8), // Starts at [base + 33]. Length = 5.
+            Instruction::AddU32ImmU32Reg(100, RegisterId::ER1), // Starts at [base + 38]. Length = 9.
+            Instruction::Hlt,           // Starts at [base + 47]. Length = 4.
             // FUNC_AAAA - Subroutine starts here.
-            Instruction::PushU32Imm(5), // Starts at 151. Length = 8.
-            Instruction::PopU32ImmU32Reg(RegisterId::ER1), // Starts at 159. Length = 5.
-            Instruction::RetArgsU32,    // Starts at 164. Length = 4.
+            Instruction::PushU32Imm(5), // Starts at [base + 51]. Length = 8.
+            Instruction::PopU32ImmU32Reg(RegisterId::ER1), // Starts at [base + 59]. Length = 5.
+            Instruction::RetArgsU32,    // Starts at [base + 64]. Length = 4.
         ];
 
         let mut compiler = Compiler::new();
         let data = compiler.compile(instructions);
 
-        let mut vm = VirtualMachine::new(100, data, &[], 30 * mem::memory_handler::BYTES_IN_U32);
+        let mut vm = VirtualMachine::new(
+            vm::MIN_USER_SEGMENT_SIZE,
+            data,
+            &[],
+            30 * mem::memory_handler::BYTES_IN_U32,
+        );
 
         vm.run();
 
@@ -1723,6 +1739,8 @@ mod tests_cpu {
     /// Test the call and return instructions, simple non-nested test.
     #[test]
     fn test_call_return_u32_simple() {
+        let base_offset = vm::MIN_USER_SEGMENT_SIZE as u32;
+
         let test_registers = [
             (RegisterId::ER2, 2),
             (RegisterId::ER3, 3),
@@ -1737,19 +1755,19 @@ mod tests_cpu {
         ];
 
         let instructions = &[
-            Instruction::MovU32ImmU32Reg(test_registers[0].1, test_registers[0].0), // Starts at 100. Length = 9.
-            Instruction::MovU32ImmU32Reg(test_registers[1].1, test_registers[1].0), // Starts at 109. Length = 9.
-            Instruction::MovU32ImmU32Reg(test_registers[2].1, test_registers[2].0), // Starts at 118. Length = 9.
-            Instruction::MovU32ImmU32Reg(test_registers[3].1, test_registers[3].0), // Starts at 127. Length = 9.
-            Instruction::MovU32ImmU32Reg(test_registers[4].1, test_registers[4].0), // Starts at 136. Length = 9.
-            Instruction::MovU32ImmU32Reg(test_registers[5].1, test_registers[5].0), // Starts at 145. Length = 9.
-            Instruction::MovU32ImmU32Reg(test_registers[6].1, test_registers[6].0), // Starts at 154. Length = 9.
+            Instruction::MovU32ImmU32Reg(test_registers[0].1, test_registers[0].0), // Starts at [base]. Length = 9.
+            Instruction::MovU32ImmU32Reg(test_registers[1].1, test_registers[1].0), // Starts at [base + 9]. Length = 9.
+            Instruction::MovU32ImmU32Reg(test_registers[2].1, test_registers[2].0), // Starts at [base + 18]. Length = 9.
+            Instruction::MovU32ImmU32Reg(test_registers[3].1, test_registers[3].0), // Starts at [base + 27]. Length = 9.
+            Instruction::MovU32ImmU32Reg(test_registers[4].1, test_registers[4].0), // Starts at [base + 36]. Length = 9.
+            Instruction::MovU32ImmU32Reg(test_registers[5].1, test_registers[5].0), // Starts at [base + 45]. Length = 9.
+            Instruction::MovU32ImmU32Reg(test_registers[6].1, test_registers[6].0), // Starts at [base + 54]. Length = 9.
             // The number of arguments for the subroutine.
-            Instruction::PushU32Imm(0), // Starts at 163. Length = 8. The number of arguments.
-            Instruction::CallU32Imm(183), // Starts at 171. Length = 8.
-            Instruction::Hlt,           // Starts at 179. Length = 4.
+            Instruction::PushU32Imm(0), // Starts at [base + 63]. Length = 8. The number of arguments.
+            Instruction::CallU32Imm(base_offset + 83), // Starts at [base + 71]. Length = 8.
+            Instruction::Hlt,           // Starts at [base + 79]. Length = 4.
             // FUNC_AAAA - Subroutine starts here.
-            Instruction::MovU32ImmU32Reg(0, RegisterId::ER2), // Starts at 183.
+            Instruction::MovU32ImmU32Reg(0, RegisterId::ER2), // Starts at [base + 83].
             Instruction::MovU32ImmU32Reg(0, RegisterId::ER3),
             Instruction::MovU32ImmU32Reg(0, RegisterId::ER4),
             Instruction::MovU32ImmU32Reg(0, RegisterId::ER5),
@@ -1765,7 +1783,12 @@ mod tests_cpu {
         let mut compiler = Compiler::new();
         let data = compiler.compile(instructions);
 
-        let mut vm = VirtualMachine::new(100, data, &[], 30 * mem::memory_handler::BYTES_IN_U32);
+        let mut vm = VirtualMachine::new(
+            vm::MIN_USER_SEGMENT_SIZE,
+            data,
+            &[],
+            30 * mem::memory_handler::BYTES_IN_U32,
+        );
 
         vm.run();
 
@@ -1778,27 +1801,34 @@ mod tests_cpu {
     /// Test the call and return instructions, nested test.
     #[test]
     fn test_call_return_u32_nested() {
+        let base_offset = vm::MIN_USER_SEGMENT_SIZE as u32;
+
         let instructions = &[
-            Instruction::PushU32Imm(3), // Starts at 100. Length = 8. This should remain in place.
-            Instruction::PushU32Imm(2), // Starts at 108. Length = 8. Subroutine argument 1.
-            Instruction::PushU32Imm(1), // Starts at 116. Length = 8. The number of arguments.
-            Instruction::CallU32Imm(136), // Starts at 124. Length = 8.
-            Instruction::Hlt,           // Starts at 132. Length = 4.
+            Instruction::PushU32Imm(3), // Starts at [base]. Length = 8. This should remain in place.
+            Instruction::PushU32Imm(2), // Starts at [base + 8]. Length = 8. Subroutine argument 1.
+            Instruction::PushU32Imm(1), // Starts at [base + 16]. Length = 8. The number of arguments.
+            Instruction::CallU32Imm(base_offset + 36), // Starts at [base + 24]. Length = 8.
+            Instruction::Hlt,           // Starts at [base + 32]. Length = 4.
             // FUNC_AAAA - Subroutine 1 starts here.
-            Instruction::PushU32Imm(0), // Starts at 136. Length = 8. The number of arguments.
-            Instruction::CallU32Imm(165), // Starts at 144. Length = 8.
-            Instruction::AddU32ImmU32Reg(5, RegisterId::ER1), // Starts at 152. Length = 9.
-            Instruction::RetArgsU32,    // Starts at 161. Length = 4.
+            Instruction::PushU32Imm(0), // Starts at [base + 36]. Length = 8. The number of arguments.
+            Instruction::CallU32Imm(base_offset + 65), // Starts at [base + 44]. Length = 8.
+            Instruction::AddU32ImmU32Reg(5, RegisterId::ER1), // Starts at [base + 52]. Length = 9.
+            Instruction::RetArgsU32,    // Starts at [base + 61]. Length = 4.
             // FUNC_BBBB - Subroutine 2 starts here.
-            Instruction::PushU32Imm(100), // Starts at 165. Length = 8. This should NOT be preserved.
-            Instruction::PopU32ImmU32Reg(RegisterId::ER1), // Starts at 173. Length = 5.
-            Instruction::RetArgsU32,      // Starts at 178. Length = 4.
+            Instruction::PushU32Imm(100), // Starts at [base + 65]. Length = 8. This should NOT be preserved.
+            Instruction::PopU32ImmU32Reg(RegisterId::ER1), // Starts at [base + 73]. Length = 5.
+            Instruction::RetArgsU32,      // Starts at [base + 78]. Length = 4.
         ];
 
         let mut compiler = Compiler::new();
         let data = compiler.compile(instructions);
 
-        let mut vm = VirtualMachine::new(100, data, &[], 30 * mem::memory_handler::BYTES_IN_U32);
+        let mut vm = VirtualMachine::new(
+            vm::MIN_USER_SEGMENT_SIZE,
+            data,
+            &[],
+            30 * mem::memory_handler::BYTES_IN_U32,
+        );
 
         vm.run();
 
@@ -1849,7 +1879,6 @@ mod tests_cpu {
         let tests = [TestU32::new(
             &[Nop],
             &[],
-            None,
             0,
             false,
             "NOP - failed to execute NOP instruction",
@@ -1865,7 +1894,6 @@ mod tests_cpu {
             TestU32::new(
                 &[Hlt],
                 &[],
-                None,
                 0,
                 false,
                 "HLT - failed to execute HLT instruction",
@@ -1875,7 +1903,6 @@ mod tests_cpu {
             TestU32::new(
                 &[Hlt, MovU32ImmU32Reg(0xf, RegisterId::ER1)],
                 &[(RegisterId::ER1, 0)],
-                None,
                 0,
                 false,
                 "HLT - failed to correctly stop execution after a HLT instruction",
@@ -1891,7 +1918,6 @@ mod tests_cpu {
         let tests = [TestU32::new(
             &[Mret],
             &[],
-            None,
             0,
             false,
             "MRET - failed to execute MRET instruction",
@@ -1918,7 +1944,7 @@ mod tests_cpu {
         let compiled = (u32::MAX - 11).to_le_bytes();
 
         // Build a virtual machine instance.
-        let mut vm = VirtualMachine::new(100, &compiled, &[], 0);
+        let mut vm = VirtualMachine::new(vm::MIN_USER_SEGMENT_SIZE, &compiled, &[], 0);
 
         vm.run();
     }
@@ -1940,7 +1966,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "ADD - incorrect result value produced",
@@ -1958,7 +1983,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::IF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "ADD - CPU flags not correctly set",
@@ -1969,7 +1993,6 @@ mod tests_cpu {
                     RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
-                None,
                 0,
                 false,
                 "ADD - CPU flags not correctly set",
@@ -1987,7 +2010,6 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x3),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
-                None,
                 0,
                 false,
                 "ADD - CPU parity flag not correctly set",
@@ -2005,7 +2027,6 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x2),
                     (RegisterId::EFL, 0x0),
                 ],
-                None,
                 0,
                 false,
                 "ADD - CPU parity flag not correctly cleared",
@@ -2026,7 +2047,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "ADD - CPU signed flag not correctly set",
@@ -2044,7 +2064,6 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x2),
                     (RegisterId::EFL, 0x0),
                 ],
-                None,
                 0,
                 false,
                 "ADD - CPU signed flag not correctly cleared",
@@ -2069,7 +2088,6 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x1),
                     (RegisterId::EAC, 0x10),
                 ],
-                None,
                 0,
                 false,
                 "ADD - incorrect result value produced",
@@ -2089,7 +2107,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::IF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "ADD - CPU flags not correctly set",
@@ -2100,7 +2117,6 @@ mod tests_cpu {
                     RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
-                None,
                 0,
                 false,
                 "ADD - CPU flags not correctly set",
@@ -2120,7 +2136,6 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x3),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
-                None,
                 0,
                 false,
                 "ADD - CPU parity flag not correctly set",
@@ -2138,7 +2153,6 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x2),
                     (RegisterId::EFL, 0x0),
                 ],
-                None,
                 0,
                 false,
                 "ADD - CPU parity flag not correctly cleared",
@@ -2161,7 +2175,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "ADD - CPU signed flag not correctly set",
@@ -2181,7 +2194,6 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x2),
                     (RegisterId::EFL, 0x0),
                 ],
-                None,
                 0,
                 false,
                 "ADD - CPU signed flag not correctly cleared",
@@ -2201,7 +2213,6 @@ mod tests_cpu {
                     SubU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x2), (RegisterId::EAC, 0x1)],
-                None,
                 0,
                 false,
                 "SUB - incorrect result value produced",
@@ -2219,7 +2230,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "SUB - CPU flags not correctly set",
@@ -2230,7 +2240,6 @@ mod tests_cpu {
                     RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
-                None,
                 0,
                 false,
                 "SUB - CPU flags not correctly set",
@@ -2248,7 +2257,6 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x3),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
-                None,
                 0,
                 false,
                 "SUB - CPU parity flag not correctly set",
@@ -2266,7 +2274,6 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x1),
                     (RegisterId::EFL, 0x0),
                 ],
-                None,
                 0,
                 false,
                 "SUB - CPU parity flag not correctly cleared",
@@ -2284,7 +2291,6 @@ mod tests_cpu {
                     (RegisterId::EAC, 0b1111_1111_1111_1111_1111_1111_1111_1110),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::SF])),
                 ],
-                None,
                 0,
                 false,
                 "SUB - CPU signed flag not correctly set",
@@ -2302,7 +2308,6 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x1),
                     (RegisterId::EFL, 0x0),
                 ],
-                None,
                 0,
                 false,
                 "SUB - CPU signed flag not correctly cleared",
@@ -2322,7 +2327,6 @@ mod tests_cpu {
                     SubU32RegU32Imm(RegisterId::ER1, 0x3),
                 ],
                 &[(RegisterId::ER1, 0x2), (RegisterId::EAC, 0x1)],
-                None,
                 0,
                 false,
                 "SUB - incorrect result value produced",
@@ -2340,7 +2344,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "SUB - CPU flags not correctly set",
@@ -2351,7 +2354,6 @@ mod tests_cpu {
                     RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
-                None,
                 0,
                 false,
                 "SUB - CPU flags not correctly set",
@@ -2369,7 +2371,6 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x3),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
-                None,
                 0,
                 false,
                 "SUB - CPU parity flag not correctly set",
@@ -2387,7 +2388,6 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x1),
                     (RegisterId::EFL, 0x0),
                 ],
-                None,
                 0,
                 false,
                 "SUB - CPU parity flag not correctly cleared",
@@ -2405,7 +2405,6 @@ mod tests_cpu {
                     (RegisterId::EAC, 0b1111_1111_1111_1111_1111_1111_1111_1110),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::SF])),
                 ],
-                None,
                 0,
                 false,
                 "SUB - CPU signed flag not correctly set",
@@ -2423,7 +2422,6 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x1),
                     (RegisterId::EFL, 0x0),
                 ],
-                None,
                 0,
                 false,
                 "SUB - CPU signed flag not correctly cleared",
@@ -2448,7 +2446,6 @@ mod tests_cpu {
                     (RegisterId::ER2, 0xf),
                     (RegisterId::EAC, 0xe),
                 ],
-                None,
                 0,
                 false,
                 "SUB - incorrect result value produced",
@@ -2468,7 +2465,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "SUB - CPU flags not correctly set",
@@ -2479,7 +2475,6 @@ mod tests_cpu {
                     RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
-                None,
                 0,
                 false,
                 "SUB - CPU flags not correctly set",
@@ -2499,7 +2494,6 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x3),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
-                None,
                 0,
                 false,
                 "SUB - CPU parity flag not correctly set",
@@ -2519,7 +2513,6 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x1),
                     (RegisterId::EFL, 0x0),
                 ],
-                None,
                 0,
                 false,
                 "SUB - CPU parity flag not correctly cleared",
@@ -2539,7 +2532,6 @@ mod tests_cpu {
                     (RegisterId::EAC, 0b1111_1111_1111_1111_1111_1111_1111_1110),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::SF])),
                 ],
-                None,
                 0,
                 false,
                 "SUB - CPU signed flag not correctly set",
@@ -2559,7 +2551,6 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x1),
                     (RegisterId::EFL, 0x0),
                 ],
-                None,
                 0,
                 false,
                 "SUB - CPU signed flag not correctly cleared",
@@ -2579,7 +2570,6 @@ mod tests_cpu {
                     MulU32ImmU32Reg(0x2, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1), (RegisterId::EAC, 0x2)],
-                None,
                 0,
                 false,
                 "MUL - incorrect result value produced",
@@ -2597,7 +2587,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "MUL - CPU flags not correctly set",
@@ -2622,7 +2611,6 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x2),
                     (RegisterId::EAC, 0x2),
                 ],
-                None,
                 0,
                 false,
                 "MUL - incorrect result value produced",
@@ -2642,7 +2630,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "MUL - CPU flags not correctly set",
@@ -2662,7 +2649,6 @@ mod tests_cpu {
                     DivU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x2), (RegisterId::EAC, 0x2)],
-                None,
                 0,
                 false,
                 "DIV - incorrect result value produced",
@@ -2673,7 +2659,6 @@ mod tests_cpu {
                     DivU32ImmU32Reg(0x2, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, u32::MAX), (RegisterId::EAC, 2147483647)],
-                None,
                 0,
                 false,
                 "DIV - CPU flags not correctly set",
@@ -2681,7 +2666,6 @@ mod tests_cpu {
             TestU32::new(
                 &[DivU32ImmU32Reg(0x0, RegisterId::ER1)],
                 &[],
-                None,
                 0,
                 true,
                 "DIV - failed to panic when attempting to divide by zero",
@@ -2701,7 +2685,6 @@ mod tests_cpu {
                     DivU32RegU32Imm(RegisterId::ER1, 0x2),
                 ],
                 &[(RegisterId::ER1, 0x1), (RegisterId::EAC, 0x2)],
-                None,
                 0,
                 false,
                 "DIV - incorrect result value produced",
@@ -2712,7 +2695,6 @@ mod tests_cpu {
                     DivU32RegU32Imm(RegisterId::ER1, u32::MAX),
                 ],
                 &[(RegisterId::ER1, 0x2), (RegisterId::EAC, 2147483647)],
-                None,
                 0,
                 false,
                 "DIV - CPU flags not correctly set",
@@ -2720,7 +2702,6 @@ mod tests_cpu {
             TestU32::new(
                 &[DivU32RegU32Imm(RegisterId::ER1, 0x0)],
                 &[],
-                None,
                 0,
                 true,
                 "DIV - failed to panic when attempting to divide by zero",
@@ -2745,7 +2726,6 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x1),
                     (RegisterId::EAC, 0x2),
                 ],
-                None,
                 0,
                 false,
                 "DIV - incorrect result value produced",
@@ -2761,7 +2741,6 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x2),
                     (RegisterId::EAC, 2147483647),
                 ],
-                None,
                 0,
                 false,
                 "DIV - CPU flags not correctly set",
@@ -2772,7 +2751,6 @@ mod tests_cpu {
                     DivU32RegU32Reg(RegisterId::ER2, RegisterId::ER1),
                 ],
                 &[],
-                None,
                 0,
                 true,
                 "DIV - failed to panic when attempting to divide by zero",
@@ -2792,7 +2770,6 @@ mod tests_cpu {
                     ModU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x2), (RegisterId::EAC, 0x0)],
-                None,
                 0,
                 false,
                 "MOD - incorrect result value produced",
@@ -2803,7 +2780,6 @@ mod tests_cpu {
                     ModU32ImmU32Reg(0x2, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x3), (RegisterId::EAC, 0x1)],
-                None,
                 0,
                 false,
                 "MOD - incorrect result value produced",
@@ -2811,7 +2787,6 @@ mod tests_cpu {
             TestU32::new(
                 &[DivU32ImmU32Reg(0x0, RegisterId::ER1)],
                 &[],
-                None,
                 0,
                 true,
                 "MOD - failed to panic when attempting to divide by zero",
@@ -2831,7 +2806,6 @@ mod tests_cpu {
                     ModU32RegU32Imm(RegisterId::ER1, 0x2),
                 ],
                 &[(RegisterId::ER1, 0x1), (RegisterId::EAC, 0x0)],
-                None,
                 0,
                 false,
                 "MOD - incorrect result value produced",
@@ -2842,7 +2816,6 @@ mod tests_cpu {
                     ModU32RegU32Imm(RegisterId::ER1, 0x3),
                 ],
                 &[(RegisterId::ER1, 0x2), (RegisterId::EAC, 0x1)],
-                None,
                 0,
                 false,
                 "MOD - incorrect result value produced",
@@ -2850,7 +2823,6 @@ mod tests_cpu {
             TestU32::new(
                 &[ModU32RegU32Imm(RegisterId::ER1, 0x0)],
                 &[],
-                None,
                 0,
                 true,
                 "MOD - failed to panic when attempting to divide by zero",
@@ -2875,7 +2847,6 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x2),
                     (RegisterId::EAC, 0x0),
                 ],
-                None,
                 0,
                 false,
                 "MOD - incorrect result value produced",
@@ -2891,7 +2862,6 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x3),
                     (RegisterId::EAC, 0x1),
                 ],
-                None,
                 0,
                 false,
                 "MOD - incorrect result value produced",
@@ -2899,7 +2869,6 @@ mod tests_cpu {
             TestU32::new(
                 &[ModU32RegU32Reg(RegisterId::ER1, RegisterId::ER2)],
                 &[],
-                None,
                 0,
                 true,
                 "MOD - failed to panic when attempting to divide by zero",
@@ -2916,7 +2885,6 @@ mod tests_cpu {
             TestU32::new(
                 &[IncU32Reg(RegisterId::ER1)],
                 &[(RegisterId::ER1, 0x1)],
-                None,
                 0,
                 false,
                 "INC - incorrect result value produced",
@@ -2938,7 +2906,6 @@ mod tests_cpu {
                         ]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "INC - CPU flags not correctly set",
@@ -2955,7 +2922,6 @@ mod tests_cpu {
                     (RegisterId::ER1, 0x3),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
-                None,
                 0,
                 false,
                 "INC - CPU parity flag not correctly set",
@@ -2968,7 +2934,6 @@ mod tests_cpu {
                     IncU32Reg(RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1), (RegisterId::EFL, 0x0)],
-                None,
                 0,
                 false,
                 "INC - CPU parity flag not correctly cleared",
@@ -2988,7 +2953,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "INC - CPU signed flag not correctly set",
@@ -3001,7 +2965,6 @@ mod tests_cpu {
                     IncU32Reg(RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1), (RegisterId::EFL, 0x0)],
-                None,
                 0,
                 false,
                 "INC - CPU signed flag not correctly cleared",
@@ -3027,7 +2990,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "DEC - incorrect result value produced",
@@ -3046,7 +3008,6 @@ mod tests_cpu {
                         ]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "DEC - CPU flags not correctly set",
@@ -3063,7 +3024,6 @@ mod tests_cpu {
                     (RegisterId::ER1, 0x3),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
-                None,
                 0,
                 false,
                 "DEC - CPU parity flag not correctly set",
@@ -3077,7 +3037,6 @@ mod tests_cpu {
                     DecU32Reg(RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x2), (RegisterId::EFL, 0x0)],
-                None,
                 0,
                 false,
                 "DEC - CPU parity flag not correctly cleared",
@@ -3094,7 +3053,6 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::SF])),
                 ],
-                None,
                 0,
                 false,
                 "DEC - CPU signed flag not correctly set",
@@ -3108,7 +3066,6 @@ mod tests_cpu {
                     DecU32Reg(RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1), (RegisterId::EFL, 0x0)],
-                None,
                 0,
                 false,
                 "DEC - CPU signed flag not correctly cleared",
@@ -3128,7 +3085,6 @@ mod tests_cpu {
                     AndU32ImmU32Reg(0x2, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x3), (RegisterId::EAC, 0x2)],
-                None,
                 0,
                 false,
                 "AND - incorrect result value produced",
@@ -3139,7 +3095,6 @@ mod tests_cpu {
                     AndU32ImmU32Reg(0x3, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x2), (RegisterId::EAC, 0x2)],
-                None,
                 0,
                 false,
                 "AND - incorrect result value produced",
@@ -3157,7 +3112,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "AND - incorrect result value produced",
@@ -3171,7 +3125,6 @@ mod tests_cpu {
                     RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
-                None,
                 0,
                 false,
                 "AND - CPU flags not correctly set",
@@ -3189,7 +3142,6 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x3),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
-                None,
                 0,
                 false,
                 "AND - CPU parity flag not correctly set",
@@ -3207,7 +3159,6 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x2),
                     (RegisterId::EFL, 0x0),
                 ],
-                None,
                 0,
                 false,
                 "AND - CPU parity flag not correctly cleared",
@@ -3228,7 +3179,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "AND - CPU signed flag not correctly set",
@@ -3246,7 +3196,6 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x2),
                     (RegisterId::EFL, 0x0),
                 ],
-                None,
                 0,
                 false,
                 "AND - CPU signed flag not correctly cleared",
@@ -3266,7 +3215,6 @@ mod tests_cpu {
                     LeftShiftU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x2)],
-                None,
                 0,
                 false,
                 "SHL - incorrect result value produced",
@@ -3285,7 +3233,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "SHL - CPU flags not correctly set",
@@ -3309,7 +3256,6 @@ mod tests_cpu {
                         ]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "SHL - CPU flags not correctly set",
@@ -3324,7 +3270,6 @@ mod tests_cpu {
                     RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
-                None,
                 0,
                 false,
                 "SHL - CPU flags not correctly set",
@@ -3342,7 +3287,6 @@ mod tests_cpu {
                     RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                 )],
-                None,
                 0,
                 false,
                 "SHL - parity or zero flags are not set",
@@ -3351,7 +3295,6 @@ mod tests_cpu {
             TestU32::new(
                 &[LeftShiftU32ImmU32Reg(0x20, RegisterId::ER1)],
                 &[],
-                None,
                 0,
                 true,
                 "SHL - successfully executed instruction with invalid shift value",
@@ -3365,7 +3308,6 @@ mod tests_cpu {
                     LeftShiftU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x2), (RegisterId::EFL, 0x0)],
-                None,
                 0,
                 false,
                 "SHL - CPU parity flag not correctly cleared",
@@ -3377,7 +3319,6 @@ mod tests_cpu {
                     LeftShiftU32ImmU32Reg(0x0, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1)],
-                None,
                 0,
                 false,
                 "SHL - zero left-shift did not leave the result unchanged",
@@ -3397,7 +3338,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "SHL - CPU signed flag not correctly set",
@@ -3411,7 +3351,6 @@ mod tests_cpu {
                     LeftShiftU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x2), (RegisterId::EFL, 0x0)],
-                None,
                 0,
                 false,
                 "SHL - CPU signed flag not correctly cleared",
@@ -3432,7 +3371,6 @@ mod tests_cpu {
                     LeftShiftU32RegU32Reg(RegisterId::ER2, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x2), (RegisterId::ER2, 0x1)],
-                None,
                 0,
                 false,
                 "SHL - incorrect result value produced",
@@ -3453,7 +3391,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "SHL - invalid CPU flag state",
@@ -3479,7 +3416,6 @@ mod tests_cpu {
                         ]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "SHL - CPU flags not correctly set",
@@ -3504,7 +3440,6 @@ mod tests_cpu {
                         ]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "SHL - CPU flags not correctly set",
@@ -3523,7 +3458,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "SHL - CPU flags not correctly set",
@@ -3545,7 +3479,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "SHL - CPU flags not correctly set",
@@ -3557,7 +3490,6 @@ mod tests_cpu {
                     LeftShiftU32RegU32Reg(RegisterId::ER2, RegisterId::ER1),
                 ],
                 &[],
-                None,
                 0,
                 true,
                 "SHL - successfully executed instruction with invalid shift value",
@@ -3569,7 +3501,6 @@ mod tests_cpu {
                     LeftShiftU32RegU32Reg(RegisterId::ER2, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1)],
-                None,
                 0,
                 false,
                 "SHL - zero left-shift did not leave the result unchanged",
@@ -3591,7 +3522,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "SHL - CPU signed flag not correctly set",
@@ -3610,7 +3540,6 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x1),
                     (RegisterId::EFL, 0x0),
                 ],
-                None,
                 0,
                 false,
                 "SHL - CPU signed flag not correctly cleared",
@@ -3630,7 +3559,6 @@ mod tests_cpu {
                     ArithLeftShiftU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x2)],
-                None,
                 0,
                 false,
                 "SAL - incorrect result value produced",
@@ -3647,7 +3575,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::IF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "SAL - incorrect result value produced",
@@ -3662,7 +3589,6 @@ mod tests_cpu {
                     RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
-                None,
                 0,
                 false,
                 "SAL - CPU flags not correctly set",
@@ -3674,7 +3600,6 @@ mod tests_cpu {
                     ArithLeftShiftU32ImmU32Reg(0x0, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1)],
-                None,
                 0,
                 false,
                 "SAL - zero left-shift did not leave the result unchanged",
@@ -3694,7 +3619,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "SAL - CPU signed flag not correctly set",
@@ -3708,7 +3632,6 @@ mod tests_cpu {
                     ArithLeftShiftU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x2), (RegisterId::EFL, 0x0)],
-                None,
                 0,
                 false,
                 "SAL - CPU signed flag not correctly cleared",
@@ -3729,7 +3652,6 @@ mod tests_cpu {
                     ArithLeftShiftU32RegU32Reg(RegisterId::ER2, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x2), (RegisterId::ER2, 0x1)],
-                None,
                 0,
                 false,
                 "SAL - incorrect result value produced",
@@ -3748,7 +3670,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::IF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "SAL - incorrect result value produced",
@@ -3767,7 +3688,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "SAL - CPU flags not correctly set",
@@ -3779,7 +3699,6 @@ mod tests_cpu {
                     ArithLeftShiftU32RegU32Reg(RegisterId::ER2, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1)],
-                None,
                 0,
                 false,
                 "SAL - zero left-shift did not leave the result unchanged",
@@ -3801,7 +3720,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "SAL - CPU signed flag not correctly set",
@@ -3820,7 +3738,6 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x1),
                     (RegisterId::EFL, 0x0),
                 ],
-                None,
                 0,
                 false,
                 "SAL - CPU signed flag not correctly cleared",
@@ -3840,7 +3757,6 @@ mod tests_cpu {
                     RightShiftU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1)],
-                None,
                 0,
                 false,
                 "SHR - incorrect result value produced",
@@ -3862,7 +3778,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::PF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "SHR - carry or parity CPU flags were not correctly set",
@@ -3881,7 +3796,6 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b0011_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
-                None,
                 0,
                 false,
                 "SHR - CPU flags were not correctly set",
@@ -3896,7 +3810,6 @@ mod tests_cpu {
                     RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
-                None,
                 0,
                 false,
                 "SHR - zero or parity CPU flags were not correctly set",
@@ -3905,7 +3818,6 @@ mod tests_cpu {
             TestU32::new(
                 &[RightShiftU32ImmU32Reg(0x20, RegisterId::ER1)],
                 &[],
-                None,
                 0,
                 true,
                 "SHR - successfully executed instruction with invalid shift value",
@@ -3917,7 +3829,6 @@ mod tests_cpu {
                     RightShiftU32ImmU32Reg(0x0, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1)],
-                None,
                 0,
                 false,
                 "SHR - zero right-shift did not leave the result unchanged",
@@ -3937,7 +3848,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::CF, CpuFlag::PF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "SAL - CPU signed flag not correctly cleared",
@@ -3958,7 +3868,6 @@ mod tests_cpu {
                     RightShiftU32RegU32Reg(RegisterId::ER2, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1), (RegisterId::ER2, 0x1)],
-                None,
                 0,
                 false,
                 "SHR - incorrect result value produced",
@@ -3982,7 +3891,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::PF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "SHR - carry or parity CPU flags were not correctly set",
@@ -4003,7 +3911,6 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x1),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
-                None,
                 0,
                 false,
                 "SHR - CPU flags were not correctly set",
@@ -4022,7 +3929,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "SHR - zero or parity CPU flags were not correctly set",
@@ -4034,7 +3940,6 @@ mod tests_cpu {
                     RightShiftU32RegU32Reg(RegisterId::ER2, RegisterId::ER1),
                 ],
                 &[],
-                None,
                 0,
                 true,
                 "SHR - successfully executed instruction with invalid shift value",
@@ -4046,7 +3951,6 @@ mod tests_cpu {
                     RightShiftU32RegU32Reg(RegisterId::ER2, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1)],
-                None,
                 0,
                 false,
                 "SHR - zero right-shift did not leave the result unchanged",
@@ -4066,7 +3970,6 @@ mod tests_cpu {
                     ArithRightShiftU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1)],
-                None,
                 0,
                 false,
                 "SAR - incorrect result value produced",
@@ -4083,7 +3986,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "SAR - incorrect result value produced",
@@ -4098,7 +4000,6 @@ mod tests_cpu {
                     RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
-                None,
                 0,
                 false,
                 "SAR - zero or parity CPU flags were not correctly set",
@@ -4110,7 +4011,6 @@ mod tests_cpu {
                     ArithRightShiftU32ImmU32Reg(0x0, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1)],
-                None,
                 0,
                 false,
                 "SAR - zero right-shift did not leave the result unchanged",
@@ -4130,7 +4030,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "SAR - CPU signed flag not correctly set",
@@ -4144,7 +4043,6 @@ mod tests_cpu {
                     ArithRightShiftU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1), (RegisterId::EFL, 0x0)],
-                None,
                 0,
                 false,
                 "SAR - CPU signed flag not correctly cleared",
@@ -4165,7 +4063,6 @@ mod tests_cpu {
                     ArithRightShiftU32RegU32Reg(RegisterId::ER2, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1), (RegisterId::ER2, 0x1)],
-                None,
                 0,
                 false,
                 "SAR - incorrect result value produced",
@@ -4184,7 +4081,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "SAR - incorrect result value produced",
@@ -4203,7 +4099,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "SAR - zero or parity CPU flags were not correctly set",
@@ -4215,7 +4110,6 @@ mod tests_cpu {
                     ArithRightShiftU32RegU32Reg(RegisterId::ER2, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1)],
-                None,
                 0,
                 false,
                 "SAR - zero right-shift did not leave the result unchanged",
@@ -4237,7 +4131,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "SAR - CPU signed flag not correctly set",
@@ -4256,7 +4149,6 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x1),
                     (RegisterId::EFL, 0x0),
                 ],
-                None,
                 0,
                 false,
                 "SAR - CPU signed flag not correctly cleared",
@@ -4273,7 +4165,6 @@ mod tests_cpu {
             TestU32::new(
                 &[MovU32ImmU32Reg(0x1, RegisterId::ER1)],
                 &[(RegisterId::ER1, 0x1)],
-                None,
                 0,
                 false,
                 "MOV - invalid value moved to register",
@@ -4284,7 +4175,6 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0x2, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x2)],
-                None,
                 0,
                 false,
                 "MOV - invalid value moved to register",
@@ -4304,7 +4194,6 @@ mod tests_cpu {
                     MovU32RegU32Reg(RegisterId::ER1, RegisterId::ER2),
                 ],
                 &[(RegisterId::ER1, 0x1), (RegisterId::ER2, 0x1)],
-                None,
                 0,
                 false,
                 "MOV - immediate value not moved to register",
@@ -4316,7 +4205,6 @@ mod tests_cpu {
                     MovU32RegU32Reg(RegisterId::ER1, RegisterId::ER2),
                 ],
                 &[(RegisterId::ER1, 0x1), (RegisterId::ER2, 0x1)],
-                None,
                 0,
                 false,
                 "MOV - immediate value not moved to register",
@@ -4330,14 +4218,12 @@ mod tests_cpu {
     #[test]
     fn test_move_u32_lit_mem() {
         let tests = [TestU32::new(
-            &[MovU32ImmMemSimple(0x123, 0x0)],
-            &[],
-            Some(vec![
-                35, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            ]),
+            &[
+                MovU32ImmMemSimple(0x123, 0x0),
+                // Check that the value was written by reading it back into a register.
+                MovMemU32RegSimple(0x0, RegisterId::ER1),
+            ],
+            &[(RegisterId::ER1, 0x123)],
             0,
             false,
             "MOV - immediate value not moved to memory",
@@ -4353,14 +4239,10 @@ mod tests_cpu {
             &[
                 MovU32ImmU32Reg(0x123, RegisterId::ER1),
                 MovU32RegMemSimple(RegisterId::ER1, 0x0),
+                // Check that the value was written by reading it back into a register.
+                MovMemU32RegSimple(0x0, RegisterId::ER2),
             ],
-            &[(RegisterId::ER1, 0x123)],
-            Some(vec![
-                35, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            ]),
+            &[(RegisterId::ER1, 0x123), (RegisterId::ER2, 0x123)],
             0,
             false,
             "MOV - u32 register value not moved to memory",
@@ -4377,16 +4259,10 @@ mod tests_cpu {
                 // Move the value to memory.
                 MovU32ImmU32Reg(0x123, RegisterId::ER1),
                 MovU32RegMemSimple(RegisterId::ER1, 0x0),
-                // Move the value from memory to a register.
+                // Check that the value was written by reading it back into a register.
                 MovMemU32RegSimple(0x0, RegisterId::ER2),
             ],
             &[(RegisterId::ER1, 0x123), (RegisterId::ER2, 0x123)],
-            Some(vec![
-                35, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            ]),
             0,
             false,
             "MOV - value not correctly moved from memory to register",
@@ -4400,21 +4276,15 @@ mod tests_cpu {
     fn test_move_u32_reg_ptr_u32_reg() {
         let tests = [TestU32::new(
             &[
-                // Store value in memory.
                 MovU32ImmU32Reg(0x123, RegisterId::ER1),
+                // Store value in memory.
                 MovU32RegMemSimple(RegisterId::ER1, 0x0),
-                // Set the address pointer in R2.
+                // Set the address pointer in ER2.
                 MovU32ImmU32Reg(0x0, RegisterId::ER2),
-                // Read the value from the address of R2 into R1.
+                // Read the value from the address of ER2 into ER1.
                 MovU32RegPtrU32RegSimple(RegisterId::ER2, RegisterId::ER3),
             ],
             &[(RegisterId::ER1, 0x123), (RegisterId::ER3, 0x123)],
-            Some(vec![
-                35, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            ]),
             0,
             false,
             "MOV - value not correctly moved from memory to register via register pointer",
@@ -4433,7 +4303,6 @@ mod tests_cpu {
                 SwapU32RegU32Reg(RegisterId::ER1, RegisterId::ER2),
             ],
             &[(RegisterId::ER1, 0x2), (RegisterId::ER2, 0x1)],
-            None,
             0,
             false,
             "SWAP - values of the two registers were not correctly swapped",
@@ -4451,7 +4320,6 @@ mod tests_cpu {
                 ByteSwapU32(RegisterId::ER1),
             ],
             &[(RegisterId::ER1, 0xDDCCBBAA)],
-            None,
             0,
             false,
             "BSWAP - the byte order of the register was not correctly swapped",
@@ -4467,23 +4335,20 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmMemExpr(
-                    0x123,
-                    MoveExpressionHandler::from(
-                        &[
-                            ExpressionArgs::Immediate(0x8),
-                            ExpressionArgs::Operator(ExpressionOperator::Add),
-                            ExpressionArgs::Immediate(0x8),
-                        ][..],
-                    )
-                    .pack(),
-                )],
-                &[],
-                Some(vec![
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
+                        0x123,
+                        MoveExpressionHandler::from(
+                            &[
+                                ExpressionArgs::Immediate(0x8),
+                                ExpressionArgs::Operator(ExpressionOperator::Add),
+                                ExpressionArgs::Immediate(0x8),
+                            ][..],
+                        )
+                        .pack(),
+                    ),
+                    // Check that the value was written by reading it back into a register.
+                    MovMemU32RegSimple(0x8 + 0x8, RegisterId::ER8),
+                ],
+                &[(RegisterId::ER8, 0x123)],
                 0,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - two constants",
@@ -4503,14 +4368,10 @@ mod tests_cpu {
                         )
                         .pack(),
                     ),
+                    // Check that the value was written by reading it back into a register.
+                    MovMemU32RegSimple(0x8 + 0x8, RegisterId::ER8),
                 ],
-                &[(RegisterId::ER1, 0x8), (RegisterId::ER2, 0x8)],
-                Some(vec![
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
+                &[(RegisterId::ER1, 0x8), (RegisterId::ER2, 0x8), (RegisterId::ER8, 0x123)],
                 0,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - two registers",
@@ -4529,14 +4390,10 @@ mod tests_cpu {
                         )
                         .pack(),
                     ),
+                    // Check that the value was written by reading it back into a register.
+                    MovMemU32RegSimple(0x8 + 0x8, RegisterId::ER8),
                 ],
-                &[(RegisterId::ER1, 0x8)],
-                Some(vec![
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
+                &[(RegisterId::ER1, 0x8), (RegisterId::ER8, 0x123)],
                 0,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - one constant and one register",
@@ -4556,14 +4413,10 @@ mod tests_cpu {
                         )
                         .pack(),
                     ),
+                    // Check that the value was written by reading it back into a register.
+                    MovMemU32RegSimple(0x2 * 0x8, RegisterId::ER8),
                 ],
-                &[(RegisterId::ER1, 0x2), (RegisterId::ER2, 0x8)],
-                Some(vec![
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
+                &[(RegisterId::ER1, 0x2), (RegisterId::ER2, 0x8), (RegisterId::ER8, 0x123)],
                 0,
                 false,
                 "MOV - value not correctly moved from memory to register - using multiplication",
@@ -4583,14 +4436,10 @@ mod tests_cpu {
                         )
                         .pack(),
                     ),
+                    // Check that the value was written by reading it back into a register.
+                    MovMemU32RegSimple(0x1a - 0x4, RegisterId::ER8),
                 ],
-                &[(RegisterId::ER1, 0x1A), (RegisterId::ER2, 0x4)],
-                Some(vec![
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
+                &[(RegisterId::ER1, 0x1a), (RegisterId::ER2, 0x4), (RegisterId::ER8, 0x123)],
                 0,
                 false,
                 "MOV - value not correctly moved from memory to register - using subtraction",
@@ -4598,25 +4447,22 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmMemExpr(
-                    0x123,
-                    MoveExpressionHandler::from(
-                        &[
-                            ExpressionArgs::Immediate(0x8),
-                            ExpressionArgs::Operator(ExpressionOperator::Add),
-                            ExpressionArgs::Immediate(0x4),
-                            ExpressionArgs::Operator(ExpressionOperator::Multiply),
-                            ExpressionArgs::Immediate(0x2),
-                        ][..],
-                    )
-                    .pack(),
-                )],
-                &[],
-                Some(vec![
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
+                        0x123,
+                        MoveExpressionHandler::from(
+                            &[
+                                ExpressionArgs::Immediate(0x8),
+                                ExpressionArgs::Operator(ExpressionOperator::Add),
+                                ExpressionArgs::Immediate(0x4),
+                                ExpressionArgs::Operator(ExpressionOperator::Multiply),
+                                ExpressionArgs::Immediate(0x2),
+                            ][..],
+                        )
+                        .pack(),
+                    ),
+                    // Check that the value was written by reading it back into a register.
+                    MovMemU32RegSimple(8 + (0x4 * 0x2), RegisterId::ER8),
+                ],
+                &[(RegisterId::ER8, 0x123)],
                 0,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - three constants",
@@ -4646,12 +4492,6 @@ mod tests_cpu {
                     ),
                 ],
                 &[(RegisterId::ER8, 0x123)],
-                Some(vec![
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
                 0,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - two constants",
@@ -4678,12 +4518,6 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x8),
                     (RegisterId::ER8, 0x123),
                 ],
-                Some(vec![
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
                 0,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - two registers",
@@ -4705,12 +4539,6 @@ mod tests_cpu {
                     ),
                 ],
                 &[(RegisterId::ER1, 0x8), (RegisterId::ER8, 0x123)],
-                Some(vec![
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
                 0,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - one constant and one register",
@@ -4737,12 +4565,6 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x8),
                     (RegisterId::ER8, 0x123),
                 ],
-                Some(vec![
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
                 0,
                 false,
                 "MOV - value not correctly moved from memory to register - using multiplication",
@@ -4769,12 +4591,6 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x4),
                     (RegisterId::ER8, 0x123),
                 ],
-                Some(vec![
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
                 0,
                 false,
                 "MOV - value not correctly moved from memory to register - using subtraction",
@@ -4797,12 +4613,6 @@ mod tests_cpu {
                     ),
                 ],
                 &[(RegisterId::ER8, 0x123)],
-                Some(vec![
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
                 0,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - two constants",
@@ -4832,12 +4642,6 @@ mod tests_cpu {
                     ),
                 ],
                 &[(RegisterId::ER8, 0x123)],
-                Some(vec![
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
                 0,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - two constants",
@@ -4865,12 +4669,6 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x8),
                     (RegisterId::ER8, 0x123),
                 ],
-                Some(vec![
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
                 0,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - two registers",
@@ -4893,12 +4691,6 @@ mod tests_cpu {
                     ),
                 ],
                 &[(RegisterId::ER1, 0x8), (RegisterId::ER8, 0x123)],
-                Some(vec![
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
                 0,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - one constant and one register",
@@ -4926,12 +4718,6 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x8),
                     (RegisterId::ER8, 0x123),
                 ],
-                Some(vec![
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
                 0,
                 false,
                 "MOV - value not correctly moved from memory to register - using multiplication",
@@ -4959,12 +4745,6 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x4),
                     (RegisterId::ER8, 0x123),
                 ],
-                Some(vec![
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
                 0,
                 false,
                 "MOV - value not correctly moved from memory to register - using subtraction",
@@ -4987,12 +4767,6 @@ mod tests_cpu {
                     ),
                 ],
                 &[(RegisterId::ER8, 0x123)],
-                Some(vec![
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 1, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
                 0,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - two constants",
@@ -5021,7 +4795,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "ZHBI - incorrect result value produced",
@@ -5041,7 +4814,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "ZHBI - incorrect result value produced",
@@ -5061,7 +4833,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "ZHBI - incorrect result value produced",
@@ -5077,7 +4848,6 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x1b),
                     (RegisterId::ER3, 0b0000_0000_0000_0000_0000_0000_0001_1111),
                 ],
-                None,
                 0,
                 false,
                 "ZHBI - incorrect result value produced",
@@ -5092,7 +4862,6 @@ mod tests_cpu {
                     RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
                 )],
-                None,
                 0,
                 false,
                 "ZHBI - incorrect flag state - zero flag not set",
@@ -5108,7 +4877,6 @@ mod tests_cpu {
                     ),
                 ],
                 &[(RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::ZF]))],
-                None,
                 0,
                 false,
                 "ZHBI - incorrect flag state - overflow flag not cleared",
@@ -5123,7 +4891,6 @@ mod tests_cpu {
                     ),
                 ],
                 &[],
-                None,
                 0,
                 true,
                 "ZHBI - successfully executed instruction with invalid bit index",
@@ -5149,7 +4916,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::CF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "ZHBI - CPU signed flag not correctly set",
@@ -5172,7 +4938,6 @@ mod tests_cpu {
                     (RegisterId::ER3, 0b0111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
                 ],
-                None,
                 0,
                 false,
                 "ZHBI - CPU signed flag not correctly cleared",
@@ -5199,7 +4964,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "ZHBI - incorrect result value produced",
@@ -5217,7 +4981,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "ZHBI - incorrect result value produced",
@@ -5235,7 +4998,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "ZHBI - incorrect result value produced",
@@ -5249,7 +5011,6 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::ER2, 0b0000_0000_0000_0000_0000_0000_0001_1111),
                 ],
-                None,
                 0,
                 false,
                 "ZHBI - incorrect result value produced",
@@ -5264,7 +5025,6 @@ mod tests_cpu {
                     RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
                 )],
-                None,
                 0,
                 false,
                 "ZHBI - incorrect flag state - zero flag not set",
@@ -5280,7 +5040,6 @@ mod tests_cpu {
                     ),
                 ],
                 &[(RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::ZF]))],
-                None,
                 0,
                 false,
                 "ZHBI - incorrect flag state - overflow flag not cleared",
@@ -5292,7 +5051,6 @@ mod tests_cpu {
                     RegisterId::ER2,
                 )],
                 &[],
-                None,
                 0,
                 true,
                 "ZHBI - successfully executed instruction with invalid bit index",
@@ -5314,7 +5072,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::CF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "ZHBI - CPU signed flag not correctly set",
@@ -5333,7 +5090,6 @@ mod tests_cpu {
                     (RegisterId::ER2, 0b0111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
                 ],
-                None,
                 0,
                 false,
                 "ZHBI - CPU signed flag not correctly cleared",
@@ -5359,7 +5115,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "BT - incorrect result produced from the bit-test instruction - carry flag not set",
@@ -5370,7 +5125,6 @@ mod tests_cpu {
                     BitTestU32Reg(0x0, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1110)],
-                None,
                 0,
                 false,
                 "BT - incorrect result produced from the bit-test instruction - carry flag set",
@@ -5378,7 +5132,6 @@ mod tests_cpu {
             TestU32::new(
                 &[BitTestU32Reg(0x20, RegisterId::ER1)],
                 &[],
-                None,
                 0,
                 true,
                 "BT - successfully executed instruction with invalid bit index",
@@ -5401,12 +5154,6 @@ mod tests_cpu {
                     RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
                 )],
-                Some(vec![
-                    255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
                 0,
                 false,
                 "BT - incorrect result produced from the bit-test instruction - carry flag not set",
@@ -5417,12 +5164,6 @@ mod tests_cpu {
                     BitTestU32Mem(0x0, 0x0),
                 ],
                 &[],
-                Some(vec![
-                    254, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
                 0,
                 false,
                 "BT - incorrect result produced from the bit-test instruction - carry flag set",
@@ -5430,7 +5171,6 @@ mod tests_cpu {
             TestU32::new(
                 &[BitTestU32Mem(0x20, 0x0)],
                 &[],
-                None,
                 0,
                 true,
                 "BT - successfully executed instruction with invalid bit index",
@@ -5456,7 +5196,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF])),
                 ],
-                None,
+
                 0,
                 false,
                 "BTR - incorrect result produced from the bit-test instruction - carry flag not set",
@@ -5470,7 +5210,7 @@ mod tests_cpu {
                     BitTestResetU32Reg(0x0, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1110)],
-                None,
+
                 0,
                 false,
                 "BTR - incorrect result produced from the bit-test instruction - carry flag set",
@@ -5480,7 +5220,7 @@ mod tests_cpu {
                     BitTestResetU32Reg(0x20, RegisterId::ER1),
                 ],
                 &[],
-                None,
+
                 0,
                 true,
                 "BTR - successfully executed instruction with invalid bit index",
@@ -5501,14 +5241,10 @@ mod tests_cpu {
                         0x0,
                     ),
                     BitTestResetU32Mem(0x0, 0x0),
+                    // Check that the value was written by reading it back into a register.
+                    MovMemU32RegSimple(0x0, RegisterId::ER8),
                 ],
-                &[(RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]))],
-                Some(vec![
-                    254, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
+                &[(RegisterId::ER8, 0b1111_1111_1111_1111_1111_1111_1111_1110), (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]))],
                 0,
                 false,
                 "BTR - incorrect result produced from the bit-test instruction - carry flag not set",
@@ -5520,14 +5256,10 @@ mod tests_cpu {
                         0x0,
                     ),
                     BitTestResetU32Mem(0x0, 0x0),
+                    // Check that the value was written by reading it back into a register.
+                    MovMemU32RegSimple(0x0, RegisterId::ER8),
                 ],
-                &[],
-                Some(vec![
-                    254, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
+                &[(RegisterId::ER8, 0b1111_1111_1111_1111_1111_1111_1111_1110)],
                 0,
                 false,
                 "BTR - incorrect result produced from the bit-test instruction - carry flag set",
@@ -5535,7 +5267,7 @@ mod tests_cpu {
             TestU32::new(
                 &[BitTestResetU32Mem(0x20, 0x0)],
                 &[],
-                None,
+
                 0,
                 true,
                 "BTR - successfully executed instruction with invalid bit index",
@@ -5561,7 +5293,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF])),
                 ],
-                None,
+
                 0,
                 false,
                 "BTS - incorrect result produced from the bit-test instruction - carry flag not set",
@@ -5575,7 +5307,7 @@ mod tests_cpu {
                     BitTestSetU32Reg(0x0, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111)],
-                None,
+
                 0,
                 false,
                 "BTS - incorrect result produced from the bit-test instruction - carry flag set",
@@ -5583,7 +5315,7 @@ mod tests_cpu {
             TestU32::new(
                 &[BitTestSetU32Reg(0x20, RegisterId::ER1)],
                 &[],
-                None,
+
                 0,
                 true,
                 "BTS - successfully executed instruction with invalid bit index",
@@ -5604,14 +5336,13 @@ mod tests_cpu {
                         0x0,
                     ),
                     BitTestSetU32Mem(0x0, 0x0),
+                    // Check that the value was written by reading it back into a register.
+                    MovMemU32RegSimple(0x0, RegisterId::ER8),
                 ],
-                &[(RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]))],
-                Some(vec![
-                    255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
+                &[
+                    (RegisterId::ER8, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]))
+                ],
                 0,
                 false,
                 "BTS - incorrect result produced from the bit-test instruction - carry flag not set",
@@ -5623,14 +5354,10 @@ mod tests_cpu {
                         0x0,
                     ),
                     BitTestSetU32Mem(0x0, 0x0),
+                    // Check that the value was written by reading it back into a register.
+                    MovMemU32RegSimple(0x0, RegisterId::ER8),
                 ],
-                &[],
-                Some(vec![
-                    255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
+                &[(RegisterId::ER8, 0b1111_1111_1111_1111_1111_1111_1111_1111)],
                 0,
                 false,
                 "BTS - incorrect result produced from the bit-test instruction - carry flag set",
@@ -5638,7 +5365,7 @@ mod tests_cpu {
             TestU32::new(
                 &[BitTestSetU32Mem(0x20, 0x0)],
                 &[],
-                None,
+
                 0,
                 true,
                 "BTS - successfully executed instruction with invalid bit index",
@@ -5658,7 +5385,6 @@ mod tests_cpu {
                     BitScanReverseU32RegU32Reg(RegisterId::ER1, RegisterId::ER2),
                 ],
                 &[(RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111)],
-                None,
                 0,
                 false,
                 "BSR - incorrect result produced from the bit search",
@@ -5672,7 +5398,6 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b0000_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::ER2, 0x4),
                 ],
-                None,
                 0,
                 false,
                 "BSR - incorrect result produced from the bit search",
@@ -5689,7 +5414,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "BSR - incorrect result produced from the bit search",
@@ -5709,12 +5433,6 @@ mod tests_cpu {
                     BitScanReverseU32MemU32Reg(0x0, RegisterId::ER1),
                 ],
                 &[],
-                Some(vec![
-                    255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
                 0,
                 false,
                 "BSR - incorrect result produced from the bit search",
@@ -5725,12 +5443,6 @@ mod tests_cpu {
                     BitScanReverseU32MemU32Reg(0x0, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x4)],
-                Some(vec![
-                    255, 255, 255, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
                 0,
                 false,
                 "BSR - incorrect result produced from the bit search",
@@ -5744,7 +5456,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "BSR - incorrect result produced from the bit search",
@@ -5762,9 +5473,13 @@ mod tests_cpu {
                 &[
                     MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
                     BitScanReverseU32RegMemU32(RegisterId::ER1, 0x0),
+                    // Check that the value was written by reading it back into a register.
+                    MovMemU32RegSimple(0x0, RegisterId::ER8),
                 ],
-                &[(RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111)],
-                None,
+                &[
+                    (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::ER8, 0x0),
+                ],
                 0,
                 false,
                 "BSR - incorrect result produced from the bit search",
@@ -5773,30 +5488,30 @@ mod tests_cpu {
                 &[
                     MovU32ImmU32Reg(0b0000_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
                     BitScanReverseU32RegMemU32(RegisterId::ER1, 0x0),
+                    // Check that the value was written by reading it back into a register.
+                    MovMemU32RegSimple(0x0, RegisterId::ER8),
                 ],
-                &[(RegisterId::ER1, 0b0000_1111_1111_1111_1111_1111_1111_1111)],
-                Some(vec![
-                    4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
+                &[
+                    (RegisterId::ER1, 0b0000_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::ER8, 0x4),
+                ],
                 0,
                 false,
                 "BSR - incorrect result produced from the bit search",
             ),
             TestU32::new(
-                &[BitScanReverseU32RegMemU32(RegisterId::ER1, 0x0)],
-                &[(
-                    RegisterId::EFL,
-                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
-                )],
-                Some(vec![
-                    32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
+                &[
+                    BitScanReverseU32RegMemU32(RegisterId::ER1, 0x0),
+                    // Check that the value was written by reading it back into a register.
+                    MovMemU32RegSimple(0x0, RegisterId::ER8),
+                ],
+                &[
+                    (RegisterId::ER8, 0x20),
+                    (
+                        RegisterId::EFL,
+                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
+                    ),
+                ],
                 0,
                 false,
                 "BSR - incorrect result produced from the bit search",
@@ -5814,14 +5529,10 @@ mod tests_cpu {
                 &[
                     MovU32ImmMemSimple(0b1111_1111_1111_1111_1111_1111_1111_1111, 0x0),
                     BitScanReverseU32MemU32Mem(0x0, 0x4),
+                    // Check that the value was written by reading it back into a register.
+                    MovMemU32RegSimple(0x4, RegisterId::ER8),
                 ],
-                &[],
-                Some(vec![
-                    255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
+                &[(RegisterId::ER8, 0x0)],
                 0,
                 false,
                 "BSR - incorrect result produced from the bit search",
@@ -5830,30 +5541,27 @@ mod tests_cpu {
                 &[
                     MovU32ImmMemSimple(0b0000_1111_1111_1111_1111_1111_1111_1111, 0x0),
                     BitScanReverseU32MemU32Mem(0x0, 0x4),
+                    // Check that the value was written by reading it back into a register.
+                    MovMemU32RegSimple(0x4, RegisterId::ER8),
                 ],
-                &[],
-                Some(vec![
-                    255, 255, 255, 15, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
+                &[(RegisterId::ER8, 0x4)],
                 0,
                 false,
                 "BSR - incorrect result produced from the bit search",
             ),
             TestU32::new(
-                &[BitScanReverseU32MemU32Mem(0x0, 0x4)],
-                &[(
-                    RegisterId::EFL,
-                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
-                )],
-                Some(vec![
-                    0, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
+                &[
+                    BitScanReverseU32MemU32Mem(0x0, 0x4),
+                    // Check that the value was written by reading it back into a register.
+                    MovMemU32RegSimple(0x4, RegisterId::ER8),
+                ],
+                &[
+                    (RegisterId::ER8, 0x20),
+                    (
+                        RegisterId::EFL,
+                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
+                    ),
+                ],
                 0,
                 false,
                 "BSR - incorrect result produced from the bit search",
@@ -5873,7 +5581,6 @@ mod tests_cpu {
                     BitScanForwardU32RegU32Reg(RegisterId::ER1, RegisterId::ER2),
                 ],
                 &[(RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111)],
-                None,
                 0,
                 false,
                 "BSF - incorrect result produced from the bit search",
@@ -5887,7 +5594,6 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_0000),
                     (RegisterId::ER2, 0x4),
                 ],
-                None,
                 0,
                 false,
                 "BSF - incorrect result produced from the bit search",
@@ -5904,7 +5610,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "BSF - incorrect result produced from the bit search",
@@ -5924,12 +5629,6 @@ mod tests_cpu {
                     BitScanForwardU32MemU32Reg(0x0, RegisterId::ER1),
                 ],
                 &[],
-                Some(vec![
-                    255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
                 0,
                 false,
                 "BSF - incorrect result produced from the bit search",
@@ -5940,12 +5639,6 @@ mod tests_cpu {
                     BitScanForwardU32MemU32Reg(0x0, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x4)],
-                Some(vec![
-                    240, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
                 0,
                 false,
                 "BSF - incorrect result produced from the bit search",
@@ -5959,7 +5652,6 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
                     ),
                 ],
-                None,
                 0,
                 false,
                 "BSF - incorrect result produced from the bit search",
@@ -5977,9 +5669,13 @@ mod tests_cpu {
                 &[
                     MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
                     BitScanForwardU32RegMemU32(RegisterId::ER1, 0x0),
+                    // Check that the value was written by reading it back into a register.
+                    MovMemU32RegSimple(0x0, RegisterId::ER8),
                 ],
-                &[(RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111)],
-                None,
+                &[
+                    (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::ER8, 0x0),
+                ],
                 0,
                 false,
                 "BSF - incorrect result produced from the bit search",
@@ -5988,30 +5684,30 @@ mod tests_cpu {
                 &[
                     MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_0000, RegisterId::ER1),
                     BitScanForwardU32RegMemU32(RegisterId::ER1, 0x0),
+                    // Check that the value was written by reading it back into a register.
+                    MovMemU32RegSimple(0x0, RegisterId::ER8),
                 ],
-                &[(RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_0000)],
-                Some(vec![
-                    4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
+                &[
+                    (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_0000),
+                    (RegisterId::ER8, 0x4),
+                ],
                 0,
                 false,
                 "BSF - incorrect result produced from the bit search",
             ),
             TestU32::new(
-                &[BitScanForwardU32RegMemU32(RegisterId::ER1, 0x0)],
-                &[(
-                    RegisterId::EFL,
-                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
-                )],
-                Some(vec![
-                    32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
+                &[
+                    BitScanForwardU32RegMemU32(RegisterId::ER1, 0x0),
+                    // Check that the value was written by reading it back into a register.
+                    MovMemU32RegSimple(0x0, RegisterId::ER8),
+                ],
+                &[
+                    (RegisterId::ER8, 0x20),
+                    (
+                        RegisterId::EFL,
+                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
+                    ),
+                ],
                 0,
                 false,
                 "BSF - incorrect result produced from the bit search",
@@ -6029,14 +5725,10 @@ mod tests_cpu {
                 &[
                     MovU32ImmMemSimple(0b1111_1111_1111_1111_1111_1111_1111_1111, 0x0),
                     BitScanForwardU32MemU32Mem(0x0, 0x4),
+                    // Check that the value was written by reading it back into a register.
+                    MovMemU32RegSimple(0x4, RegisterId::ER8),
                 ],
-                &[],
-                Some(vec![
-                    255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
+                &[(RegisterId::ER8, 0x0)],
                 0,
                 false,
                 "BSF - incorrect result produced from the bit search",
@@ -6045,30 +5737,27 @@ mod tests_cpu {
                 &[
                     MovU32ImmMemSimple(0b1111_1111_1111_1111_1111_1111_1111_0000, 0x0),
                     BitScanForwardU32MemU32Mem(0x0, 0x4),
+                    // Check that the value was written by reading it back into a register.
+                    MovMemU32RegSimple(0x4, RegisterId::ER8),
                 ],
-                &[],
-                Some(vec![
-                    240, 255, 255, 255, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
+                &[(RegisterId::ER8, 0x4)],
                 0,
                 false,
                 "BSR - incorrect result produced from the bit search",
             ),
             TestU32::new(
-                &[BitScanForwardU32MemU32Mem(0x0, 0x4)],
-                &[(
-                    RegisterId::EFL,
-                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
-                )],
-                Some(vec![
-                    0, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]),
+                &[
+                    BitScanForwardU32MemU32Mem(0x0, 0x4),
+                    // Check that the value was written by reading it back into a register.
+                    MovMemU32RegSimple(0x4, RegisterId::ER8),
+                ],
+                &[
+                    (RegisterId::ER8, 0x20),
+                    (
+                        RegisterId::EFL,
+                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
+                    ),
+                ],
                 0,
                 false,
                 "BSR - incorrect result produced from the bit search",
@@ -6084,7 +5773,6 @@ mod tests_cpu {
         let tests = [TestU32::new(
             &[PushU32Imm(0x123), PushU32Imm(0x321)],
             &[],
-            None,
             2,
             false,
             "PUSH - failed to execute PUSH instruction",
@@ -6103,7 +5791,6 @@ mod tests_cpu {
         let tests = [TestU32::new(
             &[PushU32Imm(0x123)],
             &[],
-            None,
             1,
             false,
             "PUSH - failed to execute PUSH instruction",
@@ -6122,7 +5809,6 @@ mod tests_cpu {
         let tests = [TestU32::new(
             &[Nop],
             &[],
-            None,
             2,
             false,
             "PUSH - failed to execute PUSH instruction",
@@ -6143,7 +5829,6 @@ mod tests_cpu {
             TestU32::new(
                 &[PushU32Imm(0x123), PopU32ImmU32Reg(RegisterId::ER1)],
                 &[(RegisterId::ER1, 0x123)],
-                None,
                 2,
                 false,
                 "POP - failed to execute POP instruction",
@@ -6156,7 +5841,6 @@ mod tests_cpu {
                     PopU32ImmU32Reg(RegisterId::ER2),
                 ],
                 &[(RegisterId::ER1, 0x321), (RegisterId::ER1, 0x321)],
-                None,
                 2,
                 false,
                 "POP - failed to execute POP instruction",
@@ -6164,7 +5848,6 @@ mod tests_cpu {
             TestU32::new(
                 &[PopU32ImmU32Reg(RegisterId::ER1)],
                 &[],
-                None,
                 2,
                 true,
                 "POP - failed to execute POP instruction",
@@ -6177,31 +5860,31 @@ mod tests_cpu {
     /// Test the absolute jump by immediate address instruction.
     #[test]
     fn test_jump_absolute_addr() {
+        let base_offset = vm::MIN_USER_SEGMENT_SIZE as u32;
+
         let tests = [
             TestU32::new(
                 &[
                     // The address is calculated as follows:
                     //
-                    // The start of the code segment is at byte index 100 since, by default,
-                    // the testing user memory segment is 100 bytes in length.
+                    // The start of the code segment is at byte index [base].
                     //
                     // The jump instruction is _8 bytes_ in length
                     //      (4 for the instruction and 4 for the u32 argument).
                     // The first move instruction is _9 bytes_ in length
                     //      (4 for the instruction, 4 for the u32 argument and 1 for the register ID argument).
                     //
-                    // This means that we need to move to index 100 + 8 + 9 = 117 to get to the
+                    // This means that we need to move to index [base + 8 + 9] to get to the
                     // start of the second move instruction.
                     //
                     // We expect that the first move instruction will be skipped entirely.
-                    JumpAbsU32Imm(117),
+                    JumpAbsU32Imm(base_offset + 17),
                     // This instruction should be skipped, so R1 should remain at the default value of 0.
                     MovU32ImmU32Reg(0xf, RegisterId::ER1),
                     // The jump should start execution here.
                     MovU32ImmU32Reg(0xa, RegisterId::ER2),
                 ],
                 &[(RegisterId::ER1, 0x0), (RegisterId::ER2, 0xa)],
-                None,
                 0,
                 false,
                 "JMP - failed to execute JMP instruction",
@@ -6209,7 +5892,6 @@ mod tests_cpu {
             TestU32::new(
                 &[JumpAbsU32Imm(u32::MAX)],
                 &[],
-                None,
                 0,
                 true,
                 "JMP - successfully jumped outside of valid memory bounds.",
@@ -6247,7 +5929,6 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0xa, RegisterId::ER2),
                 ],
                 &[(RegisterId::ER1, 0x0), (RegisterId::ER2, 0xa)],
-                None,
                 0,
                 false,
                 "JMP - failed to execute JMP instruction",
@@ -6258,7 +5939,6 @@ mod tests_cpu {
                     JumpAbsU32Reg(RegisterId::ER1),
                 ],
                 &[],
-                None,
                 0,
                 true,
                 "JMP - successfully jumped outside of valid memory bounds.",

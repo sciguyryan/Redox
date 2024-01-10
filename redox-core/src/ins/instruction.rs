@@ -83,7 +83,9 @@ pub enum Instruction {
     CallU32Reg(RegisterId),
     /// Return from a subroutine that had zero or more u32 arguments supplied.
     RetArgsU32,
-    Int(u32),
+    /// Trigger a specific type of interrupt handler.
+    Int(u8),
+    /// Returns from an interrupt handler.
     IntRet,
     /// Unconditional jump to a specified address.
     JumpAbsU32Imm(u32),
@@ -97,7 +99,7 @@ pub enum Instruction {
     MovU32ImmU32Reg(u32, RegisterId),
     /// Move a u32 register (B) to u32 register (A). The result is copied into register A.
     MovU32RegU32Reg(RegisterId, RegisterId),
-    /// Move a u32 iImmediate to memory. The result is copied into the specified memory address.
+    /// Move a u32 immediate to memory. The result is copied into the specified memory address.
     MovU32ImmMemSimple(u32, u32),
     /// Move a u32 register to memory. The result is copied into the specified memory address.
     MovU32RegMemSimple(RegisterId, u32),
@@ -462,7 +464,7 @@ impl Instruction {
             OpCode::CallU32Imm => ARG_MEM_ADDR_SIZE,
             OpCode::CallU32Reg => ARG_REG_ID_SIZE,
             OpCode::RetArgsU32 => 0,
-            OpCode::Int => ARG_MEM_ADDR_SIZE,
+            OpCode::Int => ARG_U8_IMM_SIZE,
             OpCode::IntRet => 0,
             OpCode::JumpAbsU32Imm => ARG_MEM_ADDR_SIZE,
             OpCode::JumpAbsU32Reg => ARG_REG_ID_SIZE,

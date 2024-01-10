@@ -479,9 +479,9 @@ impl MemoryHandler {
             }
             RetArgsU32 => Instruction::RetArgsU32,
             Int => {
-                let addr = Self::read_u32(arg_bytes, &mut cursor);
+                let int_index = Self::read_u8(arg_bytes, &mut cursor);
 
-                Instruction::Int(addr)
+                Instruction::Int(int_index)
             }
             IntRet => Instruction::IntRet,
             JumpAbsU32Imm => {

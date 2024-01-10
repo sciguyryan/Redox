@@ -71,7 +71,9 @@ pub enum OpCode {
     CallU32Reg,
     /// Return from a subroutine that had zero or more u32 arguments supplied.
     RetArgsU32,
+    /// Trigger a specific type of interrupt handler.
     Int,
+    /// Returns from an interrupt handler.
     IntRet,
     /// Unconditional jump to a specified address.
     JumpAbsU32Imm,

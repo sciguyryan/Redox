@@ -6,7 +6,7 @@ use crate::{
 };
 
 /// The smallest permitted size of the user memory segment.
-pub const MIN_USER_SEGMENT_SIZE: usize = MEGABYTE * 32;
+pub const MIN_USER_SEGMENT_SIZE: usize = MEGABYTE * 5;
 /// The default size of the stack, in terms of how many u32 values can be held.
 pub const U32_STACK_CAPACITY: usize = 1000;
 
@@ -32,12 +32,10 @@ impl VirtualMachine {
     ) -> Self {
         // We have a minimum memory condition for this VM to ensure that certain assumptions
         // around the placement of things in memory remain sound.
-        #[cfg(all(debug_assertions, not(test)))]
-        {
-            if user_segment_size <= MIN_USER_SEGMENT_SIZE {
-                println!("WARNING: attempting to create a virtual machine with a user memory segment size that is smaller than the suggested minimum. Some features may not work correctly.");
-            }
-        }
+        //#[cfg(not(test))]
+        //{
+        assert!(user_segment_size >= MIN_USER_SEGMENT_SIZE);
+        //}
 
         // Construct out virtual machine.
         let mut vm = Self {

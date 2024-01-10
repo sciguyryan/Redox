@@ -107,8 +107,7 @@ impl Compiler {
             }
 
             /******** [u32 immediate] ********/
-            Instruction::Int(imm)
-            | Instruction::PushU32Imm(imm)
+            Instruction::PushU32Imm(imm)
             | Instruction::CallU32Imm(imm)
             | Instruction::JumpAbsU32Imm(imm) => {
                 self.write_u32(imm);
@@ -152,6 +151,11 @@ impl Compiler {
                 self.write_u32(imm);
                 self.write_register_id(&reg_1);
                 self.write_register_id(&reg_2);
+            }
+
+            /******** [u8 immediate] ********/
+            Instruction::Int(imm) => {
+                self.write_u8(imm);
             }
 
             /******** [No Arguments] ********/
@@ -289,7 +293,7 @@ mod tests_compiler {
                 OpCode::CallU32Imm => Instruction::CallU32Imm(0xdeafbeed),
                 OpCode::CallU32Reg => Instruction::CallU32Reg(RegisterId::ER2),
                 OpCode::RetArgsU32 => Instruction::RetArgsU32,
-                OpCode::Int => Instruction::Int(0xdeadbeef),
+                OpCode::Int => Instruction::Int(0xff),
                 OpCode::IntRet => Instruction::IntRet,
                 OpCode::JumpAbsU32Imm => Instruction::JumpAbsU32Imm(0xdeadbeef),
                 OpCode::JumpAbsU32Reg => Instruction::JumpAbsU32Reg(ER1),
