@@ -197,9 +197,8 @@ impl Cpu {
     ///
     /// * `int_type` - The type of interrupt to be triggered.
     /// * `mem` - The [`MemoryHandler`] connected to this CPU instance.
-    /// * `ins` - The [`Instruction`] used to trigger the interrupt.
     #[inline]
-    fn handle_interrupt(&mut self, int_type: u8, mem: &mut MemoryHandler, ins: &Instruction) {
+    fn handle_interrupt(&mut self, int_type: u8, mem: &mut MemoryHandler) {
         let is_masked = (1 << int_type) & self.read_reg_u32_unchecked(&RegisterId::EIM) == 0;
 
         // Is this interrupt unmasked? NMI's can't be masked.
@@ -220,7 +219,7 @@ impl Cpu {
             // Once the interrupt handler has completed then we will jump back to the
             // position directly following this function.
             // The return address will be pushed to the stack.
-            mem.push_u32(self.get_instruction_pointer() + ins.get_total_instruction_size() as u32);
+            mem.push_u32(self.get_instruction_pointer());
         }
 
         self.is_in_interrupt_handler = true;
@@ -468,16 +467,8 @@ impl Cpu {
     fn perform_call_jump(
         &mut self,
         mem: &mut MemoryHandler,
-        addr: u32,
-        call_instruction: &Instruction,
+        addr: u32
     ) {
-        // We need to force the IP to update -before- we store the stack frame
-        // this is because we don't want to jump to the start of this instruction
-        // when we return from the subroutine.
-        // We can't do this at the usual point because that will impact the offset
-        // at the call destination instead.
-        self.increment_ip_register(call_instruction.get_total_instruction_size());
-
         // Store the current stack frame state.
         self.push_state(mem);
 
@@ -858,6 +849,9 @@ impl Cpu {
 
         let privilege = &self.get_privilege();
 
+        // Advance the instruction pointer by the number of bytes used for the instruction.
+        self.increment_ip_register(instruction.get_total_instruction_size());
+
         match instruction {
             Nop => {}
 
@@ -914,11 +908,7 @@ impl Cpu {
 
                     self.set_u32_accumulator(new_value);
                 } else {
-                    self.handle_interrupt(0x0, mem, instruction);
-
-                    // We don't want to update the instruction pointer here since it
-                    // would mess with the jump destination.
-                    return;
+                    self.handle_interrupt(0x0, mem);
                 }
             }
             DivU32RegU32Imm(divisor_reg, imm) => {
@@ -928,11 +918,7 @@ impl Cpu {
 
                     self.set_u32_accumulator(new_value);
                 } else {
-                    self.handle_interrupt(0x0, mem, instruction);
-
-                    // We don't want to update the instruction pointer here since it
-                    // would mess with the jump destination.
-                    return;
+                    self.handle_interrupt(0x0, mem);
                 }
             }
             DivU32RegU32Reg(divisor_reg, reg) => {
@@ -943,11 +929,7 @@ impl Cpu {
 
                     self.set_u32_accumulator(new_value);
                 } else {
-                    self.handle_interrupt(0x0, mem, instruction);
-
-                    // We don't want to update the instruction pointer here since it
-                    // would mess with the jump destination.
-                    return;
+                    self.handle_interrupt(0x0, mem);
                 }
             }
             ModU32ImmU32Reg(imm, reg) => {
@@ -1046,48 +1028,28 @@ impl Cpu {
             CallU32Imm(addr) => {
                 // call 0xdeafbeef
                 // call :label
-                self.perform_call_jump(mem, *addr, instruction);
-
-                // We don't want to update the instruction pointer here since it
-                // would mess with the jump destination.
-                return;
+                self.perform_call_jump(mem, *addr);
             }
             CallU32Reg(reg) => {
                 // call %reg
                 // Get the value of the register.
                 let addr = self.read_reg_u32(reg, privilege);
-                self.perform_call_jump(mem, addr, instruction);
-
-                // We don't want to update the instruction pointer here since it
-                // would mess with the jump destination.
-                return;
+                self.perform_call_jump(mem, addr);
             }
             RetArgsU32 => {
                 // iret
                 // Restore the state of the last stack frame.
                 self.pop_state(mem, StackArgType::U32);
-
-                // We don't want to update the instruction pointer here since it
-                // would mess with the jump destination.
-                return;
             }
             Int(int_type) => {
                 // We will only handle interrupts if the interrupt enabled flag is set.
                 if self.is_cpu_flag_set(&CpuFlag::IF) {
-                    self.handle_interrupt(*int_type, mem, instruction);
-
-                    // We don't want to update the instruction pointer here since it
-                    // would mess with the jump destination.
-                    return;
+                    self.handle_interrupt(*int_type, mem);
                 }
             }
             IntRet => {
                 self.is_in_interrupt_handler = false;
                 self.set_instruction_pointer(mem.pop_u32());
-
-                // We don't want to update the instruction pointer here since it
-                // would mess with the jump destination.
-                return;
             }
             JumpAbsU32Imm(addr) => {
                 // jmp 0xaaaa
@@ -1321,9 +1283,6 @@ impl Cpu {
                 panic!("attempted to run an unrecognized instruction: {id}");
             }
         };
-
-        // Advance the instruction pointer by the number of bytes used for the instruction.
-        self.increment_ip_register(instruction.get_total_instruction_size());
     }
 
     /// Set the state of the specified CPU flag.
