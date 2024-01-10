@@ -1,3 +1,5 @@
+use hashbrown::HashMap;
+
 use crate::{
     compiler::bytecode_compiler::Compiler,
     cpu::CpuFlag,
@@ -16,9 +18,14 @@ pub const BOOT_REGION_NAME: &str = "boot";
 pub struct BootRom {}
 
 impl BootRom {
-    pub fn compile(mem: &MemoryHandler) -> Vec<u8> {
+    /// Compile the boot ROM for the virtual machine.
+    ///
+    /// # Arguments
+    ///
+    /// * `mem` - A reference to the virtual machine's [`MemoryHandler`].
+    pub fn compile(mem: &MemoryHandler) -> (Vec<u8>, HashMap<u8, u32>) {
         // A set of instructions to setup the virtual machine's CPU.
-        let instructions = vec![
+        let boot_instructions = vec![
             // Set the interrupt mask.
             Instruction::MovU32ImmU32Reg(0xffffffff, RegisterId::EIM),
             // Setup the stack.
@@ -34,7 +41,33 @@ impl BootRom {
             Instruction::JumpAbsU32Reg(RegisterId::ECS),
         ];
 
+        // Now that we have the base instructions, we build the default IVT
+        // handlers for interrupts we want to handle by default.
+        let mut default_ivt_handlers = HashMap::new();
+
+        // Calculate the position of the start of the interrupt vector.
+        let instruction_start_pos = BootRom::total_size_of_instructions(&boot_instructions);
+
+        // The first interrupt we want to handle is division by zero, which has the code 0x0.
+        let interrupt_0_instructions = vec![Instruction::Hlt];
+        default_ivt_handlers.insert(0, instruction_start_pos);
+
+        let mut final_instructions = vec![];
+        final_instructions.extend_from_slice(&boot_instructions);
+        final_instructions.extend_from_slice(&interrupt_0_instructions);
+
         let mut compiler = Compiler::new();
-        compiler.compile(&instructions).to_vec()
+        (
+            compiler.compile(&boot_instructions).to_vec(),
+            default_ivt_handlers,
+        )
+    }
+
+    fn total_size_of_instructions(instructions: &[Instruction]) -> u32 {
+        let mut size = 0;
+        for ins in instructions {
+            size += ins.get_total_instruction_size();
+        }
+        size as u32
     }
 }

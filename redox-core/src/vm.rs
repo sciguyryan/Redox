@@ -1,3 +1,5 @@
+use hashbrown::HashMap;
+
 use crate::{
     boot_rom::{BootRom, BOOT_MEMORY_LENGTH, BOOT_MEMORY_START, BOOT_REGION_NAME},
     cpu::Cpu,
@@ -11,8 +13,13 @@ pub const MIN_USER_SEGMENT_SIZE: usize = MEGABYTE * 5;
 pub const U32_STACK_CAPACITY: usize = 1000;
 
 pub struct VirtualMachine {
+    /// The [`MemoryHandler`] for this virtual machine.
     pub mem: MemoryHandler,
+    /// The [`Cpu`] for this virtual machine.
     pub cpu: Cpu,
+
+    /// The default interrupt vector table handlers.
+    default_ivt_handlers: HashMap<u8, u32>,
 }
 
 impl VirtualMachine {
@@ -30,12 +37,14 @@ impl VirtualMachine {
         data_segment_bytes: &[u8],
         stack_segment_size: usize,
     ) -> Self {
-        // We have a minimum memory condition for this VM to ensure that certain assumptions
-        // around the placement of things in memory remain sound.
-        //#[cfg(not(test))]
-        //{
+        // We have a minimum memory condition for this VM to ensure that certain
+        //assumptions around the placement of things in memory remain sound.
         assert!(user_segment_size >= MIN_USER_SEGMENT_SIZE);
-        //}
+
+        // The first 1024 bytes (1 kilobyte) of user memory are used for
+        // the interrupt vector table (IVT). This is comprised of 256
+        // entries of 4 bytes, each representing a potential address for the
+        // interrupt handler. Some interrupts aren't
 
         // Construct out virtual machine.
         let mut vm = Self {
@@ -46,18 +55,24 @@ impl VirtualMachine {
                 stack_segment_size,
             ),
             cpu: Cpu::default(),
+            default_ivt_handlers: HashMap::new(),
         };
 
         // Build and load the boot ROM.
-        vm.load_boot_rom();
+        // This will return a list of our default interrupt vector handlers
+        // from the compiled boot ROM.
+        let default_ivt_handlers = vm.load_boot_rom();
+
+        // Load the default interrupt vector table entries into memory.
+        vm.load_default_ivt_handlers(default_ivt_handlers);
 
         vm
     }
 
     /// Create and load the bootable ROM into memory.
-    fn load_boot_rom(&mut self) {
+    fn load_boot_rom(&mut self) -> HashMap<u8, u32> {
         // Create the bootable ROM.
-        let boot_rom = BootRom::compile(&self.mem);
+        let (boot_rom, default_ivt_handlers) = BootRom::compile(&self.mem);
 
         // Create a new memory segment tp hold the bootable ROM data.
         let boot_mem_id = self.mem.add_mapped_memory_segment(
@@ -73,6 +88,13 @@ impl VirtualMachine {
             .get_mapped_segment_by_index_mut(boot_mem_id)
             .expect("failed to get memory segment")
             .set_contents(&boot_rom);
+
+        // Return the default IVT handlers for further processing.
+        default_ivt_handlers
+    }
+
+    fn load_default_ivt_handlers(&mut self, handlers: HashMap<u8, u32>) {
+        for (int_code, address) in handlers {}
     }
 
     /// Run the virtual machine until completion.

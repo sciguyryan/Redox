@@ -12,6 +12,9 @@ use crate::{
     utils,
 };
 
+// The following is a list of preset interrupts and what they are used for:
+// 0x0 - division by zero - default handler implemented.
+
 /// A list of f32 registers to be preserved when entering a subroutine. Use when storing state.
 ///
 /// # Note
@@ -190,23 +193,42 @@ impl Cpu {
     ///
     /// * `int_type` - The type of interrupt to be triggered.
     /// * `mem` - The [`MemoryHandler`] connected to this CPU instance.
+    /// * `ins` - The [`Instruction`] used to trigger the interrupt.
     #[inline]
-    fn handle_interrupt(&mut self, int_type: u8, mem: &mut MemoryHandler) {
-        let is_unmasked = (1 << int_type) & self.read_reg_u32_unchecked(&RegisterId::EIM);
+    fn maybe_handle_interrupt(&mut self, int_type: u8, mem: &mut MemoryHandler, ins: &Instruction) {
+        let is_masked = (1 << int_type) & self.read_reg_u32_unchecked(&RegisterId::EIM) == 0;
 
         // Is this interrupt unmasked?
-        if is_unmasked == 0 {
+        if is_masked {
+            eprintln!("cpu.rs - handle_interrupt - masked");
+
             // The interrupt is masked, therefore we don't want to do anything here.
             return;
         }
 
+        eprintln!("cpu.rs - handle_interrupt - unmasked");
+
         // Calculate the place within the interrupt vector we need to look.
         let iv_addr = self.interrupt_vector_address + (int_type as u32 * 4);
 
-        // Get the handler address from the IV.
+        // Get the handler address from the interrupt vector.
         let iv_handler_addr = mem.get_u32(iv_addr as usize);
 
-        panic!("{iv_handler_addr}");
+        eprintln!("cpu.rs - handle_interrupt - iv_handler_addr = {iv_handler_addr}");
+
+        // We will only save state when we are not already in an interrupt handler.
+        if !self.is_in_interrupt_handler {
+            // Calculate the interrupt return address.
+            // Once the interrupt handler has completed then we will jump back to the
+            // position directly following this function.
+            // The return address will be pushed to the stack.
+            mem.push_u32(self.get_instruction_pointer() + ins.get_total_instruction_size() as u32);
+        }
+
+        self.is_in_interrupt_handler = true;
+
+        // Jump to the interrupt vector handler.
+        self.set_instruction_pointer(iv_handler_addr);
     }
 
     /// Increment the instruction pointer (IP) register by a specified amount.
@@ -223,6 +245,18 @@ impl Cpu {
         self.registers
             .get_register_u32_mut(RegisterId::EPC)
             .increment_unchecked();
+    }
+
+    /// Check whether a specific CPU flag is set.
+    ///
+    /// # Arguments
+    ///
+    /// * `flag` - The [`CpuFlag`] to check.
+    #[inline(always)]
+    fn is_cpu_flag_set(&self, flag: &CpuFlag) -> bool {
+        // Get the current CPU flags.
+        let flags = self.read_reg_u32_unchecked(&RegisterId::EFL);
+        utils::is_bit_set(flags, *flag as u8)
     }
 
     /// Perform a checked add of two u32 values.
@@ -1025,10 +1059,16 @@ impl Cpu {
                 skip_ip_update = true;
             }
             Int(int_type) => {
-                self.handle_interrupt(*int_type, mem);
+                // TODO - handle the special pre-set interrupts here.
+
+                // We will only handle interrupts if the interrupt enabled flag is set.
+                if self.is_cpu_flag_set(&CpuFlag::IF) {
+                    self.maybe_handle_interrupt(*int_type, mem, instruction);
+                }
             }
             IntRet => {
-                todo!();
+                self.is_in_interrupt_handler = false;
+                self.set_instruction_pointer(mem.pop_u32());
             }
             JumpAbsU32Imm(addr) => {
                 // jmp 0xaaaa
@@ -1700,7 +1740,7 @@ mod tests_cpu {
             Instruction::PushU32Imm(1), // Starts at [base + 25]. Length = 8. The number of arguments.
             Instruction::CallU32Reg(RegisterId::ER8), // Starts at [base + 33]. Length = 5.
             Instruction::AddU32ImmU32Reg(100, RegisterId::ER1), // Starts at [base + 38]. Length = 9.
-            Instruction::Hlt,           // Starts at [base + 47]. Length = 4.
+            Instruction::Hlt, // Starts at [base + 47]. Length = 4.
             // FUNC_AAAA - Subroutine starts here.
             Instruction::PushU32Imm(5), // Starts at [base + 51]. Length = 8.
             Instruction::PopU32ImmU32Reg(RegisterId::ER1), // Starts at [base + 59]. Length = 5.
