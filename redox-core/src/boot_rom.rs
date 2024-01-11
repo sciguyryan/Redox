@@ -2,7 +2,7 @@ use hashbrown::HashMap;
 
 use crate::{
     compiler::bytecode_compiler::Compiler,
-    cpu::Interrupt,
+    cpu::{DIVIDE_BY_ZERO_INT, NON_MASKABLE_INT},
     ins::instruction::Instruction,
     mem::memory_handler::{MemoryHandler, MEGABYTE},
     reg::registers::RegisterId,
@@ -27,7 +27,7 @@ impl BootRom {
         // A set of instructions to setup the virtual machine's CPU.
         let boot_instructions = vec![
             // Disable maskable interrupts.
-            Instruction::CLI,
+            Instruction::ClearInterruptFlag,
             // Set the interrupt mask.
             Instruction::MovU32ImmU32Reg(0xffffffff, RegisterId::EIM),
             // Setup the stack.
@@ -38,7 +38,7 @@ impl BootRom {
             Instruction::MovU32ImmU32Reg(mem.code_segment_start as u32, RegisterId::ECS),
             Instruction::MovU32ImmU32Reg(mem.data_segment_start as u32, RegisterId::EDS),
             // Enable CPU interrupts.
-            Instruction::SLI,
+            Instruction::SetInterruptFlag,
             // Jump to the start of the user executable code.
             Instruction::JumpAbsU32Reg(RegisterId::ECS),
         ];
@@ -58,14 +58,17 @@ impl BootRom {
         // implementing the stepping interrupt.
 
         // The division by zero interrupt handler.
-        let interrupt_div_zero_handler = vec![Instruction::Hlt, Instruction::IntRet];
-        default_ivt_handlers.insert(Interrupt::DivideByZero.into(), next_handler_pos);
+        let interrupt_div_zero_handler = vec![Instruction::MovU32ImmU32Reg(0x123, RegisterId::ER8), Instruction::Halt, Instruction::IntRet];
+        default_ivt_handlers.insert(DIVIDE_BY_ZERO_INT, next_handler_pos);
 
         next_handler_pos += BootRom::total_size_of_instructions(&interrupt_div_zero_handler);
 
         // The non-maskable interrupt (NMI) handler.
-        let interrupt_nmi_handler = vec![Instruction::Hlt, Instruction::IntRet];
-        default_ivt_handlers.insert(Interrupt::Nmi.into(), next_handler_pos);
+        let interrupt_nmi_handler = vec![Instruction::MovU32ImmU32Reg(0x123, RegisterId::ER7), Instruction::Halt, Instruction::IntRet];
+        default_ivt_handlers.insert(NON_MASKABLE_INT, next_handler_pos);
+
+        // next_handler_pos += BootRom::total_size_of_instructions(&interrupt_nmi_handler);
+        // etc.
 
         // Build and compile the final bootable ROM.
         let mut final_instructions = vec![];

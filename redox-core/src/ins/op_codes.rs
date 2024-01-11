@@ -147,14 +147,18 @@ pub enum OpCode {
     BitScanForwardU32MemU32Mem,
 
     /******** [Special Instructions] ********/
-    /// Clear the CPU interrupt enabled flag.
-    Cli,
-    /// Set the CPU interrupt enabled flag.
-    Slt,
-    /// Machine return - downgrade the privilege level of the processor.
-    Mret = 65534,
+    /// Clear the global CPU interrupt enabled flag.
+    ClearInterruptFlag,
+    /// Set the global CPU interrupt enabled flag.
+    SetInterruptFlag,
+    /// Mask a specific interrupt.
+    MaskInterrupt,
+    /// Unmask a specific interrupt.
+    UnmaskInterrupt,
+    /// Machine-mode return - downgrade the privilege level of the processor.
+    MachineReturn = 65534,
     /// Halt the execution of the virtual machine.
-    Hlt = 65535,
+    Halt = 65535,
 
     // Anything above u32::MAX - 10 (0xfffffff5) is an invalid opcode. These are reserved for future or special use.
     Reserved1 = u32::MAX - 10,
@@ -252,10 +256,12 @@ impl From<&Instruction> for OpCode {
             Instruction::BitScanForwardU32MemU32Mem(_, _) => OpCode::BitScanForwardU32MemU32Mem,
 
             /******** [Special Instructions] ********/
-            Instruction::CLI => OpCode::Cli,
-            Instruction::SLI => OpCode::Slt,
-            Instruction::Mret => OpCode::Mret,
-            Instruction::Hlt => OpCode::Hlt,
+            Instruction::ClearInterruptFlag => OpCode::ClearInterruptFlag,
+            Instruction::SetInterruptFlag => OpCode::SetInterruptFlag,
+            Instruction::MaskInterrupt(_) => OpCode::MaskInterrupt,
+            Instruction::UnmaskInterrupt(_) => OpCode::UnmaskInterrupt,
+            Instruction::MachineReturn => OpCode::MachineReturn,
+            Instruction::Halt => OpCode::Halt,
 
             /******** [Reserved Instructions] ********/
             Instruction::Reserved1 => OpCode::Reserved1,

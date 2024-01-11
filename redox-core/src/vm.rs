@@ -112,6 +112,9 @@ impl VirtualMachine {
         // Clear any stack type hints that may be present.
         self.mem.reset_stack_configuration();
 
+        // Completely clear the physical memory segment.
+        self.mem.clear();
+
         // Reset the registers to their startup configuration.
         self.cpu.registers = Registers::default();
 

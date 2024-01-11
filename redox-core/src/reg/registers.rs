@@ -115,7 +115,6 @@ impl Display for RegisterId {
             RegisterId::EIP => "EIP",
             RegisterId::EFP => "EFP",
             RegisterId::ESP => "ESP",
-
             RegisterId::EFL => "EFL",
             RegisterId::EIM => "EIM",
 
@@ -155,32 +154,6 @@ pub struct Registers {
     pub registers_f32: HashMap<RegisterId, RegisterF32>,
 }
 
-impl PartialEq for Registers {
-    fn eq(&self, other: &Self) -> bool {
-        for (self_reg, other_reg) in self
-            .registers_u32
-            .values()
-            .zip(other.registers_u32.values())
-        {
-            if self_reg.read_unchecked() != other_reg.read_unchecked() {
-                return false;
-            }
-        }
-        for (self_reg, other_reg) in self
-            .registers_f32
-            .values()
-            .zip(other.registers_f32.values())
-        {
-            if self_reg.read_unchecked() != other_reg.read_unchecked() {
-                return false;
-            }
-        }
-        true
-    }
-}
-
-impl Eq for Registers {}
-
 impl Registers {
     pub fn new() -> Self {
         let rw = RegisterPermission::R | RegisterPermission::W;
@@ -204,7 +177,7 @@ impl Registers {
                 register_u32!(RegisterId::EFP, &prpw, 0),
                 register_u32!(RegisterId::ESP, &prpw, 0),
                 register_u32!(RegisterId::EFL, &rpw, 0),
-                register_u32!(RegisterId::EIM, &rpw, 0),
+                register_u32!(RegisterId::EIM, &rw, 0),
                 // [ Segment Registers ] //
                 register_u32!(RegisterId::ESS, &rpw, 0),
                 register_u32!(RegisterId::ECS, &rpw, 0),
@@ -326,6 +299,11 @@ impl Registers {
                     other_reg.read_unchecked()
                 ));
             }
+        }
+
+        if u32_different.is_empty() && f32_different.is_empty() {
+            println!("No register differences to report!");
+            return;
         }
 
         if !u32_different.is_empty() {

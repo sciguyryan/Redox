@@ -12,42 +12,25 @@ use crate::{
     utils,
 };
 
-#[derive(PartialEq, Eq, Hash)]
-#[repr(u8)]
-pub enum Interrupt {
-    /// Division by zero interrupt - default handler implemented.
-    DivideByZero = 0,
-    /// Single-step interrupt - not yet implemented.
-    SingleStep = 1,
-    /// NMI (non-maskable interrupt) - default handler implemented.
-    Nmi = 2,
-    General(u8),
-}
+// I have taken some of the common ones from the ones that are generally universal.
 
-impl From<u8> for Interrupt {
-    fn from(value: u8) -> Self {
-        match value {
-            0 => Interrupt::DivideByZero,
-            1 => Interrupt::SingleStep,
-            2 => Interrupt::Nmi,
-            id => Interrupt::General(id),
-        }
-    }
-}
+/// Division by zero interrupt - default handler implemented.
+pub const DIVIDE_BY_ZERO_INT: u8 = 0x0;
+/// Single-step interrupt - not yet implemented.
+pub const SINGLE_STEP_INT: u8 = 0x1;
+/// NMI (non-maskable interrupt) - default handler implemented.
+pub const NON_MASKABLE_INT: u8 = 0x2;
+/// The invalid opcode interrupt - not yet implemented.
+pub const INVALID_OPCODE_INT: u8 = 0x6;
 
-impl From<Interrupt> for u8 {
-    fn from(val: Interrupt) -> Self {
-        match val {
-            Interrupt::DivideByZero => 0,
-            Interrupt::SingleStep => 1,
-            Interrupt::Nmi => 2,
-            Interrupt::General(id) => id,
-        }
-    }
-}
-
-/// A list of the non-maskable interrupts.
-pub const NMI_INTERRUPTS: [Interrupt; 1] = [Interrupt::Nmi];
+/// A list of the non-maskable interrupts. Typically anything defined with a constant above
+/// shouldn't be maskable.
+pub const NMI_INTERRUPTS: [u8; 4] = [
+    DIVIDE_BY_ZERO_INT,
+    SINGLE_STEP_INT,
+    NON_MASKABLE_INT,
+    INVALID_OPCODE_INT,
+];
 
 /// A list of f32 registers to be preserved when entering a subroutine. Use when storing state.
 ///
@@ -89,6 +72,8 @@ const PRESERVE_REGISTERS_U32_REV: [RegisterId; 8] = [
 
 /// The mask to get only the lowest 8 bits of a u32 value.
 const U32_LOW_BYTE_MASK: u32 = 0xff;
+/// The mask to get everything except the lowest 8 bits of a u32 value.
+const NOT_U32_LOW_BYTE_MASK: u32 = !U32_LOW_BYTE_MASK;
 
 /// The default interrupt vector address.
 const INTERRUPT_VECTOR_ADDRESS: u32 = 0x0;
@@ -104,6 +89,8 @@ pub struct Cpu {
     pub is_in_interrupt_handler: bool,
     /// The address of the interrupt vector table.
     pub interrupt_vector_address: u32,
+    /// The last interrupt handler that was "active" (no intret instruction termination).
+    pub last_interrupt_code: Option<u8>,
 }
 
 impl Cpu {
@@ -114,6 +101,7 @@ impl Cpu {
             is_machine_mode: true,
             is_in_interrupt_handler: false,
             interrupt_vector_address,
+            last_interrupt_code: None,
         }
     }
 
@@ -200,7 +188,7 @@ impl Cpu {
     ///
     /// # Arguments
     ///
-    /// * `mem` - A reference to the virtual machine [`Memory`] instance.
+    /// * `mem` - A reference to the [`MemoryHandler`] connected to this CPU instance.
     ///
     /// # Returns
     ///
@@ -226,16 +214,15 @@ impl Cpu {
     /// # Arguments
     ///
     /// * `int_type` - The type of interrupt to be triggered.
-    /// * `mem` - The [`MemoryHandler`] connected to this CPU instance.
+    /// * `mem` - A mutable reference to the [`MemoryHandler`] connected to this CPU instance.
     #[inline]
     fn handle_interrupt(&mut self, int_type: u8, mem: &mut MemoryHandler) {
-        let is_masked = (1 << int_type) & self.read_reg_u32_unchecked(&RegisterId::EIM) == 0;
+        let is_masked = (self.read_reg_u32_unchecked(&RegisterId::EIM) & (int_type as u32)) == 0;
 
         // Should we handle this interrupt?
         // We will always handle a NMI, regardless of whether the CPU's interrupt enabled
         // flag is set, or whether that interrupt is masked. NMI's can't be ignored.
-        if !NMI_INTERRUPTS.contains(&int_type.into())
-            && (is_masked || !self.is_cpu_flag_set(&CpuFlag::IF))
+        if !NMI_INTERRUPTS.contains(&int_type) && (is_masked || !self.is_cpu_flag_set(&CpuFlag::IF))
         {
             return;
         }
@@ -245,6 +232,9 @@ impl Cpu {
 
         // Get the handler address from the interrupt vector.
         let iv_handler_addr = mem.get_u32(iv_addr as usize);
+        if iv_handler_addr == 0 {
+            panic!("no handler has been specified for this interrupt code!");
+        }
 
         // We will only save state when we are not already in an interrupt handler.
         if !self.is_in_interrupt_handler {
@@ -255,7 +245,11 @@ impl Cpu {
             mem.push_u32(self.get_instruction_pointer());
         }
 
+        // Indicate that we are currently within an interrupt handler.
         self.is_in_interrupt_handler = true;
+
+        // Indicate that we have an unfinished interrupt.
+        self.last_interrupt_code = Some(int_type);
 
         // Jump to the interrupt vector handler.
         self.set_instruction_pointer(iv_handler_addr);
@@ -370,7 +364,6 @@ impl Cpu {
     /// This method affects the following flags: none. All flags are undefined.
     #[inline(always)]
     fn perform_checked_div_u32(&mut self, value: u32, divisor: u32) -> u32 {
-        // TODO - when implementing exceptions and interrupts, ensure one is triggered with division by zero.
         value.wrapping_div(divisor)
     }
 
@@ -493,9 +486,8 @@ impl Cpu {
     ///
     /// # Arguments
     ///
-    /// * `mem` - A mutable reference to the virtual machine [`Memory`] instance.
+    /// * `mem` - A mutable reference to the [`MemoryHandler`] connected to this CPU instance.
     /// * `addr` - The call jump address.
-    /// * `call_instruction` - The instruction that executed the call.
     #[inline(always)]
     fn perform_call_jump(&mut self, mem: &mut MemoryHandler, addr: u32) {
         // Store the current stack frame state.
@@ -853,7 +845,7 @@ impl Cpu {
     ///
     /// # Arguments
     ///
-    /// * `mem` - The [`Memory`] connected to this CPU instance.
+    /// * `mem` - A mutable reference to the [`MemoryHandler`] connected to this CPU instance.
     /// * `instructions` - A slice of [`Instruction`] instances to be executed.
     pub fn run_instructions(&mut self, mem: &mut MemoryHandler, instructions: &[Instruction]) {
         for ins in instructions {
@@ -871,7 +863,7 @@ impl Cpu {
     ///
     /// # Arguments
     ///
-    /// * `mem` - The [`MemoryHandler`] connected to this CPU instance.
+    /// * `mem` - A mutable reference to the [`MemoryHandler`] connected to this CPU instance.
     /// * `instruction` - An [`Instruction`] instance to be executed.
     fn run_instruction(&mut self, mem: &mut MemoryHandler, instruction: &Instruction) {
         use Instruction::*;
@@ -931,52 +923,70 @@ impl Cpu {
                 self.set_u32_accumulator(new_value);
             }
             DivU32ImmU32Reg(divisor, reg) => {
-                if *divisor > 0 {
-                    let old_value = self.read_reg_u32(reg, privilege);
-                    let new_value = self.perform_checked_div_u32(old_value, *divisor);
-
-                    self.set_u32_accumulator(new_value);
-                } else {
-                    self.handle_interrupt(0x0, mem);
+                if *divisor == 0 {
+                    self.handle_interrupt(DIVIDE_BY_ZERO_INT, mem);
+                    return;
                 }
+
+                let old_value = self.read_reg_u32(reg, privilege);
+                let new_value = self.perform_checked_div_u32(old_value, *divisor);
+
+                self.set_u32_accumulator(new_value);
             }
             DivU32RegU32Imm(divisor_reg, imm) => {
-                let old_value = self.read_reg_u32(divisor_reg, privilege);
-                if old_value > 0 {
-                    let new_value = self.perform_checked_div_u32(*imm, old_value);
-
-                    self.set_u32_accumulator(new_value);
-                } else {
-                    self.handle_interrupt(0x0, mem);
+                let divisor = self.read_reg_u32(divisor_reg, privilege);
+                if divisor == 0 {
+                    self.handle_interrupt(DIVIDE_BY_ZERO_INT, mem);
+                    return;
                 }
+
+                let new_value = self.perform_checked_div_u32(*imm, divisor);
+
+                self.set_u32_accumulator(new_value);
             }
             DivU32RegU32Reg(divisor_reg, reg) => {
-                let divisor_reg_val = self.read_reg_u32(divisor_reg, privilege);
-                if divisor_reg_val > 0 {
-                    let old_value = self.read_reg_u32(reg, privilege);
-                    let new_value = self.perform_checked_div_u32(old_value, divisor_reg_val);
-
-                    self.set_u32_accumulator(new_value);
-                } else {
-                    self.handle_interrupt(0x0, mem);
+                let divisor = self.read_reg_u32(divisor_reg, privilege);
+                if divisor == 0 {
+                    self.handle_interrupt(DIVIDE_BY_ZERO_INT, mem);
+                    return;
                 }
+
+                let old_value = self.read_reg_u32(reg, privilege);
+                let new_value = self.perform_checked_div_u32(old_value, divisor);
+
+                self.set_u32_accumulator(new_value);
             }
             ModU32ImmU32Reg(imm, reg) => {
-                let reg_val = self.read_reg_u32(reg, privilege);
-                let new_value = self.perform_modulo_u32(reg_val, *imm);
+                let divisor = self.read_reg_u32(reg, privilege);
+                if divisor == 0 {
+                    self.handle_interrupt(DIVIDE_BY_ZERO_INT, mem);
+                    return;
+                }
+
+                let new_value = self.perform_modulo_u32(divisor, *imm);
 
                 self.set_u32_accumulator(new_value);
             }
             ModU32RegU32Imm(reg, imm) => {
-                let reg_val = self.read_reg_u32(reg, privilege);
-                let new_value = self.perform_modulo_u32(*imm, reg_val);
+                let divisor = self.read_reg_u32(reg, privilege);
+                if divisor == 0 {
+                    self.handle_interrupt(DIVIDE_BY_ZERO_INT, mem);
+                    return;
+                }
+
+                let new_value = self.perform_modulo_u32(*imm, divisor);
 
                 self.set_u32_accumulator(new_value);
             }
-            ModU32RegU32Reg(reg_1, reg_2) => {
-                let reg_1_val = self.read_reg_u32(reg_1, privilege);
-                let reg_2_val = self.read_reg_u32(reg_2, privilege);
-                let new_value = self.perform_modulo_u32(reg_2_val, reg_1_val);
+            ModU32RegU32Reg(divisor_reg, reg) => {
+                let divisor = self.read_reg_u32(divisor_reg, privilege);
+                if divisor == 0 {
+                    self.handle_interrupt(DIVIDE_BY_ZERO_INT, mem);
+                    return;
+                }
+
+                let reg_val = self.read_reg_u32(reg, privilege);
+                let new_value = self.perform_modulo_u32(reg_val, divisor);
 
                 self.set_u32_accumulator(new_value);
             }
@@ -1075,6 +1085,7 @@ impl Cpu {
             }
             IntRet => {
                 self.is_in_interrupt_handler = false;
+                self.last_interrupt_code = None;
                 self.set_instruction_pointer(mem.pop_u32());
             }
             JumpAbsU32Imm(addr) => {
@@ -1280,16 +1291,26 @@ impl Cpu {
             }
 
             /******** [Special Instructions] ********/
-            CLI => {
+            ClearInterruptFlag => {
                 self.set_flag_state(CpuFlag::IF, false);
             }
-            SLI => {
+            SetInterruptFlag => {
                 self.set_flag_state(CpuFlag::IF, true);
             }
-            Mret => {
+            MaskInterrupt(int_code) => {
+                let im = self.registers.get_register_u32_mut(RegisterId::EIM);
+                let new_mask = im.read_unchecked() & !*int_code as u32;
+                im.write_unchecked(new_mask);
+            }
+            UnmaskInterrupt(int_code) => {
+                let im = self.registers.get_register_u32_mut(RegisterId::EIM);
+                let new_mask = (im.read_unchecked() & NOT_U32_LOW_BYTE_MASK) | *int_code as u32;
+                im.write_unchecked(new_mask);
+            }
+            MachineReturn => {
                 self.set_machine_mode(false);
             }
-            Hlt => {
+            Halt => {
                 self.set_halted(true);
             }
 
@@ -1356,7 +1377,7 @@ impl Cpu {
     ///
     /// # Arguments
     ///
-    /// * `mem` - A reference to the VM [`Memory`] instance.
+    /// * `mem` - A reference to the [`MemoryHandler`] connected to this CPU instance.
     #[inline(always)]
     pub fn set_segment_registers(&mut self, mem: &MemoryHandler) {
         self.write_reg_u32_unchecked(&RegisterId::ESS, mem.stack_segment_start as u32);
@@ -1536,6 +1557,7 @@ mod tests_cpu {
 
     use crate::{
         compiler::bytecode_compiler::Compiler,
+        cpu::DIVIDE_BY_ZERO_INT,
         ins::{
             instruction::Instruction::{self, *},
             move_expressions::{ExpressionArgs, ExpressionOperator, MoveExpressionHandler},
@@ -1546,6 +1568,9 @@ mod tests_cpu {
     };
 
     use super::{Cpu, CpuFlag};
+
+    /// The default stack capacity (in terms of u32 values) for tests.
+    const DEFAULT_U32_STACK_CAPACITY: usize = 30;
 
     struct TestsU32 {
         tests: Vec<TestU32>,
@@ -1619,8 +1644,8 @@ mod tests_cpu {
             // Ensure we always end with a halt instruction.
             let mut instructions_vec = instructions.to_vec();
             if let Some(ins) = instructions_vec.last() {
-                if !matches!(ins, Hlt) {
-                    instructions_vec.push(Hlt);
+                if !matches!(ins, Halt) {
+                    instructions_vec.push(Halt);
                 }
             }
 
@@ -1741,7 +1766,7 @@ mod tests_cpu {
             Instruction::PushU32Imm(1), // Starts at [base + 25]. Length = 8. The number of arguments.
             Instruction::CallU32Reg(RegisterId::ER8), // Starts at [base + 33]. Length = 5.
             Instruction::AddU32ImmU32Reg(100, RegisterId::ER1), // Starts at [base + 38]. Length = 9.
-            Instruction::Hlt, // Starts at [base + 47]. Length = 4.
+            Instruction::Halt, // Starts at [base + 47]. Length = 4.
             // FUNC_AAAA - Subroutine starts here.
             Instruction::PushU32Imm(5), // Starts at [base + 51]. Length = 8.
             Instruction::PopU32ImmU32Reg(RegisterId::ER1), // Starts at [base + 59]. Length = 5.
@@ -1806,7 +1831,7 @@ mod tests_cpu {
             // The number of arguments for the subroutine.
             Instruction::PushU32Imm(0), // Starts at [base + 63]. Length = 8. The number of arguments.
             Instruction::CallU32Imm(base_offset + 83), // Starts at [base + 71]. Length = 8.
-            Instruction::Hlt,           // Starts at [base + 79]. Length = 4.
+            Instruction::Halt,          // Starts at [base + 79]. Length = 4.
             // FUNC_AAAA - Subroutine starts here.
             Instruction::MovU32ImmU32Reg(0, RegisterId::ER2), // Starts at [base + 83].
             Instruction::MovU32ImmU32Reg(0, RegisterId::ER3),
@@ -1849,7 +1874,7 @@ mod tests_cpu {
             Instruction::PushU32Imm(2), // Starts at [base + 8]. Length = 8. Subroutine argument 1.
             Instruction::PushU32Imm(1), // Starts at [base + 16]. Length = 8. The number of arguments.
             Instruction::CallU32Imm(base_offset + 36), // Starts at [base + 24]. Length = 8.
-            Instruction::Hlt,           // Starts at [base + 32]. Length = 4.
+            Instruction::Halt,          // Starts at [base + 32]. Length = 4.
             // FUNC_AAAA - Subroutine 1 starts here.
             Instruction::PushU32Imm(0), // Starts at [base + 36]. Length = 8. The number of arguments.
             Instruction::CallU32Imm(base_offset + 65), // Starts at [base + 44]. Length = 8.
@@ -1857,8 +1882,8 @@ mod tests_cpu {
             Instruction::RetArgsU32,    // Starts at [base + 61]. Length = 4.
             // FUNC_BBBB - Subroutine 2 starts here.
             Instruction::PushU32Imm(100), // Starts at [base + 65]. Length = 8. This should NOT be preserved.
-            Instruction::PopU32ImmU32Reg(RegisterId::ER1), // Starts at [base + 73]. Length = 5.
-            Instruction::RetArgsU32,      // Starts at [base + 78]. Length = 4.
+            Instruction::PopU32ImmU32Reg(RegisterId::ER1),
+            Instruction::RetArgsU32,
         ];
 
         let mut compiler = Compiler::new();
@@ -1933,18 +1958,18 @@ mod tests_cpu {
     fn test_hlt() {
         let tests = [
             TestU32::new(
-                &[Hlt],
+                &[Halt],
                 &[],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "HLT - failed to execute HLT instruction",
             ),
             // The halt instruction should prevent any following instructions from executing, which
             // means that the register value will never change.
             TestU32::new(
-                &[Hlt, MovU32ImmU32Reg(0xf, RegisterId::ER1)],
+                &[Halt, MovU32ImmU32Reg(0xf, RegisterId::ER1)],
                 &[(RegisterId::ER1, 0)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "HLT - failed to correctly stop execution after a HLT instruction",
             ),
@@ -1957,9 +1982,9 @@ mod tests_cpu {
     #[test]
     fn test_mret() {
         let tests = [TestU32::new(
-            &[Mret],
+            &[MachineReturn],
             &[],
-            0,
+            DEFAULT_U32_STACK_CAPACITY,
             false,
             "MRET - failed to execute MRET instruction",
         )];
@@ -2007,7 +2032,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ADD - incorrect result value produced",
             ),
@@ -2024,7 +2049,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ADD - CPU flags not correctly set",
             ),
@@ -2034,7 +2059,7 @@ mod tests_cpu {
                     RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ADD - CPU flags not correctly set",
             ),
@@ -2051,7 +2076,7 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x3),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ADD - CPU parity flag not correctly set",
             ),
@@ -2068,7 +2093,7 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x2),
                     (RegisterId::EFL, 0x0),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ADD - CPU parity flag not correctly cleared",
             ),
@@ -2088,7 +2113,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ADD - CPU signed flag not correctly set",
             ),
@@ -2105,7 +2130,7 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x2),
                     (RegisterId::EFL, 0x0),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ADD - CPU signed flag not correctly cleared",
             ),
@@ -2129,7 +2154,7 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x1),
                     (RegisterId::EAC, 0x10),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ADD - incorrect result value produced",
             ),
@@ -2148,7 +2173,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ADD - CPU flags not correctly set",
             ),
@@ -2158,7 +2183,7 @@ mod tests_cpu {
                     RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ADD - CPU flags not correctly set",
             ),
@@ -2177,7 +2202,7 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x3),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ADD - CPU parity flag not correctly set",
             ),
@@ -2194,7 +2219,7 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x2),
                     (RegisterId::EFL, 0x0),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ADD - CPU parity flag not correctly cleared",
             ),
@@ -2216,7 +2241,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ADD - CPU signed flag not correctly set",
             ),
@@ -2235,7 +2260,7 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x2),
                     (RegisterId::EFL, 0x0),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ADD - CPU signed flag not correctly cleared",
             ),
@@ -2254,7 +2279,7 @@ mod tests_cpu {
                     SubU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x2), (RegisterId::EAC, 0x1)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SUB - incorrect result value produced",
             ),
@@ -2271,7 +2296,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SUB - CPU flags not correctly set",
             ),
@@ -2281,7 +2306,7 @@ mod tests_cpu {
                     RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SUB - CPU flags not correctly set",
             ),
@@ -2298,7 +2323,7 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x3),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SUB - CPU parity flag not correctly set",
             ),
@@ -2315,7 +2340,7 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x1),
                     (RegisterId::EFL, 0x0),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SUB - CPU parity flag not correctly cleared",
             ),
@@ -2332,7 +2357,7 @@ mod tests_cpu {
                     (RegisterId::EAC, 0b1111_1111_1111_1111_1111_1111_1111_1110),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::SF])),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SUB - CPU signed flag not correctly set",
             ),
@@ -2349,7 +2374,7 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x1),
                     (RegisterId::EFL, 0x0),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SUB - CPU signed flag not correctly cleared",
             ),
@@ -2368,7 +2393,7 @@ mod tests_cpu {
                     SubU32RegU32Imm(RegisterId::ER1, 0x3),
                 ],
                 &[(RegisterId::ER1, 0x2), (RegisterId::EAC, 0x1)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SUB - incorrect result value produced",
             ),
@@ -2385,7 +2410,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SUB - CPU flags not correctly set",
             ),
@@ -2395,7 +2420,7 @@ mod tests_cpu {
                     RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SUB - CPU flags not correctly set",
             ),
@@ -2412,7 +2437,7 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x3),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SUB - CPU parity flag not correctly set",
             ),
@@ -2429,7 +2454,7 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x1),
                     (RegisterId::EFL, 0x0),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SUB - CPU parity flag not correctly cleared",
             ),
@@ -2446,7 +2471,7 @@ mod tests_cpu {
                     (RegisterId::EAC, 0b1111_1111_1111_1111_1111_1111_1111_1110),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::SF])),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SUB - CPU signed flag not correctly set",
             ),
@@ -2463,7 +2488,7 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x1),
                     (RegisterId::EFL, 0x0),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SUB - CPU signed flag not correctly cleared",
             ),
@@ -2487,7 +2512,7 @@ mod tests_cpu {
                     (RegisterId::ER2, 0xf),
                     (RegisterId::EAC, 0xe),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SUB - incorrect result value produced",
             ),
@@ -2506,7 +2531,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SUB - CPU flags not correctly set",
             ),
@@ -2516,7 +2541,7 @@ mod tests_cpu {
                     RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SUB - CPU flags not correctly set",
             ),
@@ -2535,7 +2560,7 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x3),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SUB - CPU parity flag not correctly set",
             ),
@@ -2554,7 +2579,7 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x1),
                     (RegisterId::EFL, 0x0),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SUB - CPU parity flag not correctly cleared",
             ),
@@ -2573,7 +2598,7 @@ mod tests_cpu {
                     (RegisterId::EAC, 0b1111_1111_1111_1111_1111_1111_1111_1110),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::SF])),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SUB - CPU signed flag not correctly set",
             ),
@@ -2592,7 +2617,7 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x1),
                     (RegisterId::EFL, 0x0),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SUB - CPU signed flag not correctly cleared",
             ),
@@ -2611,7 +2636,7 @@ mod tests_cpu {
                     MulU32ImmU32Reg(0x2, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1), (RegisterId::EAC, 0x2)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MUL - incorrect result value produced",
             ),
@@ -2628,7 +2653,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MUL - CPU flags not correctly set",
             ),
@@ -2652,7 +2677,7 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x2),
                     (RegisterId::EAC, 0x2),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MUL - incorrect result value produced",
             ),
@@ -2671,7 +2696,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MUL - CPU flags not correctly set",
             ),
@@ -2690,7 +2715,7 @@ mod tests_cpu {
                     DivU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x2), (RegisterId::EAC, 0x2)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "DIV - incorrect result value produced",
             ),
@@ -2700,20 +2725,39 @@ mod tests_cpu {
                     DivU32ImmU32Reg(0x2, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, u32::MAX), (RegisterId::EAC, 2147483647)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "DIV - CPU flags not correctly set",
-            ),
-            TestU32::new(
-                &[DivU32ImmU32Reg(0x0, RegisterId::ER1)],
-                &[],
-                0,
-                true,
-                "DIV - failed to panic when attempting to divide by zero",
             ),
         ];
 
         TestsU32::new(&tests).run_all();
+
+        // Additional division by zero exception tests.
+        let div_zero_tests = [TestU32::new(
+            &[DivU32ImmU32Reg(0x0, RegisterId::ER1)],
+            &[],
+            DEFAULT_U32_STACK_CAPACITY,
+            false,
+            "DIV - failed to panic when attempting to divide by zero",
+        )];
+
+        TestsU32::new(&div_zero_tests).run_all_special(|id: usize, vm: Option<VirtualMachine>| {
+            if let Some(v) = vm {
+                assert!(
+                    v.cpu.is_in_interrupt_handler,
+                    "Test {id} Failed - machine is not in an interrupt handler!"
+                );
+                assert_eq!(
+                    v.cpu.last_interrupt_code,
+                    Some(DIVIDE_BY_ZERO_INT),
+                    "Test {id} Failed - incorrect interrupt handler code!"
+                );
+            } else {
+                // We can't do anything here. The test asserted and so we didn't
+                // yield a valid virtual machine instance to interrogate.
+            }
+        });
     }
 
     /// Test the division of a u32 immediate by a u32 register instruction.
@@ -2726,7 +2770,7 @@ mod tests_cpu {
                     DivU32RegU32Imm(RegisterId::ER1, 0x2),
                 ],
                 &[(RegisterId::ER1, 0x1), (RegisterId::EAC, 0x2)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "DIV - incorrect result value produced",
             ),
@@ -2736,20 +2780,39 @@ mod tests_cpu {
                     DivU32RegU32Imm(RegisterId::ER1, u32::MAX),
                 ],
                 &[(RegisterId::ER1, 0x2), (RegisterId::EAC, 2147483647)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "DIV - CPU flags not correctly set",
-            ),
-            TestU32::new(
-                &[DivU32RegU32Imm(RegisterId::ER1, 0x0)],
-                &[],
-                0,
-                true,
-                "DIV - failed to panic when attempting to divide by zero",
             ),
         ];
 
         TestsU32::new(&tests).run_all();
+
+        // Additional division by zero exception tests.
+        let div_zero_tests = [TestU32::new(
+            &[DivU32RegU32Imm(RegisterId::ER1, 0x0)],
+            &[],
+            DEFAULT_U32_STACK_CAPACITY,
+            false,
+            "DIV - failed to panic when attempting to divide by zero",
+        )];
+
+        TestsU32::new(&div_zero_tests).run_all_special(|id: usize, vm: Option<VirtualMachine>| {
+            if let Some(v) = vm {
+                assert!(
+                    v.cpu.is_in_interrupt_handler,
+                    "Test {id} Failed - machine is not in an interrupt handler!"
+                );
+                assert_eq!(
+                    v.cpu.last_interrupt_code,
+                    Some(DIVIDE_BY_ZERO_INT),
+                    "Test {id} Failed - incorrect interrupt handler code!"
+                );
+            } else {
+                // We can't do anything here. The test asserted and so we didn't
+                // yield a valid virtual machine instance to interrogate.
+            }
+        });
     }
 
     /// Test the division of a u32 register by a u32 register instruction.
@@ -2767,7 +2830,7 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x1),
                     (RegisterId::EAC, 0x2),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "DIV - incorrect result value produced",
             ),
@@ -2782,23 +2845,42 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x2),
                     (RegisterId::EAC, 2147483647),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "DIV - CPU flags not correctly set",
-            ),
-            TestU32::new(
-                &[
-                    MovU32ImmU32Reg(0x1, RegisterId::ER1),
-                    DivU32RegU32Reg(RegisterId::ER2, RegisterId::ER1),
-                ],
-                &[],
-                0,
-                true,
-                "DIV - failed to panic when attempting to divide by zero",
             ),
         ];
 
         TestsU32::new(&tests).run_all();
+
+        // Additional division by zero exception tests.
+        let div_zero_tests = [TestU32::new(
+            &[
+                MovU32ImmU32Reg(0x1, RegisterId::ER1),
+                DivU32RegU32Reg(RegisterId::ER2, RegisterId::ER1),
+            ],
+            &[],
+            DEFAULT_U32_STACK_CAPACITY,
+            false,
+            "DIV - failed to panic when attempting to divide by zero",
+        )];
+
+        TestsU32::new(&div_zero_tests).run_all_special(|id: usize, vm: Option<VirtualMachine>| {
+            if let Some(v) = vm {
+                assert!(
+                    v.cpu.is_in_interrupt_handler,
+                    "Test {id} Failed - machine is not in an interrupt handler!"
+                );
+                assert_eq!(
+                    v.cpu.last_interrupt_code,
+                    Some(DIVIDE_BY_ZERO_INT),
+                    "Test {id} Failed - incorrect interrupt handler code!"
+                );
+            } else {
+                // We can't do anything here. The test asserted and so we didn't
+                // yield a valid virtual machine instance to interrogate.
+            }
+        });
     }
 
     /// Test the modulo of a u32 register by a u32 immediate instruction.
@@ -2811,7 +2893,7 @@ mod tests_cpu {
                     ModU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x2), (RegisterId::EAC, 0x0)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOD - incorrect result value produced",
             ),
@@ -2821,20 +2903,39 @@ mod tests_cpu {
                     ModU32ImmU32Reg(0x2, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x3), (RegisterId::EAC, 0x1)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOD - incorrect result value produced",
-            ),
-            TestU32::new(
-                &[DivU32ImmU32Reg(0x0, RegisterId::ER1)],
-                &[],
-                0,
-                true,
-                "MOD - failed to panic when attempting to divide by zero",
             ),
         ];
 
         TestsU32::new(&tests).run_all();
+
+        // Additional division by zero exception tests.
+        let div_zero_tests = [TestU32::new(
+            &[ModU32ImmU32Reg(0x0, RegisterId::ER1)],
+            &[],
+            DEFAULT_U32_STACK_CAPACITY,
+            false,
+            "MOD - failed to panic when attempting to divide by zero",
+        )];
+
+        TestsU32::new(&div_zero_tests).run_all_special(|id: usize, vm: Option<VirtualMachine>| {
+            if let Some(v) = vm {
+                assert!(
+                    v.cpu.is_in_interrupt_handler,
+                    "Test {id} Failed - machine is not in an interrupt handler!"
+                );
+                assert_eq!(
+                    v.cpu.last_interrupt_code,
+                    Some(DIVIDE_BY_ZERO_INT),
+                    "Test {id} Failed - incorrect interrupt handler code!"
+                );
+            } else {
+                // We can't do anything here. The test asserted and so we didn't
+                // yield a valid virtual machine instance to interrogate.
+            }
+        });
     }
 
     /// Test the modulo of a u32 immediate by a u32 register instruction.
@@ -2847,7 +2948,7 @@ mod tests_cpu {
                     ModU32RegU32Imm(RegisterId::ER1, 0x2),
                 ],
                 &[(RegisterId::ER1, 0x1), (RegisterId::EAC, 0x0)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOD - incorrect result value produced",
             ),
@@ -2857,20 +2958,39 @@ mod tests_cpu {
                     ModU32RegU32Imm(RegisterId::ER1, 0x3),
                 ],
                 &[(RegisterId::ER1, 0x2), (RegisterId::EAC, 0x1)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOD - incorrect result value produced",
-            ),
-            TestU32::new(
-                &[ModU32RegU32Imm(RegisterId::ER1, 0x0)],
-                &[],
-                0,
-                true,
-                "MOD - failed to panic when attempting to divide by zero",
             ),
         ];
 
         TestsU32::new(&tests).run_all();
+
+        // Additional division by zero exception tests.
+        let div_zero_tests = [TestU32::new(
+            &[ModU32RegU32Imm(RegisterId::ER1, 0x0)],
+            &[],
+            DEFAULT_U32_STACK_CAPACITY,
+            false,
+            "MOD - failed to panic when attempting to divide by zero",
+        )];
+
+        TestsU32::new(&div_zero_tests).run_all_special(|id: usize, vm: Option<VirtualMachine>| {
+            if let Some(v) = vm {
+                assert!(
+                    v.cpu.is_in_interrupt_handler,
+                    "Test {id} Failed - machine is not in an interrupt handler!"
+                );
+                assert_eq!(
+                    v.cpu.last_interrupt_code,
+                    Some(DIVIDE_BY_ZERO_INT),
+                    "Test {id} Failed - incorrect interrupt handler code!"
+                );
+            } else {
+                // We can't do anything here. The test asserted and so we didn't
+                // yield a valid virtual machine instance to interrogate.
+            }
+        });
     }
 
     /// Test the modulo of a u32 register by a u32 register instruction.
@@ -2888,7 +3008,7 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x2),
                     (RegisterId::EAC, 0x0),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOD - incorrect result value produced",
             ),
@@ -2903,20 +3023,39 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x3),
                     (RegisterId::EAC, 0x1),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOD - incorrect result value produced",
-            ),
-            TestU32::new(
-                &[ModU32RegU32Reg(RegisterId::ER1, RegisterId::ER2)],
-                &[],
-                0,
-                true,
-                "MOD - failed to panic when attempting to divide by zero",
             ),
         ];
 
         TestsU32::new(&tests).run_all();
+
+        // Additional division by zero exception tests.
+        let div_zero_tests = [TestU32::new(
+            &[ModU32RegU32Reg(RegisterId::ER1, RegisterId::ER2)],
+            &[],
+            DEFAULT_U32_STACK_CAPACITY,
+            false,
+            "MOD - failed to panic when attempting to divide by zero",
+        )];
+
+        TestsU32::new(&div_zero_tests).run_all_special(|id: usize, vm: Option<VirtualMachine>| {
+            if let Some(v) = vm {
+                assert!(
+                    v.cpu.is_in_interrupt_handler,
+                    "Test {id} Failed - machine is not in an interrupt handler!"
+                );
+                assert_eq!(
+                    v.cpu.last_interrupt_code,
+                    Some(DIVIDE_BY_ZERO_INT),
+                    "Test {id} Failed - incorrect interrupt handler code!"
+                );
+            } else {
+                // We can't do anything here. The test asserted and so we didn't
+                // yield a valid virtual machine instance to interrogate.
+            }
+        });
     }
 
     /// Test the increment u32 register instruction.
@@ -2926,7 +3065,7 @@ mod tests_cpu {
             TestU32::new(
                 &[IncU32Reg(RegisterId::ER1)],
                 &[(RegisterId::ER1, 0x1)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "INC - incorrect result value produced",
             ),
@@ -2947,7 +3086,7 @@ mod tests_cpu {
                         ]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "INC - CPU flags not correctly set",
             ),
@@ -2963,7 +3102,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0x3),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "INC - CPU parity flag not correctly set",
             ),
@@ -2975,7 +3114,7 @@ mod tests_cpu {
                     IncU32Reg(RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1), (RegisterId::EFL, 0x0)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "INC - CPU parity flag not correctly cleared",
             ),
@@ -2994,7 +3133,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "INC - CPU signed flag not correctly set",
             ),
@@ -3006,7 +3145,7 @@ mod tests_cpu {
                     IncU32Reg(RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1), (RegisterId::EFL, 0x0)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "INC - CPU signed flag not correctly cleared",
             ),
@@ -3031,7 +3170,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "DEC - incorrect result value produced",
             ),
@@ -3049,7 +3188,7 @@ mod tests_cpu {
                         ]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "DEC - CPU flags not correctly set",
             ),
@@ -3065,7 +3204,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0x3),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "DEC - CPU parity flag not correctly set",
             ),
@@ -3078,7 +3217,7 @@ mod tests_cpu {
                     DecU32Reg(RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x2), (RegisterId::EFL, 0x0)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "DEC - CPU parity flag not correctly cleared",
             ),
@@ -3094,7 +3233,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::SF])),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "DEC - CPU signed flag not correctly set",
             ),
@@ -3107,7 +3246,7 @@ mod tests_cpu {
                     DecU32Reg(RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1), (RegisterId::EFL, 0x0)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "DEC - CPU signed flag not correctly cleared",
             ),
@@ -3126,7 +3265,7 @@ mod tests_cpu {
                     AndU32ImmU32Reg(0x2, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x3), (RegisterId::EAC, 0x2)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "AND - incorrect result value produced",
             ),
@@ -3136,7 +3275,7 @@ mod tests_cpu {
                     AndU32ImmU32Reg(0x3, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x2), (RegisterId::EAC, 0x2)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "AND - incorrect result value produced",
             ),
@@ -3153,7 +3292,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "AND - incorrect result value produced",
             ),
@@ -3166,7 +3305,7 @@ mod tests_cpu {
                     RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "AND - CPU flags not correctly set",
             ),
@@ -3183,7 +3322,7 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x3),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "AND - CPU parity flag not correctly set",
             ),
@@ -3200,7 +3339,7 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x2),
                     (RegisterId::EFL, 0x0),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "AND - CPU parity flag not correctly cleared",
             ),
@@ -3220,7 +3359,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "AND - CPU signed flag not correctly set",
             ),
@@ -3237,7 +3376,7 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x2),
                     (RegisterId::EFL, 0x0),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "AND - CPU signed flag not correctly cleared",
             ),
@@ -3256,7 +3395,7 @@ mod tests_cpu {
                     LeftShiftU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x2)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SHL - incorrect result value produced",
             ),
@@ -3274,7 +3413,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SHL - CPU flags not correctly set",
             ),
@@ -3297,7 +3436,7 @@ mod tests_cpu {
                         ]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SHL - CPU flags not correctly set",
             ),
@@ -3311,7 +3450,7 @@ mod tests_cpu {
                     RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SHL - CPU flags not correctly set",
             ),
@@ -3328,7 +3467,7 @@ mod tests_cpu {
                     RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                 )],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SHL - parity or zero flags are not set",
             ),
@@ -3336,7 +3475,7 @@ mod tests_cpu {
             TestU32::new(
                 &[LeftShiftU32ImmU32Reg(0x20, RegisterId::ER1)],
                 &[],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 true,
                 "SHL - successfully executed instruction with invalid shift value",
             ),
@@ -3349,7 +3488,7 @@ mod tests_cpu {
                     LeftShiftU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x2), (RegisterId::EFL, 0x0)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SHL - CPU parity flag not correctly cleared",
             ),
@@ -3360,7 +3499,7 @@ mod tests_cpu {
                     LeftShiftU32ImmU32Reg(0x0, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SHL - zero left-shift did not leave the result unchanged",
             ),
@@ -3379,7 +3518,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SHL - CPU signed flag not correctly set",
             ),
@@ -3392,7 +3531,7 @@ mod tests_cpu {
                     LeftShiftU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x2), (RegisterId::EFL, 0x0)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SHL - CPU signed flag not correctly cleared",
             ),
@@ -3412,7 +3551,7 @@ mod tests_cpu {
                     LeftShiftU32RegU32Reg(RegisterId::ER2, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x2), (RegisterId::ER2, 0x1)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SHL - incorrect result value produced",
             ),
@@ -3432,7 +3571,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SHL - invalid CPU flag state",
             ),
@@ -3457,7 +3596,7 @@ mod tests_cpu {
                         ]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SHL - CPU flags not correctly set",
             ),
@@ -3481,7 +3620,7 @@ mod tests_cpu {
                         ]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SHL - CPU flags not correctly set",
             ),
@@ -3499,7 +3638,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SHL - CPU flags not correctly set",
             ),
@@ -3520,7 +3659,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SHL - CPU flags not correctly set",
             ),
@@ -3531,7 +3670,7 @@ mod tests_cpu {
                     LeftShiftU32RegU32Reg(RegisterId::ER2, RegisterId::ER1),
                 ],
                 &[],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 true,
                 "SHL - successfully executed instruction with invalid shift value",
             ),
@@ -3542,7 +3681,7 @@ mod tests_cpu {
                     LeftShiftU32RegU32Reg(RegisterId::ER2, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SHL - zero left-shift did not leave the result unchanged",
             ),
@@ -3563,7 +3702,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SHL - CPU signed flag not correctly set",
             ),
@@ -3581,7 +3720,7 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x1),
                     (RegisterId::EFL, 0x0),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SHL - CPU signed flag not correctly cleared",
             ),
@@ -3600,7 +3739,7 @@ mod tests_cpu {
                     ArithLeftShiftU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x2)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SAL - incorrect result value produced",
             ),
@@ -3616,7 +3755,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SAL - incorrect result value produced",
             ),
@@ -3630,7 +3769,7 @@ mod tests_cpu {
                     RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SAL - CPU flags not correctly set",
             ),
@@ -3641,7 +3780,7 @@ mod tests_cpu {
                     ArithLeftShiftU32ImmU32Reg(0x0, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SAL - zero left-shift did not leave the result unchanged",
             ),
@@ -3660,7 +3799,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SAL - CPU signed flag not correctly set",
             ),
@@ -3673,7 +3812,7 @@ mod tests_cpu {
                     ArithLeftShiftU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x2), (RegisterId::EFL, 0x0)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SAL - CPU signed flag not correctly cleared",
             ),
@@ -3693,7 +3832,7 @@ mod tests_cpu {
                     ArithLeftShiftU32RegU32Reg(RegisterId::ER2, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x2), (RegisterId::ER2, 0x1)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SAL - incorrect result value produced",
             ),
@@ -3711,7 +3850,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SAL - incorrect result value produced",
             ),
@@ -3729,7 +3868,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SAL - CPU flags not correctly set",
             ),
@@ -3740,7 +3879,7 @@ mod tests_cpu {
                     ArithLeftShiftU32RegU32Reg(RegisterId::ER2, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SAL - zero left-shift did not leave the result unchanged",
             ),
@@ -3761,7 +3900,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SAL - CPU signed flag not correctly set",
             ),
@@ -3779,7 +3918,7 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x1),
                     (RegisterId::EFL, 0x0),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SAL - CPU signed flag not correctly cleared",
             ),
@@ -3798,7 +3937,7 @@ mod tests_cpu {
                     RightShiftU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SHR - incorrect result value produced",
             ),
@@ -3819,7 +3958,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::PF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SHR - carry or parity CPU flags were not correctly set",
             ),
@@ -3837,7 +3976,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b0011_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SHR - CPU flags were not correctly set",
             ),
@@ -3851,7 +3990,7 @@ mod tests_cpu {
                     RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SHR - zero or parity CPU flags were not correctly set",
             ),
@@ -3859,7 +3998,7 @@ mod tests_cpu {
             TestU32::new(
                 &[RightShiftU32ImmU32Reg(0x20, RegisterId::ER1)],
                 &[],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 true,
                 "SHR - successfully executed instruction with invalid shift value",
             ),
@@ -3870,7 +4009,7 @@ mod tests_cpu {
                     RightShiftU32ImmU32Reg(0x0, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SHR - zero right-shift did not leave the result unchanged",
             ),
@@ -3889,7 +4028,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::CF, CpuFlag::PF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SAL - CPU signed flag not correctly cleared",
             ),
@@ -3909,7 +4048,7 @@ mod tests_cpu {
                     RightShiftU32RegU32Reg(RegisterId::ER2, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1), (RegisterId::ER2, 0x1)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SHR - incorrect result value produced",
             ),
@@ -3932,7 +4071,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::PF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SHR - carry or parity CPU flags were not correctly set",
             ),
@@ -3952,7 +4091,7 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x1),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SHR - CPU flags were not correctly set",
             ),
@@ -3970,7 +4109,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SHR - zero or parity CPU flags were not correctly set",
             ),
@@ -3981,7 +4120,7 @@ mod tests_cpu {
                     RightShiftU32RegU32Reg(RegisterId::ER2, RegisterId::ER1),
                 ],
                 &[],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 true,
                 "SHR - successfully executed instruction with invalid shift value",
             ),
@@ -3992,7 +4131,7 @@ mod tests_cpu {
                     RightShiftU32RegU32Reg(RegisterId::ER2, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SHR - zero right-shift did not leave the result unchanged",
             ),
@@ -4011,7 +4150,7 @@ mod tests_cpu {
                     ArithRightShiftU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SAR - incorrect result value produced",
             ),
@@ -4027,7 +4166,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SAR - incorrect result value produced",
             ),
@@ -4041,7 +4180,7 @@ mod tests_cpu {
                     RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                 )],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SAR - zero or parity CPU flags were not correctly set",
             ),
@@ -4052,7 +4191,7 @@ mod tests_cpu {
                     ArithRightShiftU32ImmU32Reg(0x0, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SAR - zero right-shift did not leave the result unchanged",
             ),
@@ -4071,7 +4210,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SAR - CPU signed flag not correctly set",
             ),
@@ -4084,7 +4223,7 @@ mod tests_cpu {
                     ArithRightShiftU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1), (RegisterId::EFL, 0x0)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SAR - CPU signed flag not correctly cleared",
             ),
@@ -4104,7 +4243,7 @@ mod tests_cpu {
                     ArithRightShiftU32RegU32Reg(RegisterId::ER2, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1), (RegisterId::ER2, 0x1)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SAR - incorrect result value produced",
             ),
@@ -4122,7 +4261,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SAR - incorrect result value produced",
             ),
@@ -4140,7 +4279,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SAR - zero or parity CPU flags were not correctly set",
             ),
@@ -4151,7 +4290,7 @@ mod tests_cpu {
                     ArithRightShiftU32RegU32Reg(RegisterId::ER2, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SAR - zero right-shift did not leave the result unchanged",
             ),
@@ -4172,7 +4311,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SAR - CPU signed flag not correctly set",
             ),
@@ -4190,7 +4329,7 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x1),
                     (RegisterId::EFL, 0x0),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SAR - CPU signed flag not correctly cleared",
             ),
@@ -4206,7 +4345,7 @@ mod tests_cpu {
             TestU32::new(
                 &[MovU32ImmU32Reg(0x1, RegisterId::ER1)],
                 &[(RegisterId::ER1, 0x1)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOV - invalid value moved to register",
             ),
@@ -4216,7 +4355,7 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0x2, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x2)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOV - invalid value moved to register",
             ),
@@ -4235,7 +4374,7 @@ mod tests_cpu {
                     MovU32RegU32Reg(RegisterId::ER1, RegisterId::ER2),
                 ],
                 &[(RegisterId::ER1, 0x1), (RegisterId::ER2, 0x1)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOV - immediate value not moved to register",
             ),
@@ -4246,7 +4385,7 @@ mod tests_cpu {
                     MovU32RegU32Reg(RegisterId::ER1, RegisterId::ER2),
                 ],
                 &[(RegisterId::ER1, 0x1), (RegisterId::ER2, 0x1)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOV - immediate value not moved to register",
             ),
@@ -4390,7 +4529,7 @@ mod tests_cpu {
                     MovMemU32RegSimple(0x8 + 0x8, RegisterId::ER8),
                 ],
                 &[(RegisterId::ER8, 0x123)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - two constants",
             ),
@@ -4413,7 +4552,7 @@ mod tests_cpu {
                     MovMemU32RegSimple(0x8 + 0x8, RegisterId::ER8),
                 ],
                 &[(RegisterId::ER1, 0x8), (RegisterId::ER2, 0x8), (RegisterId::ER8, 0x123)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - two registers",
             ),
@@ -4435,7 +4574,7 @@ mod tests_cpu {
                     MovMemU32RegSimple(0x8 + 0x8, RegisterId::ER8),
                 ],
                 &[(RegisterId::ER1, 0x8), (RegisterId::ER8, 0x123)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - one constant and one register",
             ),
@@ -4458,7 +4597,7 @@ mod tests_cpu {
                     MovMemU32RegSimple(0x2 * 0x8, RegisterId::ER8),
                 ],
                 &[(RegisterId::ER1, 0x2), (RegisterId::ER2, 0x8), (RegisterId::ER8, 0x123)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOV - value not correctly moved from memory to register - using multiplication",
             ),
@@ -4481,7 +4620,7 @@ mod tests_cpu {
                     MovMemU32RegSimple(0x1a - 0x4, RegisterId::ER8),
                 ],
                 &[(RegisterId::ER1, 0x1a), (RegisterId::ER2, 0x4), (RegisterId::ER8, 0x123)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOV - value not correctly moved from memory to register - using subtraction",
             ),
@@ -4504,7 +4643,7 @@ mod tests_cpu {
                     MovMemU32RegSimple(8 + (0x4 * 0x2), RegisterId::ER8),
                 ],
                 &[(RegisterId::ER8, 0x123)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - three constants",
             ),
@@ -4533,7 +4672,7 @@ mod tests_cpu {
                     ),
                 ],
                 &[(RegisterId::ER8, 0x123)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - two constants",
             ),
@@ -4559,7 +4698,7 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x8),
                     (RegisterId::ER8, 0x123),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - two registers",
             ),
@@ -4580,7 +4719,7 @@ mod tests_cpu {
                     ),
                 ],
                 &[(RegisterId::ER1, 0x8), (RegisterId::ER8, 0x123)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - one constant and one register",
             ),
@@ -4606,7 +4745,7 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x8),
                     (RegisterId::ER8, 0x123),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOV - value not correctly moved from memory to register - using multiplication",
             ),
@@ -4632,7 +4771,7 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x4),
                     (RegisterId::ER8, 0x123),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOV - value not correctly moved from memory to register - using subtraction",
             ),
@@ -4654,7 +4793,7 @@ mod tests_cpu {
                     ),
                 ],
                 &[(RegisterId::ER8, 0x123)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - two constants",
             ),
@@ -4683,7 +4822,7 @@ mod tests_cpu {
                     ),
                 ],
                 &[(RegisterId::ER8, 0x123)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - two constants",
             ),
@@ -4710,7 +4849,7 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x8),
                     (RegisterId::ER8, 0x123),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - two registers",
             ),
@@ -4732,7 +4871,7 @@ mod tests_cpu {
                     ),
                 ],
                 &[(RegisterId::ER1, 0x8), (RegisterId::ER8, 0x123)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - one constant and one register",
             ),
@@ -4759,7 +4898,7 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x8),
                     (RegisterId::ER8, 0x123),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOV - value not correctly moved from memory to register - using multiplication",
             ),
@@ -4786,7 +4925,7 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x4),
                     (RegisterId::ER8, 0x123),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOV - value not correctly moved from memory to register - using subtraction",
             ),
@@ -4808,7 +4947,7 @@ mod tests_cpu {
                     ),
                 ],
                 &[(RegisterId::ER8, 0x123)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - two constants",
             ),
@@ -4836,7 +4975,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ZHBI - incorrect result value produced",
             ),
@@ -4855,7 +4994,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ZHBI - incorrect result value produced",
             ),
@@ -4874,7 +5013,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ZHBI - incorrect result value produced",
             ),
@@ -4889,7 +5028,7 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x1b),
                     (RegisterId::ER3, 0b0000_0000_0000_0000_0000_0000_0001_1111),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ZHBI - incorrect result value produced",
             ),
@@ -4903,7 +5042,7 @@ mod tests_cpu {
                     RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
                 )],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ZHBI - incorrect flag state - zero flag not set",
             ),
@@ -4918,7 +5057,7 @@ mod tests_cpu {
                     ),
                 ],
                 &[(RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::ZF]))],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ZHBI - incorrect flag state - overflow flag not cleared",
             ),
@@ -4932,7 +5071,7 @@ mod tests_cpu {
                     ),
                 ],
                 &[],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 true,
                 "ZHBI - successfully executed instruction with invalid bit index",
             ),
@@ -4957,7 +5096,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::CF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ZHBI - CPU signed flag not correctly set",
             ),
@@ -4979,7 +5118,7 @@ mod tests_cpu {
                     (RegisterId::ER3, 0b0111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ZHBI - CPU signed flag not correctly cleared",
             ),
@@ -5005,7 +5144,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ZHBI - incorrect result value produced",
             ),
@@ -5022,7 +5161,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ZHBI - incorrect result value produced",
             ),
@@ -5039,7 +5178,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ZHBI - incorrect result value produced",
             ),
@@ -5052,7 +5191,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::ER2, 0b0000_0000_0000_0000_0000_0000_0001_1111),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ZHBI - incorrect result value produced",
             ),
@@ -5066,7 +5205,7 @@ mod tests_cpu {
                     RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
                 )],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ZHBI - incorrect flag state - zero flag not set",
             ),
@@ -5081,7 +5220,7 @@ mod tests_cpu {
                     ),
                 ],
                 &[(RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::ZF]))],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ZHBI - incorrect flag state - overflow flag not cleared",
             ),
@@ -5092,7 +5231,7 @@ mod tests_cpu {
                     RegisterId::ER2,
                 )],
                 &[],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 true,
                 "ZHBI - successfully executed instruction with invalid bit index",
             ),
@@ -5113,7 +5252,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::CF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ZHBI - CPU signed flag not correctly set",
             ),
@@ -5131,7 +5270,7 @@ mod tests_cpu {
                     (RegisterId::ER2, 0b0111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ZHBI - CPU signed flag not correctly cleared",
             ),
@@ -5156,7 +5295,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BT - incorrect result produced from the bit-test instruction - carry flag not set",
             ),
@@ -5166,14 +5305,14 @@ mod tests_cpu {
                     BitTestU32Reg(0x0, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1110)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BT - incorrect result produced from the bit-test instruction - carry flag set",
             ),
             TestU32::new(
                 &[BitTestU32Reg(0x20, RegisterId::ER1)],
                 &[],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 true,
                 "BT - successfully executed instruction with invalid bit index",
             ),
@@ -5195,7 +5334,7 @@ mod tests_cpu {
                     RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
                 )],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BT - incorrect result produced from the bit-test instruction - carry flag not set",
             ),
@@ -5205,14 +5344,14 @@ mod tests_cpu {
                     BitTestU32Mem(0x0, 0x0),
                 ],
                 &[],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BT - incorrect result produced from the bit-test instruction - carry flag set",
             ),
             TestU32::new(
                 &[BitTestU32Mem(0x20, 0x0)],
                 &[],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 true,
                 "BT - successfully executed instruction with invalid bit index",
             ),
@@ -5238,7 +5377,7 @@ mod tests_cpu {
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF])),
                 ],
 
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BTR - incorrect result produced from the bit-test instruction - carry flag not set",
             ),
@@ -5252,7 +5391,7 @@ mod tests_cpu {
                 ],
                 &[(RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1110)],
 
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BTR - incorrect result produced from the bit-test instruction - carry flag set",
             ),
@@ -5262,7 +5401,7 @@ mod tests_cpu {
                 ],
                 &[],
 
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 true,
                 "BTR - successfully executed instruction with invalid bit index",
             ),
@@ -5286,7 +5425,7 @@ mod tests_cpu {
                     MovMemU32RegSimple(0x0, RegisterId::ER8),
                 ],
                 &[(RegisterId::ER8, 0b1111_1111_1111_1111_1111_1111_1111_1110), (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]))],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BTR - incorrect result produced from the bit-test instruction - carry flag not set",
             ),
@@ -5301,7 +5440,7 @@ mod tests_cpu {
                     MovMemU32RegSimple(0x0, RegisterId::ER8),
                 ],
                 &[(RegisterId::ER8, 0b1111_1111_1111_1111_1111_1111_1111_1110)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BTR - incorrect result produced from the bit-test instruction - carry flag set",
             ),
@@ -5309,7 +5448,7 @@ mod tests_cpu {
                 &[BitTestResetU32Mem(0x20, 0x0)],
                 &[],
 
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 true,
                 "BTR - successfully executed instruction with invalid bit index",
             ),
@@ -5335,7 +5474,7 @@ mod tests_cpu {
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF])),
                 ],
 
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BTS - incorrect result produced from the bit-test instruction - carry flag not set",
             ),
@@ -5349,7 +5488,7 @@ mod tests_cpu {
                 ],
                 &[(RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111)],
 
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BTS - incorrect result produced from the bit-test instruction - carry flag set",
             ),
@@ -5357,7 +5496,7 @@ mod tests_cpu {
                 &[BitTestSetU32Reg(0x20, RegisterId::ER1)],
                 &[],
 
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 true,
                 "BTS - successfully executed instruction with invalid bit index",
             ),
@@ -5384,7 +5523,7 @@ mod tests_cpu {
                     (RegisterId::ER8, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]))
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BTS - incorrect result produced from the bit-test instruction - carry flag not set",
             ),
@@ -5399,7 +5538,7 @@ mod tests_cpu {
                     MovMemU32RegSimple(0x0, RegisterId::ER8),
                 ],
                 &[(RegisterId::ER8, 0b1111_1111_1111_1111_1111_1111_1111_1111)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BTS - incorrect result produced from the bit-test instruction - carry flag set",
             ),
@@ -5407,7 +5546,7 @@ mod tests_cpu {
                 &[BitTestSetU32Mem(0x20, 0x0)],
                 &[],
 
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 true,
                 "BTS - successfully executed instruction with invalid bit index",
             ),
@@ -5426,7 +5565,7 @@ mod tests_cpu {
                     BitScanReverseU32RegU32Reg(RegisterId::ER1, RegisterId::ER2),
                 ],
                 &[(RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BSR - incorrect result produced from the bit search",
             ),
@@ -5439,7 +5578,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b0000_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::ER2, 0x4),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BSR - incorrect result produced from the bit search",
             ),
@@ -5455,7 +5594,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BSR - incorrect result produced from the bit search",
             ),
@@ -5474,7 +5613,7 @@ mod tests_cpu {
                     BitScanReverseU32MemU32Reg(0x1000, RegisterId::ER1),
                 ],
                 &[],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BSR - incorrect result produced from the bit search",
             ),
@@ -5484,7 +5623,7 @@ mod tests_cpu {
                     BitScanReverseU32MemU32Reg(0x1000, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x4)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BSR - incorrect result produced from the bit search",
             ),
@@ -5497,7 +5636,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BSR - incorrect result produced from the bit search",
             ),
@@ -5521,7 +5660,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::ER8, 0x0),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BSR - incorrect result produced from the bit search",
             ),
@@ -5536,7 +5675,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b0000_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::ER8, 0x4),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BSR - incorrect result produced from the bit search",
             ),
@@ -5553,7 +5692,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BSR - incorrect result produced from the bit search",
             ),
@@ -5574,7 +5713,7 @@ mod tests_cpu {
                     MovMemU32RegSimple(0x1004, RegisterId::ER8),
                 ],
                 &[(RegisterId::ER8, 0x0)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BSR - incorrect result produced from the bit search",
             ),
@@ -5586,7 +5725,7 @@ mod tests_cpu {
                     MovMemU32RegSimple(0x1004, RegisterId::ER8),
                 ],
                 &[(RegisterId::ER8, 0x4)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BSR - incorrect result produced from the bit search",
             ),
@@ -5603,7 +5742,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BSR - incorrect result produced from the bit search",
             ),
@@ -5622,7 +5761,7 @@ mod tests_cpu {
                     BitScanForwardU32RegU32Reg(RegisterId::ER1, RegisterId::ER2),
                 ],
                 &[(RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BSF - incorrect result produced from the bit search",
             ),
@@ -5635,7 +5774,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_0000),
                     (RegisterId::ER2, 0x4),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BSF - incorrect result produced from the bit search",
             ),
@@ -5651,7 +5790,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BSF - incorrect result produced from the bit search",
             ),
@@ -5670,7 +5809,7 @@ mod tests_cpu {
                     BitScanForwardU32MemU32Reg(0x1000, RegisterId::ER1),
                 ],
                 &[],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BSF - incorrect result produced from the bit search",
             ),
@@ -5680,7 +5819,7 @@ mod tests_cpu {
                     BitScanForwardU32MemU32Reg(0x1000, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x4)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BSF - incorrect result produced from the bit search",
             ),
@@ -5693,7 +5832,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BSF - incorrect result produced from the bit search",
             ),
@@ -5717,7 +5856,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::ER8, 0x0),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BSF - incorrect result produced from the bit search",
             ),
@@ -5732,7 +5871,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_0000),
                     (RegisterId::ER8, 0x4),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BSF - incorrect result produced from the bit search",
             ),
@@ -5749,7 +5888,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BSF - incorrect result produced from the bit search",
             ),
@@ -5770,7 +5909,7 @@ mod tests_cpu {
                     MovMemU32RegSimple(0x1004, RegisterId::ER8),
                 ],
                 &[(RegisterId::ER8, 0x0)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BSF - incorrect result produced from the bit search",
             ),
@@ -5782,7 +5921,7 @@ mod tests_cpu {
                     MovMemU32RegSimple(0x1004, RegisterId::ER8),
                 ],
                 &[(RegisterId::ER8, 0x4)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BSR - incorrect result produced from the bit search",
             ),
@@ -5799,7 +5938,7 @@ mod tests_cpu {
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
                     ),
                 ],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BSR - incorrect result produced from the bit search",
             ),
@@ -5926,14 +6065,14 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0xa, RegisterId::ER2),
                 ],
                 &[(RegisterId::ER1, 0x0), (RegisterId::ER2, 0xa)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "JMP - failed to execute JMP instruction",
             ),
             TestU32::new(
                 &[JumpAbsU32Imm(u32::MAX)],
                 &[],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 true,
                 "JMP - successfully jumped outside of valid memory bounds.",
             ),
@@ -5970,7 +6109,7 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0xa, RegisterId::ER2),
                 ],
                 &[(RegisterId::ER1, 0x0), (RegisterId::ER2, 0xa)],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "JMP - failed to execute JMP instruction",
             ),
@@ -5980,7 +6119,7 @@ mod tests_cpu {
                     JumpAbsU32Reg(RegisterId::ER1),
                 ],
                 &[],
-                0,
+                DEFAULT_U32_STACK_CAPACITY,
                 true,
                 "JMP - successfully jumped outside of valid memory bounds.",
             ),

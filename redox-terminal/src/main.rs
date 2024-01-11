@@ -66,10 +66,12 @@ fn main() {
     }
 
     let instructions = &[
-        Instruction::PushU32Imm(1234),
-        Instruction::PushU32Imm(4321),
-        Instruction::Int(2),
-        Instruction::Hlt,
+        //Instruction::PushU32Imm(1234),
+        //Instruction::PushU32Imm(4321),
+        Instruction::Int(3),
+        //Instruction::DivU32ImmU32Reg(0, redox_core::reg::registers::RegisterId::ER1),
+        //Instruction::MovU32ImmU32Reg(0x123, redox_core::reg::registers::RegisterId::ER8),
+        Instruction::Halt,
     ];
 
     /*let instructions = &[

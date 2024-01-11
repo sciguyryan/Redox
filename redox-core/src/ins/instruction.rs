@@ -155,14 +155,18 @@ pub enum Instruction {
     BitScanForwardU32MemU32Mem(u32, u32),
 
     /******** [Special Instructions] ********/
-    /// Clear the CPU interrupt enabled flag.
-    CLI,
-    /// Set the CPU interrupt enabled flag.
-    SLI,
-    /// Machine return - downgrade the privilege level of the processor.
-    Mret,
+    /// Clear the global CPU interrupt enabled flag.
+    ClearInterruptFlag,
+    /// Set the global CPU interrupt enabled flag.
+    SetInterruptFlag,
+    /// Mask a specific interrupt.
+    MaskInterrupt(u8),
+    /// Unmask a specific interrupt.
+    UnmaskInterrupt(u8),
+    /// Machine-mode return - downgrade the privilege level of the processor.
+    MachineReturn,
     /// Halt the execution of the processor.
-    Hlt,
+    Halt,
 
     /******** [Reserved Instructions] ********/
     Reserved1,
@@ -273,8 +277,8 @@ impl Display for Instruction {
                 format!("call [%{reg}]")
             }
             Instruction::RetArgsU32 => String::from("iret"),
-            Instruction::Int(addr) => {
-                format!("int ${addr:02x}")
+            Instruction::Int(int_code) => {
+                format!("int ${int_code:02x}")
             }
             Instruction::IntRet => String::from("intret"),
             Instruction::JumpAbsU32Imm(addr) => {
@@ -386,10 +390,16 @@ impl Display for Instruction {
             }
 
             /******** [Special Instructions] ********/
-            Instruction::CLI => String::from("cli"),
-            Instruction::SLI => String::from("sli"),
-            Instruction::Mret => String::from("mret"),
-            Instruction::Hlt => String::from("hlt"),
+            Instruction::ClearInterruptFlag => String::from("cli"),
+            Instruction::SetInterruptFlag => String::from("sli"),
+            Instruction::MaskInterrupt(int_code) => {
+                format!("mint ${int_code:02x}")
+            }
+            Instruction::UnmaskInterrupt(int_code) => {
+                format!("umint ${int_code:02x}")
+            }
+            Instruction::MachineReturn => String::from("mret"),
+            Instruction::Halt => String::from("hlt"),
 
             /******** [Reserved Instructions] ********/
             Instruction::Reserved1
@@ -513,7 +523,12 @@ impl Instruction {
             OpCode::BitScanForwardU32MemU32Mem => ARG_MEM_ADDR_SIZE + ARG_MEM_ADDR_SIZE,
 
             /******** [Special Instructions] ********/
-            OpCode::Cli | OpCode::Slt | OpCode::Mret | OpCode::Hlt => 0,
+            OpCode::MaskInterrupt => ARG_U8_IMM_SIZE,
+            OpCode::UnmaskInterrupt => ARG_U8_IMM_SIZE,
+            OpCode::ClearInterruptFlag
+            | OpCode::SetInterruptFlag
+            | OpCode::MachineReturn
+            | OpCode::Halt => 0,
 
             /******** [Reserved Instructions] ********/
             OpCode::Reserved1

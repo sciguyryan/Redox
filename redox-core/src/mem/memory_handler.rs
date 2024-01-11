@@ -17,7 +17,7 @@ pub const MAX_PHYSICAL_MEMORY: usize = MEGABYTE * 256;
 /// The name of the RAM segment.
 pub const RAM_SEGMENT_NAME: &str = "ram";
 
-#[allow(unused)]
+/// A hint as to the type of value currently stored on the stack.
 pub enum StackArgType {
     F32,
     U32,
@@ -684,10 +684,20 @@ impl MemoryHandler {
             }
 
             /******** [Special Instructions] ********/
-            Cli => Instruction::CLI,
-            Slt => Instruction::SLI,
-            Mret => Instruction::Mret,
-            Hlt => Instruction::Hlt,
+            ClearInterruptFlag => Instruction::ClearInterruptFlag,
+            SetInterruptFlag => Instruction::SetInterruptFlag,
+            MaskInterrupt => {
+                let int_code = Self::read_u8(arg_bytes, &mut cursor);
+
+                Instruction::MaskInterrupt(int_code)
+            }
+            UnmaskInterrupt => {
+                let int_code = Self::read_u8(arg_bytes, &mut cursor);
+
+                Instruction::UnmaskInterrupt(int_code)
+            }
+            MachineReturn => Instruction::MachineReturn,
+            Halt => Instruction::Halt,
 
             /******** [Reserved Instructions] ********/
             OpCode::Reserved1 => Instruction::Reserved1,
@@ -1358,12 +1368,6 @@ impl MemoryHandler {
             println!("WARNING: debug stack type hints are disabled. A raw view of stack memory will be displayed.");
             println!("{:?}", self.get_stack_segment_storage());
         }
-    }
-}
-
-impl From<&[u8]> for MemoryHandler {
-    fn from(values: &[u8]) -> Self {
-        MemoryHandler::new(100, values, &[], 0)
     }
 }
 

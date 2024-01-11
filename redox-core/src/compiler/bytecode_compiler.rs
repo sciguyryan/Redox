@@ -154,7 +154,9 @@ impl Compiler {
             }
 
             /******** [u8 immediate] ********/
-            Instruction::Int(imm) => {
+            Instruction::Int(imm)
+            | Instruction::MaskInterrupt(imm)
+            | Instruction::UnmaskInterrupt(imm) => {
                 self.write_u8(imm);
             }
 
@@ -162,10 +164,10 @@ impl Compiler {
             Instruction::Nop
             | Instruction::IntRet
             | Instruction::RetArgsU32
-            | Instruction::CLI
-            | Instruction::SLI
-            | Instruction::Mret
-            | Instruction::Hlt => {}
+            | Instruction::ClearInterruptFlag
+            | Instruction::SetInterruptFlag
+            | Instruction::MachineReturn
+            | Instruction::Halt => {}
 
             /* These instructions are reserved for future use and shouldn't be constructed. */
             Instruction::Reserved1
@@ -348,10 +350,12 @@ mod tests_compiler {
                 OpCode::BitScanForwardU32MemU32Mem => {
                     Instruction::BitScanForwardU32MemU32Mem(0x123, 0x321)
                 }
-                OpCode::Cli => Instruction::CLI,
-                OpCode::Slt => Instruction::SLI,
-                OpCode::Mret => Instruction::Mret,
-                OpCode::Hlt => Instruction::Hlt,
+                OpCode::ClearInterruptFlag => Instruction::ClearInterruptFlag,
+                OpCode::SetInterruptFlag => Instruction::SetInterruptFlag,
+                OpCode::MaskInterrupt => Instruction::MaskInterrupt(0xff),
+                OpCode::UnmaskInterrupt => Instruction::UnmaskInterrupt(0xff),
+                OpCode::MachineReturn => Instruction::MachineReturn,
+                OpCode::Halt => Instruction::Halt,
 
                 // We don't want to test constructing these instructions.
                 OpCode::Reserved1
