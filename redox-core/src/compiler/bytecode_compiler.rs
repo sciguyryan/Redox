@@ -162,6 +162,8 @@ impl Compiler {
             Instruction::Nop
             | Instruction::IntRet
             | Instruction::RetArgsU32
+            | Instruction::CLI
+            | Instruction::SLI
             | Instruction::Mret
             | Instruction::Hlt => {}
 
@@ -346,6 +348,8 @@ mod tests_compiler {
                 OpCode::BitScanForwardU32MemU32Mem => {
                     Instruction::BitScanForwardU32MemU32Mem(0x123, 0x321)
                 }
+                OpCode::Cli => Instruction::CLI,
+                OpCode::Slt => Instruction::SLI,
                 OpCode::Mret => Instruction::Mret,
                 OpCode::Hlt => Instruction::Hlt,
 

@@ -147,6 +147,10 @@ pub enum OpCode {
     BitScanForwardU32MemU32Mem,
 
     /******** [Special Instructions] ********/
+    /// Clear the CPU interrupt enabled flag.
+    Cli,
+    /// Set the CPU interrupt enabled flag.
+    Slt,
     /// Machine return - downgrade the privilege level of the processor.
     Mret = 65534,
     /// Halt the execution of the virtual machine.
@@ -248,6 +252,8 @@ impl From<&Instruction> for OpCode {
             Instruction::BitScanForwardU32MemU32Mem(_, _) => OpCode::BitScanForwardU32MemU32Mem,
 
             /******** [Special Instructions] ********/
+            Instruction::CLI => OpCode::Cli,
+            Instruction::SLI => OpCode::Slt,
             Instruction::Mret => OpCode::Mret,
             Instruction::Hlt => OpCode::Hlt,
 

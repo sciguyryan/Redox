@@ -107,7 +107,7 @@ impl VirtualMachine {
         }
     }
 
-    /// Reset the virtual machine.
+    /// Reset the virtual machine back to a default configuration.
     pub fn reset(&mut self) {
         // Clear any stack type hints that may be present.
         self.mem.reset_stack_configuration();

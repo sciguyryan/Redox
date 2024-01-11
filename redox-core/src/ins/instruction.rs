@@ -155,6 +155,10 @@ pub enum Instruction {
     BitScanForwardU32MemU32Mem(u32, u32),
 
     /******** [Special Instructions] ********/
+    /// Clear the CPU interrupt enabled flag.
+    CLI,
+    /// Set the CPU interrupt enabled flag.
+    SLI,
     /// Machine return - downgrade the privilege level of the processor.
     Mret,
     /// Halt the execution of the processor.
@@ -382,6 +386,8 @@ impl Display for Instruction {
             }
 
             /******** [Special Instructions] ********/
+            Instruction::CLI => String::from("cli"),
+            Instruction::SLI => String::from("sli"),
             Instruction::Mret => String::from("mret"),
             Instruction::Hlt => String::from("hlt"),
 
@@ -507,7 +513,7 @@ impl Instruction {
             OpCode::BitScanForwardU32MemU32Mem => ARG_MEM_ADDR_SIZE + ARG_MEM_ADDR_SIZE,
 
             /******** [Special Instructions] ********/
-            OpCode::Mret | OpCode::Hlt => 0,
+            OpCode::Cli | OpCode::Slt | OpCode::Mret | OpCode::Hlt => 0,
 
             /******** [Reserved Instructions] ********/
             OpCode::Reserved1

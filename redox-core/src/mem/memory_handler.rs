@@ -684,6 +684,8 @@ impl MemoryHandler {
             }
 
             /******** [Special Instructions] ********/
+            Cli => Instruction::CLI,
+            Slt => Instruction::SLI,
             Mret => Instruction::Mret,
             Hlt => Instruction::Hlt,
 

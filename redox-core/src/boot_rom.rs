@@ -2,7 +2,7 @@ use hashbrown::HashMap;
 
 use crate::{
     compiler::bytecode_compiler::Compiler,
-    cpu::{CpuFlag, INT_DIVIDE_BY_ZERO, INT_NMI},
+    cpu::Interrupt,
     ins::instruction::Instruction,
     mem::memory_handler::{MemoryHandler, MEGABYTE},
     reg::registers::RegisterId,
@@ -26,6 +26,8 @@ impl BootRom {
     pub fn compile(mem: &MemoryHandler) -> (Vec<u8>, HashMap<u8, usize>) {
         // A set of instructions to setup the virtual machine's CPU.
         let boot_instructions = vec![
+            // Disable maskable interrupts.
+            Instruction::CLI,
             // Set the interrupt mask.
             Instruction::MovU32ImmU32Reg(0xffffffff, RegisterId::EIM),
             // Setup the stack.
@@ -36,7 +38,7 @@ impl BootRom {
             Instruction::MovU32ImmU32Reg(mem.code_segment_start as u32, RegisterId::ECS),
             Instruction::MovU32ImmU32Reg(mem.data_segment_start as u32, RegisterId::EDS),
             // Enable CPU interrupts.
-            Instruction::MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::IF]), RegisterId::EFL),
+            Instruction::SLI,
             // Jump to the start of the user executable code.
             Instruction::JumpAbsU32Reg(RegisterId::ECS),
         ];
@@ -57,13 +59,13 @@ impl BootRom {
 
         // The division by zero interrupt handler.
         let interrupt_div_zero_handler = vec![Instruction::Hlt, Instruction::IntRet];
-        default_ivt_handlers.insert(INT_DIVIDE_BY_ZERO, next_handler_pos);
+        default_ivt_handlers.insert(Interrupt::DivideByZero.into(), next_handler_pos);
 
         next_handler_pos += BootRom::total_size_of_instructions(&interrupt_div_zero_handler);
 
         // The non-maskable interrupt (NMI) handler.
         let interrupt_nmi_handler = vec![Instruction::Hlt, Instruction::IntRet];
-        default_ivt_handlers.insert(INT_NMI, next_handler_pos);
+        default_ivt_handlers.insert(Interrupt::Nmi.into(), next_handler_pos);
 
         // Build and compile the final bootable ROM.
         let mut final_instructions = vec![];

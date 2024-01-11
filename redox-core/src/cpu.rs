@@ -12,15 +12,42 @@ use crate::{
     utils,
 };
 
-/// Division by zero interrupt - default handler implemented.
-pub const INT_DIVIDE_BY_ZERO: u8 = 0x0;
-/// Single-step interrupt - not yet implemented.
-pub const INT_SINGLE_STEP: u8 = 0x1;
-/// NMI (non-maskable interrupt) - default handler implemented.
-pub const INT_NMI: u8 = 0x2;
+#[derive(PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum Interrupt {
+    /// Division by zero interrupt - default handler implemented.
+    DivideByZero = 0,
+    /// Single-step interrupt - not yet implemented.
+    SingleStep = 1,
+    /// NMI (non-maskable interrupt) - default handler implemented.
+    Nmi = 2,
+    General(u8),
+}
+
+impl From<u8> for Interrupt {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => Interrupt::DivideByZero,
+            1 => Interrupt::SingleStep,
+            2 => Interrupt::Nmi,
+            id => Interrupt::General(id),
+        }
+    }
+}
+
+impl From<Interrupt> for u8 {
+    fn from(val: Interrupt) -> Self {
+        match val {
+            Interrupt::DivideByZero => 0,
+            Interrupt::SingleStep => 1,
+            Interrupt::Nmi => 2,
+            Interrupt::General(id) => id,
+        }
+    }
+}
 
 /// A list of the non-maskable interrupts.
-pub const NMI_INTERRUPTS: [u8; 1] = [INT_NMI];
+pub const NMI_INTERRUPTS: [Interrupt; 1] = [Interrupt::Nmi];
 
 /// A list of f32 registers to be preserved when entering a subroutine. Use when storing state.
 ///
@@ -207,7 +234,8 @@ impl Cpu {
         // Should we handle this interrupt?
         // We will always handle a NMI, regardless of whether the CPU's interrupt enabled
         // flag is set, or whether that interrupt is masked. NMI's can't be ignored.
-        if !NMI_INTERRUPTS.contains(&int_type) && (is_masked || !self.is_cpu_flag_set(&CpuFlag::IF))
+        if !NMI_INTERRUPTS.contains(&int_type.into())
+            && (is_masked || !self.is_cpu_flag_set(&CpuFlag::IF))
         {
             return;
         }
@@ -1252,6 +1280,12 @@ impl Cpu {
             }
 
             /******** [Special Instructions] ********/
+            CLI => {
+                self.set_flag_state(CpuFlag::IF, false);
+            }
+            SLI => {
+                self.set_flag_state(CpuFlag::IF, true);
+            }
             Mret => {
                 self.set_machine_mode(false);
             }
