@@ -19,6 +19,9 @@ pub const INT_SINGLE_STEP: u8 = 0x1;
 /// NMI (non-maskable interrupt) - default handler implemented.
 pub const INT_NMI: u8 = 0x2;
 
+/// A list of the non-maskable interrupts.
+pub const NMI_INTERRUPTS: [u8; 1] = [INT_NMI];
+
 /// A list of f32 registers to be preserved when entering a subroutine. Use when storing state.
 ///
 /// # Note
@@ -201,9 +204,11 @@ impl Cpu {
     fn handle_interrupt(&mut self, int_type: u8, mem: &mut MemoryHandler) {
         let is_masked = (1 << int_type) & self.read_reg_u32_unchecked(&RegisterId::EIM) == 0;
 
-        // Is this interrupt unmasked? NMI's can't be masked.
-        if int_type != INT_NMI && is_masked {
-            // The interrupt is masked, therefore we don't want to do anything here.
+        // Should we handle this interrupt?
+        // We will always handle a NMI, regardless of whether the CPU's interrupt enabled
+        // flag is set, or whether that interrupt is masked. NMI's can't be ignored.
+        if !NMI_INTERRUPTS.contains(&int_type) && (is_masked || !self.is_cpu_flag_set(&CpuFlag::IF))
+        {
             return;
         }
 
@@ -217,7 +222,7 @@ impl Cpu {
         if !self.is_in_interrupt_handler {
             // Calculate the interrupt return address.
             // Once the interrupt handler has completed then we will jump back to the
-            // position directly following this function.
+            // instruction directly following the one that triggered the exception.
             // The return address will be pushed to the stack.
             mem.push_u32(self.get_instruction_pointer());
         }
@@ -464,11 +469,7 @@ impl Cpu {
     /// * `addr` - The call jump address.
     /// * `call_instruction` - The instruction that executed the call.
     #[inline(always)]
-    fn perform_call_jump(
-        &mut self,
-        mem: &mut MemoryHandler,
-        addr: u32
-    ) {
+    fn perform_call_jump(&mut self, mem: &mut MemoryHandler, addr: u32) {
         // Store the current stack frame state.
         self.push_state(mem);
 
@@ -1042,10 +1043,7 @@ impl Cpu {
                 self.pop_state(mem, StackArgType::U32);
             }
             Int(int_type) => {
-                // We will only handle interrupts if the interrupt enabled flag is set.
-                if self.is_cpu_flag_set(&CpuFlag::IF) {
-                    self.handle_interrupt(*int_type, mem);
-                }
+                self.handle_interrupt(*int_type, mem);
             }
             IntRet => {
                 self.is_in_interrupt_handler = false;

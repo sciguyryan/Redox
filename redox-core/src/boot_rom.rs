@@ -50,7 +50,7 @@ impl BootRom {
             BOOT_MEMORY_START + BootRom::total_size_of_instructions(&boot_instructions);
 
         // NOTE - in the instances where we are building a custom interrupt handler
-        // we would need to use the intret instruction to mark the end of the subroutine.
+        // we would need to use the intret instruction to mark the end of the handler subroutine.
         // This isn't technically needed in the ones we are using here since these all
         // result in the CPU halting, but they've been included just in case I end up
         // implementing the stepping interrupt.
