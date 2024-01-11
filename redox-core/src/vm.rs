@@ -1,5 +1,3 @@
-use hashbrown::HashMap;
-
 use crate::{
     boot_rom::{BootRom, BOOT_MEMORY_LENGTH, BOOT_MEMORY_START, BOOT_REGION_NAME},
     cpu::Cpu,
@@ -58,10 +56,7 @@ impl VirtualMachine {
         // Build and load the boot ROM.
         // This will return a list of our default interrupt vector handlers
         // from the compiled boot ROM.
-        let default_ivt_handlers = vm.load_boot_rom();
-
-        // Load the default interrupt vector table entries into memory.
-        vm.load_default_ivt_handlers(default_ivt_handlers);
+        vm.load_boot_rom();
 
         vm
     }
@@ -71,9 +66,9 @@ impl VirtualMachine {
     /// # Returns
     ///
     /// A hashmap, the key being the interrupt code and the value being the address in memory where the handler is located.
-    fn load_boot_rom(&mut self) -> HashMap<u8, usize> {
+    fn load_boot_rom(&mut self) {
         // Create the bootable ROM.
-        let (boot_rom, default_ivt_handlers) = BootRom::compile(&self.mem);
+        let boot_rom = BootRom::compile(&self.mem);
 
         // Create a new memory segment tp hold the bootable ROM data.
         let boot_mem_id = self.mem.add_mapped_memory_segment(
@@ -89,22 +84,6 @@ impl VirtualMachine {
             .get_mapped_segment_by_index_mut(boot_mem_id)
             .expect("failed to get memory segment")
             .set_contents(&boot_rom);
-
-        // Return the default IVT handlers.
-        default_ivt_handlers
-    }
-
-    /// Load the specified default interrupt vector table entries into memory.
-    ///
-    /// # Arguments
-    ///
-    /// * `handlers` - A hashmap, the key being the interrupt code and the value being the address in memory where the handler is located.
-    fn load_default_ivt_handlers(&mut self, handlers: HashMap<u8, usize>) {
-        for (int_code, address) in handlers {
-            // Note that the 4 here is because a memory address is 32-bits in size, meaning
-            // that it is 4 bytes in total.
-            self.mem.set_u32((int_code * 4) as usize, address as u32);
-        }
     }
 
     /// Reset the virtual machine back to a default configuration.

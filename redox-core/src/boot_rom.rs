@@ -1,5 +1,3 @@
-use hashbrown::HashMap;
-
 use crate::{
     compiler::bytecode_compiler::Compiler,
     cpu::{DIVIDE_BY_ZERO_INT, NON_MASKABLE_INT},
@@ -23,7 +21,7 @@ impl BootRom {
     /// # Arguments
     ///
     /// * `mem` - A reference to the virtual machine's [`MemoryHandler`].
-    pub fn compile(mem: &MemoryHandler) -> (Vec<u8>, HashMap<u8, usize>) {
+    pub fn compile(mem: &MemoryHandler) -> Vec<u8> {
         // A set of instructions to setup the virtual machine's CPU.
         let boot_instructions = vec![
             // Disable maskable interrupts.
@@ -37,15 +35,17 @@ impl BootRom {
             Instruction::MovU32ImmU32Reg(mem.stack_segment_start as u32, RegisterId::ESS),
             Instruction::MovU32ImmU32Reg(mem.code_segment_start as u32, RegisterId::ECS),
             Instruction::MovU32ImmU32Reg(mem.data_segment_start as u32, RegisterId::EDS),
+            // Call the setup code for the interrupt vector table.
+            // This is a placeholder and it will be replaced further in this method.
+            Instruction::PushU32Imm(0),
+            Instruction::CallU32Imm(0xffffffff),
             // Enable CPU interrupts.
             Instruction::SetInterruptFlag,
             // Jump to the start of the user executable code.
             Instruction::JumpAbsU32Reg(RegisterId::ECS),
+            // We shouldn't be able to hit this, but just to be safe.
+            Instruction::Halt,
         ];
-
-        // Now that we have the base instructions, we build the default IVT
-        // handlers for interrupts we want to handle by default.
-        let mut default_ivt_handlers = HashMap::new();
 
         // Calculate the position of the start of the interrupt vector.
         let mut next_handler_pos =
@@ -56,31 +56,58 @@ impl BootRom {
         // This isn't technically needed in the ones we are using here since these all
         // result in the CPU halting, but they've been included just in case I end up
         // implementing the stepping interrupt.
+        let default_handlers: Vec<(u8, Vec<Instruction>)> = vec![
+            // The division by zero interrupt handler.
+            (
+                DIVIDE_BY_ZERO_INT,
+                vec![Instruction::Halt, Instruction::IntRet],
+            ),
+            // The non-maskable interrupt (NMI) handler.
+            (
+                NON_MASKABLE_INT,
+                vec![Instruction::Halt, Instruction::IntRet],
+            ),
+        ];
 
-        // The division by zero interrupt handler.
-        let interrupt_div_zero_handler = vec![Instruction::MovU32ImmU32Reg(0x123, RegisterId::ER8), Instruction::Halt, Instruction::IntRet];
-        default_ivt_handlers.insert(DIVIDE_BY_ZERO_INT, next_handler_pos);
+        // This will hold the final boot ROM instruction list.
+        let mut final_instructions = boot_instructions.clone();
 
-        next_handler_pos += BootRom::total_size_of_instructions(&interrupt_div_zero_handler);
+        // This will hold the IVT initialization subroutine.
+        let mut init_ivt_subroutine = vec![];
 
-        // The non-maskable interrupt (NMI) handler.
-        let interrupt_nmi_handler = vec![Instruction::MovU32ImmU32Reg(0x123, RegisterId::ER7), Instruction::Halt, Instruction::IntRet];
-        default_ivt_handlers.insert(NON_MASKABLE_INT, next_handler_pos);
+        // Add the interrupt handlers to the final boot ROM.
+        for (int_code, instructions) in default_handlers {
+            // Add the initialization entry for this interrupt code.
+            init_ivt_subroutine.push(Instruction::MovU32ImmMemSimple(
+                next_handler_pos as u32,
+                (int_code * 4) as u32,
+            ));
 
-        // next_handler_pos += BootRom::total_size_of_instructions(&interrupt_nmi_handler);
-        // etc.
+            // Add this handler into the boot ROM instruction list.
+            final_instructions.extend_from_slice(&instructions);
 
-        // Build and compile the final bootable ROM.
-        let mut final_instructions = vec![];
-        final_instructions.extend_from_slice(&boot_instructions);
-        final_instructions.extend_from_slice(&interrupt_div_zero_handler);
-        final_instructions.extend_from_slice(&interrupt_nmi_handler);
+            // Advance the next handler location.
+            next_handler_pos += BootRom::total_size_of_instructions(&instructions);
+        }
 
-        let mut compiler = Compiler::new();
-        (
-            compiler.compile(&final_instructions).to_vec(),
-            default_ivt_handlers,
-        )
+        // Add the return instruction from our IVT initialization subroutine and add
+        // the subroutine to the boot ROM.
+        init_ivt_subroutine.push(Instruction::RetArgsU32);
+        final_instructions.extend_from_slice(&init_ivt_subroutine);
+
+        // Now that we know the location of the IVT initialization routine we can
+        // update that in our earlier call code. It will directly follow the last IVT handler.
+        let index = final_instructions
+            .iter()
+            .position(|e| *e == Instruction::CallU32Imm(0xffffffff))
+            .expect("failed to find correct instruction");
+
+        // Replace the dummy call instruction with one that has the correct
+        // subroutine address.
+        final_instructions[index] = Instruction::CallU32Imm(next_handler_pos as u32);
+
+        // Return the compiled bytecode.
+        Compiler::new().compile(&final_instructions).to_vec()
     }
 
     /// Compute the total size of an [`Instruction`] slice.

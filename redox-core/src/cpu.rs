@@ -75,8 +75,8 @@ const U32_LOW_BYTE_MASK: u32 = 0xff;
 /// The mask to get everything except the lowest 8 bits of a u32 value.
 const NOT_U32_LOW_BYTE_MASK: u32 = !U32_LOW_BYTE_MASK;
 
-/// The default interrupt vector address.
-const INTERRUPT_VECTOR_ADDRESS: u32 = 0x0;
+/// The default interrupt vector table address.
+const IVT_ADDRESS: u32 = 0x0;
 
 pub struct Cpu {
     /// The registers associated with this CPU.
@@ -129,6 +129,7 @@ impl Cpu {
     /// # Returns
     ///
     /// A u32 that is the calculated result of the expression.
+    #[inline]
     fn decode_evaluate_u32_move_expression(
         &mut self,
         expr: &u32,
@@ -159,6 +160,15 @@ impl Cpu {
         };
 
         decoder.evaluate(value_1, value_2, value_3)
+    }
+
+    /// Get the flags register.
+    #[inline(always)]
+    pub fn get_flags(&self) -> u32 {
+        *self
+            .registers
+            .get_register_u32(RegisterId::EFL)
+            .read_unchecked()
     }
 
     /// Get the instruction pointer (IP) register.
@@ -238,7 +248,9 @@ impl Cpu {
 
         // We will only save state when we are not already in an interrupt handler.
         if !self.is_in_interrupt_handler {
-            // Calculate the interrupt return address.
+            // Want to preserve the state of the flags register.
+            mem.push_u32(self.get_flags());
+
             // Once the interrupt handler has completed then we will jump back to the
             // instruction directly following the one that triggered the exception.
             // The return address will be pushed to the stack.
@@ -1086,7 +1098,9 @@ impl Cpu {
             IntRet => {
                 self.is_in_interrupt_handler = false;
                 self.last_interrupt_code = None;
+
                 self.set_instruction_pointer(mem.pop_u32());
+                self.set_flags(mem.pop_u32());
             }
             JumpAbsU32Imm(addr) => {
                 // jmp 0xaaaa
@@ -1317,17 +1331,27 @@ impl Cpu {
             /******** [Reserved Instructions] ********/
             Reserved1 | Reserved2 | Reserved3 | Reserved4 | Reserved5 | Reserved6 | Reserved7
             | Reserved8 | Reserved9 => {
-                unreachable!("attempted to use a reserved instruction");
+                self.handle_interrupt(INVALID_OPCODE_INT, mem);
             }
 
             /******** [Pseudo Instructions] ********/
             Label(_) => {
-                unreachable!("attempted to use label pseudo instruction");
+                self.handle_interrupt(INVALID_OPCODE_INT, mem);
             }
-            Unknown(id) => {
-                panic!("attempted to run an unrecognized instruction: {id}");
+            Unknown(_id) => {
+                self.handle_interrupt(INVALID_OPCODE_INT, mem);
             }
         };
+    }
+
+    /// Update the flags register.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The new value of the flags register.
+    #[inline(always)]
+    pub fn set_flags(&mut self, value: u32) {
+        self.write_reg_u32_unchecked(&RegisterId::EFL, value);
     }
 
     /// Set the state of the specified CPU flag.
@@ -1481,7 +1505,7 @@ impl Cpu {
 
 impl Default for Cpu {
     fn default() -> Self {
-        Self::new(INTERRUPT_VECTOR_ADDRESS)
+        Self::new(IVT_ADDRESS)
     }
 }
 
@@ -1754,6 +1778,213 @@ mod tests_cpu {
         }
     }
 
+    /// Test whether a non-masked interrupt executes correctly.
+    #[test]
+    fn test_non_masked_interrupt_no_execution() {
+        let base_offset = vm::MIN_USER_SEGMENT_SIZE as u32;
+
+        let instructions = &[
+            // Write the handler address into the IVT.
+            Instruction::MovU32ImmMemSimple(base_offset + 35, 255 * 4), // Starts at [base]. Length = 12.
+            // Mask the interrupt.
+            Instruction::MaskInterrupt(0xff), // Starts at [base + 12]. Length = 5.
+            Instruction::Int(0xff),           // Starts at [base + 17]. Length = 5.
+            Instruction::AddU32ImmU32Reg(0x5, RegisterId::ER1), // Starts at [base + 22]. Length = 9.
+            Instruction::Halt, // Starts at [base + 31]. Length = 4.
+            /***** INT_FF - Interrupt handler for interrupt 0xff starts here. *****/
+            Instruction::MovU32ImmU32Reg(0x64, RegisterId::ER1), // Starts at [base + 35]. Length = 9.
+            Instruction::IntRet,
+        ];
+
+        let mut compiler = Compiler::new();
+        let data = compiler.compile(instructions);
+
+        let mut vm = VirtualMachine::new(
+            vm::MIN_USER_SEGMENT_SIZE,
+            data,
+            &[],
+            20 * mem::memory_handler::BYTES_IN_U32,
+        );
+
+        vm.run();
+
+        // The interrupt handler should not be executed and so the value of 5 should be added
+        // to the value of the register ER1 (which is zero). Therefore, 5 should be moved to
+        // accumulator register.
+        assert_eq!(
+            *vm.cpu
+                .registers
+                .get_register_u32(RegisterId::EAC)
+                .read_unchecked(),
+            0x5
+        );
+
+        // The CPU should not still be within an interrupt handler.
+        assert!(!vm.cpu.is_in_interrupt_handler);
+
+        // There should be no indication of the last interrupt handler, since it
+        // should have completed.
+        assert_eq!(vm.cpu.last_interrupt_code, None);
+    }
+
+    /// Test whether a non-masked interrupt executes correctly.
+    #[test]
+    fn test_unmasked_interrupt_executes() {
+        let base_offset = vm::MIN_USER_SEGMENT_SIZE as u32;
+
+        let instructions = &[
+            // Write the handler address into the IVT.
+            Instruction::MovU32ImmMemSimple(base_offset + 44, 255 * 4), // Starts at [base]. Length = 12.
+            // Mask every interrupt.
+            Instruction::MovU32ImmU32Reg(0, RegisterId::EIM), // Starts at [base + 12]. Length = 9.
+            // And now unmask the specific interrupt we want to enable.
+            Instruction::UnmaskInterrupt(0xff), // Starts at [base + 21]. Length = 5.
+            Instruction::Int(0xff),             // Starts at [base + 26]. Length = 5.
+            Instruction::AddU32ImmU32Reg(0x5, RegisterId::ER1), // Starts at [base + 31]. Length = 9.
+            Instruction::Halt, // Starts at [base + 40]. Length = 4.
+            /***** INT_FF - Interrupt handler for interrupt 0xff starts here. *****/
+            Instruction::MovU32ImmU32Reg(0x64, RegisterId::ER1), // Starts at [base + 44]. Length = 9.
+            Instruction::IntRet,
+        ];
+
+        let mut compiler = Compiler::new();
+        let data = compiler.compile(instructions);
+
+        let mut vm = VirtualMachine::new(
+            vm::MIN_USER_SEGMENT_SIZE,
+            data,
+            &[],
+            20 * mem::memory_handler::BYTES_IN_U32,
+        );
+
+        vm.run();
+
+        // The interrupt handler should not be executed and so the value of 5 should be added
+        // to the value of the register ER1 (which is zero). Therefore, 5 should be moved to
+        // accumulator register.
+        assert_eq!(
+            *vm.cpu
+                .registers
+                .get_register_u32(RegisterId::EAC)
+                .read_unchecked(),
+            0x69
+        );
+
+        // The CPU should not still be within an interrupt handler.
+        assert!(!vm.cpu.is_in_interrupt_handler);
+
+        // There should be no indication of the last interrupt handler, since it
+        // should have completed.
+        assert_eq!(vm.cpu.last_interrupt_code, None);
+    }
+
+    /// Test whether a masking an interrupt ensures it doesn't execute.
+    #[test]
+    fn test_masked_interrupt_non_execute() {
+        let base_offset = vm::MIN_USER_SEGMENT_SIZE as u32;
+
+        let instructions = &[
+            // Write the handler address into the IVT.
+            Instruction::MovU32ImmMemSimple(base_offset + 30, 255 * 4), // Starts at [base]. Length = 12.
+            Instruction::Int(0xff), // Starts at [base + 12]. Length = 5.
+            Instruction::AddU32ImmU32Reg(0x5, RegisterId::ER1), // Starts at [base + 17]. Length = 9.
+            Instruction::Halt, // Starts at [base + 26]. Length = 4.
+            /***** INT_FF - Interrupt handler for interrupt 0xff starts here. *****/
+            Instruction::MovU32ImmU32Reg(0x64, RegisterId::ER1), // Starts at [base + 30]. Length = 9.
+            Instruction::IntRet,
+        ];
+
+        let mut compiler = Compiler::new();
+        let data = compiler.compile(instructions);
+
+        let mut vm = VirtualMachine::new(
+            vm::MIN_USER_SEGMENT_SIZE,
+            data,
+            &[],
+            20 * mem::memory_handler::BYTES_IN_U32,
+        );
+
+        vm.run();
+
+        // The interrupt handler should set the value of the ER1 register to 0x64.
+        // After returning, 0x5 should be added to the value of ER1, the result moved to the accumulator.
+        assert_eq!(
+            *vm.cpu
+                .registers
+                .get_register_u32(RegisterId::EAC)
+                .read_unchecked(),
+            0x69
+        );
+
+        // The CPU should not still be within an interrupt handler.
+        assert!(!vm.cpu.is_in_interrupt_handler);
+
+        // There should be no indication of the last interrupt handler, since it
+        // should have completed.
+        assert_eq!(vm.cpu.last_interrupt_code, None);
+    }
+
+    /// Test the interaction between interrupts and the CPU interrupt enabled flag.
+    /// We expect that non-maskable interrupts will ignore the state of the CPU interrupt enabled
+    /// flag while every other type of interrupt will be disabled.
+    #[test]
+    fn test_maskable_interrupt_control_via_cpu_flag() {
+        let base_offset = vm::MIN_USER_SEGMENT_SIZE as u32;
+
+        let instructions = &[
+            // Write the handler addresses into the IVT.
+            // Handler for 0x00. This is a non-maskable interrupt.
+            // We are essentially replacing the default handler for the division by zero interrupt.
+            Instruction::MovU32ImmMemSimple(base_offset + 51, 0), // Starts at [base]. Length = 12.
+            // Handler for 0xff.
+            Instruction::MovU32ImmMemSimple(base_offset + 64, 255 * 4), // Starts at [base + 12]. Length = 12.
+            // Disable maskable CPU interrupts.
+            Instruction::ClearInterruptFlag, // Starts at [base + 24]. Length = 4.
+            // This interrupt handler should not be executed.
+            Instruction::Int(0xff), // Starts at [base + 28]. Length = 5.
+            // This interrupt handler should be executed since it can't be disabled or masked.
+            Instruction::Int(0x0), // Starts at [base + 33]. Length = 5.
+            Instruction::AddU32ImmU32Reg(0x5, RegisterId::ER1), // Starts at [base + 38]. Length = 9.
+            Instruction::Halt, // Starts at [base + 47]. Length = 4.
+            /***** INT_00 - Interrupt handler for interrupt 0x00 starts here. *****/
+            Instruction::MovU32ImmU32Reg(0x64, RegisterId::ER1), // Starts at [base + 51]. Length = 9.
+            Instruction::IntRet, // Starts at [base + 60]. Length = 4.
+            /***** INT_FF - Interrupt handler for interrupt 0xff starts here. *****/
+            Instruction::MovU32ImmU32Reg(0x5, RegisterId::ER1), // Starts at [base + 64]. Length = 9.
+            Instruction::IntRet,
+        ];
+
+        let mut compiler = Compiler::new();
+        let data = compiler.compile(instructions);
+
+        let mut vm = VirtualMachine::new(
+            vm::MIN_USER_SEGMENT_SIZE,
+            data,
+            &[],
+            20 * mem::memory_handler::BYTES_IN_U32,
+        );
+
+        vm.run();
+
+        // The interrupt handler should not be executed and so the value of 5 should be added
+        // to the value of the register ER1 (which is zero). Therefore, 5 should be moved to
+        // accumulator register.
+        assert_eq!(
+            *vm.cpu
+                .registers
+                .get_register_u32(RegisterId::EAC)
+                .read_unchecked(),
+            0x69
+        );
+
+        // The CPU should not still be within an interrupt handler.
+        assert!(!vm.cpu.is_in_interrupt_handler);
+
+        // There should be no indication of the last interrupt handler, since it
+        // should have completed.
+        assert_eq!(vm.cpu.last_interrupt_code, None);
+    }
+
     /// Test the call and return instructions by register pointer instruction.
     #[test]
     fn test_call_return_u32_reg() {
@@ -1767,7 +1998,7 @@ mod tests_cpu {
             Instruction::CallU32Reg(RegisterId::ER8), // Starts at [base + 33]. Length = 5.
             Instruction::AddU32ImmU32Reg(100, RegisterId::ER1), // Starts at [base + 38]. Length = 9.
             Instruction::Halt, // Starts at [base + 47]. Length = 4.
-            // FUNC_AAAA - Subroutine starts here.
+            /***** FUNC_AAAA - Subroutine starts here. *****/
             Instruction::PushU32Imm(5), // Starts at [base + 51]. Length = 8.
             Instruction::PopU32ImmU32Reg(RegisterId::ER1), // Starts at [base + 59]. Length = 5.
             Instruction::RetArgsU32,    // Starts at [base + 64]. Length = 4.
@@ -1832,7 +2063,7 @@ mod tests_cpu {
             Instruction::PushU32Imm(0), // Starts at [base + 63]. Length = 8. The number of arguments.
             Instruction::CallU32Imm(base_offset + 83), // Starts at [base + 71]. Length = 8.
             Instruction::Halt,          // Starts at [base + 79]. Length = 4.
-            // FUNC_AAAA - Subroutine starts here.
+            /***** FUNC_AAAA - Subroutine starts here. *****/
             Instruction::MovU32ImmU32Reg(0, RegisterId::ER2), // Starts at [base + 83].
             Instruction::MovU32ImmU32Reg(0, RegisterId::ER3),
             Instruction::MovU32ImmU32Reg(0, RegisterId::ER4),
@@ -1875,12 +2106,12 @@ mod tests_cpu {
             Instruction::PushU32Imm(1), // Starts at [base + 16]. Length = 8. The number of arguments.
             Instruction::CallU32Imm(base_offset + 36), // Starts at [base + 24]. Length = 8.
             Instruction::Halt,          // Starts at [base + 32]. Length = 4.
-            // FUNC_AAAA - Subroutine 1 starts here.
+            /***** FUNC_AAAA - Subroutine 1 starts here. *****/
             Instruction::PushU32Imm(0), // Starts at [base + 36]. Length = 8. The number of arguments.
             Instruction::CallU32Imm(base_offset + 65), // Starts at [base + 44]. Length = 8.
             Instruction::AddU32ImmU32Reg(5, RegisterId::ER1), // Starts at [base + 52]. Length = 9.
             Instruction::RetArgsU32,    // Starts at [base + 61]. Length = 4.
-            // FUNC_BBBB - Subroutine 2 starts here.
+            /***** FUNC_BBBB - Subroutine 2 starts here. *****/
             Instruction::PushU32Imm(100), // Starts at [base + 65]. Length = 8. This should NOT be preserved.
             Instruction::PopU32ImmU32Reg(RegisterId::ER1),
             Instruction::RetArgsU32,
@@ -1945,7 +2176,7 @@ mod tests_cpu {
         let tests = [TestU32::new(
             &[Nop],
             &[],
-            0,
+            DEFAULT_U32_STACK_CAPACITY,
             false,
             "NOP - failed to execute NOP instruction",
         )];
@@ -4404,7 +4635,7 @@ mod tests_cpu {
                 MovMemU32RegSimple(0x0, RegisterId::ER1),
             ],
             &[(RegisterId::ER1, 0x123)],
-            0,
+            DEFAULT_U32_STACK_CAPACITY,
             false,
             "MOV - immediate value not moved to memory",
         )];
@@ -4423,7 +4654,7 @@ mod tests_cpu {
                 MovMemU32RegSimple(0x0, RegisterId::ER2),
             ],
             &[(RegisterId::ER1, 0x123), (RegisterId::ER2, 0x123)],
-            0,
+            DEFAULT_U32_STACK_CAPACITY,
             false,
             "MOV - u32 register value not moved to memory",
         )];
@@ -4443,7 +4674,7 @@ mod tests_cpu {
                 MovMemU32RegSimple(0x0, RegisterId::ER2),
             ],
             &[(RegisterId::ER1, 0x123), (RegisterId::ER2, 0x123)],
-            0,
+            DEFAULT_U32_STACK_CAPACITY,
             false,
             "MOV - value not correctly moved from memory to register",
         )];
@@ -4465,7 +4696,7 @@ mod tests_cpu {
                 MovU32RegPtrU32RegSimple(RegisterId::ER2, RegisterId::ER3),
             ],
             &[(RegisterId::ER1, 0x123), (RegisterId::ER3, 0x123)],
-            0,
+            DEFAULT_U32_STACK_CAPACITY,
             false,
             "MOV - value not correctly moved from memory to register via register pointer",
         )];
@@ -4483,7 +4714,7 @@ mod tests_cpu {
                 SwapU32RegU32Reg(RegisterId::ER1, RegisterId::ER2),
             ],
             &[(RegisterId::ER1, 0x2), (RegisterId::ER2, 0x1)],
-            0,
+            DEFAULT_U32_STACK_CAPACITY,
             false,
             "SWAP - values of the two registers were not correctly swapped",
         )];
@@ -4500,7 +4731,7 @@ mod tests_cpu {
                 ByteSwapU32(RegisterId::ER1),
             ],
             &[(RegisterId::ER1, 0xDDCCBBAA)],
-            0,
+            DEFAULT_U32_STACK_CAPACITY,
             false,
             "BSWAP - the byte order of the register was not correctly swapped",
         )];
@@ -5953,7 +6184,7 @@ mod tests_cpu {
         let tests = [TestU32::new(
             &[PushU32Imm(0x123), PushU32Imm(0x321)],
             &[],
-            2,
+            DEFAULT_U32_STACK_CAPACITY,
             false,
             "PUSH - failed to execute PUSH instruction",
         )];
@@ -5971,7 +6202,7 @@ mod tests_cpu {
         let tests = [TestU32::new(
             &[PushU32Imm(0x123)],
             &[],
-            1,
+            DEFAULT_U32_STACK_CAPACITY,
             false,
             "PUSH - failed to execute PUSH instruction",
         )];
@@ -5989,7 +6220,7 @@ mod tests_cpu {
         let tests = [TestU32::new(
             &[Nop],
             &[],
-            2,
+            DEFAULT_U32_STACK_CAPACITY,
             false,
             "PUSH - failed to execute PUSH instruction",
         )];
@@ -6009,7 +6240,7 @@ mod tests_cpu {
             TestU32::new(
                 &[PushU32Imm(0x123), PopU32ImmU32Reg(RegisterId::ER1)],
                 &[(RegisterId::ER1, 0x123)],
-                2,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "POP - failed to execute POP instruction",
             ),
@@ -6021,14 +6252,14 @@ mod tests_cpu {
                     PopU32ImmU32Reg(RegisterId::ER2),
                 ],
                 &[(RegisterId::ER1, 0x321), (RegisterId::ER1, 0x321)],
-                2,
+                DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "POP - failed to execute POP instruction",
             ),
             TestU32::new(
                 &[PopU32ImmU32Reg(RegisterId::ER1)],
                 &[],
-                2,
+                DEFAULT_U32_STACK_CAPACITY,
                 true,
                 "POP - failed to execute POP instruction",
             ),

@@ -58,7 +58,7 @@ pub enum RegisterId {
     ESP = 103,
     /// CPU flags register.
     EFL = 104,
-    /// Interrupt mask register.
+    /// Interrupt mask register. Only the lowest order byte is used.
     EIM = 105,
 
     // [ Segment Registers ] //
