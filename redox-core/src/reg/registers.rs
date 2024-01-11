@@ -1,6 +1,5 @@
 use core::fmt;
 use hashbrown::HashMap;
-use num_derive::FromPrimitive;
 use prettytable::{row, Table};
 use std::fmt::Display;
 
@@ -8,7 +7,7 @@ use crate::boot_rom::BOOT_MEMORY_START;
 
 use super::register::{RegisterF32, RegisterPermission, RegisterU32};
 
-#[derive(Clone, Copy, Debug, Default, Eq, FromPrimitive, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(u8)]
 pub enum RegisterId {
     // Layout
@@ -20,7 +19,7 @@ pub enum RegisterId {
     // [ User Registers ] //
     /// Data register 1.
     #[default]
-    ER1,
+    ER1 = 0,
     /// Data register 1, two highest order bytes.
     //R1X,
     /// Data register 1, highest order byte.
@@ -29,46 +28,73 @@ pub enum RegisterId {
     //R1L,
 
     /// Data register 2.
-    ER2,
+    ER2 = 4,
     /// Data register 3.
-    ER3,
+    ER3 = 8,
     /// Data register 4.
-    ER4,
+    ER4 = 12,
     /// Data register 5.
-    ER5,
+    ER5 = 16,
     /// Data register 6.
-    ER6,
+    ER6 = 20,
     /// Data register 7.
-    ER7,
+    ER7 = 24,
     /// Data register 8.
-    ER8,
+    ER8 = 28,
 
     /// Float data register 1.
-    FR1,
+    FR1 = 29,
     /// Float data register 2.
-    FR2,
+    FR2 = 30,
 
     // [ System Registers ] //
     /// Accumulator register.
-    EAC,
+    EAC = 100,
     /// Instruction pointer register.
-    EIP,
+    EIP = 101,
     /// Stack frame pointer.
-    EFP,
+    EFP = 102,
     /// Stack pointer register.
-    ESP,
+    ESP = 103,
     /// CPU flags register.
-    EFL,
+    EFL = 104,
     /// Interrupt mask register.
-    EIM,
+    EIM = 105,
 
     // [ Segment Registers ] //
     /// Stack segment register.
-    ESS,
+    ESS = 200,
     /// Code segment register.
-    ECS,
+    ECS = 201,
     /// Data segment register.
-    EDS,
+    EDS = 202,
+}
+
+impl From<u8> for RegisterId {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => RegisterId::ER1,
+            4 => RegisterId::ER2,
+            8 => RegisterId::ER3,
+            12 => RegisterId::ER4,
+            16 => RegisterId::ER5,
+            20 => RegisterId::ER6,
+            24 => RegisterId::ER7,
+            28 => RegisterId::ER8,
+            29 => RegisterId::FR1,
+            30 => RegisterId::FR2,
+            100 => RegisterId::EAC,
+            101 => RegisterId::EIP,
+            102 => RegisterId::EFP,
+            103 => RegisterId::ESP,
+            104 => RegisterId::EFL,
+            105 => RegisterId::EIM,
+            200 => RegisterId::ESS,
+            201 => RegisterId::ECS,
+            202 => RegisterId::EDS,
+            id => panic!("invalid register id {id}"),
+        }
+    }
 }
 
 impl Display for RegisterId {

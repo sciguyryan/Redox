@@ -66,9 +66,9 @@ fn main() {
     }
 
     let instructions = &[
-        //Instruction::PushU32Imm(1234),
-        //Instruction::PushU32Imm(4321),
-        Instruction::Int(2),
+        Instruction::PushU32Imm(1234),
+        Instruction::PushU32Imm(4321),
+        //Instruction::Int(2),
         Instruction::Hlt,
     ];
 

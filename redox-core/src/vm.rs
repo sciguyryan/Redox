@@ -5,6 +5,7 @@ use crate::{
     cpu::Cpu,
     ins::instruction::Instruction,
     mem::memory_handler::{MemoryHandler, MEGABYTE},
+    reg::registers::Registers,
 };
 
 /// The smallest permitted size of the user memory segment.
@@ -104,6 +105,18 @@ impl VirtualMachine {
             // that it is 4 bytes in total.
             self.mem.set_u32((int_code * 4) as usize, address as u32);
         }
+    }
+
+    /// Reset the virtual machine.
+    pub fn reset(&mut self) {
+        // Clear any stack type hints that may be present.
+        self.mem.reset_stack_configuration();
+
+        // Reset the registers to their startup configuration.
+        self.cpu.registers = Registers::default();
+
+        // Allow the CPU to run.
+        self.cpu.is_halted = false;
     }
 
     /// Run the virtual machine until completion.

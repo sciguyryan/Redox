@@ -1,6 +1,4 @@
 use core::fmt;
-use num_derive::FromPrimitive;
-use num_traits::FromPrimitive;
 use std::fmt::Display;
 
 use crate::reg::registers::RegisterId;
@@ -173,40 +171,32 @@ impl MoveExpressionHandler {
         let is_argument_2_immediate = (packed & IS_VALUE_2_IMM_MASK) != 0;
         let is_argument_3_immediate = (packed & IS_VALUE_3_IMM_MASK) != 0;
 
-        self.operator_1 = ExpressionArgs::Operator(
-            FromPrimitive::from_u32((packed >> OPERATOR_1_SHIFT) & OPERATOR_MASK)
-                .expect("failed to get valid operator id"),
-        );
-        self.operator_2 = ExpressionArgs::Operator(
-            FromPrimitive::from_u32((packed >> OPERATOR_2_SHIFT) & OPERATOR_MASK)
-                .expect("failed to get valid operator id"),
-        );
+        self.operator_1 = ExpressionArgs::Operator(ExpressionOperator::from(
+            ((packed >> OPERATOR_1_SHIFT) & OPERATOR_MASK) as u8,
+        ));
+        self.operator_2 = ExpressionArgs::Operator(ExpressionOperator::from(
+            ((packed >> OPERATOR_2_SHIFT) & OPERATOR_MASK) as u8,
+        ));
 
         let value_1 = (packed >> VALUE_1_SHIFT) & VALUE_MASK;
         self.operand_1 = if is_argument_1_immediate {
             ExpressionArgs::Immediate(value_1 as u8)
         } else {
-            ExpressionArgs::Register(
-                FromPrimitive::from_u32(value_1).expect("failed to get valid register id"),
-            )
+            ExpressionArgs::Register(RegisterId::from(value_1 as u8))
         };
 
         let value_2 = (packed >> VALUE_2_SHIFT) & VALUE_MASK;
         self.operand_2 = if is_argument_2_immediate {
             ExpressionArgs::Immediate(value_2 as u8)
         } else {
-            ExpressionArgs::Register(
-                FromPrimitive::from_u32(value_2).expect("failed to get valid register id"),
-            )
+            ExpressionArgs::Register(RegisterId::from(value_2 as u8))
         };
 
         let value_3 = (packed >> VALUE_3_SHIFT) & VALUE_MASK;
         self.operand_3 = if is_argument_3_immediate {
             ExpressionArgs::Immediate(value_3 as u8)
         } else {
-            ExpressionArgs::Register(
-                FromPrimitive::from_u32(value_3).expect("failed to get valid register id"),
-            )
+            ExpressionArgs::Register(RegisterId::from(value_3 as u8))
         };
     }
 }
@@ -281,12 +271,23 @@ impl Display for MoveExpressionHandler {
 }
 
 #[repr(u32)]
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, FromPrimitive)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum ExpressionOperator {
     #[default]
-    Add,
-    Subtract,
-    Multiply,
+    Add = 0,
+    Subtract = 1,
+    Multiply = 2,
+}
+
+impl From<u8> for ExpressionOperator {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => ExpressionOperator::Add,
+            1 => ExpressionOperator::Subtract,
+            2 => ExpressionOperator::Multiply,
+            id => panic!("invalid expression operator id {id}"),
+        }
+    }
 }
 
 impl Display for ExpressionOperator {

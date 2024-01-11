@@ -227,6 +227,14 @@ impl MemoryHandler {
         self.get_physical_memory_segment_mut().clear();
     }
 
+    /// Completely clear the type hints vector.
+    fn clear_stack_type_hints(&mut self) {
+        #[cfg(feature = "stack-type-hints")]
+        {
+            self.debug_stack_type_hints.clear();
+        }
+    }
+
     /// Attempt to decompile any instructions between a start and end memory location.
     ///
     /// # Arguments
@@ -312,6 +320,9 @@ impl MemoryHandler {
 
         // Calculate the length of the arguments, in bytes.
         let arg_len = Instruction::get_instruction_arg_size_from_op(opcode);
+
+        // We will assert here if we can't read enough bytes to meet the expected amount.
+        // This means that subsequent "unsafe" reads are actually safe.
         let arg_bytes = self.get_range_ptr(pos + 4, arg_len);
 
         let mut cursor = 0;
@@ -1151,8 +1162,7 @@ impl MemoryHandler {
     /// * `cursor` - A mutable reference to the cursor, which specifies the starting position within the slice.
     #[inline]
     pub fn read_register_id(bytes: &[u8], cursor: &mut usize) -> RegisterId {
-        FromPrimitive::from_u8(MemoryHandler::read_u8(bytes, cursor))
-            .expect("failed to read register ID from memory")
+        RegisterId::from(MemoryHandler::read_u8(bytes, cursor))
     }
 
     /// Attempt to read a f32 value from a memory slice.
@@ -1163,8 +1173,6 @@ impl MemoryHandler {
     /// * `cursor` - A mutable reference to the cursor, which specifies the starting position within the slice.
     #[inline]
     pub fn read_f32(bytes: &[u8], cursor: &mut usize) -> f32 {
-        assert!(bytes.len() >= *cursor + 4);
-
         // A slight optimization. Since we have asserted that we will always
         // have sufficient elements in order to build the f32 value.
         // Note that this works with little-Endian and would need to be adjusted
@@ -1191,8 +1199,6 @@ impl MemoryHandler {
     /// * `cursor` - A mutable reference to the cursor, which specifies the starting position within the slice.
     #[inline]
     pub fn read_u32(bytes: &[u8], cursor: &mut usize) -> u32 {
-        assert!(bytes.len() >= *cursor + 4);
-
         // A slight optimization. Since we have asserted that we will always
         // have sufficient elements in order to build the u32 value.
         // Note that this works with little-Endian and would need to be adjusted
@@ -1242,6 +1248,17 @@ impl MemoryHandler {
         segment.data[pos - segment.start] = value;
     }
 
+    /// Write a f32 value into memory.
+    ///
+    /// # Arguments
+    ///
+    /// * `pos` - The position of the first byte to be written into memory.
+    /// * `value` - The value to be written into memory.
+    #[inline]
+    pub fn set_f32(&mut self, pos: usize, value: f32) {
+        self.set_range(pos, &f32::to_le_bytes(value));
+    }
+
     /// Set the value of a range of values in memory.
     ///
     /// # Arguments
@@ -1266,15 +1283,12 @@ impl MemoryHandler {
         segment.data[start..end].copy_from_slice(values);
     }
 
-    /// Write a f32 value into memory.
-    ///
-    /// # Arguments
-    ///
-    /// * `pos` - The position of the first byte to be written into memory.
-    /// * `value` - The value to be written into memory.
+    /// Reset the configuration of the stack.
     #[inline]
-    pub fn set_f32(&mut self, pos: usize, value: f32) {
-        self.set_range(pos, &f32::to_le_bytes(value));
+    pub fn reset_stack_configuration(&mut self) {
+        self.clear_stack_type_hints();
+        self.stack_frame_size = 0;
+        self.stack_pointer = self.stack_segment_end;
     }
 
     /// Write a u32 value into memory.
