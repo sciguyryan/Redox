@@ -27,10 +27,9 @@ impl BootRom {
     pub fn compile(mem: &MemoryHandler) -> Vec<u8> {
         // A set of instructions to setup the virtual machine's CPU.
         let boot_instructions = vec![
-            // Disable maskable interrupts.
+            // Completely disable maskable interrupts.
             Instruction::ClearInterruptFlag,
-            // Set the interrupt mask.
-            Instruction::MovU32ImmU32Reg(0xffffffff, RegisterId::EIM),
+            Instruction::MovU32ImmU32Reg(0, RegisterId::EIM),
             // Setup the stack.
             Instruction::MovU32ImmU32Reg(mem.stack_segment_end as u32, RegisterId::EFP),
             Instruction::MovU32ImmU32Reg(mem.stack_segment_end as u32, RegisterId::ESP),
@@ -42,10 +41,11 @@ impl BootRom {
             // This is a placeholder and it will be replaced further in this method.
             Instruction::PushU32Imm(0),
             Instruction::CallU32Imm(0xffffffff),
-            // Set the interrupt descriptor table register to the default IDT location in memory.
+            // Load the interrupt descriptor table register with the IVT location in memory.
             Instruction::LoadIVTAddrU32Imm(DEFAULT_IVT_ADDRESS),
             // Enable CPU interrupts.
             Instruction::SetInterruptFlag,
+            Instruction::MovU32ImmU32Reg(0xffffffff, RegisterId::EIM),
             // Jump to the start of the user executable code.
             Instruction::JumpAbsU32Reg(RegisterId::ECS),
             // We shouldn't be able to hit this, but just to be safe.
