@@ -56,9 +56,8 @@ impl BootRom {
 
         // NOTE - in the instances where we are building a custom interrupt handler
         // we would need to use the intret instruction to mark the end of the handler subroutine.
-        // This isn't technically needed in the ones we are using here since these all
-        // result in the CPU halting, but they've been included just in case I end up
-        // implementing the stepping interrupt.
+        // This isn't technically needed here since we these all result in the CPU halting,
+        // but they've been included just in case I end up implementing the stepping interrupt.
         let default_handlers: Vec<(u8, Vec<Instruction>)> = vec![
             // The division by zero interrupt handler.
             (

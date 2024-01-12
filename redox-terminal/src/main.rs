@@ -133,7 +133,7 @@ fn main() {
     println!("Code successfully executed in {elapsed} ns!");
     println!();
     println!("Machine Mode? {}", vm.cpu.is_machine_mode);
-    println!("Stack Frame Size: {}", vm.mem.stack_frame_size);
+    println!("Stack Frame Size: {}", vm.com_bus.mem.stack_frame_size);
     println!();
 
     println!("----------[Registers]----------");
@@ -141,14 +141,14 @@ fn main() {
     println!();
 
     println!("----------[Code Memory Segment]----------");
-    println!("{:?}", &vm.mem.get_code_segment_storage());
+    println!("{:?}", &vm.com_bus.mem.get_code_segment_storage());
     println!();
 
     println!("----------[Stack]----------");
-    vm.mem.print_stack();
+    vm.com_bus.mem.print_stack();
     println!();
 
     println!("----------[Mapped Memory Segments]----------");
-    vm.mem.print_mapped_memory_segments();
+    vm.com_bus.mem.print_mapped_memory_segments();
     println!();
 }

@@ -3,7 +3,7 @@ use crate::{
     cpu::Cpu,
     ins::instruction::Instruction,
     mem::memory_handler::{MemoryHandler, MEGABYTE},
-    reg::registers::Registers,
+    reg::registers::Registers, communication_bus::CommunicationBus,
 };
 
 /// The smallest permitted size of the user memory segment.
@@ -12,10 +12,10 @@ pub const MIN_USER_SEGMENT_SIZE: usize = MEGABYTE * 5;
 pub const U32_STACK_CAPACITY: usize = 1000;
 
 pub struct VirtualMachine {
-    /// The [`MemoryHandler`] for this virtual machine.
-    pub mem: MemoryHandler,
     /// The [`Cpu`] for this virtual machine.
     pub cpu: Cpu,
+    /// The [`CommunicationBus`] for this virtual machine.
+    pub com_bus: CommunicationBus,
 }
 
 impl VirtualMachine {
@@ -37,19 +37,15 @@ impl VirtualMachine {
         //assumptions around the placement of things in memory remain sound.
         assert!(user_segment_size >= MIN_USER_SEGMENT_SIZE);
 
-        // The first 1024 bytes (1 kilobyte) of user memory are used for
-        // the interrupt vector table (IVT). This is comprised of 256
-        // entries of 4 bytes, each representing a potential address for the
-        // interrupt handler. Some interrupts aren't
+        // The first 1024 bytes (1 kilobyte) of user memory are typically used for
+        // the interrupt vector table (IVT).
+        // This is comprised of 256 entries of 4 bytes, each representing a potential
+        // address for the interrupt handler.
+        let mem = MemoryHandler::new(user_segment_size, code_segment_bytes, data_segment_bytes, stack_segment_size);
 
         // Construct out virtual machine.
         let mut vm = Self {
-            mem: MemoryHandler::new(
-                user_segment_size,
-                code_segment_bytes,
-                data_segment_bytes,
-                stack_segment_size,
-            ),
+            com_bus: CommunicationBus::new(mem),
             cpu: Cpu::default(),
         };
 
@@ -68,10 +64,10 @@ impl VirtualMachine {
     /// A hashmap, the key being the interrupt code and the value being the address in memory where the handler is located.
     fn load_boot_rom(&mut self) {
         // Create the bootable ROM.
-        let boot_rom = BootRom::compile(&self.mem);
+        let boot_rom = BootRom::compile(&self.com_bus.mem);
 
         // Create a new memory segment tp hold the bootable ROM data.
-        let boot_mem_id = self.mem.add_mapped_memory_segment(
+        let boot_mem_id = self.com_bus.mem.add_mapped_memory_segment(
             BOOT_MEMORY_START,
             BOOT_MEMORY_LENGTH,
             true,
@@ -80,7 +76,7 @@ impl VirtualMachine {
         );
 
         // Load the contents of the boot into the newly created memory segment.
-        self.mem
+        self.com_bus.mem
             .get_mapped_segment_by_index_mut(boot_mem_id)
             .expect("failed to get memory segment")
             .set_contents(&boot_rom);
@@ -89,10 +85,10 @@ impl VirtualMachine {
     /// Reset the virtual machine back to a default configuration.
     pub fn reset(&mut self) {
         // Clear any stack type hints that may be present.
-        self.mem.reset_stack_configuration();
+        self.com_bus.mem.reset_stack_configuration();
 
         // Completely clear the physical memory segment.
-        self.mem.clear();
+        self.com_bus.mem.clear();
 
         // Reset the registers to their startup configuration.
         self.cpu.registers = Registers::default();
@@ -103,11 +99,11 @@ impl VirtualMachine {
 
     /// Run the virtual machine until completion.
     pub fn run(&mut self) {
-        self.cpu.run(&mut self.mem);
+        self.cpu.run(&mut self.com_bus);
     }
 
     /// Run a sequence of [`Instruction`]s within the virtual machine.
     pub fn run_instructions(&mut self, instructions: &[Instruction]) {
-        self.cpu.run_instructions(&mut self.mem, instructions);
+        self.cpu.run_instructions(&mut self.com_bus, instructions);
     }
 }

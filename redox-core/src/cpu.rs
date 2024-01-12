@@ -2,6 +2,7 @@ use core::fmt;
 use std::{panic, slice::Iter};
 
 use crate::{
+    communication_bus::CommunicationBus,
     ins::{
         instruction::Instruction,
         move_expressions::{ExpressionArgs, MoveExpressionHandler},
@@ -198,19 +199,19 @@ impl Cpu {
     ///
     /// # Arguments
     ///
-    /// * `mem` - A reference to the [`MemoryHandler`] connected to this CPU instance.
+    /// * `com_bus` - A reference to the [`CommunicationBus`] for the virtual machine.
     ///
     /// # Returns
     ///
     /// The next [`Instruction`] to be executed.
-    fn fetch_decode_next_instruction(&mut self, mem: &MemoryHandler) -> Instruction {
+    fn fetch_decode_next_instruction(&mut self, com_bus: &CommunicationBus) -> Instruction {
         // Get the current instruction pointer.
         let ip = *self
             .registers
             .get_register_u32(RegisterId::EIP)
             .read_unchecked() as usize;
 
-        mem.get_instruction(ip)
+        com_bus.mem.get_instruction(ip)
     }
 
     /// Get the value of the stack pointer (SP) register.
@@ -848,11 +849,11 @@ impl Cpu {
     ///
     /// # Arguments
     ///
-    /// * `mem` - A reference to the virtual machine [`Memory`] instance.
-    pub fn run(&mut self, mem: &mut MemoryHandler) {
+    /// * `com_bus` - A mutable reference to the [`CommunicationBus`] for the virtual machine.
+    pub fn run(&mut self, com_bus: &mut CommunicationBus) {
         while !self.is_halted {
-            let ins = self.fetch_decode_next_instruction(mem);
-            self.run_instruction(mem, &ins);
+            let ins = self.fetch_decode_next_instruction(com_bus);
+            self.run_instruction(com_bus, &ins);
         }
     }
 
@@ -860,11 +861,11 @@ impl Cpu {
     ///
     /// # Arguments
     ///
-    /// * `mem` - A mutable reference to the [`MemoryHandler`] connected to this CPU instance.
+    /// * `com_bus` - A mutable reference to the [`CommunicationBus`] for the virtual machine.
     /// * `instructions` - A slice of [`Instruction`] instances to be executed.
-    pub fn run_instructions(&mut self, mem: &mut MemoryHandler, instructions: &[Instruction]) {
+    pub fn run_instructions(&mut self, com_bus: &mut CommunicationBus, instructions: &[Instruction]) {
         for ins in instructions {
-            self.run_instruction(mem, ins);
+            self.run_instruction(com_bus, ins);
 
             if self.is_halted {
                 break;
@@ -878,12 +879,13 @@ impl Cpu {
     ///
     /// # Arguments
     ///
-    /// * `mem` - A mutable reference to the [`MemoryHandler`] connected to this CPU instance.
+    /// * `com_bus` - A mutable reference to the [`CommunicationBus`] for the virtual machine.
     /// * `instruction` - An [`Instruction`] instance to be executed.
-    fn run_instruction(&mut self, mem: &mut MemoryHandler, instruction: &Instruction) {
+    fn run_instruction(&mut self, com_bus: &mut CommunicationBus, instruction: &Instruction) {
         use Instruction::*;
 
         let privilege = &self.get_privilege();
+        let mem = &mut com_bus.mem;
 
         // Advance the instruction pointer by the number of bytes used for the instruction.
         self.increment_ip_register(instruction.get_total_instruction_size());
@@ -2026,10 +2028,10 @@ mod tests_cpu {
         );
 
         // There should be one entry on the stack.
-        assert_eq!(vm.mem.pop_u32(), 3);
+        assert_eq!(vm.com_bus.mem.pop_u32(), 3);
 
         // The stack should now be empty.
-        assert_eq!(vm.mem.stack_frame_size, 0);
+        assert_eq!(vm.com_bus.mem.stack_frame_size, 0);
     }
 
     /// Test the call and return instructions, simple non-nested test.
@@ -2140,10 +2142,10 @@ mod tests_cpu {
         );
 
         // There should be one entry on the stack.
-        assert_eq!(vm.mem.pop_u32(), 3);
+        assert_eq!(vm.com_bus.mem.pop_u32(), 3);
 
         // The stack should now be empty.
-        assert_eq!(vm.mem.stack_frame_size, 0);
+        assert_eq!(vm.com_bus.mem.stack_frame_size, 0);
     }
 
     /// Test the parity checking.
@@ -6101,8 +6103,8 @@ mod tests_cpu {
 
         TestsU32::new(&tests).run_all_special(|_id: usize, vm: Option<VirtualMachine>| {
             let mut vm = vm.expect("failed to correctly execute test code");
-            assert_eq!(vm.mem.pop_u32(), 0x321);
-            assert_eq!(vm.mem.pop_u32(), 0x123);
+            assert_eq!(vm.com_bus.mem.pop_u32(), 0x321);
+            assert_eq!(vm.com_bus.mem.pop_u32(), 0x123);
         });
     }
 
@@ -6122,7 +6124,7 @@ mod tests_cpu {
 
         TestsU32::new(&tests).run_all_special(|_id: usize, vm: Option<VirtualMachine>| {
             let mut vm = vm.expect("failed to correctly execute test code");
-            assert_eq!(vm.mem.pop_u32(), 0x123);
+            assert_eq!(vm.com_bus.mem.pop_u32(), 0x123);
         });
     }
 
@@ -6139,8 +6141,8 @@ mod tests_cpu {
 
         TestsU32::new(&tests).run_all_special(|_id: usize, vm: Option<VirtualMachine>| {
             let mut vm = vm.expect("failed to correctly execute test code");
-            assert_eq!(vm.mem.pop_u32(), 0x321);
-            assert_eq!(vm.mem.pop_u32(), 0x123);
+            assert_eq!(vm.com_bus.mem.pop_u32(), 0x321);
+            assert_eq!(vm.com_bus.mem.pop_u32(), 0x123);
         });
     }
 
@@ -6157,7 +6159,7 @@ mod tests_cpu {
 
         TestsU32::new(&tests).run_all_special(|_id: usize, vm: Option<VirtualMachine>| {
             let mut vm = vm.expect("failed to correctly execute test code");
-            assert_eq!(vm.mem.pop_u32(), 0x123);
+            assert_eq!(vm.com_bus.mem.pop_u32(), 0x123);
         });
     }
 
@@ -6177,7 +6179,7 @@ mod tests_cpu {
             let mut vm = vm.expect("failed to correctly execute test code");
 
             // There is nothing on the stack, this should assert.
-            _ = vm.mem.pop_u32();
+            _ = vm.com_bus.mem.pop_u32();
         });
     }
 
