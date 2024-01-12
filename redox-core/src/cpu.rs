@@ -13,8 +13,7 @@ use crate::{
     utils,
 };
 
-// I have taken some of the common ones from the ones that are generally universal
-// By convention the first 32 are reserved for processor exceptions.
+// I have taken some of the common ones from the ones that are generally universal.
 /// Division by zero interrupt - default handler implemented.
 pub const DIVIDE_BY_ZERO_INT: u8 = 0x0;
 /// Single-step interrupt - not yet implemented.
@@ -26,15 +25,8 @@ pub const INVALID_OPCODE_INT: u8 = 0x6;
 /// A general protection fault - not yet implemented.
 pub const GENERAL_PROTECTION_FAULT_INT: u8 = 0x0d;
 
-/// A list of the non-maskable interrupts. Typically anything defined with a constant above
-/// shouldn't be maskable.
-pub const NMI_INTERRUPTS: [u8; 5] = [
-    DIVIDE_BY_ZERO_INT,
-    SINGLE_STEP_INT,
-    NON_MASKABLE_INT,
-    INVALID_OPCODE_INT,
-    GENERAL_PROTECTION_FAULT_INT,
-];
+/// By default, all interrupts below 32 (0x20) are used for exceptions and are thus not maskable.
+const EXCEPTION_INT_CUTOFF: u8 = 0x1f;
 
 /// A list of f32 registers to be preserved when entering a subroutine. Use when storing state.
 ///
@@ -215,16 +207,16 @@ impl Cpu {
     ///
     /// # Arguments
     ///
-    /// * `int_type` - The type of interrupt to be triggered.
+    /// * `int_code` - The type of interrupt to be triggered.
     /// * `mem` - A mutable reference to the [`MemoryHandler`] connected to this CPU instance.
     #[inline]
-    fn handle_interrupt(&mut self, int_type: u8, mem: &mut MemoryHandler) {
-        let is_masked = (self.read_reg_u32_unchecked(&RegisterId::EIM) & (int_type as u32)) == 0;
+    fn handle_interrupt(&mut self, int_code: u8, mem: &mut MemoryHandler) {
+        let is_masked = (self.read_reg_u32_unchecked(&RegisterId::EIM) & (int_code as u32)) == 0;
 
         // Should we handle this interrupt?
-        // We will always handle a NMI, regardless of whether that interrupt is masked.
-        // NMI's can't be masked, thus their name.
-        if !NMI_INTERRUPTS.contains(&int_type) && is_masked {
+        // Exception interrupts have an interrupt code below 0x20 and are
+        // considered important enough that they can't be masked.
+        if is_masked && int_code > EXCEPTION_INT_CUTOFF {
             return;
         }
 
@@ -232,7 +224,7 @@ impl Cpu {
         let ivt_base = self.read_reg_u32_unchecked(&RegisterId::IDTR);
 
         // Calculate the place within the interrupt vector we need to look.
-        let iv_addr = ivt_base + (int_type as u32 * 4);
+        let iv_addr = ivt_base + (int_code as u32 * 4);
 
         // Get the handler address from the interrupt vector.
         let iv_handler_addr = mem.get_u32(iv_addr as usize);
@@ -255,7 +247,7 @@ impl Cpu {
         self.is_in_interrupt_handler = true;
 
         // Indicate that we have an unfinished interrupt.
-        self.last_interrupt_code = Some(int_type);
+        self.last_interrupt_code = Some(int_code);
 
         // Jump to the interrupt vector handler.
         self.set_instruction_pointer(iv_handler_addr);
