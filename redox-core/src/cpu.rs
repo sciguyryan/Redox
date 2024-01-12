@@ -1799,6 +1799,53 @@ mod tests_cpu {
         }
     }
 
+    /// Test load interrupt vector table instruction fails in user mode.
+    #[test]
+    fn test_livt_fails_user_mode() {
+        let tests = [TestU32::new(
+            &[MachineReturn, LoadIVTAddrU32Imm(0xdeafbeef)],
+            &[],
+            DEFAULT_U32_STACK_CAPACITY,
+            true,
+            "LIVT - successfully executed instruction in user mode",
+        )];
+
+        TestsU32::new(&tests).run_all();
+    }
+
+    /// Test load interrupt vector table instruction successfully changes the interrupt vector table address.
+    #[test]
+    fn test_livt_successful_update() {
+        let instructions = &[
+            // Move the address of the division by zero interrupt handler
+            // to the new IVT location. We don't care about the rest here.
+            MovMemU32RegSimple(0x0, RegisterId::ER1),
+            MovU32RegMemSimple(RegisterId::ER1, 0x1000),
+            // Erase the old handler address to ensure it can't be used.
+            MovU32ImmMemSimple(0x0, 0x0),
+            // Load the new IVT address.
+            Instruction::LoadIVTAddrU32Imm(0x1000),
+            // Trigger the division by zero interrupt.
+            Int(0),
+        ];
+
+        let mut compiler = Compiler::new();
+        let data = compiler.compile(instructions);
+
+        let mut vm = VirtualMachine::new(
+            vm::MIN_USER_SEGMENT_SIZE,
+            data,
+            &[],
+            20 * mem::memory_handler::SIZE_OF_U32,
+        );
+
+        vm.run();
+
+        // The CPU should still be within an interrupt handler.
+        assert!(vm.cpu.is_in_interrupt_handler);
+        assert_eq!(vm.cpu.last_interrupt_code, Some(DIVIDE_BY_ZERO_INT));
+    }
+
     /// Test whether a non-masked interrupt executes correctly.
     #[test]
     fn test_non_masked_interrupt_no_execution() {

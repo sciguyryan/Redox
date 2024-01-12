@@ -412,7 +412,7 @@ impl Display for Instruction {
                 format!("umint ${int_code:02x}")
             }
             LoadIVTAddrU32Imm(addr) => {
-                format!("lidt [${addr:08x}]")
+                format!("livt [${addr:08x}]")
             }
             MachineReturn => String::from("mret"),
             Halt => String::from("hlt"),
