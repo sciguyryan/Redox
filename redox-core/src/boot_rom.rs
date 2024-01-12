@@ -13,6 +13,9 @@ pub const BOOT_MEMORY_LENGTH: usize = MEGABYTE; // Extending for 1 megabyte.
 /// The name of the region.
 pub const BOOT_REGION_NAME: &str = "boot";
 
+/// The default interrupt vector table address.
+const DEFAULT_IVT_ADDRESS: u32 = 0x0;
+
 pub struct BootRom {}
 
 impl BootRom {
@@ -39,6 +42,8 @@ impl BootRom {
             // This is a placeholder and it will be replaced further in this method.
             Instruction::PushU32Imm(0),
             Instruction::CallU32Imm(0xffffffff),
+            // Set the interrupt descriptor table register to the default IDT location in memory.
+            Instruction::LoadIVTAddrU32Imm(DEFAULT_IVT_ADDRESS),
             // Enable CPU interrupts.
             Instruction::SetInterruptFlag,
             // Jump to the start of the user executable code.

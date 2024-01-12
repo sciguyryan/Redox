@@ -157,6 +157,12 @@ pub enum OpCode {
     MaskInterrupt,
     /// Unmask a specific interrupt.
     UnmaskInterrupt,
+    /// Set the location of the interrupt vector table.
+    ///
+    /// # Note
+    ///
+    /// This can only be done in machine mode.
+    LoadIVTAddrU32Imm,
     /// Machine-mode return - downgrade the privilege level of the processor.
     MachineReturn = 65534,
     /// Halt the execution of the virtual machine.
@@ -263,6 +269,7 @@ impl From<&Instruction> for OpCode {
             SetInterruptFlag => OpCode::SetInterruptFlag,
             MaskInterrupt(_) => OpCode::MaskInterrupt,
             UnmaskInterrupt(_) => OpCode::UnmaskInterrupt,
+            LoadIVTAddrU32Imm(_) => OpCode::LoadIVTAddrU32Imm,
             MachineReturn => OpCode::MachineReturn,
             Halt => OpCode::Halt,
 

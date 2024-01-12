@@ -162,7 +162,6 @@ impl Registers {
     pub fn new() -> Self {
         let rw = RegisterPermission::R | RegisterPermission::W;
         let rpw = RegisterPermission::R | RegisterPermission::PW;
-        let prpw = RegisterPermission::PR | RegisterPermission::PW;
 
         Self {
             registers_u32: HashMap::from([
@@ -178,8 +177,8 @@ impl Registers {
                 // [ System Registers ] //
                 register_u32!(RegisterId::EAC, &rw, 0),
                 register_u32!(RegisterId::EIP, &rw, BOOT_MEMORY_START as u32),
-                register_u32!(RegisterId::EFP, &prpw, 0),
-                register_u32!(RegisterId::ESP, &prpw, 0),
+                register_u32!(RegisterId::EFP, &rpw, 0),
+                register_u32!(RegisterId::ESP, &rpw, 0),
                 register_u32!(RegisterId::EFL, &rpw, 0),
                 register_u32!(RegisterId::EIM, &rw, 0),
                 register_u32!(RegisterId::IDTR, &rpw, 0),

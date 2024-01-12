@@ -165,6 +165,12 @@ pub enum Instruction {
     MaskInterrupt(u8),
     /// Unmask a specific interrupt.
     UnmaskInterrupt(u8),
+    /// Set the location of the interrupt vector table.
+    ///
+    /// # Note
+    ///
+    /// This can only be done in machine mode.
+    LoadIVTAddrU32Imm(u32),
     /// Machine-mode return - downgrade the privilege level of the processor.
     MachineReturn,
     /// Halt the execution of the processor.
@@ -405,6 +411,9 @@ impl Display for Instruction {
             UnmaskInterrupt(int_code) => {
                 format!("umint ${int_code:02x}")
             }
+            LoadIVTAddrU32Imm(addr) => {
+                format!("lidt [${addr:08x}]")
+            }
             MachineReturn => String::from("mret"),
             Halt => String::from("hlt"),
 
@@ -523,7 +532,9 @@ impl Instruction {
             /******** [Special Instructions] ********/
             MaskInterrupt => ARG_U8_IMM_SIZE,
             UnmaskInterrupt => ARG_U8_IMM_SIZE,
-            ClearInterruptFlag | SetInterruptFlag | MachineReturn | Halt => 0,
+            ClearInterruptFlag | SetInterruptFlag => 0,
+            LoadIVTAddrU32Imm => ARG_MEM_ADDR_SIZE,
+            MachineReturn | Halt => 0,
 
             /******** [Reserved Instructions] ********/
             Reserved1 | Reserved2 | Reserved3 | Reserved4 | Reserved5 | Reserved6 | Reserved7

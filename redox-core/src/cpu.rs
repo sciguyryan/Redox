@@ -6,7 +6,7 @@ use crate::{
         instruction::Instruction,
         move_expressions::{ExpressionArgs, MoveExpressionHandler},
     },
-    mem::memory_handler::{MemoryHandler, StackArgType, BYTES_IN_U32},
+    mem::memory_handler::{MemoryHandler, StackArgType, SIZE_OF_U32},
     privilege_level::PrivilegeLevel,
     reg::registers::{RegisterId, Registers},
     utils,
@@ -22,6 +22,8 @@ pub const SINGLE_STEP_INT: u8 = 0x1;
 pub const NON_MASKABLE_INT: u8 = 0x2;
 /// The invalid opcode interrupt - not yet implemented.
 pub const INVALID_OPCODE_INT: u8 = 0x6;
+/// A general protection fault - not yet implemented.
+pub const GENERAL_PROTECTION_FAULT_INT: u8 = 0x0d;
 
 /// A list of the non-maskable interrupts. Typically anything defined with a constant above
 /// shouldn't be maskable.
@@ -75,11 +77,8 @@ const U32_LOW_BYTE_MASK: u32 = 0xff;
 /// The mask to get everything except the lowest 8 bits of a u32 value.
 const NOT_U32_LOW_BYTE_MASK: u32 = !U32_LOW_BYTE_MASK;
 
-/// The default interrupt vector table address.
-const IVT_ADDRESS: u32 = 0x0;
-
 /// The size of a u32 value, in bytes.
-const SIZE_OF_U32: u32 = BYTES_IN_U32 as u32;
+const SIZE_OF_U32_LOCAL: u32 = SIZE_OF_U32 as u32;
 
 pub struct Cpu {
     /// The registers associated with this CPU.
@@ -90,20 +89,17 @@ pub struct Cpu {
     pub is_machine_mode: bool,
     /// Is the CPU currently in an interrupt handler?
     pub is_in_interrupt_handler: bool,
-    /// The address of the interrupt vector table.
-    pub interrupt_vector_address: u32,
     /// The last interrupt handler that was "active" (no intret instruction termination).
     pub last_interrupt_code: Option<u8>,
 }
 
 impl Cpu {
-    pub fn new(interrupt_vector_address: u32) -> Self {
+    pub fn new() -> Self {
         Self {
             registers: Registers::default(),
             is_halted: false,
             is_machine_mode: true,
             is_in_interrupt_handler: false,
-            interrupt_vector_address,
             last_interrupt_code: None,
         }
     }
@@ -240,8 +236,11 @@ impl Cpu {
             return;
         }
 
+        // Get the base IVT address.
+        let ivt_base = self.read_reg_u32_unchecked(&RegisterId::IDTR);
+
         // Calculate the place within the interrupt vector we need to look.
-        let iv_addr = self.interrupt_vector_address + (int_type as u32 * 4);
+        let iv_addr = ivt_base + (int_type as u32 * 4);
 
         // Get the handler address from the interrupt vector.
         let iv_handler_addr = mem.get_u32(iv_addr as usize);
@@ -1190,7 +1189,7 @@ impl Cpu {
                 // Update the stack pointer register.
                 self.registers
                     .get_register_u32_mut(RegisterId::ESP)
-                    .subtract_unchecked(SIZE_OF_U32);
+                    .subtract_unchecked(SIZE_OF_U32_LOCAL);
             }
             PushU32Reg(reg) => {
                 // push %reg
@@ -1200,7 +1199,7 @@ impl Cpu {
                 // Update the stack pointer register.
                 self.registers
                     .get_register_u32_mut(RegisterId::ESP)
-                    .subtract_unchecked(SIZE_OF_U32);
+                    .subtract_unchecked(SIZE_OF_U32_LOCAL);
             }
             PopU32ImmU32Reg(out_reg) => {
                 // pop %out_reg
@@ -1333,6 +1332,15 @@ impl Cpu {
                 let im = self.registers.get_register_u32_mut(RegisterId::EIM);
                 let new_mask = (im.read_unchecked() & NOT_U32_LOW_BYTE_MASK) | *int_code as u32;
                 im.write_unchecked(new_mask);
+            }
+            LoadIVTAddrU32Imm(addr) => {
+                // livt [addr]
+                if !self.is_machine_mode {
+                    self.handle_interrupt(GENERAL_PROTECTION_FAULT_INT, mem);
+                    return;
+                }
+
+                self.write_reg_u32_unchecked(&RegisterId::IDTR, *addr);
             }
             MachineReturn => {
                 self.set_machine_mode(false);
@@ -1518,7 +1526,7 @@ impl Cpu {
 
 impl Default for Cpu {
     fn default() -> Self {
-        Self::new(IVT_ADDRESS)
+        Self::new()
     }
 }
 
@@ -1722,7 +1730,7 @@ mod tests_cpu {
                     vm::MIN_USER_SEGMENT_SIZE,
                     compiled,
                     &[],
-                    self.stack_seg_capacity_u32 * mem::memory_handler::BYTES_IN_U32,
+                    self.stack_seg_capacity_u32 * mem::memory_handler::SIZE_OF_U32,
                 );
 
                 // Execute the code.
@@ -1816,7 +1824,7 @@ mod tests_cpu {
             vm::MIN_USER_SEGMENT_SIZE,
             data,
             &[],
-            20 * mem::memory_handler::BYTES_IN_U32,
+            20 * mem::memory_handler::SIZE_OF_U32,
         );
 
         vm.run();
@@ -1867,7 +1875,7 @@ mod tests_cpu {
             vm::MIN_USER_SEGMENT_SIZE,
             data,
             &[],
-            20 * mem::memory_handler::BYTES_IN_U32,
+            20 * mem::memory_handler::SIZE_OF_U32,
         );
 
         vm.run();
@@ -1914,7 +1922,7 @@ mod tests_cpu {
             vm::MIN_USER_SEGMENT_SIZE,
             data,
             &[],
-            20 * mem::memory_handler::BYTES_IN_U32,
+            20 * mem::memory_handler::SIZE_OF_U32,
         );
 
         vm.run();
@@ -1974,7 +1982,7 @@ mod tests_cpu {
             vm::MIN_USER_SEGMENT_SIZE,
             data,
             &[],
-            20 * mem::memory_handler::BYTES_IN_U32,
+            20 * mem::memory_handler::SIZE_OF_U32,
         );
 
         vm.run();
@@ -2024,7 +2032,7 @@ mod tests_cpu {
             vm::MIN_USER_SEGMENT_SIZE,
             data,
             &[],
-            30 * mem::memory_handler::BYTES_IN_U32,
+            30 * mem::memory_handler::SIZE_OF_U32,
         );
 
         vm.run();
@@ -2097,7 +2105,7 @@ mod tests_cpu {
             vm::MIN_USER_SEGMENT_SIZE,
             data,
             &[],
-            30 * mem::memory_handler::BYTES_IN_U32,
+            30 * mem::memory_handler::SIZE_OF_U32,
         );
 
         vm.run();
@@ -2137,7 +2145,7 @@ mod tests_cpu {
             vm::MIN_USER_SEGMENT_SIZE,
             data,
             &[],
-            30 * mem::memory_handler::BYTES_IN_U32,
+            30 * mem::memory_handler::SIZE_OF_U32,
         );
 
         vm.run();
