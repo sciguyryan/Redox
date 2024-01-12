@@ -27,11 +27,12 @@ pub const GENERAL_PROTECTION_FAULT_INT: u8 = 0x0d;
 
 /// A list of the non-maskable interrupts. Typically anything defined with a constant above
 /// shouldn't be maskable.
-pub const NMI_INTERRUPTS: [u8; 4] = [
+pub const NMI_INTERRUPTS: [u8; 5] = [
     DIVIDE_BY_ZERO_INT,
     SINGLE_STEP_INT,
     NON_MASKABLE_INT,
     INVALID_OPCODE_INT,
+    GENERAL_PROTECTION_FAULT_INT,
 ];
 
 /// A list of f32 registers to be preserved when entering a subroutine. Use when storing state.
@@ -231,8 +232,7 @@ impl Cpu {
         // Should we handle this interrupt?
         // We will always handle a NMI, regardless of whether the CPU's interrupt enabled
         // flag is set, or whether that interrupt is masked. NMI's can't be ignored.
-        if !NMI_INTERRUPTS.contains(&int_type) && (is_masked || !self.is_cpu_flag_set(&CpuFlag::IF))
-        {
+        if !NMI_INTERRUPTS.contains(&int_type) && is_masked {
             return;
         }
 
@@ -282,6 +282,7 @@ impl Cpu {
     /// # Arguments
     ///
     /// * `flag` - The [`CpuFlag`] to check.
+    #[allow(unused)]
     #[inline(always)]
     fn is_cpu_flag_set(&self, flag: &CpuFlag) -> bool {
         // Get the current CPU flags.
@@ -1317,12 +1318,6 @@ impl Cpu {
             }
 
             /******** [Special Instructions] ********/
-            ClearInterruptFlag => {
-                self.set_flag_state(CpuFlag::IF, false);
-            }
-            SetInterruptFlag => {
-                self.set_flag_state(CpuFlag::IF, true);
-            }
             MaskInterrupt(int_code) => {
                 let im = self.registers.get_register_u32_mut(RegisterId::EIM);
                 let new_mask = im.read_unchecked() & !*int_code as u32;
@@ -1543,8 +1538,6 @@ pub enum CpuFlag {
     CF,
     // The parity flag - set to true depending on the parity of the bits.
     PF,
-    /// The interrupt enabled flag - set to true if interrupts are enabled.
-    IF,
 }
 
 impl fmt::Display for CpuFlag {
@@ -1555,20 +1548,18 @@ impl fmt::Display for CpuFlag {
             CpuFlag::OF => write!(f, "OF"),
             CpuFlag::CF => write!(f, "CF"),
             CpuFlag::PF => write!(f, "PF"),
-            CpuFlag::IF => write!(f, "IF"),
         }
     }
 }
 
 impl CpuFlag {
     pub fn iterator() -> Iter<'static, CpuFlag> {
-        static FLAGS: [CpuFlag; 6] = [
+        static FLAGS: [CpuFlag; 5] = [
             CpuFlag::SF,
             CpuFlag::ZF,
             CpuFlag::OF,
             CpuFlag::CF,
             CpuFlag::PF,
-            CpuFlag::IF,
         ];
         FLAGS.iter()
     }
@@ -1953,12 +1944,13 @@ mod tests_cpu {
 
         let instructions = &[
             // Write the handler address into the IVT.
-            Instruction::MovU32ImmMemSimple(base_offset + 30, 255 * 4), // Starts at [base]. Length = 12.
-            Instruction::Int(0xff), // Starts at [base + 12]. Length = 5.
-            Instruction::AddU32ImmU32Reg(0x5, RegisterId::ER1), // Starts at [base + 17]. Length = 9.
-            Instruction::Halt, // Starts at [base + 26]. Length = 4.
+            Instruction::MovU32ImmMemSimple(base_offset + 35, 255 * 4), // Starts at [base]. Length = 12.
+            Instruction::MaskInterrupt(0xff), // Starts at [base + 12]. Length = 5.
+            Instruction::Int(0xff),           // Starts at [base + 17]. Length = 5.
+            Instruction::AddU32ImmU32Reg(0x5, RegisterId::ER1), // Starts at [base + 22]. Length = 9.
+            Instruction::Halt, // Starts at [base + 31]. Length = 4.
             /***** INT_FF - Interrupt handler for interrupt 0xff starts here. *****/
-            Instruction::MovU32ImmU32Reg(0x64, RegisterId::ER1), // Starts at [base + 30]. Length = 9.
+            Instruction::MovU32ImmU32Reg(0x64, RegisterId::ER1), // Starts at [base + 35]. Length = 9.
             Instruction::IntRet,
         ];
 
@@ -1981,68 +1973,7 @@ mod tests_cpu {
                 .registers
                 .get_register_u32(RegisterId::EAC)
                 .read_unchecked(),
-            0x69
-        );
-
-        // The CPU should not still be within an interrupt handler.
-        assert!(!vm.cpu.is_in_interrupt_handler);
-
-        // There should be no indication of the last interrupt handler, since it
-        // should have completed.
-        assert_eq!(vm.cpu.last_interrupt_code, None);
-    }
-
-    /// Test the interaction between interrupts and the CPU interrupt enabled flag.
-    /// We expect that non-maskable interrupts will ignore the state of the CPU interrupt enabled
-    /// flag while every other type of interrupt will be disabled.
-    #[test]
-    fn test_maskable_interrupt_control_via_cpu_flag() {
-        let base_offset = vm::MIN_USER_SEGMENT_SIZE as u32;
-
-        let instructions = &[
-            // Write the handler addresses into the IVT.
-            // Handler for 0x00. This is a non-maskable interrupt.
-            // We are essentially replacing the default handler for the division by zero interrupt.
-            Instruction::MovU32ImmMemSimple(base_offset + 51, 0), // Starts at [base]. Length = 12.
-            // Handler for 0xff.
-            Instruction::MovU32ImmMemSimple(base_offset + 64, 255 * 4), // Starts at [base + 12]. Length = 12.
-            // Disable maskable CPU interrupts.
-            Instruction::ClearInterruptFlag, // Starts at [base + 24]. Length = 4.
-            // This interrupt handler should not be executed.
-            Instruction::Int(0xff), // Starts at [base + 28]. Length = 5.
-            // This interrupt handler should be executed since it can't be disabled or masked.
-            Instruction::Int(0x0), // Starts at [base + 33]. Length = 5.
-            Instruction::AddU32ImmU32Reg(0x5, RegisterId::ER1), // Starts at [base + 38]. Length = 9.
-            Instruction::Halt, // Starts at [base + 47]. Length = 4.
-            /***** INT_00 - Interrupt handler for interrupt 0x00 starts here. *****/
-            Instruction::MovU32ImmU32Reg(0x64, RegisterId::ER1), // Starts at [base + 51]. Length = 9.
-            Instruction::IntRet, // Starts at [base + 60]. Length = 4.
-            /***** INT_FF - Interrupt handler for interrupt 0xff starts here. *****/
-            Instruction::MovU32ImmU32Reg(0x5, RegisterId::ER1), // Starts at [base + 64]. Length = 9.
-            Instruction::IntRet,
-        ];
-
-        let mut compiler = Compiler::new();
-        let data = compiler.compile(instructions);
-
-        let mut vm = VirtualMachine::new(
-            vm::MIN_USER_SEGMENT_SIZE,
-            data,
-            &[],
-            20 * mem::memory_handler::SIZE_OF_U32,
-        );
-
-        vm.run();
-
-        // The interrupt handler should not be executed and so the value of 5 should be added
-        // to the value of the register ER1 (which is zero). Therefore, 5 should be moved to
-        // accumulator register.
-        assert_eq!(
-            *vm.cpu
-                .registers
-                .get_register_u32(RegisterId::EAC)
-                .read_unchecked(),
-            0x69
+            0x5
         );
 
         // The CPU should not still be within an interrupt handler.
@@ -2326,10 +2257,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::ER1, 0x1),
                     (RegisterId::EAC, 0x3),
-                    (
-                        RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::PF, CpuFlag::IF]),
-                    ),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -2343,10 +2271,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::ER1, u32::MAX),
                     (RegisterId::EAC, 0x1),
-                    (
-                        RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::IF]),
-                    ),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::OF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -2356,7 +2281,7 @@ mod tests_cpu {
                 &[AddU32ImmU32Reg(0, RegisterId::ER1)],
                 &[(
                     RegisterId::EFL,
-                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                 )],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -2467,10 +2392,7 @@ mod tests_cpu {
                     (RegisterId::ER1, u32::MAX),
                     (RegisterId::ER2, 0x2),
                     (RegisterId::EAC, 0x1),
-                    (
-                        RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::IF]),
-                    ),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::OF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -2480,7 +2402,7 @@ mod tests_cpu {
                 &[AddU32RegU32Reg(RegisterId::ER1, RegisterId::ER2)],
                 &[(
                     RegisterId::EFL,
-                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                 )],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -2592,7 +2514,7 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x3),
                     (
                         RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::PF, CpuFlag::IF]),
+                        CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::PF]),
                     ),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -2603,7 +2525,7 @@ mod tests_cpu {
                 &[SubU32ImmU32Reg(0, RegisterId::ER1)],
                 &[(
                     RegisterId::EFL,
-                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                 )],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -2706,7 +2628,7 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x3),
                     (
                         RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::PF, CpuFlag::IF]),
+                        CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::PF]),
                     ),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -2717,7 +2639,7 @@ mod tests_cpu {
                 &[SubU32RegU32Imm(RegisterId::ER1, 0)],
                 &[(
                     RegisterId::EFL,
-                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                 )],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -2827,7 +2749,7 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x3),
                     (
                         RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::PF, CpuFlag::IF]),
+                        CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::PF]),
                     ),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -2838,7 +2760,7 @@ mod tests_cpu {
                 &[SubU32RegU32Reg(RegisterId::ER1, RegisterId::ER2)],
                 &[(
                     RegisterId::EFL,
-                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                 )],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -2949,7 +2871,7 @@ mod tests_cpu {
                     (RegisterId::EAC, 4294967294),
                     (
                         RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::CF, CpuFlag::IF]),
+                        CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::CF]),
                     ),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -2992,7 +2914,7 @@ mod tests_cpu {
                     (RegisterId::EAC, 4294967294),
                     (
                         RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::CF, CpuFlag::IF]),
+                        CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::CF]),
                     ),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -3377,12 +3299,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0),
                     (
                         RegisterId::EFL,
-                        CpuFlag::compute_from(&[
-                            CpuFlag::ZF,
-                            CpuFlag::OF,
-                            CpuFlag::PF,
-                            CpuFlag::IF,
-                        ]),
+                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::OF, CpuFlag::PF]),
                     ),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -3466,7 +3383,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0x0),
                     (
                         RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
+                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                     ),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -3479,12 +3396,7 @@ mod tests_cpu {
                     (RegisterId::ER1, u32::MAX),
                     (
                         RegisterId::EFL,
-                        CpuFlag::compute_from(&[
-                            CpuFlag::SF,
-                            CpuFlag::OF,
-                            CpuFlag::PF,
-                            CpuFlag::IF,
-                        ]),
+                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::OF, CpuFlag::PF]),
                     ),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -3588,7 +3500,7 @@ mod tests_cpu {
                     (RegisterId::EAC, 0x0),
                     (
                         RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
+                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                     ),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -3602,7 +3514,7 @@ mod tests_cpu {
                 ],
                 &[(
                     RegisterId::EFL,
-                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                 )],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -3709,7 +3621,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1000),
                     (
                         RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::CF, CpuFlag::IF]),
+                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::CF]),
                     ),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -3727,12 +3639,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
                     (
                         RegisterId::EFL,
-                        CpuFlag::compute_from(&[
-                            CpuFlag::SF,
-                            CpuFlag::CF,
-                            CpuFlag::OF,
-                            CpuFlag::IF,
-                        ]),
+                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::CF, CpuFlag::OF]),
                     ),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -3747,7 +3654,7 @@ mod tests_cpu {
                 ],
                 &[(
                     RegisterId::EFL,
-                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                 )],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -3867,7 +3774,7 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x3),
                     (
                         RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::CF, CpuFlag::IF]),
+                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::CF]),
                     ),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -3887,12 +3794,7 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x1),
                     (
                         RegisterId::EFL,
-                        CpuFlag::compute_from(&[
-                            CpuFlag::SF,
-                            CpuFlag::OF,
-                            CpuFlag::CF,
-                            CpuFlag::IF,
-                        ]),
+                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::OF, CpuFlag::CF]),
                     ),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -3911,12 +3813,7 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x1),
                     (
                         RegisterId::EFL,
-                        CpuFlag::compute_from(&[
-                            CpuFlag::SF,
-                            CpuFlag::OF,
-                            CpuFlag::CF,
-                            CpuFlag::IF,
-                        ]),
+                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::OF, CpuFlag::CF]),
                     ),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -3934,7 +3831,7 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x1),
                     (
                         RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
+                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                     ),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -4049,10 +3946,7 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1101),
-                    (
-                        RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::IF]),
-                    ),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::SF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -4066,7 +3960,7 @@ mod tests_cpu {
                 ],
                 &[(
                     RegisterId::EFL,
-                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                 )],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -4144,10 +4038,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1101),
                     (RegisterId::ER2, 0x1),
-                    (
-                        RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::IF]),
-                    ),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::SF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -4164,7 +4055,7 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x1),
                     (
                         RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
+                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                     ),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -4287,7 +4178,7 @@ mod tests_cpu {
                 ],
                 &[(
                     RegisterId::EFL,
-                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                 )],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -4405,7 +4296,7 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x1),
                     (
                         RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
+                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                     ),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -4462,7 +4353,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b1011_1111_1111_1111_1111_1111_1111_1111),
                     (
                         RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF, CpuFlag::IF]),
+                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -4477,7 +4368,7 @@ mod tests_cpu {
                 ],
                 &[(
                     RegisterId::EFL,
-                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
+                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                 )],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -4557,7 +4448,7 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x1),
                     (
                         RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF, CpuFlag::IF]),
+                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
                     ),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -4575,7 +4466,7 @@ mod tests_cpu {
                     (RegisterId::ER2, 0x1),
                     (
                         RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF, CpuFlag::IF]),
+                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
                     ),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -5269,10 +5160,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::ER2, 0x4),
                     (RegisterId::ER3, 0b0000_1111_1111_1111_1111_1111_1111_1111),
-                    (
-                        RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
-                    ),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -5288,10 +5176,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::ER2, 0x18),
                     (RegisterId::ER3, 0b0000_0000_0000_0000_0000_0000_1111_1111),
-                    (
-                        RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
-                    ),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -5307,10 +5192,7 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::ER2, 0x19),
                     (RegisterId::ER3, 0b0000_0000_0000_0000_0000_0000_0111_1111),
-                    (
-                        RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
-                    ),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -5337,10 +5219,7 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0x0, RegisterId::ER2),
                     ZeroHighBitsByIndexU32Reg(RegisterId::ER2, RegisterId::ER1, RegisterId::ER3),
                 ],
-                &[(
-                    RegisterId::EFL,
-                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
-                )],
+                &[(RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::ZF]))],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ZHBI - incorrect flag state - zero flag not set",
@@ -5438,10 +5317,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::ER2, 0b0000_1111_1111_1111_1111_1111_1111_1111),
-                    (
-                        RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
-                    ),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -5455,10 +5331,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::ER2, 0b0000_0000_0000_0000_0000_0000_1111_1111),
-                    (
-                        RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
-                    ),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -5472,10 +5345,7 @@ mod tests_cpu {
                 &[
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::ER2, 0b0000_0000_0000_0000_0000_0000_0111_1111),
-                    (
-                        RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
-                    ),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -5500,10 +5370,7 @@ mod tests_cpu {
                     RegisterId::ER1, // Already has the value of 0.
                     RegisterId::ER2,
                 )],
-                &[(
-                    RegisterId::EFL,
-                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
-                )],
+                &[(RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::ZF]))],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ZHBI - incorrect flag state - zero flag not set",
@@ -5589,10 +5456,7 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (
-                        RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
-                    ),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -5629,10 +5493,7 @@ mod tests_cpu {
                     MovU32ImmMemSimple(0b1111_1111_1111_1111_1111_1111_1111_1111, 0x0),
                     BitTestU32Mem(0x0, 0x0),
                 ],
-                &[(
-                    RegisterId::EFL,
-                    CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]),
-                )],
+                &[(RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF]))],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BT - incorrect result produced from the bit-test instruction - carry flag not set",
@@ -5673,7 +5534,7 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
-                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF])),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
                 ],
 
                 DEFAULT_U32_STACK_CAPACITY,
@@ -5723,7 +5584,7 @@ mod tests_cpu {
                     // Check that the value was written by reading it back into a register.
                     MovMemU32RegSimple(0x0, RegisterId::ER8),
                 ],
-                &[(RegisterId::ER8, 0b1111_1111_1111_1111_1111_1111_1111_1110), (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]))],
+                &[(RegisterId::ER8, 0b1111_1111_1111_1111_1111_1111_1111_1110), (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF]))],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BTR - incorrect result produced from the bit-test instruction - carry flag not set",
@@ -5770,7 +5631,7 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF])),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
                 ],
 
                 DEFAULT_U32_STACK_CAPACITY,
@@ -5820,7 +5681,7 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::ER8, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::IF]))
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF]))
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -5888,10 +5749,7 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::ER2, 0x20),
-                    (
-                        RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
-                    ),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::ZF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -5930,10 +5788,7 @@ mod tests_cpu {
                 &[BitScanReverseU32MemU32Reg(0x1000, RegisterId::ER1)],
                 &[
                     (RegisterId::ER1, 0x20),
-                    (
-                        RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
-                    ),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::ZF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -5986,10 +5841,7 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::ER8, 0x20),
-                    (
-                        RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
-                    ),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::ZF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -6036,10 +5888,7 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::ER8, 0x20),
-                    (
-                        RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
-                    ),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::ZF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -6084,10 +5933,7 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::ER2, 0x20),
-                    (
-                        RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
-                    ),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::ZF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -6126,10 +5972,7 @@ mod tests_cpu {
                 &[BitScanForwardU32MemU32Reg(0x1000, RegisterId::ER1)],
                 &[
                     (RegisterId::ER1, 0x20),
-                    (
-                        RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
-                    ),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::ZF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -6182,10 +6025,7 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::ER8, 0x20),
-                    (
-                        RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
-                    ),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::ZF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -6232,10 +6072,7 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::ER8, 0x20),
-                    (
-                        RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::IF]),
-                    ),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::ZF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,

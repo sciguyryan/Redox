@@ -157,10 +157,6 @@ pub enum Instruction {
     BitScanForwardU32MemU32Mem(u32, u32),
 
     /******** [Special Instructions] ********/
-    /// Clear the global CPU interrupt enabled flag.
-    ClearInterruptFlag,
-    /// Set the global CPU interrupt enabled flag.
-    SetInterruptFlag,
     /// Mask a specific interrupt.
     MaskInterrupt(u8),
     /// Unmask a specific interrupt.
@@ -403,8 +399,6 @@ impl Display for Instruction {
             }
 
             /******** [Special Instructions] ********/
-            ClearInterruptFlag => String::from("cli"),
-            SetInterruptFlag => String::from("sli"),
             MaskInterrupt(int_code) => {
                 format!("mint ${int_code:02x}")
             }
@@ -532,7 +526,6 @@ impl Instruction {
             /******** [Special Instructions] ********/
             MaskInterrupt => ARG_U8_IMM_SIZE,
             UnmaskInterrupt => ARG_U8_IMM_SIZE,
-            ClearInterruptFlag | SetInterruptFlag => 0,
             LoadIVTAddrU32Imm => ARG_MEM_ADDR_SIZE,
             MachineReturn | Halt => 0,
 

@@ -149,10 +149,6 @@ pub enum OpCode {
     BitScanForwardU32MemU32Mem,
 
     /******** [Special Instructions] ********/
-    /// Clear the global CPU interrupt enabled flag.
-    ClearInterruptFlag,
-    /// Set the global CPU interrupt enabled flag.
-    SetInterruptFlag,
     /// Mask a specific interrupt.
     MaskInterrupt,
     /// Unmask a specific interrupt.
@@ -265,8 +261,6 @@ impl From<&Instruction> for OpCode {
             BitScanForwardU32MemU32Mem(_, _) => OpCode::BitScanForwardU32MemU32Mem,
 
             /******** [Special Instructions] ********/
-            ClearInterruptFlag => OpCode::ClearInterruptFlag,
-            SetInterruptFlag => OpCode::SetInterruptFlag,
             MaskInterrupt(_) => OpCode::MaskInterrupt,
             UnmaskInterrupt(_) => OpCode::UnmaskInterrupt,
             LoadIVTAddrU32Imm(_) => OpCode::LoadIVTAddrU32Imm,

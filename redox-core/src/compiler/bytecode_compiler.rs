@@ -166,8 +166,6 @@ impl Compiler {
             Instruction::Nop
             | Instruction::IntRet
             | Instruction::RetArgsU32
-            | Instruction::ClearInterruptFlag
-            | Instruction::SetInterruptFlag
             | Instruction::MachineReturn
             | Instruction::Halt => {}
 
@@ -327,8 +325,6 @@ mod tests_compiler {
                 BitScanForwardU32MemU32Reg => Instruction::BitScanForwardU32MemU32Reg(0x123, ER2),
                 BitScanForwardU32RegMemU32 => Instruction::BitScanForwardU32RegMemU32(ER2, 0x123),
                 BitScanForwardU32MemU32Mem => Instruction::BitScanForwardU32MemU32Mem(0x123, 0x321),
-                ClearInterruptFlag => Instruction::ClearInterruptFlag,
-                SetInterruptFlag => Instruction::SetInterruptFlag,
                 MaskInterrupt => Instruction::MaskInterrupt(0xff),
                 UnmaskInterrupt => Instruction::UnmaskInterrupt(0xff),
                 LoadIVTAddrU32Imm => Instruction::LoadIVTAddrU32Imm(0xdeadbeef),

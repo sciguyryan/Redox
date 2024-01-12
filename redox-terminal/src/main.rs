@@ -4,6 +4,7 @@ use redox_core::{
     compiler::bytecode_compiler::Compiler,
     ins::instruction::Instruction,
     mem,
+    reg::registers::RegisterId,
     vm::{self, VirtualMachine},
 };
 
@@ -65,12 +66,35 @@ fn main() {
         panic!("currently unsupported");
     }
 
+    let base_offset = vm::MIN_USER_SEGMENT_SIZE as u32;
+
     let instructions = &[
-        //Instruction::PushU32Imm(1234),
+        /*//Instruction::PushU32Imm(1234),
         //Instruction::PushU32Imm(4321),
         //Instruction::Int(2),
         //Instruction::DivU32ImmU32Reg(0, redox_core::reg::registers::RegisterId::ER1),
-        //Instruction::MovU32ImmU32Reg(0x123, redox_core::reg::registers::RegisterId::ER8),
+        //Instruction::MovU32ImmU32Reg(0x123, redox_core::reg::registers::RegisterId::ER8),*/
+
+        // Write the handler addresses into the IVT.
+        // Handler for 0x00. This is a non-maskable interrupt.
+        // We are essentially replacing the default handler for the division by zero interrupt.
+        Instruction::MovU32ImmMemSimple(base_offset + 56, 0), // Starts at [base]. Length = 12.
+        // Handler for 0xff.
+        Instruction::MovU32ImmMemSimple(base_offset + 69, 255 * 4), // Starts at [base + 12]. Length = 12.
+        // Disable maskable CPU interrupts.
+        Instruction::MovU32ImmU32Reg(0x0, RegisterId::EIM), // Starts at [base + 24]. Length = 9.
+        // This interrupt handler should not be executed.
+        Instruction::Int(0xff), // Starts at [base + 33]. Length = 5.
+        // This interrupt handler should be executed since it can't be disabled or masked.
+        Instruction::Int(0x0), // Starts at [base + 38]. Length = 5.
+        Instruction::AddU32ImmU32Reg(0x5, RegisterId::ER1), // Starts at [base + 43]. Length = 9.
+        Instruction::Halt,     // Starts at [base + 52]. Length = 4.
+        /***** INT_00 - Interrupt handler for interrupt 0x00 starts here. *****/
+        Instruction::MovU32ImmU32Reg(0x64, RegisterId::ER1), // Starts at [base + 56]. Length = 9.
+        Instruction::IntRet,                                 // Starts at [base + 65]. Length = 4.
+        /***** INT_FF - Interrupt handler for interrupt 0xff starts here. *****/
+        Instruction::MovU32ImmU32Reg(0x5, RegisterId::ER1), // Starts at [base + 69]. Length = 9.
+        Instruction::IntRet,
         Instruction::Halt,
     ];
 

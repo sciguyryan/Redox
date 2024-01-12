@@ -695,8 +695,6 @@ impl MemoryHandler {
             }
 
             /******** [Special Instructions] ********/
-            ClearInterruptFlag => Instruction::ClearInterruptFlag,
-            SetInterruptFlag => Instruction::SetInterruptFlag,
             MaskInterrupt => {
                 let int_code = Self::read_u8(arg_bytes, &mut cursor);
 
