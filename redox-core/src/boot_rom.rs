@@ -35,7 +35,7 @@ impl BootRom {
             Instruction::MovU32ImmU32Reg(mem.stack_segment_start as u32, RegisterId::ESS),
             Instruction::MovU32ImmU32Reg(mem.code_segment_start as u32, RegisterId::ECS),
             Instruction::MovU32ImmU32Reg(mem.data_segment_start as u32, RegisterId::EDS),
-            // Call the interrupt vector table setup subroutine.
+            // Call the setup code for the interrupt vector table.
             // This is a placeholder and it will be replaced further in this method.
             Instruction::PushU32Imm(0),
             Instruction::CallU32Imm(0xffffffff),

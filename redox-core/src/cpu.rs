@@ -12,8 +12,8 @@ use crate::{
     utils,
 };
 
-// I have taken some of the common ones from the ones that are generally universal.
-
+// I have taken some of the common ones from the ones that are generally universal
+// By convention the first 32 are reserved for processor exceptions.
 /// Division by zero interrupt - default handler implemented.
 pub const DIVIDE_BY_ZERO_INT: u8 = 0x0;
 /// Single-step interrupt - not yet implemented.

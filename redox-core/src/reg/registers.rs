@@ -60,6 +60,8 @@ pub enum RegisterId {
     EFL = 104,
     /// Interrupt mask register. Only the lowest order byte is used.
     EIM = 105,
+    /// Interrupt descriptor table register.
+    IDTR = 106,
 
     // [ Segment Registers ] //
     /// Stack segment register.
@@ -89,6 +91,7 @@ impl From<u8> for RegisterId {
             103 => RegisterId::ESP,
             104 => RegisterId::EFL,
             105 => RegisterId::EIM,
+            106 => RegisterId::IDTR,
             200 => RegisterId::ESS,
             201 => RegisterId::ECS,
             202 => RegisterId::EDS,
@@ -117,6 +120,7 @@ impl Display for RegisterId {
             RegisterId::ESP => "ESP",
             RegisterId::EFL => "EFL",
             RegisterId::EIM => "EIM",
+            RegisterId::IDTR => "IDTR",
 
             RegisterId::ESS => "ESS",
             RegisterId::ECS => "ECS",
@@ -178,6 +182,7 @@ impl Registers {
                 register_u32!(RegisterId::ESP, &prpw, 0),
                 register_u32!(RegisterId::EFL, &rpw, 0),
                 register_u32!(RegisterId::EIM, &rw, 0),
+                register_u32!(RegisterId::IDTR, &rpw, 0),
                 // [ Segment Registers ] //
                 register_u32!(RegisterId::ESS, &rpw, 0),
                 register_u32!(RegisterId::ECS, &rpw, 0),
