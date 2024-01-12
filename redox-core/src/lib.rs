@@ -1,7 +1,7 @@
 #![crate_name = "redox_core"]
 
 mod boot_rom;
-mod communication_bus;
+mod com_bus;
 pub mod compiler;
 mod cpu;
 mod data_access_type;

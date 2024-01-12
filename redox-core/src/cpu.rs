@@ -2,7 +2,7 @@ use core::fmt;
 use std::{panic, slice::Iter};
 
 use crate::{
-    communication_bus::CommunicationBus,
+    com_bus::communication_bus::CommunicationBus,
     ins::{
         instruction::Instruction,
         move_expressions::{ExpressionArgs, MoveExpressionHandler},
@@ -91,7 +91,7 @@ pub struct Cpu {
     pub is_machine_mode: bool,
     /// Is the CPU currently in an interrupt handler?
     pub is_in_interrupt_handler: bool,
-    /// The last interrupt handler that was "active" (no intret instruction termination).
+    /// The last interrupt handler that was "active" (i.e. was not terminated with intret).
     pub last_interrupt_code: Option<u8>,
 }
 
@@ -166,19 +166,13 @@ impl Cpu {
     /// Get the flags register.
     #[inline(always)]
     pub fn get_flags(&self) -> u32 {
-        *self
-            .registers
-            .get_register_u32(RegisterId::EFL)
-            .read_unchecked()
+        self.read_reg_u32_unchecked(&RegisterId::EFL)
     }
 
     /// Get the instruction pointer (IP) register.
     #[inline(always)]
     pub fn get_instruction_pointer(&self) -> u32 {
-        *self
-            .registers
-            .get_register_u32(RegisterId::EIP)
-            .read_unchecked()
+        self.read_reg_u32_unchecked(&RegisterId::EIP)
     }
 
     /// Get the current privilege level of the processor.
@@ -206,10 +200,7 @@ impl Cpu {
     /// The next [`Instruction`] to be executed.
     fn fetch_decode_next_instruction(&mut self, com_bus: &CommunicationBus) -> Instruction {
         // Get the current instruction pointer.
-        let ip = *self
-            .registers
-            .get_register_u32(RegisterId::EIP)
-            .read_unchecked() as usize;
+        let ip = self.read_reg_u32_unchecked(&RegisterId::EIP) as usize;
 
         com_bus.mem.get_instruction(ip)
     }
@@ -231,8 +222,8 @@ impl Cpu {
         let is_masked = (self.read_reg_u32_unchecked(&RegisterId::EIM) & (int_type as u32)) == 0;
 
         // Should we handle this interrupt?
-        // We will always handle a NMI, regardless of whether the CPU's interrupt enabled
-        // flag is set, or whether that interrupt is masked. NMI's can't be ignored.
+        // We will always handle a NMI, regardless of whether that interrupt is masked.
+        // NMI's can't be masked, thus their name.
         if !NMI_INTERRUPTS.contains(&int_type) && is_masked {
             return;
         }
@@ -863,7 +854,11 @@ impl Cpu {
     ///
     /// * `com_bus` - A mutable reference to the [`CommunicationBus`] for the virtual machine.
     /// * `instructions` - A slice of [`Instruction`] instances to be executed.
-    pub fn run_instructions(&mut self, com_bus: &mut CommunicationBus, instructions: &[Instruction]) {
+    pub fn run_instructions(
+        &mut self,
+        com_bus: &mut CommunicationBus,
+        instructions: &[Instruction],
+    ) {
         for ins in instructions {
             self.run_instruction(com_bus, ins);
 

@@ -3,6 +3,7 @@ use crate::mem::memory_handler::MemoryHandler;
 pub struct CommunicationBus {
     /// The [`MemoryHandler`] instance to be connected to this bus.
     pub mem: MemoryHandler,
+    // TODO - add the components here.
 }
 
 impl CommunicationBus {
@@ -11,15 +12,7 @@ impl CommunicationBus {
     /// # Arguments
     ///
     /// * `mem` - The [`MemoryHandler`] instance to be connected to this bus.
-    pub fn new(
-        mem: MemoryHandler,
-    ) -> Self {
-        Self {
-            mem,
-        }
-    }
-
-    pub fn read_u32() {
-        println!("here");
+    pub fn new(mem: MemoryHandler) -> Self {
+        Self { mem }
     }
 }

@@ -1,9 +1,10 @@
 use crate::{
     boot_rom::{BootRom, BOOT_MEMORY_LENGTH, BOOT_MEMORY_START, BOOT_REGION_NAME},
+    com_bus::communication_bus::CommunicationBus,
     cpu::Cpu,
     ins::instruction::Instruction,
     mem::memory_handler::{MemoryHandler, MEGABYTE},
-    reg::registers::Registers, communication_bus::CommunicationBus,
+    reg::registers::Registers,
 };
 
 /// The smallest permitted size of the user memory segment.
@@ -41,7 +42,12 @@ impl VirtualMachine {
         // the interrupt vector table (IVT).
         // This is comprised of 256 entries of 4 bytes, each representing a potential
         // address for the interrupt handler.
-        let mem = MemoryHandler::new(user_segment_size, code_segment_bytes, data_segment_bytes, stack_segment_size);
+        let mem = MemoryHandler::new(
+            user_segment_size,
+            code_segment_bytes,
+            data_segment_bytes,
+            stack_segment_size,
+        );
 
         // Construct out virtual machine.
         let mut vm = Self {
@@ -76,7 +82,8 @@ impl VirtualMachine {
         );
 
         // Load the contents of the boot into the newly created memory segment.
-        self.com_bus.mem
+        self.com_bus
+            .mem
             .get_mapped_segment_by_index_mut(boot_mem_id)
             .expect("failed to get memory segment")
             .set_contents(&boot_rom);
