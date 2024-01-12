@@ -10,8 +10,14 @@ use super::mapped_memory::MappedMemory;
 
 /// The number of bytes in a megabyte.
 pub const MEGABYTE: usize = 1024 * 1024;
+
+/// The size of an instruction, in bytes.
+pub const BYTES_IN_INSTRUCTION: usize = 4;
 /// The size of a u32 value, in bytes.
 pub const BYTES_IN_U32: usize = 4;
+/// The size of a f32 value, in bytes.
+pub const BYTES_IN_F32: usize = 4;
+
 /// The maximum permissible size of the system RAM segment.
 pub const MAX_PHYSICAL_MEMORY: usize = MEGABYTE * 256;
 /// The name of the RAM segment.
@@ -198,27 +204,27 @@ impl MemoryHandler {
     #[inline(always)]
     pub fn can_pop_f32(&self) -> bool {
         self.stack_pointer >= self.stack_segment_start
-            && self.stack_pointer + 4 <= self.stack_segment_end
+            && self.stack_pointer + BYTES_IN_F32 <= self.stack_segment_end
     }
 
     /// Can we pop a u32 value from the stack?
     #[inline(always)]
     pub fn can_pop_u32(&self) -> bool {
         self.stack_pointer >= self.stack_segment_start
-            && self.stack_pointer + 4 <= self.stack_segment_end
+            && self.stack_pointer + BYTES_IN_U32 <= self.stack_segment_end
     }
 
     /// Can we push a f32 value onto the stack?
     #[inline(always)]
     pub fn can_push_f32(&self) -> bool {
-        self.stack_pointer - 4 >= self.stack_segment_start
+        self.stack_pointer - BYTES_IN_F32 >= self.stack_segment_start
             && self.stack_pointer <= self.stack_segment_end
     }
 
     /// Can we push a u32 value onto the stack?
     #[inline(always)]
     pub fn can_push_u32(&self) -> bool {
-        self.stack_pointer - 4 >= self.stack_segment_start
+        self.stack_pointer - BYTES_IN_U32 >= self.stack_segment_start
             && self.stack_pointer <= self.stack_segment_end
     }
 
@@ -323,7 +329,7 @@ impl MemoryHandler {
 
         // We will assert here if we can't read enough bytes to meet the expected amount.
         // This means that subsequent "unsafe" reads are actually safe.
-        let arg_bytes = self.get_range_ptr(pos + 4, arg_len);
+        let arg_bytes = self.get_range_ptr(pos + BYTES_IN_INSTRUCTION, arg_len);
 
         let mut cursor = 0;
 
@@ -591,6 +597,11 @@ impl MemoryHandler {
 
                 Instruction::PushU32Imm(imm)
             }
+            PushU32Reg => {
+                let reg = Self::read_register_id(arg_bytes, &mut cursor);
+
+                Instruction::PushU32Reg(reg)
+            }
             PopU32ImmU32Reg => {
                 let out_reg = Self::read_register_id(arg_bytes, &mut cursor);
 
@@ -700,15 +711,15 @@ impl MemoryHandler {
             Halt => Instruction::Halt,
 
             /******** [Reserved Instructions] ********/
-            OpCode::Reserved1 => Instruction::Reserved1,
-            OpCode::Reserved2 => Instruction::Reserved2,
-            OpCode::Reserved3 => Instruction::Reserved3,
-            OpCode::Reserved4 => Instruction::Reserved4,
-            OpCode::Reserved5 => Instruction::Reserved5,
-            OpCode::Reserved6 => Instruction::Reserved6,
-            OpCode::Reserved7 => Instruction::Reserved7,
-            OpCode::Reserved8 => Instruction::Reserved8,
-            OpCode::Reserved9 => Instruction::Reserved9,
+            Reserved1 => Instruction::Reserved1,
+            Reserved2 => Instruction::Reserved2,
+            Reserved3 => Instruction::Reserved3,
+            Reserved4 => Instruction::Reserved4,
+            Reserved5 => Instruction::Reserved5,
+            Reserved6 => Instruction::Reserved6,
+            Reserved7 => Instruction::Reserved7,
+            Reserved8 => Instruction::Reserved8,
+            Reserved9 => Instruction::Reserved9,
 
             /******** [Pseudo Instructions] ********/
             Label | Unknown => Instruction::Unknown(opcode_id),
@@ -1002,18 +1013,18 @@ impl MemoryHandler {
         self.pop_type_hint();
 
         // Update the stack pointer.
-        self.stack_pointer = value_start_pos + 4;
+        self.stack_pointer = value_start_pos + BYTES_IN_F32;
 
         // Update the frame size indicator.
         // A little hackery to ensure we don't assert in debug builds in
         // instances where the stack size is zero, something that can occur during a subroutine call.
         #[cfg(debug_assertions)]
         {
-            self.stack_frame_size = self.stack_frame_size.wrapping_sub(4);
+            self.stack_frame_size = self.stack_frame_size.wrapping_sub(BYTES_IN_F32 as u32);
         }
         #[cfg(not(debug_assertions))]
         {
-            self.stack_frame_size -= 4;
+            self.stack_frame_size -= BYTES_IN_F32 as u32;
         }
 
         result
@@ -1070,18 +1081,18 @@ impl MemoryHandler {
         self.pop_type_hint();
 
         // Update the stack pointer.
-        self.stack_pointer = value_start_pos + 4;
+        self.stack_pointer = value_start_pos + BYTES_IN_U32;
 
         // Update the frame size indicator.
         // A little hackery to ensure we don't assert in debug builds in
         // instances where the stack size is zero, something that can occur during a subroutine call.
         #[cfg(debug_assertions)]
         {
-            self.stack_frame_size = self.stack_frame_size.wrapping_sub(4);
+            self.stack_frame_size = self.stack_frame_size.wrapping_sub(BYTES_IN_U32 as u32);
         }
         #[cfg(not(debug_assertions))]
         {
-            self.stack_frame_size -= 4;
+            self.stack_frame_size -= BYTES_IN_U32 as u32;
         }
 
         result
@@ -1105,7 +1116,7 @@ impl MemoryHandler {
             "insufficient space on the stack to push a onto f32 value"
         );
 
-        let value_start_pos = self.stack_pointer - 4;
+        let value_start_pos = self.stack_pointer - BYTES_IN_F32;
 
         // Push the value to the stack.
         self.set_f32(value_start_pos, value);
@@ -1115,7 +1126,7 @@ impl MemoryHandler {
         self.stack_pointer = value_start_pos;
 
         // Update the frame size indicator.
-        self.stack_frame_size += 4;
+        self.stack_frame_size += BYTES_IN_F32 as u32;
     }
 
     /// Attempt to push a [`StackTypeHint`] onto the stack hint list.
@@ -1153,7 +1164,7 @@ impl MemoryHandler {
             "insufficient space on the stack to push a onto u32 value"
         );
 
-        let value_start_pos = self.stack_pointer - 4;
+        let value_start_pos = self.stack_pointer - BYTES_IN_U32;
 
         // Push the value to the stack.
         self.set_u32(value_start_pos, value);
@@ -1163,7 +1174,7 @@ impl MemoryHandler {
         self.stack_pointer = value_start_pos;
 
         // Update the frame size indicator.
-        self.stack_frame_size += 4;
+        self.stack_frame_size += BYTES_IN_U32 as u32;
     }
 
     /// Attempt to read a [`RegisterId`] from a memory slice.
@@ -1198,7 +1209,7 @@ impl MemoryHandler {
             ])
         };
 
-        *cursor += 4;
+        *cursor += BYTES_IN_F32;
 
         value
     }
@@ -1224,7 +1235,7 @@ impl MemoryHandler {
             ])
         };
 
-        *cursor += 4;
+        *cursor += BYTES_IN_U32;
 
         value
     }
@@ -1351,11 +1362,11 @@ impl MemoryHandler {
             for (id, hint) in self.debug_stack_type_hints.iter().enumerate() {
                 match *hint {
                     StackArgType::F32 => {
-                        let value = self.get_f32(current_pos - 4);
+                        let value = self.get_f32(current_pos - BYTES_IN_F32);
                         table.add_row(row![id, format!("{value}"), "f32"]);
                     }
                     StackArgType::U32 => {
-                        let value = self.get_u32(current_pos - 4);
+                        let value = self.get_u32(current_pos - BYTES_IN_U32);
                         table.add_row(row![id, format!("{value}"), "u32"]);
                     }
                 }

@@ -134,6 +134,7 @@ impl Compiler {
             | Instruction::IncU32Reg(reg)
             | Instruction::DecU32Reg(reg)
             | Instruction::JumpAbsU32Reg(reg)
+            | Instruction::PushU32Reg(reg)
             | Instruction::PopU32ImmU32Reg(reg)
             | Instruction::CallU32Reg(reg) => {
                 self.write_register_id(&reg);
@@ -319,6 +320,7 @@ mod tests_compiler {
                     Instruction::ZeroHighBitsByIndexU32RegU32Imm(0x123, ER2, ER3)
                 }
                 OpCode::PushU32Imm => Instruction::PushU32Imm(0x123),
+                OpCode::PushU32Reg => Instruction::PushU32Reg(ER2),
                 OpCode::PopU32ImmU32Reg => Instruction::PopU32ImmU32Reg(ER2),
                 OpCode::BitTestU32Reg => Instruction::BitTestU32Reg(0x40, ER2),
                 OpCode::BitTestU32Mem => Instruction::BitTestU32Mem(0x40, 0x123),

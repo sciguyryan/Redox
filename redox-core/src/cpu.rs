@@ -6,7 +6,7 @@ use crate::{
         instruction::Instruction,
         move_expressions::{ExpressionArgs, MoveExpressionHandler},
     },
-    mem::memory_handler::{MemoryHandler, StackArgType},
+    mem::memory_handler::{MemoryHandler, StackArgType, BYTES_IN_U32},
     privilege_level::PrivilegeLevel,
     reg::registers::{RegisterId, Registers},
     utils,
@@ -77,6 +77,9 @@ const NOT_U32_LOW_BYTE_MASK: u32 = !U32_LOW_BYTE_MASK;
 
 /// The default interrupt vector table address.
 const IVT_ADDRESS: u32 = 0x0;
+
+/// The size of a u32 value, in bytes.
+const SIZE_OF_U32: u32 = BYTES_IN_U32 as u32;
 
 pub struct Cpu {
     /// The registers associated with this CPU.
@@ -1187,7 +1190,17 @@ impl Cpu {
                 // Update the stack pointer register.
                 self.registers
                     .get_register_u32_mut(RegisterId::ESP)
-                    .subtract_unchecked(4);
+                    .subtract_unchecked(SIZE_OF_U32);
+            }
+            PushU32Reg(reg) => {
+                // push %reg
+                let value = self.read_reg_u32(reg, privilege);
+                mem.push_u32(value);
+
+                // Update the stack pointer register.
+                self.registers
+                    .get_register_u32_mut(RegisterId::ESP)
+                    .subtract_unchecked(SIZE_OF_U32);
             }
             PopU32ImmU32Reg(out_reg) => {
                 // pop %out_reg
@@ -6178,6 +6191,49 @@ mod tests_cpu {
         TestsU32::new(&tests).run_all();
     }
 
+    /// Test the push u32 register instruction.
+    #[test]
+    fn test_push_u32_reg_multiple() {
+        let tests = [TestU32::new(
+            &[
+                MovU32ImmU32Reg(0x123, RegisterId::ER1),
+                MovU32ImmU32Reg(0x321, RegisterId::ER2),
+                PushU32Reg(RegisterId::ER1),
+                PushU32Reg(RegisterId::ER2),
+            ],
+            &[],
+            DEFAULT_U32_STACK_CAPACITY,
+            false,
+            "PUSH - failed to execute PUSH instruction",
+        )];
+
+        TestsU32::new(&tests).run_all_special(|_id: usize, vm: Option<VirtualMachine>| {
+            let mut vm = vm.expect("failed to correctly execute test code");
+            assert_eq!(vm.mem.pop_u32(), 0x321);
+            assert_eq!(vm.mem.pop_u32(), 0x123);
+        });
+    }
+
+    /// Test the push u32 register instruction.
+    #[test]
+    fn test_push_u32_reg_single() {
+        let tests = [TestU32::new(
+            &[
+                MovU32ImmU32Reg(0x123, RegisterId::ER1),
+                PushU32Reg(RegisterId::ER1),
+            ],
+            &[],
+            DEFAULT_U32_STACK_CAPACITY,
+            false,
+            "PUSH - failed to execute PUSH instruction",
+        )];
+
+        TestsU32::new(&tests).run_all_special(|_id: usize, vm: Option<VirtualMachine>| {
+            let mut vm = vm.expect("failed to correctly execute test code");
+            assert_eq!(vm.mem.pop_u32(), 0x123);
+        });
+    }
+
     /// Test the push u32 immediate instruction.
     #[test]
     fn test_push_u32_imm_multiple() {
@@ -6213,16 +6269,16 @@ mod tests_cpu {
         });
     }
 
-    /// Test the push u32 immediate instruction.
+    /// Test the pop u32 immediate instruction.
     #[test]
     #[should_panic]
-    fn test_push_u32_imm_invalid_pop() {
+    fn test_pop_u32_imm_invalid_pop() {
         let tests = [TestU32::new(
             &[Nop],
             &[],
             DEFAULT_U32_STACK_CAPACITY,
             false,
-            "PUSH - failed to execute PUSH instruction",
+            "POP - failed to execute POP instruction",
         )];
 
         TestsU32::new(&tests).run_all_special(|_id: usize, vm: Option<VirtualMachine>| {
