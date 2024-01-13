@@ -1897,21 +1897,23 @@ mod tests_cpu {
             Int(0),
         ];
 
-        let mut compiler = Compiler::new();
-        let data = compiler.compile(instructions);
-
-        let mut vm = VirtualMachine::new(
-            vm::MIN_USER_SEGMENT_SIZE,
-            data,
+        let tests = [TestU32::new(
+            instructions,
             &[],
-            20 * mem::memory_handler::SIZE_OF_U32,
-        );
+            DEFAULT_U32_STACK_CAPACITY,
+            false,
+            "LIVT - failed to successfully execute LIVT instruction",
+        )];
 
-        vm.run();
-
-        // The CPU should still be within an interrupt handler.
-        assert!(vm.cpu.is_in_interrupt_handler);
-        assert_eq!(vm.cpu.last_interrupt_code, Some(DIVIDE_BY_ZERO_INT));
+        TestsU32::new(&tests).run_all_special(|id, vm| {
+            if let Some(v) = vm {
+                // The CPU should still be within an interrupt handler.
+                assert!(v.cpu.is_in_interrupt_handler);
+                assert_eq!(v.cpu.last_interrupt_code, Some(DIVIDE_BY_ZERO_INT));
+            } else {
+                panic!("failed to correctly execute test id {id}");
+            }
+        });
     }
 
     /// Test whether a non-masked interrupt executes correctly.
@@ -1932,35 +1934,37 @@ mod tests_cpu {
             Instruction::IntRet,
         ];
 
-        let mut compiler = Compiler::new();
-        let data = compiler.compile(instructions);
-
-        let mut vm = VirtualMachine::new(
-            vm::MIN_USER_SEGMENT_SIZE,
-            data,
+        let tests = [TestU32::new(
+            instructions,
             &[],
-            20 * mem::memory_handler::SIZE_OF_U32,
-        );
+            DEFAULT_U32_STACK_CAPACITY,
+            false,
+            "INT - failed to successfully execute INT instruction",
+        )];
 
-        vm.run();
+        TestsU32::new(&tests).run_all_special(|id, vm| {
+            if let Some(v) = vm {
+                // The interrupt handler should not be executed and so the value of 5 should be added
+                // to the value of the register ER1 (which is zero). Therefore, 5 should be moved to
+                // accumulator register.
+                assert_eq!(
+                    *v.cpu
+                        .registers
+                        .get_register_u32(RegisterId::EAC)
+                        .read_unchecked(),
+                    0x5
+                );
 
-        // The interrupt handler should not be executed and so the value of 5 should be added
-        // to the value of the register ER1 (which is zero). Therefore, 5 should be moved to
-        // accumulator register.
-        assert_eq!(
-            *vm.cpu
-                .registers
-                .get_register_u32(RegisterId::EAC)
-                .read_unchecked(),
-            0x5
-        );
+                // The CPU should not still be within an interrupt handler.
+                assert!(!v.cpu.is_in_interrupt_handler);
 
-        // The CPU should not still be within an interrupt handler.
-        assert!(!vm.cpu.is_in_interrupt_handler);
-
-        // There should be no indication of the last interrupt handler, since it
-        // should have completed.
-        assert_eq!(vm.cpu.last_interrupt_code, None);
+                // There should be no indication of the last interrupt handler, since it
+                // should have completed.
+                assert_eq!(v.cpu.last_interrupt_code, None);
+            } else {
+                panic!("failed to correctly execute test id {id}");
+            }
+        });
     }
 
     /// Test whether a non-masked interrupt executes correctly.
@@ -1983,35 +1987,37 @@ mod tests_cpu {
             Instruction::IntRet,
         ];
 
-        let mut compiler = Compiler::new();
-        let data = compiler.compile(instructions);
-
-        let mut vm = VirtualMachine::new(
-            vm::MIN_USER_SEGMENT_SIZE,
-            data,
+        let tests = [TestU32::new(
+            instructions,
             &[],
-            20 * mem::memory_handler::SIZE_OF_U32,
-        );
+            DEFAULT_U32_STACK_CAPACITY,
+            false,
+            "INT - failed to successfully execute INT instruction",
+        )];
 
-        vm.run();
+        TestsU32::new(&tests).run_all_special(|id, vm| {
+            if let Some(v) = vm {
+                // The interrupt handler should not be executed and so the value of 5 should be added
+                // to the value of the register ER1 (which is zero). Therefore, 5 should be moved to
+                // accumulator register.
+                assert_eq!(
+                    *v.cpu
+                        .registers
+                        .get_register_u32(RegisterId::EAC)
+                        .read_unchecked(),
+                    0x69
+                );
 
-        // The interrupt handler should not be executed and so the value of 5 should be added
-        // to the value of the register ER1 (which is zero). Therefore, 5 should be moved to
-        // accumulator register.
-        assert_eq!(
-            *vm.cpu
-                .registers
-                .get_register_u32(RegisterId::EAC)
-                .read_unchecked(),
-            0x69
-        );
+                // The CPU should not still be within an interrupt handler.
+                assert!(!v.cpu.is_in_interrupt_handler);
 
-        // The CPU should not still be within an interrupt handler.
-        assert!(!vm.cpu.is_in_interrupt_handler);
-
-        // There should be no indication of the last interrupt handler, since it
-        // should have completed.
-        assert_eq!(vm.cpu.last_interrupt_code, None);
+                // There should be no indication of the last interrupt handler, since it
+                // should have completed.
+                assert_eq!(v.cpu.last_interrupt_code, None);
+            } else {
+                panic!("failed to correctly execute test id {id}");
+            }
+        });
     }
 
     /// Test whether a masking an interrupt ensures it doesn't execute.
@@ -2031,34 +2037,36 @@ mod tests_cpu {
             Instruction::IntRet,
         ];
 
-        let mut compiler = Compiler::new();
-        let data = compiler.compile(instructions);
-
-        let mut vm = VirtualMachine::new(
-            vm::MIN_USER_SEGMENT_SIZE,
-            data,
+        let tests = [TestU32::new(
+            instructions,
             &[],
-            20 * mem::memory_handler::SIZE_OF_U32,
-        );
+            DEFAULT_U32_STACK_CAPACITY,
+            false,
+            "INT - failed to successfully execute INT instruction",
+        )];
 
-        vm.run();
+        TestsU32::new(&tests).run_all_special(|id, vm| {
+            if let Some(v) = vm {
+                // The interrupt handler should set the value of the ER1 register to 0x64.
+                // After returning, 0x5 should be added to the value of ER1, the result moved to the accumulator.
+                assert_eq!(
+                    *v.cpu
+                        .registers
+                        .get_register_u32(RegisterId::EAC)
+                        .read_unchecked(),
+                    0x5
+                );
 
-        // The interrupt handler should set the value of the ER1 register to 0x64.
-        // After returning, 0x5 should be added to the value of ER1, the result moved to the accumulator.
-        assert_eq!(
-            *vm.cpu
-                .registers
-                .get_register_u32(RegisterId::EAC)
-                .read_unchecked(),
-            0x5
-        );
+                // The CPU should not still be within an interrupt handler.
+                assert!(!v.cpu.is_in_interrupt_handler);
 
-        // The CPU should not still be within an interrupt handler.
-        assert!(!vm.cpu.is_in_interrupt_handler);
-
-        // There should be no indication of the last interrupt handler, since it
-        // should have completed.
-        assert_eq!(vm.cpu.last_interrupt_code, None);
+                // There should be no indication of the last interrupt handler, since it
+                // should have completed.
+                assert_eq!(v.cpu.last_interrupt_code, None);
+            } else {
+                panic!("failed to correctly execute test id {id}");
+            }
+        });
     }
 
     /// Test the call and return instructions by register pointer instruction.
@@ -2080,33 +2088,35 @@ mod tests_cpu {
             Instruction::RetArgsU32,    // Starts at [base + 64]. Length = 4.
         ];
 
-        let mut compiler = Compiler::new();
-        let data = compiler.compile(instructions);
-
-        let mut vm = VirtualMachine::new(
-            vm::MIN_USER_SEGMENT_SIZE,
-            data,
+        let tests = [TestU32::new(
+            instructions,
             &[],
-            30 * mem::memory_handler::SIZE_OF_U32,
-        );
+            DEFAULT_U32_STACK_CAPACITY,
+            false,
+            "CALL - failed to successfully execute CALL instruction",
+        )];
 
-        vm.run();
+        TestsU32::new(&tests).run_all_special(|id, vm| {
+            if let Some(mut v) = vm {
+                // The subroutine should set the value of the ER1 register to 5.
+                // After returning, 100 should be added to the value of ER1, the result moved to the accumulator.
+                assert_eq!(
+                    *v.cpu
+                        .registers
+                        .get_register_u32(RegisterId::EAC)
+                        .read_unchecked(),
+                    105
+                );
 
-        // The subroutine should set the value of the ER1 register to 5.
-        // After returning, 100 should be added to the value of ER1, the result moved to the accumulator.
-        assert_eq!(
-            *vm.cpu
-                .registers
-                .get_register_u32(RegisterId::EAC)
-                .read_unchecked(),
-            105
-        );
+                // There should be one entry on the stack.
+                assert_eq!(v.com_bus.mem.pop_u32(), 3);
 
-        // There should be one entry on the stack.
-        assert_eq!(vm.com_bus.mem.pop_u32(), 3);
-
-        // The stack should now be empty.
-        assert_eq!(vm.com_bus.mem.stack_frame_size, 0);
+                // The stack should now be empty.
+                assert_eq!(v.com_bus.mem.stack_frame_size, 0);
+            } else {
+                panic!("failed to correctly execute test id {id}");
+            }
+        });
     }
 
     /// Test the call and return instructions, simple non-nested test.
@@ -2153,22 +2163,24 @@ mod tests_cpu {
             Instruction::RetArgsU32,
         ];
 
-        let mut compiler = Compiler::new();
-        let data = compiler.compile(instructions);
-
-        let mut vm = VirtualMachine::new(
-            vm::MIN_USER_SEGMENT_SIZE,
-            data,
+        let tests = [TestU32::new(
+            instructions,
             &[],
-            30 * mem::memory_handler::SIZE_OF_U32,
-        );
+            DEFAULT_U32_STACK_CAPACITY,
+            false,
+            "CALL - failed to successfully execute CALl instruction",
+        )];
 
-        vm.run();
-
-        // Check the registers were correctly set and restored.
-        for (id, value) in test_registers {
-            assert_eq!(vm.cpu.read_reg_u32_unchecked(&id), value);
-        }
+        TestsU32::new(&tests).run_all_special(|id, vm| {
+            if let Some(v) = vm {
+                // Check the registers were correctly set and restored.
+                for (id, value) in test_registers {
+                    assert_eq!(v.cpu.read_reg_u32_unchecked(&id), value);
+                }
+            } else {
+                panic!("failed to correctly execute test id {id}");
+            }
+        });
     }
 
     /// Test the call and return instructions, nested test.
@@ -2193,34 +2205,36 @@ mod tests_cpu {
             Instruction::RetArgsU32,
         ];
 
-        let mut compiler = Compiler::new();
-        let data = compiler.compile(instructions);
-
-        let mut vm = VirtualMachine::new(
-            vm::MIN_USER_SEGMENT_SIZE,
-            data,
+        let tests = [TestU32::new(
+            instructions,
             &[],
-            30 * mem::memory_handler::SIZE_OF_U32,
-        );
+            DEFAULT_U32_STACK_CAPACITY,
+            false,
+            "CALL - failed to successfully execute CALl instruction",
+        )];
 
-        vm.run();
+        TestsU32::new(&tests).run_all_special(|id, vm| {
+            if let Some(mut v) = vm {
+                // The first subroutine should set the value of the EAC register to 100.
+                // The second subroutine should add 5 to the value of EAC and set the accumulator
+                // to the resulting value.
+                assert_eq!(
+                    *v.cpu
+                        .registers
+                        .get_register_u32(RegisterId::EAC)
+                        .read_unchecked(),
+                    105
+                );
 
-        // The first subroutine should set the value of the EAC register to 100.
-        // The second subroutine should add 5 to the value of EAC and set the accumulator
-        // to the resulting value.
-        assert_eq!(
-            *vm.cpu
-                .registers
-                .get_register_u32(RegisterId::EAC)
-                .read_unchecked(),
-            105
-        );
+                // There should be one entry on the stack.
+                assert_eq!(v.com_bus.mem.pop_u32(), 3);
 
-        // There should be one entry on the stack.
-        assert_eq!(vm.com_bus.mem.pop_u32(), 3);
-
-        // The stack should now be empty.
-        assert_eq!(vm.com_bus.mem.stack_frame_size, 0);
+                // The stack should now be empty.
+                assert_eq!(v.com_bus.mem.stack_frame_size, 0);
+            } else {
+                panic!("failed to correctly execute test id {id}");
+            }
+        });
     }
 
     /// Test the parity checking.
