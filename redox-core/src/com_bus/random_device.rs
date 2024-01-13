@@ -10,9 +10,6 @@ use super::{
     device_error::{DeviceError, DeviceResult},
 };
 
-/// The ID of this device.
-pub const DEVICE_ID: usize = 0x1;
-
 thread_local! {
     static PRNG: RefCell<StdRng> = RefCell::new(StdRng::from_entropy());
     static OSRNG: RefCell<OsRng> = RefCell::new(OsRng);
@@ -86,7 +83,9 @@ impl ComBusIO for RandomDevice {
         Ok(value)
     }
 
-    fn write_u8(&mut self, value: u8) -> bool {
+    fn write_u8(&mut self, value: u8) -> DeviceResult<()> {
+        let mut result = DeviceResult::Ok(());
+
         // The instruction indicating the type of random number generator to be used.
         match value {
             0 => {
@@ -94,34 +93,38 @@ impl ComBusIO for RandomDevice {
                 PRNG.with(|r| *r.borrow_mut() = StdRng::from_entropy());
                 self.mode = RandomMode::Standard;
                 self.is_initialized = true;
-                true
             }
             1 => {
                 // Seeded random mode - the seed must be set via sending a u32 command after this one.
                 self.mode = RandomMode::Seeded;
                 self.is_initialized = false;
-                true
             }
             2 => {
                 // Cryptographic random mode - a cryptographically secure random number generator.
                 self.mode = RandomMode::Crypto;
                 self.is_initialized = true;
-                true
             }
-            _ => false,
+            _ => {
+                result = DeviceResult::Err(DeviceError::OperationNotSupported);
+            }
         }
+
+        result
     }
 
-    fn write_u32(&mut self, value: u32) -> bool {
+    fn write_u32(&mut self, value: u32) -> DeviceResult<()> {
+        let mut result = DeviceResult::Ok(());
+
         if self.mode == RandomMode::Seeded {
             PRNG.with(|r| *r.borrow_mut() = StdRng::seed_from_u64(value as u64));
-            true
         } else {
-            false
+            result = DeviceResult::Err(DeviceError::OperationNotSupported);
         }
+
+        result
     }
 
-    fn write_f32(&mut self, _value: f32) -> bool {
-        false
+    fn write_f32(&mut self, _value: f32) -> DeviceResult<()> {
+        DeviceResult::Err(DeviceError::OperationNotSupported)
     }
 }

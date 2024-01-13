@@ -125,6 +125,8 @@ pub enum Instruction {
     PushU32Reg(RegisterId),
     /// Pop a u32 value from the stack to a u32 register.
     PopU32ImmU32Reg(RegisterId),
+    /// Output a u32 value to a specific port.
+    OutU32Imm(u32, u8),
 
     /******** [Logic Instructions] ********/
     /// Test the state of a bit from a u32 register. The CF flag will be set to the state of the bit.
@@ -353,6 +355,9 @@ impl Display for Instruction {
             PopU32ImmU32Reg(out_reg) => {
                 format!("pop %{out_reg}")
             }
+            OutU32Imm(value, device_id) => {
+                format!("out ${value:08x}, ${device_id:02x}")
+            }
 
             /******** [Logic Instructions] ********/
             BitTestU32Reg(bit, reg) => {
@@ -506,6 +511,7 @@ impl Instruction {
             PushU32Imm => ARG_U32_IMM_SIZE,
             PushU32Reg => ARG_REG_ID_SIZE,
             PopU32ImmU32Reg => ARG_REG_ID_SIZE,
+            OutU32Imm => ARG_U32_IMM_SIZE + ARG_U8_IMM_SIZE,
 
             /******** [Logic Instructions] ********/
             BitTestU32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,

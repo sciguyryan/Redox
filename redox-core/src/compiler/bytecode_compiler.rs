@@ -162,6 +162,12 @@ impl Compiler {
                 self.write_u8(imm);
             }
 
+            /******** [u32 immediate and u8 immediate] ********/
+            Instruction::OutU32Imm(imm1, imm2) => {
+                self.write_u32(imm1);
+                self.write_u8(imm2);
+            }
+
             /******** [No Arguments] ********/
             Instruction::Nop
             | Instruction::IntRet
@@ -311,6 +317,7 @@ mod tests_compiler {
                 PushU32Imm => Instruction::PushU32Imm(0x123),
                 PushU32Reg => Instruction::PushU32Reg(ER2),
                 PopU32ImmU32Reg => Instruction::PopU32ImmU32Reg(ER2),
+                OutU32Imm => Instruction::OutU32Imm(0xdeadbeef, 0x1),
                 BitTestU32Reg => Instruction::BitTestU32Reg(0x40, ER2),
                 BitTestU32Mem => Instruction::BitTestU32Mem(0x40, 0x123),
                 BitTestResetU32Reg => Instruction::BitTestResetU32Reg(0x40, ER2),

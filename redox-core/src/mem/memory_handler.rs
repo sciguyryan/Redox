@@ -607,6 +607,12 @@ impl MemoryHandler {
 
                 Instruction::PopU32ImmU32Reg(out_reg)
             }
+            OutU32Imm => {
+                let value = Self::read_u32(arg_bytes, &mut cursor);
+                let target = Self::read_u8(arg_bytes, &mut cursor);
+
+                Instruction::OutU32Imm(value, target)
+            }
 
             /******** [Logic Instructions] ********/
             BitTestU32Reg => {

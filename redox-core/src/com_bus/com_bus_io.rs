@@ -9,9 +9,9 @@ pub trait ComBusIO {
     fn read_f32(&self) -> DeviceResult<f32>;
 
     /// Write a u8 value to the device.
-    fn write_u8(&mut self, value: u8) -> bool;
+    fn write_u8(&mut self, value: u8) -> DeviceResult<()>;
     /// Write a u32 value to the device.
-    fn write_u32(&mut self, value: u32) -> bool;
+    fn write_u32(&mut self, value: u32) -> DeviceResult<()>;
     /// Write a f32 value to the device.
-    fn write_f32(&mut self, value: f32) -> bool;
+    fn write_f32(&mut self, value: f32) -> DeviceResult<()>;
 }

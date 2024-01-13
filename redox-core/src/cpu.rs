@@ -1197,6 +1197,12 @@ impl Cpu {
                     .get_register_u32_mut(*out_reg)
                     .write(mem.pop_u32(), privilege);
             }
+            OutU32Imm(value, device) => {
+                // out $deadbeef, $0
+                if com_bus.write_u32(*value, *device).is_err() {
+                    todo!();
+                }
+            }
 
             /******** [Logic Instructions] ********/
             BitTestU32Reg(bit, reg) => {
