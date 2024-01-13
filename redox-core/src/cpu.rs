@@ -1210,6 +1210,13 @@ impl Cpu {
                     self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
                 }
             }
+            OutU32Reg(reg, port) => {
+                // out %reg, $0
+                let value = self.read_reg_u32(reg, privilege);
+                if com_bus.write_u32(value, *port).is_err() {
+                    self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
+                }
+            }
             OutU8Imm(value, port) => {
                 // out $ff, $0
                 if com_bus.write_u8(*value, *port).is_err() {
@@ -1822,9 +1829,16 @@ mod tests_cpu {
 
     /// Test writing to a valid port with a valid data types.
     #[test]
-    fn test_writing_to_port_valid_data_types() {
+    fn test_writing_port_valid_data_types() {
         let tests = [TestU32::new(
             &[OutU8Imm(0x0, 0x0), OutU32Imm(0x0, 0x0)],
+            &[],
+            DEFAULT_U32_STACK_CAPACITY,
+            false,
+            "OUT - failed to successfully execute OUT instruction with a valid port and data type",
+        ),
+        TestU32::new(
+            &[OutU32Reg(RegisterId::ER1, 0x0)],
             &[],
             DEFAULT_U32_STACK_CAPACITY,
             false,

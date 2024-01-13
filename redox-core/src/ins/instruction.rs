@@ -131,6 +131,8 @@ pub enum Instruction {
     OutF32Imm(f32, u8),
     /// Output a u32 immediate value to a specific port.
     OutU32Imm(u32, u8),
+    // Output a u32 register value value to a specific port.
+    OutU32Reg(RegisterId, u8),
     /// Output a u8 immediate value to a specific port.
     OutU8Imm(u8, u8),
 
@@ -374,6 +376,9 @@ impl Display for Instruction {
             OutU32Imm(value, port) => {
                 format!("out ${value:08x}, ${port:02x}")
             }
+            OutU32Reg(reg, port) => {
+                format!("out %{reg}, ${port:02x}")
+            }
             OutU8Imm(value, port) => {
                 format!("out ${value:02x}, ${port:02x}")
             }
@@ -532,6 +537,7 @@ impl Instruction {
             PopU32ImmU32Reg => ARG_REG_ID_SIZE,
             OutF32Imm => ARG_F32_IMM_SIZE + ARG_U8_IMM_SIZE,
             OutU32Imm => ARG_U32_IMM_SIZE + ARG_U8_IMM_SIZE,
+            OutU32Reg => ARG_REG_ID_SIZE + ARG_U8_IMM_SIZE,
             OutU8Imm => ARG_U8_IMM_SIZE + ARG_U8_IMM_SIZE,
 
             /******** [Logic Instructions] ********/

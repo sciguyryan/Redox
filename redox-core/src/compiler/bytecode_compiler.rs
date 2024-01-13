@@ -179,6 +179,11 @@ impl Compiler {
                 self.write_u8(imm2);
             }
 
+            Instruction::OutU32Reg(reg, imm) => {
+                self.write_register_id(&reg);
+                self.write_u8(imm);
+            }
+
             /******** [No Arguments] ********/
             Instruction::Nop
             | Instruction::IntRet
@@ -339,6 +344,7 @@ mod tests_compiler {
                 PopU32ImmU32Reg => Instruction::PopU32ImmU32Reg(ER2),
                 OutF32Imm => Instruction::OutF32Imm(1.0, 0xab),
                 OutU32Imm => Instruction::OutU32Imm(0xdeadbeef, 0xab),
+                OutU32Reg => Instruction::OutU32Reg(ER2, 0xab),
                 OutU8Imm => Instruction::OutU8Imm(0xba, 0xab),
                 BitTestU32Reg => Instruction::BitTestU32Reg(0x40, ER2),
                 BitTestU32Mem => Instruction::BitTestU32Mem(0x40, 0x123),

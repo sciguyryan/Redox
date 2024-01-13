@@ -121,6 +121,8 @@ pub enum OpCode {
     OutF32Imm,
     /// Output a u32 immediate value to a specific port.
     OutU32Imm,
+    // Output a u32 register value value to a specific port.
+    OutU32Reg,
     /// Output a u8 immediate value to a specific port.
     OutU8Imm,
 
@@ -251,6 +253,7 @@ impl From<&Instruction> for OpCode {
             PopU32ImmU32Reg(_) => OpCode::PopU32ImmU32Reg,
             OutF32Imm(_, _) => OpCode::OutF32Imm,
             OutU32Imm(_, _) => OpCode::OutU32Imm,
+            OutU32Reg(_, _) => OpCode::OutU32Reg,
             OutU8Imm(_, _) => OpCode::OutU8Imm,
 
             /******** [Logic Instructions] ********/

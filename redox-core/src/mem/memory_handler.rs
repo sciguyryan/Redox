@@ -619,6 +619,12 @@ impl MemoryHandler {
 
                 Instruction::OutU32Imm(value, port)
             }
+            OutU32Reg => {
+                let reg = Self::read_register_id(arg_bytes, &mut cursor);
+                let port = Self::read_u8(arg_bytes, &mut cursor);
+
+                Instruction::OutU32Reg(reg, port)
+            }
             OutU8Imm => {
                 let value = Self::read_u8(arg_bytes, &mut cursor);
                 let port = Self::read_u8(arg_bytes, &mut cursor);
