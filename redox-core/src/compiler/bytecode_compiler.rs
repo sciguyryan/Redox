@@ -168,6 +168,17 @@ impl Compiler {
                 self.write_u8(imm2);
             }
 
+            /******** [u8 immediate and u8 immediate] ********/
+            Instruction::OutU8Imm(imm1, imm2) => {
+                self.write_u8(imm1);
+                self.write_u8(imm2)
+            }
+
+            Instruction::OutF32Imm(imm1, imm2) => {
+                self.write_f32(imm1);
+                self.write_u8(imm2);
+            }
+
             /******** [No Arguments] ********/
             Instruction::Nop
             | Instruction::IntRet
@@ -216,6 +227,15 @@ impl Compiler {
     /// * `reg_id` - The [`RegisterId`] to be written.
     fn write_register_id(&mut self, reg_id: &RegisterId) {
         self.bytes.push((*reg_id).into());
+    }
+
+    /// Write a f32 into the byte sequence.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The value to be written.
+    fn write_f32(&mut self, value: f32) {
+        self.bytes.extend_from_slice(&value.to_le_bytes());
     }
 
     /// Write a u32 into the byte sequence.
@@ -317,7 +337,9 @@ mod tests_compiler {
                 PushU32Imm => Instruction::PushU32Imm(0x123),
                 PushU32Reg => Instruction::PushU32Reg(ER2),
                 PopU32ImmU32Reg => Instruction::PopU32ImmU32Reg(ER2),
-                OutU32Imm => Instruction::OutU32Imm(0xdeadbeef, 0x1),
+                OutF32Imm => Instruction::OutF32Imm(1.0, 0xab),
+                OutU32Imm => Instruction::OutU32Imm(0xdeadbeef, 0xab),
+                OutU8Imm => Instruction::OutU8Imm(0xba, 0xab),
                 BitTestU32Reg => Instruction::BitTestU32Reg(0x40, ER2),
                 BitTestU32Mem => Instruction::BitTestU32Mem(0x40, 0x123),
                 BitTestResetU32Reg => Instruction::BitTestResetU32Reg(0x40, ER2),

@@ -1,6 +1,6 @@
 use crate::{
     compiler::bytecode_compiler::Compiler,
-    cpu::{DIVIDE_BY_ZERO_INT, NON_MASKABLE_INT},
+    cpu::{DEVICE_ERROR_INT, DIVIDE_BY_ZERO_INT, GENERAL_PROTECTION_FAULT_INT, NON_MASKABLE_INT},
     ins::instruction::Instruction,
     mem::memory_handler::{MemoryHandler, MEGABYTE},
     reg::registers::RegisterId,
@@ -67,6 +67,16 @@ impl BootRom {
             // The non-maskable interrupt (NMI) handler.
             (
                 NON_MASKABLE_INT,
+                vec![Instruction::Halt, Instruction::IntRet],
+            ),
+            // A general protection fault.
+            (
+                GENERAL_PROTECTION_FAULT_INT,
+                vec![Instruction::Halt, Instruction::IntRet],
+            ),
+            // The device error interrupt handler.
+            (
+                DEVICE_ERROR_INT,
                 vec![Instruction::Halt, Instruction::IntRet],
             ),
         ];

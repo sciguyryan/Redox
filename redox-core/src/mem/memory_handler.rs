@@ -607,11 +607,23 @@ impl MemoryHandler {
 
                 Instruction::PopU32ImmU32Reg(out_reg)
             }
+            OutF32Imm => {
+                let value = Self::read_f32(arg_bytes, &mut cursor);
+                let port = Self::read_u8(arg_bytes, &mut cursor);
+
+                Instruction::OutF32Imm(value, port)
+            }
             OutU32Imm => {
                 let value = Self::read_u32(arg_bytes, &mut cursor);
-                let target = Self::read_u8(arg_bytes, &mut cursor);
+                let port = Self::read_u8(arg_bytes, &mut cursor);
 
-                Instruction::OutU32Imm(value, target)
+                Instruction::OutU32Imm(value, port)
+            }
+            OutU8Imm => {
+                let value = Self::read_u8(arg_bytes, &mut cursor);
+                let port = Self::read_u8(arg_bytes, &mut cursor);
+
+                Instruction::OutU8Imm(value, port)
             }
 
             /******** [Logic Instructions] ********/

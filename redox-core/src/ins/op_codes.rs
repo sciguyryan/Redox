@@ -117,8 +117,12 @@ pub enum OpCode {
     PushU32Reg,
     /// Pop a u32 value from the stack to a u32 register.
     PopU32ImmU32Reg,
-    /// Output a u32 value to a specific port.
+    /// Output a f32 immediate value to a specific port.
+    OutF32Imm,
+    /// Output a u32 immediate value to a specific port.
     OutU32Imm,
+    /// Output a u8 immediate value to a specific port.
+    OutU8Imm,
 
     /******** [Logic Instructions] ********/
     /// Test the state of a bit from a u32 register. The CF flag will be set to the state of the bit.
@@ -245,7 +249,9 @@ impl From<&Instruction> for OpCode {
             PushU32Imm(_) => OpCode::PushU32Imm,
             PushU32Reg(_) => OpCode::PushU32Reg,
             PopU32ImmU32Reg(_) => OpCode::PopU32ImmU32Reg,
+            OutF32Imm(_, _) => OpCode::OutF32Imm,
             OutU32Imm(_, _) => OpCode::OutU32Imm,
+            OutU8Imm(_, _) => OpCode::OutU8Imm,
 
             /******** [Logic Instructions] ********/
             BitTestU32Reg(_, _) => OpCode::BitTestU32Reg,

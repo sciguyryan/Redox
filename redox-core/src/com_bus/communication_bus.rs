@@ -29,15 +29,41 @@ impl CommunicationBus {
         }
     }
 
-    /// Write a u32 value to a specific device.
+    /// Write a f32 value to a specific port.
     ///
     /// # Arguments
     ///
-    /// * `value` - The u32 value to be written to the device.
-    /// * `device_id` - A u8 giving the ID of the device.
-    pub fn write_u32(&mut self, value: u32, device_id: u8) -> DeviceResult<()> {
-        match device_id {
+    /// * `value` - The f32 value to be written to the port.
+    /// * `port` - A u8 giving the ID of the port.
+    pub fn write_f32(&mut self, value: f32, port: u8) -> DeviceResult<()> {
+        match port {
+            RANDOM_DEVICE_ID => self.random.write_f32(value),
+            _ => Err(DeviceError::NotFound),
+        }
+    }
+
+    /// Write a u32 value to a specific port.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The u32 value to be written to the port.
+    /// * `port` - A u8 giving the ID of the port.
+    pub fn write_u32(&mut self, value: u32, port: u8) -> DeviceResult<()> {
+        match port {
             RANDOM_DEVICE_ID => self.random.write_u32(value),
+            _ => Err(DeviceError::NotFound),
+        }
+    }
+
+    /// Write a u8 value to a specific port.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The u32 value to be written to the port.
+    /// * `port` - A u8 giving the ID of the port.
+    pub fn write_u8(&mut self, value: u8, port: u8) -> DeviceResult<()> {
+        match port {
+            RANDOM_DEVICE_ID => self.random.write_u8(value),
             _ => Err(DeviceError::NotFound),
         }
     }

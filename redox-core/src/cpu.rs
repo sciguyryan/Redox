@@ -22,8 +22,10 @@ pub const SINGLE_STEP_INT: u8 = 0x1;
 pub const NON_MASKABLE_INT: u8 = 0x2;
 /// The invalid opcode interrupt - not yet implemented.
 pub const INVALID_OPCODE_INT: u8 = 0x6;
-/// A general protection fault - not yet implemented.
+/// A general protection fault - default handler implemented.
 pub const GENERAL_PROTECTION_FAULT_INT: u8 = 0x0d;
+/// A general device error interrupt - default handler implemented.
+pub const DEVICE_ERROR_INT: u8 = 0x16;
 
 /// By default, all interrupts below 32 (0x20) are used for exceptions and are thus not maskable.
 const EXCEPTION_INT_CUTOFF: u8 = 0x20;
@@ -872,7 +874,6 @@ impl Cpu {
         use Instruction::*;
 
         let privilege = &self.get_privilege();
-        let mem = &mut com_bus.mem;
 
         // Advance the instruction pointer by the number of bytes used for the instruction.
         self.increment_ip_register(instruction.get_total_instruction_size());
@@ -928,7 +929,7 @@ impl Cpu {
             }
             DivU32ImmU32Reg(divisor, reg) => {
                 if *divisor == 0 {
-                    self.handle_interrupt(DIVIDE_BY_ZERO_INT, mem);
+                    self.handle_interrupt(DIVIDE_BY_ZERO_INT, &mut com_bus.mem);
                     return;
                 }
 
@@ -940,7 +941,7 @@ impl Cpu {
             DivU32RegU32Imm(divisor_reg, imm) => {
                 let divisor = self.read_reg_u32(divisor_reg, privilege);
                 if divisor == 0 {
-                    self.handle_interrupt(DIVIDE_BY_ZERO_INT, mem);
+                    self.handle_interrupt(DIVIDE_BY_ZERO_INT, &mut com_bus.mem);
                     return;
                 }
 
@@ -951,7 +952,7 @@ impl Cpu {
             DivU32RegU32Reg(divisor_reg, reg) => {
                 let divisor = self.read_reg_u32(divisor_reg, privilege);
                 if divisor == 0 {
-                    self.handle_interrupt(DIVIDE_BY_ZERO_INT, mem);
+                    self.handle_interrupt(DIVIDE_BY_ZERO_INT, &mut com_bus.mem);
                     return;
                 }
 
@@ -963,7 +964,7 @@ impl Cpu {
             ModU32ImmU32Reg(imm, reg) => {
                 let divisor = self.read_reg_u32(reg, privilege);
                 if divisor == 0 {
-                    self.handle_interrupt(DIVIDE_BY_ZERO_INT, mem);
+                    self.handle_interrupt(DIVIDE_BY_ZERO_INT, &mut com_bus.mem);
                     return;
                 }
 
@@ -974,7 +975,7 @@ impl Cpu {
             ModU32RegU32Imm(reg, imm) => {
                 let divisor = self.read_reg_u32(reg, privilege);
                 if divisor == 0 {
-                    self.handle_interrupt(DIVIDE_BY_ZERO_INT, mem);
+                    self.handle_interrupt(DIVIDE_BY_ZERO_INT, &mut com_bus.mem);
                     return;
                 }
 
@@ -985,7 +986,7 @@ impl Cpu {
             ModU32RegU32Reg(divisor_reg, reg) => {
                 let divisor = self.read_reg_u32(divisor_reg, privilege);
                 if divisor == 0 {
-                    self.handle_interrupt(DIVIDE_BY_ZERO_INT, mem);
+                    self.handle_interrupt(DIVIDE_BY_ZERO_INT, &mut com_bus.mem);
                     return;
                 }
 
@@ -1071,28 +1072,28 @@ impl Cpu {
             CallU32Imm(addr) => {
                 // call 0xdeafbeef
                 // call :label
-                self.perform_call_jump(mem, *addr);
+                self.perform_call_jump(&mut com_bus.mem, *addr);
             }
             CallU32Reg(reg) => {
                 // call %reg
                 // Get the value of the register.
                 let addr = self.read_reg_u32(reg, privilege);
-                self.perform_call_jump(mem, addr);
+                self.perform_call_jump(&mut com_bus.mem, addr);
             }
             RetArgsU32 => {
                 // iret
                 // Restore the state of the last stack frame.
-                self.pop_state(mem, StackArgType::U32);
+                self.pop_state(&mut com_bus.mem, StackArgType::U32);
             }
             Int(int_type) => {
-                self.handle_interrupt(*int_type, mem);
+                self.handle_interrupt(*int_type, &mut com_bus.mem);
             }
             IntRet => {
                 self.is_in_interrupt_handler = false;
                 self.last_interrupt_code = None;
 
-                self.set_instruction_pointer(mem.pop_u32());
-                self.set_flags(mem.pop_u32());
+                self.set_instruction_pointer(com_bus.mem.pop_u32());
+                self.set_flags(com_bus.mem.pop_u32());
             }
             JumpAbsU32Imm(addr) => {
                 // jmp 0xaaaa
@@ -1125,21 +1126,21 @@ impl Cpu {
                 self.write_reg_u32(out_reg, value, privilege);
             }
             MovU32ImmMemSimple(imm, addr) => {
-                mem.set_u32(*addr as usize, *imm);
+                com_bus.mem.set_u32(*addr as usize, *imm);
             }
             MovU32RegMemSimple(reg, addr) => {
                 let value = self.read_reg_u32(reg, privilege);
 
-                mem.set_u32(*addr as usize, value);
+                com_bus.mem.set_u32(*addr as usize, value);
             }
             MovMemU32RegSimple(addr, reg) => {
-                let value = mem.get_u32(*addr as usize);
+                let value = com_bus.mem.get_u32(*addr as usize);
 
                 self.write_reg_u32(reg, value, privilege);
             }
             MovU32RegPtrU32RegSimple(in_reg, out_reg) => {
                 let address = self.read_reg_u32(in_reg, privilege) as usize;
-                let value = mem.get_u32(address);
+                let value = com_bus.mem.get_u32(address);
 
                 self.write_reg_u32(out_reg, value, privilege);
             }
@@ -1147,12 +1148,12 @@ impl Cpu {
                 // mov imm, [addr] - move immediate to address.
                 let addr = self.decode_evaluate_u32_move_expression(expr, privilege);
 
-                mem.set_u32(addr as usize, *imm);
+                com_bus.mem.set_u32(addr as usize, *imm);
             }
             MovMemExprU32Reg(expr, reg) => {
                 // mov [addr], register - move value at address to register.
                 let addr = self.decode_evaluate_u32_move_expression(expr, privilege);
-                let value = mem.get_u32(addr as usize);
+                let value = com_bus.mem.get_u32(addr as usize);
 
                 self.write_reg_u32(reg, value, privilege);
             }
@@ -1161,7 +1162,7 @@ impl Cpu {
                 let addr = self.decode_evaluate_u32_move_expression(expr, privilege);
                 let value = self.read_reg_u32(reg, privilege);
 
-                mem.set_u32(addr as usize, value);
+                com_bus.mem.set_u32(addr as usize, value);
             }
             ZeroHighBitsByIndexU32Reg(index_reg, source_reg, out_reg) => {
                 // zhbi source_reg, index_reg, out_reg
@@ -1174,7 +1175,7 @@ impl Cpu {
             }
             PushU32Imm(imm) => {
                 // push imm
-                mem.push_u32(*imm);
+                com_bus.mem.push_u32(*imm);
 
                 // Update the stack pointer register.
                 self.registers
@@ -1184,7 +1185,7 @@ impl Cpu {
             PushU32Reg(reg) => {
                 // push %reg
                 let value = self.read_reg_u32(reg, privilege);
-                mem.push_u32(value);
+                com_bus.mem.push_u32(value);
 
                 // Update the stack pointer register.
                 self.registers
@@ -1195,12 +1196,24 @@ impl Cpu {
                 // pop %out_reg
                 self.registers
                     .get_register_u32_mut(*out_reg)
-                    .write(mem.pop_u32(), privilege);
+                    .write(com_bus.mem.pop_u32(), privilege);
             }
-            OutU32Imm(value, device) => {
+            OutF32Imm(value, port) => {
+                // out 0.1, $0
+                if com_bus.write_f32(*value, *port).is_err() {
+                    self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
+                }
+            }
+            OutU32Imm(value, port) => {
                 // out $deadbeef, $0
-                if com_bus.write_u32(*value, *device).is_err() {
-                    todo!();
+                if com_bus.write_u32(*value, *port).is_err() {
+                    self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
+                }
+            }
+            OutU8Imm(value, port) => {
+                // out $ff, $0
+                if com_bus.write_u8(*value, *port).is_err() {
+                    self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
                 }
             }
 
@@ -1212,7 +1225,7 @@ impl Cpu {
             }
             BitTestU32Mem(bit, addr) => {
                 // bt bit, [addr]
-                let value = mem.get_u32(*addr as usize);
+                let value = com_bus.mem.get_u32(*addr as usize);
                 self.perform_bit_test_with_carry_flag(value, *bit);
             }
             BitTestResetU32Reg(bit, reg) => {
@@ -1227,10 +1240,10 @@ impl Cpu {
             BitTestResetU32Mem(bit, addr) => {
                 // btr bit, [addr]
                 // Read the value and set the carry flag state, then clear the bit.
-                let mut value = mem.get_u32(*addr as usize);
+                let mut value = com_bus.mem.get_u32(*addr as usize);
                 self.perform_bit_test_with_carry_flag_with_set(&mut value, *bit, false);
 
-                mem.set_u32(*addr as usize, value);
+                com_bus.mem.set_u32(*addr as usize, value);
             }
             BitTestSetU32Reg(bit, reg) => {
                 // bts bit, reg
@@ -1244,10 +1257,10 @@ impl Cpu {
             BitTestSetU32Mem(bit, addr) => {
                 // bts bit, [addr]
                 // Read the value and set the carry flag state, then set the bit.
-                let mut value = mem.get_u32(*addr as usize);
+                let mut value = com_bus.mem.get_u32(*addr as usize);
                 self.perform_bit_test_with_carry_flag_with_set(&mut value, *bit, true);
 
-                mem.set_u32(*addr as usize, value);
+                com_bus.mem.set_u32(*addr as usize, value);
             }
             BitScanReverseU32RegU32Reg(in_reg, out_reg) => {
                 // bsr in_reg, out_reg
@@ -1258,7 +1271,7 @@ impl Cpu {
             }
             BitScanReverseU32MemU32Reg(addr, reg) => {
                 // bsr [addr], reg
-                let value = mem.get_u32(*addr as usize);
+                let value = com_bus.mem.get_u32(*addr as usize);
                 let index = self.perform_reverse_bit_search(value);
 
                 self.write_reg_u32(reg, index, privilege);
@@ -1268,14 +1281,14 @@ impl Cpu {
                 let value = self.read_reg_u32(reg, privilege);
                 let index = self.perform_reverse_bit_search(value);
 
-                mem.set_u32(*out_addr as usize, index);
+                com_bus.mem.set_u32(*out_addr as usize, index);
             }
             BitScanReverseU32MemU32Mem(in_addr, out_addr) => {
                 // bsr [in_addr], [out_addr]
-                let value = mem.get_u32(*in_addr as usize);
+                let value = com_bus.mem.get_u32(*in_addr as usize);
                 let index = self.perform_reverse_bit_search(value);
 
-                mem.set_u32(*out_addr as usize, index);
+                com_bus.mem.set_u32(*out_addr as usize, index);
             }
             BitScanForwardU32RegU32Reg(in_reg, out_reg) => {
                 // bsf in_reg, out_reg
@@ -1286,7 +1299,7 @@ impl Cpu {
             }
             BitScanForwardU32MemU32Reg(addr, reg) => {
                 // bsf [addr], reg
-                let value = mem.get_u32(*addr as usize);
+                let value = com_bus.mem.get_u32(*addr as usize);
                 let index = self.perform_forward_bit_search(value);
 
                 self.write_reg_u32(reg, index, privilege);
@@ -1296,14 +1309,14 @@ impl Cpu {
                 let value = self.read_reg_u32(reg, privilege);
                 let index = self.perform_forward_bit_search(value);
 
-                mem.set_u32(*out_addr as usize, index);
+                com_bus.mem.set_u32(*out_addr as usize, index);
             }
             BitScanForwardU32MemU32Mem(in_addr, out_addr) => {
                 // bsf [in_addr], [out_addr]
-                let value = mem.get_u32(*in_addr as usize);
+                let value = com_bus.mem.get_u32(*in_addr as usize);
                 let index = self.perform_forward_bit_search(value);
 
-                mem.set_u32(*out_addr as usize, index);
+                com_bus.mem.set_u32(*out_addr as usize, index);
             }
             ByteSwapU32(reg) => {
                 // bswap reg
@@ -1326,7 +1339,7 @@ impl Cpu {
             LoadIVTAddrU32Imm(addr) => {
                 // livt [addr]
                 if !self.is_machine_mode {
-                    self.handle_interrupt(GENERAL_PROTECTION_FAULT_INT, mem);
+                    self.handle_interrupt(GENERAL_PROTECTION_FAULT_INT, &mut com_bus.mem);
                     return;
                 }
 
@@ -1342,15 +1355,15 @@ impl Cpu {
             /******** [Reserved Instructions] ********/
             Reserved1 | Reserved2 | Reserved3 | Reserved4 | Reserved5 | Reserved6 | Reserved7
             | Reserved8 | Reserved9 => {
-                self.handle_interrupt(INVALID_OPCODE_INT, mem);
+                self.handle_interrupt(INVALID_OPCODE_INT, &mut com_bus.mem);
             }
 
             /******** [Pseudo Instructions] ********/
             Label(_) => {
-                self.handle_interrupt(INVALID_OPCODE_INT, mem);
+                self.handle_interrupt(INVALID_OPCODE_INT, &mut com_bus.mem);
             }
             Unknown(_id) => {
-                self.handle_interrupt(INVALID_OPCODE_INT, mem);
+                self.handle_interrupt(INVALID_OPCODE_INT, &mut com_bus.mem);
             }
         };
     }
@@ -1588,7 +1601,7 @@ mod tests_cpu {
 
     use crate::{
         compiler::bytecode_compiler::Compiler,
-        cpu::DIVIDE_BY_ZERO_INT,
+        cpu::{DEVICE_ERROR_INT, DIVIDE_BY_ZERO_INT, GENERAL_PROTECTION_FAULT_INT},
         ins::{
             instruction::Instruction::{self, *},
             move_expressions::{ExpressionArgs, ExpressionOperator, MoveExpressionHandler},
@@ -1785,6 +1798,64 @@ mod tests_cpu {
         }
     }
 
+    /// Test writing to a port that is unused.
+    #[test]
+    fn test_writing_to_unused_port() {
+        let tests = [TestU32::new(
+            &[OutU8Imm(0x0, 0xff)],
+            &[],
+            DEFAULT_U32_STACK_CAPACITY,
+            false,
+            "OUT - successfully executed OUT instruction with an unused port",
+        )];
+
+        TestsU32::new(&tests).run_all_special(|id, vm| {
+            if let Some(v) = vm {
+                // The CPU should still be within an interrupt handler.
+                assert!(v.cpu.is_in_interrupt_handler);
+                assert_eq!(v.cpu.last_interrupt_code, Some(DEVICE_ERROR_INT));
+            } else {
+                panic!("failed to correctly execute test id {id}");
+            }
+        });
+    }
+
+    /// Test writing to a valid port with a valid data types.
+    #[test]
+    fn test_writing_to_port_valid_data_types() {
+        let tests = [TestU32::new(
+            &[OutU8Imm(0x0, 0x0), OutU32Imm(0x0, 0x0)],
+            &[],
+            DEFAULT_U32_STACK_CAPACITY,
+            false,
+            "OUT - failed to successfully execute OUT instruction with a valid port and data type",
+        )];
+
+        TestsU32::new(&tests).run_all();
+    }
+
+    /// Test writing to a valid port with an unsupported data type.
+    #[test]
+    fn test_writing_to_port_invalid_data_types() {
+        let tests = [TestU32::new(
+            &[OutF32Imm(0.1, 0x0)],
+            &[],
+            DEFAULT_U32_STACK_CAPACITY,
+            false,
+            "OUT - successfully executed OUT instruction with unsupported data type",
+        )];
+
+        TestsU32::new(&tests).run_all_special(|id, vm| {
+            if let Some(v) = vm {
+                // The CPU should still be within an interrupt handler.
+                assert!(v.cpu.is_in_interrupt_handler);
+                assert_eq!(v.cpu.last_interrupt_code, Some(DEVICE_ERROR_INT));
+            } else {
+                panic!("failed to correctly execute test id {id}");
+            }
+        });
+    }
+
     /// Test load interrupt vector table instruction fails in user mode.
     #[test]
     fn test_livt_fails_user_mode() {
@@ -1792,11 +1863,22 @@ mod tests_cpu {
             &[MachineReturn, LoadIVTAddrU32Imm(0xdeafbeef)],
             &[],
             DEFAULT_U32_STACK_CAPACITY,
-            true,
+            false,
             "LIVT - successfully executed instruction in user mode",
         )];
 
-        TestsU32::new(&tests).run_all();
+        TestsU32::new(&tests).run_all_special(|id, vm| {
+            if let Some(v) = vm {
+                // The CPU should still be within an interrupt handler.
+                assert!(v.cpu.is_in_interrupt_handler);
+                assert_eq!(
+                    v.cpu.last_interrupt_code,
+                    Some(GENERAL_PROTECTION_FAULT_INT)
+                );
+            } else {
+                panic!("failed to correctly execute test id {id}");
+            }
+        });
     }
 
     /// Test load interrupt vector table instruction successfully changes the interrupt vector table address.
@@ -2214,7 +2296,7 @@ mod tests_cpu {
             "MRET - failed to execute MRET instruction",
         )];
 
-        TestsU32::new(&tests).run_all_special(|id: usize, vm: Option<VirtualMachine>| {
+        TestsU32::new(&tests).run_all_special(|id, vm| {
             if let Some(v) = vm {
                 assert!(
                     !v.cpu.is_machine_mode,
