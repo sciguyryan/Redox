@@ -4,7 +4,6 @@ use redox_core::{
     compiler::bytecode_compiler::Compiler,
     ins::instruction::Instruction,
     mem,
-    reg::registers::RegisterId,
     vm::{self, VirtualMachine},
 };
 
@@ -66,7 +65,7 @@ fn main() {
         panic!("currently unsupported");
     }
 
-    let base_offset = vm::MIN_USER_SEGMENT_SIZE as u32;
+    //let base_offset = vm::MIN_USER_SEGMENT_SIZE as u32;
 
     let instructions = &[
         /*// Indicate that we want to make a seeded random number generator.
