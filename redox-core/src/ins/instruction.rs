@@ -198,152 +198,10 @@ pub enum Instruction {
     Unknown(u32),
 }
 
+// NOTE - This has to be manually implemented due to the issues with comparing f32 values.
 impl PartialEq for Instruction {
     fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::AddU32ImmU32Reg(l0, l1), Self::AddU32ImmU32Reg(r0, r1)) => l0 == r0 && l1 == r1,
-            (Self::AddU32RegU32Reg(l0, l1), Self::AddU32RegU32Reg(r0, r1)) => l0 == r0 && l1 == r1,
-            (Self::SubU32ImmU32Reg(l0, l1), Self::SubU32ImmU32Reg(r0, r1)) => l0 == r0 && l1 == r1,
-            (Self::SubU32RegU32Imm(l0, l1), Self::SubU32RegU32Imm(r0, r1)) => l0 == r0 && l1 == r1,
-            (Self::SubU32RegU32Reg(l0, l1), Self::SubU32RegU32Reg(r0, r1)) => l0 == r0 && l1 == r1,
-            (Self::MulU32ImmU32Reg(l0, l1), Self::MulU32ImmU32Reg(r0, r1)) => l0 == r0 && l1 == r1,
-            (Self::MulU32RegU32Reg(l0, l1), Self::MulU32RegU32Reg(r0, r1)) => l0 == r0 && l1 == r1,
-            (Self::DivU32ImmU32Reg(l0, l1), Self::DivU32ImmU32Reg(r0, r1)) => l0 == r0 && l1 == r1,
-            (Self::DivU32RegU32Imm(l0, l1), Self::DivU32RegU32Imm(r0, r1)) => l0 == r0 && l1 == r1,
-            (Self::DivU32RegU32Reg(l0, l1), Self::DivU32RegU32Reg(r0, r1)) => l0 == r0 && l1 == r1,
-            (Self::ModU32ImmU32Reg(l0, l1), Self::ModU32ImmU32Reg(r0, r1)) => l0 == r0 && l1 == r1,
-            (Self::ModU32RegU32Imm(l0, l1), Self::ModU32RegU32Imm(r0, r1)) => l0 == r0 && l1 == r1,
-            (Self::ModU32RegU32Reg(l0, l1), Self::ModU32RegU32Reg(r0, r1)) => l0 == r0 && l1 == r1,
-            (Self::IncU32Reg(l0), Self::IncU32Reg(r0)) => l0 == r0,
-            (Self::DecU32Reg(l0), Self::DecU32Reg(r0)) => l0 == r0,
-            (Self::AndU32ImmU32Reg(l0, l1), Self::AndU32ImmU32Reg(r0, r1)) => l0 == r0 && l1 == r1,
-            (Self::LeftShiftU32ImmU32Reg(l0, l1), Self::LeftShiftU32ImmU32Reg(r0, r1)) => {
-                l0 == r0 && l1 == r1
-            }
-            (Self::LeftShiftU32RegU32Reg(l0, l1), Self::LeftShiftU32RegU32Reg(r0, r1)) => {
-                l0 == r0 && l1 == r1
-            }
-            (
-                Self::ArithLeftShiftU32ImmU32Reg(l0, l1),
-                Self::ArithLeftShiftU32ImmU32Reg(r0, r1),
-            ) => l0 == r0 && l1 == r1,
-            (
-                Self::ArithLeftShiftU32RegU32Reg(l0, l1),
-                Self::ArithLeftShiftU32RegU32Reg(r0, r1),
-            ) => l0 == r0 && l1 == r1,
-            (Self::RightShiftU32ImmU32Reg(l0, l1), Self::RightShiftU32ImmU32Reg(r0, r1)) => {
-                l0 == r0 && l1 == r1
-            }
-            (Self::RightShiftU32RegU32Reg(l0, l1), Self::RightShiftU32RegU32Reg(r0, r1)) => {
-                l0 == r0 && l1 == r1
-            }
-            (
-                Self::ArithRightShiftU32ImmU32Reg(l0, l1),
-                Self::ArithRightShiftU32ImmU32Reg(r0, r1),
-            ) => l0 == r0 && l1 == r1,
-            (
-                Self::ArithRightShiftU32RegU32Reg(l0, l1),
-                Self::ArithRightShiftU32RegU32Reg(r0, r1),
-            ) => l0 == r0 && l1 == r1,
-            (Self::CallU32Imm(l0), Self::CallU32Imm(r0)) => l0 == r0,
-            (Self::CallU32Reg(l0), Self::CallU32Reg(r0)) => l0 == r0,
-            (Self::Int(l0), Self::Int(r0)) => l0 == r0,
-            (Self::JumpAbsU32Imm(l0), Self::JumpAbsU32Imm(r0)) => l0 == r0,
-            (Self::JumpAbsU32Reg(l0), Self::JumpAbsU32Reg(r0)) => l0 == r0,
-            (Self::SwapU32RegU32Reg(l0, l1), Self::SwapU32RegU32Reg(r0, r1)) => {
-                l0 == r0 && l1 == r1
-            }
-            (Self::MovU32ImmU32Reg(l0, l1), Self::MovU32ImmU32Reg(r0, r1)) => l0 == r0 && l1 == r1,
-            (Self::MovU32RegU32Reg(l0, l1), Self::MovU32RegU32Reg(r0, r1)) => l0 == r0 && l1 == r1,
-            (Self::MovU32ImmMemSimple(l0, l1), Self::MovU32ImmMemSimple(r0, r1)) => {
-                l0 == r0 && l1 == r1
-            }
-            (Self::MovU32RegMemSimple(l0, l1), Self::MovU32RegMemSimple(r0, r1)) => {
-                l0 == r0 && l1 == r1
-            }
-            (Self::MovMemU32RegSimple(l0, l1), Self::MovMemU32RegSimple(r0, r1)) => {
-                l0 == r0 && l1 == r1
-            }
-            (Self::MovU32RegPtrU32RegSimple(l0, l1), Self::MovU32RegPtrU32RegSimple(r0, r1)) => {
-                l0 == r0 && l1 == r1
-            }
-            (Self::MovU32ImmMemExpr(l0, l1), Self::MovU32ImmMemExpr(r0, r1)) => {
-                l0 == r0 && l1 == r1
-            }
-            (Self::MovMemExprU32Reg(l0, l1), Self::MovMemExprU32Reg(r0, r1)) => {
-                l0 == r0 && l1 == r1
-            }
-            (Self::MovU32RegMemExpr(l0, l1), Self::MovU32RegMemExpr(r0, r1)) => {
-                l0 == r0 && l1 == r1
-            }
-            (Self::ByteSwapU32(l0), Self::ByteSwapU32(r0)) => l0 == r0,
-            (
-                Self::ZeroHighBitsByIndexU32Reg(l0, l1, l2),
-                Self::ZeroHighBitsByIndexU32Reg(r0, r1, r2),
-            ) => l0 == r0 && l1 == r1 && l2 == r2,
-            (
-                Self::ZeroHighBitsByIndexU32RegU32Imm(l0, l1, l2),
-                Self::ZeroHighBitsByIndexU32RegU32Imm(r0, r1, r2),
-            ) => l0 == r0 && l1 == r1 && l2 == r2,
-            (Self::PushU32Imm(l0), Self::PushU32Imm(r0)) => l0 == r0,
-            (Self::PushU32Reg(l0), Self::PushU32Reg(r0)) => l0 == r0,
-            (Self::PopU32ImmU32Reg(l0), Self::PopU32ImmU32Reg(r0)) => l0 == r0,
-            (Self::OutF32Imm(l0, l1), Self::OutF32Imm(r0, r1)) => l0 == r0 && l1 == r1,
-            (Self::OutU32Imm(l0, l1), Self::OutU32Imm(r0, r1)) => l0 == r0 && l1 == r1,
-            (Self::OutU8Imm(l0, l1), Self::OutU8Imm(r0, r1)) => l0 == r0 && l1 == r1,
-            (Self::BitTestU32Reg(l0, l1), Self::BitTestU32Reg(r0, r1)) => l0 == r0 && l1 == r1,
-            (Self::BitTestU32Mem(l0, l1), Self::BitTestU32Mem(r0, r1)) => l0 == r0 && l1 == r1,
-            (Self::BitTestResetU32Reg(l0, l1), Self::BitTestResetU32Reg(r0, r1)) => {
-                l0 == r0 && l1 == r1
-            }
-            (Self::BitTestResetU32Mem(l0, l1), Self::BitTestResetU32Mem(r0, r1)) => {
-                l0 == r0 && l1 == r1
-            }
-            (Self::BitTestSetU32Reg(l0, l1), Self::BitTestSetU32Reg(r0, r1)) => {
-                l0 == r0 && l1 == r1
-            }
-            (Self::BitTestSetU32Mem(l0, l1), Self::BitTestSetU32Mem(r0, r1)) => {
-                l0 == r0 && l1 == r1
-            }
-            (
-                Self::BitScanReverseU32RegU32Reg(l0, l1),
-                Self::BitScanReverseU32RegU32Reg(r0, r1),
-            ) => l0 == r0 && l1 == r1,
-            (
-                Self::BitScanReverseU32MemU32Reg(l0, l1),
-                Self::BitScanReverseU32MemU32Reg(r0, r1),
-            ) => l0 == r0 && l1 == r1,
-            (
-                Self::BitScanReverseU32RegMemU32(l0, l1),
-                Self::BitScanReverseU32RegMemU32(r0, r1),
-            ) => l0 == r0 && l1 == r1,
-            (
-                Self::BitScanReverseU32MemU32Mem(l0, l1),
-                Self::BitScanReverseU32MemU32Mem(r0, r1),
-            ) => l0 == r0 && l1 == r1,
-            (
-                Self::BitScanForwardU32RegU32Reg(l0, l1),
-                Self::BitScanForwardU32RegU32Reg(r0, r1),
-            ) => l0 == r0 && l1 == r1,
-            (
-                Self::BitScanForwardU32MemU32Reg(l0, l1),
-                Self::BitScanForwardU32MemU32Reg(r0, r1),
-            ) => l0 == r0 && l1 == r1,
-            (
-                Self::BitScanForwardU32RegMemU32(l0, l1),
-                Self::BitScanForwardU32RegMemU32(r0, r1),
-            ) => l0 == r0 && l1 == r1,
-            (
-                Self::BitScanForwardU32MemU32Mem(l0, l1),
-                Self::BitScanForwardU32MemU32Mem(r0, r1),
-            ) => l0 == r0 && l1 == r1,
-            (Self::MaskInterrupt(l0), Self::MaskInterrupt(r0)) => l0 == r0,
-            (Self::UnmaskInterrupt(l0), Self::UnmaskInterrupt(r0)) => l0 == r0,
-            (Self::LoadIVTAddrU32Imm(l0), Self::LoadIVTAddrU32Imm(r0)) => l0 == r0,
-            (Self::Label(l0), Self::Label(r0)) => l0 == r0,
-            (Self::Unknown(l0), Self::Unknown(r0)) => l0 == r0,
-            _ => core::mem::discriminant(self) == core::mem::discriminant(other),
-        }
+        core::mem::discriminant(self) == core::mem::discriminant(other)
     }
 }
 
@@ -517,7 +375,7 @@ impl Display for Instruction {
                 format!("out ${value:08x}, ${port:02x}")
             }
             OutU8Imm(value, port) => {
-                format!("out ${port:02x}, ${port:02x}")
+                format!("out ${value:02x}, ${port:02x}")
             }
 
             /******** [Logic Instructions] ********/

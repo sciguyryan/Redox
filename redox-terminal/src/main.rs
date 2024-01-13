@@ -98,17 +98,6 @@ fn main() {
         Instruction::Halt,
     ];
 
-    /*let instructions = &[
-        // We expect that the first move instruction will be skipped entirely.
-        Instruction::AddU32ImmU32Reg(23, RegisterId::ECS), // 9
-        Instruction::JumpAbsU32Reg(RegisterId::EAC), // 5
-        // This instruction should be skipped, so ER1 should remain at the default value of 0.
-        Instruction::MovU32ImmU32Reg(0xf, RegisterId::ER1), // 9
-        // The jump should start execution here.
-        Instruction::MovU32ImmU32Reg(0xa, RegisterId::ER2),
-        Instruction::Hlt,
-    ];*/
-
     let mut compiler = Compiler::new();
     let data = compiler.compile(instructions);
 
