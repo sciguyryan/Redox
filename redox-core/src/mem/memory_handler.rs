@@ -607,6 +607,8 @@ impl MemoryHandler {
 
                 Instruction::PopU32ImmU32Reg(out_reg)
             }
+
+            /******** [IO Instructions] ********/
             OutF32Imm => {
                 let value = Self::read_f32(arg_bytes, &mut cursor);
                 let port = Self::read_u8(arg_bytes, &mut cursor);
@@ -630,6 +632,42 @@ impl MemoryHandler {
                 let port = Self::read_u8(arg_bytes, &mut cursor);
 
                 Instruction::OutU8Imm(value, port)
+            }
+            InU8Reg => {
+                let port = Self::read_u8(arg_bytes, &mut cursor);
+                let reg = Self::read_register_id(arg_bytes, &mut cursor);
+
+                Instruction::InU8Reg(port, reg)
+            }
+            InU8Mem => {
+                let port = Self::read_u8(arg_bytes, &mut cursor);
+                let addr = Self::read_u32(arg_bytes, &mut cursor);
+
+                Instruction::InU8Mem(port, addr)
+            }
+            InU32Reg => {
+                let port = Self::read_u8(arg_bytes, &mut cursor);
+                let reg = Self::read_register_id(arg_bytes, &mut cursor);
+
+                Instruction::InU32Reg(port, reg)
+            }
+            InU32Mem => {
+                let port = Self::read_u8(arg_bytes, &mut cursor);
+                let addr = Self::read_u32(arg_bytes, &mut cursor);
+
+                Instruction::InU32Mem(port, addr)
+            }
+            InF32Reg => {
+                let port = Self::read_u8(arg_bytes, &mut cursor);
+                let reg = Self::read_register_id(arg_bytes, &mut cursor);
+
+                Instruction::InF32Reg(port, reg)
+            }
+            InF32Mem => {
+                let port = Self::read_u8(arg_bytes, &mut cursor);
+                let addr = Self::read_u32(arg_bytes, &mut cursor);
+
+                Instruction::InF32Mem(port, addr)
             }
 
             /******** [Logic Instructions] ********/

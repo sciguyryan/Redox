@@ -127,14 +127,28 @@ pub enum Instruction {
     PushU32Reg(RegisterId),
     /// Pop a u32 value from the stack to a u32 register.
     PopU32ImmU32Reg(RegisterId),
+
+    /******** [IO Instructions] ********/
     /// Output a f32 immediate value to a specific port.
     OutF32Imm(f32, u8),
     /// Output a u32 immediate value to a specific port.
     OutU32Imm(u32, u8),
-    // Output a u32 register value value to a specific port.
+    /// Output a u32 register value value to a specific port.
     OutU32Reg(RegisterId, u8),
     /// Output a u8 immediate value to a specific port.
     OutU8Imm(u8, u8),
+    /// Input a u8 value from a specific port into a specified register.
+    InU8Reg(u8, RegisterId),
+    /// Input a u8 value from a specific port into a specified memory address.
+    InU8Mem(u8, u32),
+    /// Input a u32 value from a specific port into a specified register.
+    InU32Reg(u8, RegisterId),
+    /// Input a u32 value from a specific port into a specified memory address.
+    InU32Mem(u8, u32),
+    /// Input a f32 value from a specific port into a specified register.
+    InF32Reg(u8, RegisterId),
+    /// Input a f32 value from a specific port into a specified memory address.
+    InF32Mem(u8, u32),
 
     /******** [Logic Instructions] ********/
     /// Test the state of a bit from a u32 register. The CF flag will be set to the state of the bit.
@@ -370,6 +384,8 @@ impl Display for Instruction {
             PopU32ImmU32Reg(out_reg) => {
                 format!("pop %{out_reg}")
             }
+
+            /******** [IO Instructions] ********/
             OutF32Imm(value, port) => {
                 format!("out {value}, ${port:02x}")
             }
@@ -381,6 +397,12 @@ impl Display for Instruction {
             }
             OutU8Imm(value, port) => {
                 format!("out ${value:02x}, ${port:02x}")
+            }
+            InU8Reg(port, reg) | InU32Reg(port, reg) | InF32Reg(port, reg) => {
+                format!("in ${port:02x}, %{reg}")
+            }
+            InU8Mem(port, addr) | InU32Mem(port, addr) | InF32Mem(port, addr) => {
+                format!("in ${port:02x}, ${addr:08x}")
             }
 
             /******** [Logic Instructions] ********/
@@ -535,10 +557,18 @@ impl Instruction {
             PushU32Imm => ARG_U32_IMM_SIZE,
             PushU32Reg => ARG_REG_ID_SIZE,
             PopU32ImmU32Reg => ARG_REG_ID_SIZE,
+
+            /******** [IO Instructions] ********/
             OutF32Imm => ARG_F32_IMM_SIZE + ARG_U8_IMM_SIZE,
             OutU32Imm => ARG_U32_IMM_SIZE + ARG_U8_IMM_SIZE,
             OutU32Reg => ARG_REG_ID_SIZE + ARG_U8_IMM_SIZE,
             OutU8Imm => ARG_U8_IMM_SIZE + ARG_U8_IMM_SIZE,
+            InU8Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
+            InU8Mem => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
+            InU32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
+            InU32Mem => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
+            InF32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
+            InF32Mem => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
 
             /******** [Logic Instructions] ********/
             BitTestU32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,

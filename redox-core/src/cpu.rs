@@ -1198,29 +1198,97 @@ impl Cpu {
                     .get_register_u32_mut(*out_reg)
                     .write(com_bus.mem.pop_u32(), privilege);
             }
+
+            /******** [IO Instructions] ********/
             OutF32Imm(value, port) => {
-                // out 0.1, $0
+                // out 0.1, $ff
                 if com_bus.write_f32(*value, *port).is_err() {
                     self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
                 }
             }
             OutU32Imm(value, port) => {
-                // out $deadbeef, $0
+                // out $deadbeef, $ff
                 if com_bus.write_u32(*value, *port).is_err() {
                     self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
                 }
             }
             OutU32Reg(reg, port) => {
-                // out %reg, $0
+                // out %reg, $ff
                 let value = self.read_reg_u32(reg, privilege);
                 if com_bus.write_u32(value, *port).is_err() {
                     self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
                 }
             }
             OutU8Imm(value, port) => {
-                // out $ff, $0
+                // out $ff, $ff
                 if com_bus.write_u8(*value, *port).is_err() {
                     self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
+                }
+            }
+            InU8Reg(port, reg) => {
+                // in $ff, %reg
+                match com_bus.read_u8(*port) {
+                    Err(_) => {
+                        self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
+                    }
+                    Ok(value) => {
+                        self.write_reg_u32(reg, value as u32, privilege);
+                    }
+                }
+            }
+            InU8Mem(port, addr) => {
+                // in $ff, [$addr]
+                match com_bus.read_u8(*port) {
+                    Err(_) => {
+                        self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
+                    }
+                    Ok(value) => {
+                        com_bus.mem.set(*addr as usize, value);
+                    }
+                }
+            }
+            InU32Reg(port, reg) => {
+                // in $ff, %reg
+                match com_bus.read_u32(*port) {
+                    Err(_) => {
+                        self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
+                    }
+                    Ok(value) => {
+                        self.write_reg_u32(reg, value, privilege);
+                    }
+                }
+            }
+            InU32Mem(port, addr) => {
+                // in $ff, [$addr]
+                match com_bus.read_u32(*port) {
+                    Err(_) => {
+                        self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
+                    }
+                    Ok(value) => {
+                        com_bus.mem.set_u32(*addr as usize, value);
+                    }
+                }
+            }
+            InF32Reg(port, reg) => {
+                // in $ff, %reg
+                match com_bus.read_f32(*port) {
+                    Err(_) => {
+                        self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
+                    }
+                    Ok(value) => {
+                        self.write_reg_f32(reg, value, privilege);
+                    }
+                }
+            }
+            InF32Mem(port, addr) => {
+                // in $ff, [$addr]
+                match com_bus.read_f32(*port) {
+                    Err(_) => {
+                        self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
+                    }
+                    Ok(value) => {
+                        com_bus.mem.set_f32(*addr as usize, value);
+                    }
                 }
             }
 
@@ -1615,7 +1683,7 @@ mod tests_cpu {
         },
         mem,
         reg::registers::RegisterId,
-        vm::{self, VirtualMachine},
+        vm::{self, VirtualMachine}, com_bus::communication_bus::TEST_DEBUG_DEVICE_ID,
     };
 
     use super::{Cpu, CpuFlag};
@@ -1809,7 +1877,7 @@ mod tests_cpu {
     #[test]
     fn test_writing_to_unused_port() {
         let tests = [TestU32::new(
-            &[OutU8Imm(0x0, 0xff)],
+            &[OutU8Imm(0x0, 0xfd)],
             &[],
             DEFAULT_U32_STACK_CAPACITY,
             false,
@@ -1831,14 +1899,14 @@ mod tests_cpu {
     #[test]
     fn test_writing_port_valid_data_types() {
         let tests = [TestU32::new(
-            &[OutU8Imm(0x0, 0x0), OutU32Imm(0x0, 0x0)],
+            &[OutU8Imm(0x0, TEST_DEBUG_DEVICE_ID), OutU32Imm(0x0, TEST_DEBUG_DEVICE_ID)],
             &[],
             DEFAULT_U32_STACK_CAPACITY,
             false,
             "OUT - failed to successfully execute OUT instruction with a valid port and data type",
         ),
         TestU32::new(
-            &[OutU32Reg(RegisterId::ER1, 0x0)],
+            &[OutU32Reg(RegisterId::ER1, TEST_DEBUG_DEVICE_ID)],
             &[],
             DEFAULT_U32_STACK_CAPACITY,
             false,
@@ -1852,7 +1920,7 @@ mod tests_cpu {
     #[test]
     fn test_writing_to_port_invalid_data_types() {
         let tests = [TestU32::new(
-            &[OutF32Imm(0.1, 0x0)],
+            &[OutF32Imm(0.1, TEST_DEBUG_DEVICE_ID)],
             &[],
             DEFAULT_U32_STACK_CAPACITY,
             false,

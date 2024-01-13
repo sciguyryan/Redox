@@ -117,6 +117,9 @@ impl ComBusIO for RandomDevice {
 
         if self.mode == RandomMode::Seeded {
             PRNG.with(|r| *r.borrow_mut() = StdRng::seed_from_u64(value as u64));
+
+            // Indicate that the PRNG has been seeded and initialized.
+            self.is_initialized = true;
         } else {
             result = DeviceResult::Err(DeviceError::OperationNotSupported);
         }
@@ -126,5 +129,55 @@ impl ComBusIO for RandomDevice {
 
     fn write_f32(&mut self, _value: f32) -> DeviceResult<()> {
         DeviceResult::Err(DeviceError::OperationNotSupported)
+    }
+}
+
+#[cfg(test)]
+mod tests_random_device {
+    use crate::com_bus::com_bus_io::ComBusIO;
+
+    use super::RandomDevice;
+
+    /// Test the PRNG to ensure it is non-repeating.
+    #[test]
+    fn test_prng() {
+        // By default, the generator should use an entropy-seeded PRNG.
+        let device = RandomDevice::default();
+        let mut sequence_1 = vec![];
+        for _ in 0..1000 {
+            sequence_1.push(device.read_u32().expect(""));
+        }
+
+        let device = RandomDevice::default();
+        let mut sequence_2 = vec![];
+        for _ in 0..1000 {
+            sequence_2.push(device.read_u32().expect(""));
+        }
+
+        assert_ne!(sequence_1, sequence_2);
+    }
+
+    /// Test the seeded PRNG to ensure it is repeating.
+    #[test]
+    fn test_seeded_prng() {
+        let mut device = RandomDevice::default();
+        _ = device.write_u8(0x1);
+        _ = device.write_u32(0xdeadbeef);
+
+        let mut sequence_1 = vec![];
+        for _ in 0..1000 {
+            sequence_1.push(device.read_u32().expect(""));
+        }
+
+        let mut device = RandomDevice::default();
+        _ = device.write_u8(0x1);
+        _ = device.write_u32(0xdeadbeef);
+
+        let mut sequence_2 = vec![];
+        for _ in 0..1000 {
+            sequence_2.push(device.read_u32().expect(""));
+        }
+
+        assert_eq!(sequence_1, sequence_2);
     }
 }

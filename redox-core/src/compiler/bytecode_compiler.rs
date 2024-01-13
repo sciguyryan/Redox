@@ -174,14 +174,32 @@ impl Compiler {
                 self.write_u8(imm2)
             }
 
+            /******** [f32 immediate and u8 immediate] ********/
             Instruction::OutF32Imm(imm1, imm2) => {
                 self.write_f32(imm1);
                 self.write_u8(imm2);
             }
 
+            /******** [register ID and u8 immediate] ********/
             Instruction::OutU32Reg(reg, imm) => {
                 self.write_register_id(&reg);
                 self.write_u8(imm);
+            }
+
+            /******** [u8 immediate and register ID] ********/
+            Instruction::InU8Reg(imm, reg)
+            | Instruction::InU32Reg(imm, reg)
+            | Instruction::InF32Reg(imm, reg) => {
+                self.write_u8(imm);
+                self.write_register_id(&reg);
+            }
+
+            /******** [u8 immediate and u32 immediate] ********/
+            Instruction::InU8Mem(imm1, imm2)
+            | Instruction::InU32Mem(imm1, imm2)
+            | Instruction::InF32Mem(imm1, imm2) => {
+                self.write_u8(imm1);
+                self.write_u32(imm2);
             }
 
             /******** [No Arguments] ********/
@@ -346,6 +364,12 @@ mod tests_compiler {
                 OutU32Imm => Instruction::OutU32Imm(0xdeadbeef, 0xab),
                 OutU32Reg => Instruction::OutU32Reg(ER2, 0xab),
                 OutU8Imm => Instruction::OutU8Imm(0xba, 0xab),
+                InU8Reg => Instruction::InU8Reg(0xab, ER2),
+                InU8Mem => Instruction::InU8Mem(0xab, 0xdeadbeef),
+                InU32Reg => Instruction::InU32Reg(0xab, ER2),
+                InU32Mem => Instruction::InU32Mem(0xab, 0xdeadbeef),
+                InF32Reg => Instruction::InF32Reg(0xab, FR2),
+                InF32Mem => Instruction::InF32Mem(0xab, 0xdeadbeef),
                 BitTestU32Reg => Instruction::BitTestU32Reg(0x40, ER2),
                 BitTestU32Mem => Instruction::BitTestU32Mem(0x40, 0x123),
                 BitTestResetU32Reg => Instruction::BitTestResetU32Reg(0x40, ER2),

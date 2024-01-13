@@ -117,14 +117,28 @@ pub enum OpCode {
     PushU32Reg,
     /// Pop a u32 value from the stack to a u32 register.
     PopU32ImmU32Reg,
+
+    /******** [IO Instructions] ********/
     /// Output a f32 immediate value to a specific port.
     OutF32Imm,
     /// Output a u32 immediate value to a specific port.
     OutU32Imm,
-    // Output a u32 register value value to a specific port.
+    /// Output a u32 register value value to a specific port.
     OutU32Reg,
     /// Output a u8 immediate value to a specific port.
     OutU8Imm,
+    /// Input a u8 value from a specific port into a specified register.
+    InU8Reg,
+    /// Input a u8 value from a specific port into a specified memory address.
+    InU8Mem,
+    /// Input a u32 value from a specific port into a specified register.
+    InU32Reg,
+    /// Input a u32 value from a specific port into a specified memory address.
+    InU32Mem,
+    /// Input a f32 value from a specific port into a specified register.
+    InF32Reg,
+    /// Input a f32 value from a specific port into a specified memory address.
+    InF32Mem,
 
     /******** [Logic Instructions] ********/
     /// Test the state of a bit from a u32 register. The CF flag will be set to the state of the bit.
@@ -251,10 +265,18 @@ impl From<&Instruction> for OpCode {
             PushU32Imm(_) => OpCode::PushU32Imm,
             PushU32Reg(_) => OpCode::PushU32Reg,
             PopU32ImmU32Reg(_) => OpCode::PopU32ImmU32Reg,
+
+            /******** [IO Instructions] ********/
             OutF32Imm(_, _) => OpCode::OutF32Imm,
             OutU32Imm(_, _) => OpCode::OutU32Imm,
             OutU32Reg(_, _) => OpCode::OutU32Reg,
             OutU8Imm(_, _) => OpCode::OutU8Imm,
+            InU8Reg(_, _) => OpCode::InU8Reg,
+            InU8Mem(_, _) => OpCode::InU8Mem,
+            InU32Reg(_, _) => OpCode::InU32Reg,
+            InU32Mem(_, _) => OpCode::InU32Mem,
+            InF32Reg(_, _) => OpCode::InF32Reg,
+            InF32Mem(_, _) => OpCode::InF32Mem,
 
             /******** [Logic Instructions] ********/
             BitTestU32Reg(_, _) => OpCode::BitTestU32Reg,
