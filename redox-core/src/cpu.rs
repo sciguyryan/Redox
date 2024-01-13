@@ -26,7 +26,7 @@ pub const INVALID_OPCODE_INT: u8 = 0x6;
 pub const GENERAL_PROTECTION_FAULT_INT: u8 = 0x0d;
 
 /// By default, all interrupts below 32 (0x20) are used for exceptions and are thus not maskable.
-const EXCEPTION_INT_CUTOFF: u8 = 0x1f;
+const EXCEPTION_INT_CUTOFF: u8 = 0x20;
 
 /// A list of f32 registers to be preserved when entering a subroutine. Use when storing state.
 ///
@@ -216,7 +216,7 @@ impl Cpu {
         // Should we handle this interrupt?
         // Exception interrupts have an interrupt code below 0x20 and are
         // considered important enough that they can't be masked.
-        if is_masked && int_code > EXCEPTION_INT_CUTOFF {
+        if is_masked && int_code >= EXCEPTION_INT_CUTOFF {
             return;
         }
 
