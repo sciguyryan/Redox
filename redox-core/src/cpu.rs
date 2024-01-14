@@ -232,6 +232,7 @@ impl Cpu {
         // Get the handler address from the interrupt vector.
         let iv_handler_addr = mem.get_u32(iv_addr as usize);
         if iv_handler_addr == 0 {
+            // TODO - there might be something else we want to do here instead.
             panic!("no handler has been specified for this interrupt code!");
         }
 
@@ -426,7 +427,7 @@ impl Cpu {
     ///
     /// # Returns
     ///
-    /// The result of the operation, truncated in the case of an overflow.
+    /// The result of the operation.
     ///
     /// # Note
     ///
@@ -438,8 +439,6 @@ impl Cpu {
         if shift_by == 0 {
             return value;
         }
-
-        assert!(shift_by <= 31);
 
         let final_value = value << shift_by;
         self.set_flag_state(CpuFlag::SF, utils::is_bit_set(final_value, 31));
@@ -575,13 +574,8 @@ impl Cpu {
     /// # Note
     ///
     /// This method affects the following flags: Carry (CF). Any other flags are undefined.
-    ///
-    /// This method will panic if the bit index is larger than the number of bytes in the value.
     #[inline(always)]
     fn perform_bit_test_with_carry_flag(&mut self, value: u32, bit: u8) {
-        // Values must be in range of the number of bits in the type.
-        assert!(bit <= 31);
-
         // Set the carry flag to the current state of the bit.
         self.set_flag_state(CpuFlag::CF, utils::is_bit_set(value, bit));
     }
@@ -672,6 +666,9 @@ impl Cpu {
         assert!(index <= 31);
 
         let value = self.registers.read_reg_u32(source_reg, privilege);
+
+        // TODO - we can probably use the intrinsics here, e.g.:
+        // TODO - https://doc.rust-lang.org/stable/core/arch/x86_64/fn._bzhi_u32.html
         let final_value = if index > 0 {
             value & ((1 << (32 - index)) - 1)
         } else {
@@ -1238,18 +1235,18 @@ impl Cpu {
             BitTestU32Reg(bit, reg) => {
                 // bt bit, reg
                 let value = self.registers.read_reg_u32(reg, privilege);
-                self.perform_bit_test_with_carry_flag(value, *bit);
+                self.perform_bit_test_with_carry_flag(value, *bit % 32);
             }
             BitTestU32Mem(bit, addr) => {
                 // bt bit, [addr]
                 let value = com_bus.mem.get_u32(*addr as usize);
-                self.perform_bit_test_with_carry_flag(value, *bit);
+                self.perform_bit_test_with_carry_flag(value, *bit % 32);
             }
             BitTestResetU32Reg(bit, reg) => {
                 // btr bit, reg
                 // Read the value and set the carry flag state, clear the bit.
                 let mut value = self.registers.read_reg_u32(reg, privilege);
-                self.perform_bit_test_with_carry_flag_with_set(&mut value, *bit, false);
+                self.perform_bit_test_with_carry_flag_with_set(&mut value, *bit % 32, false);
 
                 // Write the value back to the register.
                 self.write_reg_u32(reg, value, privilege);
@@ -1258,7 +1255,7 @@ impl Cpu {
                 // btr bit, [addr]
                 // Read the value and set the carry flag state, then clear the bit.
                 let mut value = com_bus.mem.get_u32(*addr as usize);
-                self.perform_bit_test_with_carry_flag_with_set(&mut value, *bit, false);
+                self.perform_bit_test_with_carry_flag_with_set(&mut value, *bit % 32, false);
 
                 com_bus.mem.set_u32(*addr as usize, value);
             }
@@ -1266,7 +1263,7 @@ impl Cpu {
                 // bts bit, reg
                 // Read the value and set the carry flag state, set the bit.
                 let mut value = self.registers.read_reg_u32(reg, privilege);
-                self.perform_bit_test_with_carry_flag_with_set(&mut value, *bit, true);
+                self.perform_bit_test_with_carry_flag_with_set(&mut value, *bit % 32, true);
 
                 // Write the value back to the register.
                 self.write_reg_u32(reg, value, privilege);
@@ -1275,7 +1272,7 @@ impl Cpu {
                 // bts bit, [addr]
                 // Read the value and set the carry flag state, then set the bit.
                 let mut value = com_bus.mem.get_u32(*addr as usize);
-                self.perform_bit_test_with_carry_flag_with_set(&mut value, *bit, true);
+                self.perform_bit_test_with_carry_flag_with_set(&mut value, *bit % 32, true);
 
                 com_bus.mem.set_u32(*addr as usize, value);
             }
@@ -5593,11 +5590,18 @@ mod tests_cpu {
                 "BT - incorrect result produced from the bit-test instruction - carry flag set",
             ),
             TestU32::new(
-                &[BitTestU32Reg(0x20, RegisterId::ER1)],
-                &[],
+                &[
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
+                    // The modulo of the bit should be taken, meaning the 0th bit should be tested.
+                    BitTestU32Reg(0x20, RegisterId::ER1),
+                ],
+                &[
+                    (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
+                ],
                 DEFAULT_U32_STACK_CAPACITY,
-                true,
-                "BT - successfully executed instruction with invalid bit index",
+                false,
+                "BT - incorrect result produced from the bit-test instruction - carry flag not set",
             ),
         ];
 
@@ -5629,11 +5633,15 @@ mod tests_cpu {
                 "BT - incorrect result produced from the bit-test instruction - carry flag set",
             ),
             TestU32::new(
-                &[BitTestU32Mem(0x20, 0x0)],
-                &[],
+                &[
+                    // The modulo of the bit should be taken, meaning the 0th bit should be tested.
+                    MovU32ImmMemSimple(0b1111_1111_1111_1111_1111_1111_1111_1111, 0x0),
+                    BitTestU32Mem(0x20, 0x0),
+                ],
+                &[(RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF]))],
                 DEFAULT_U32_STACK_CAPACITY,
-                true,
-                "BT - successfully executed instruction with invalid bit index",
+                false,
+                "BT - incorrect result produced from the bit-test instruction - carry flag not set",
             ),
         ];
 
@@ -5656,7 +5664,6 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
                 ],
-
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BTR - incorrect result produced from the bit-test instruction - carry flag not set",
@@ -5677,12 +5684,19 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[
+                    MovU32ImmU32Reg(
+                        0b1111_1111_1111_1111_1111_1111_1111_1111,
+                        RegisterId::ER1,
+                    ),
+                    // The modulo of the bit should be taken, meaning the 0th bit should be tested.
                     BitTestResetU32Reg(0x20, RegisterId::ER1),
                 ],
-                &[],
-
+                &[
+                    (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
+                ],
                 DEFAULT_U32_STACK_CAPACITY,
-                true,
+                false,
                 "BTR - successfully executed instruction with invalid bit index",
             ),
         ];
@@ -5701,7 +5715,6 @@ mod tests_cpu {
                         0x0,
                     ),
                     BitTestResetU32Mem(0x0, 0x0),
-                    // Check that the value was written by reading it back into a register.
                     MovMemU32RegSimple(0x0, RegisterId::ER8),
                 ],
                 &[(RegisterId::ER8, 0b1111_1111_1111_1111_1111_1111_1111_1110), (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF]))],
@@ -5716,7 +5729,6 @@ mod tests_cpu {
                         0x0,
                     ),
                     BitTestResetU32Mem(0x0, 0x0),
-                    // Check that the value was written by reading it back into a register.
                     MovMemU32RegSimple(0x0, RegisterId::ER8),
                 ],
                 &[(RegisterId::ER8, 0b1111_1111_1111_1111_1111_1111_1111_1110)],
@@ -5725,12 +5737,19 @@ mod tests_cpu {
                 "BTR - incorrect result produced from the bit-test instruction - carry flag set",
             ),
             TestU32::new(
-                &[BitTestResetU32Mem(0x20, 0x0)],
-                &[],
-
+                &[
+                    MovU32ImmMemSimple(
+                        0b1111_1111_1111_1111_1111_1111_1111_1111,
+                        0x0,
+                    ),
+                    // The modulo of the bit should be taken, meaning the 0th bit should be tested.
+                    BitTestResetU32Mem(0x20, 0x0),
+                    MovMemU32RegSimple(0x0, RegisterId::ER8),
+                ],
+                &[(RegisterId::ER8, 0b1111_1111_1111_1111_1111_1111_1111_1110), (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF]))],
                 DEFAULT_U32_STACK_CAPACITY,
-                true,
-                "BTR - successfully executed instruction with invalid bit index",
+                false,
+                "BTR - incorrect result produced from the bit-test instruction - carry flag not set",
             ),
         ];
 
@@ -5753,7 +5772,6 @@ mod tests_cpu {
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
                 ],
-
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BTS - incorrect result produced from the bit-test instruction - carry flag not set",
@@ -5773,12 +5791,21 @@ mod tests_cpu {
                 "BTS - incorrect result produced from the bit-test instruction - carry flag set",
             ),
             TestU32::new(
-                &[BitTestSetU32Reg(0x20, RegisterId::ER1)],
-                &[],
-
+                &[
+                    MovU32ImmU32Reg(
+                        0b1111_1111_1111_1111_1111_1111_1111_1111,
+                        RegisterId::ER1,
+                    ),
+                    // The modulo of the bit should be taken, meaning the 0th bit should be tested.
+                    BitTestSetU32Reg(0x20, RegisterId::ER1),
+                ],
+                &[
+                    (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
+                ],
                 DEFAULT_U32_STACK_CAPACITY,
-                true,
-                "BTS - successfully executed instruction with invalid bit index",
+                false,
+                "BTS - incorrect result produced from the bit-test instruction - carry flag not set",
             ),
         ];
 
@@ -5796,7 +5823,6 @@ mod tests_cpu {
                         0x0,
                     ),
                     BitTestSetU32Mem(0x0, 0x0),
-                    // Check that the value was written by reading it back into a register.
                     MovMemU32RegSimple(0x0, RegisterId::ER8),
                 ],
                 &[
@@ -5814,7 +5840,6 @@ mod tests_cpu {
                         0x0,
                     ),
                     BitTestSetU32Mem(0x0, 0x0),
-                    // Check that the value was written by reading it back into a register.
                     MovMemU32RegSimple(0x0, RegisterId::ER8),
                 ],
                 &[(RegisterId::ER8, 0b1111_1111_1111_1111_1111_1111_1111_1111)],
@@ -5823,12 +5848,22 @@ mod tests_cpu {
                 "BTS - incorrect result produced from the bit-test instruction - carry flag set",
             ),
             TestU32::new(
-                &[BitTestSetU32Mem(0x20, 0x0)],
-                &[],
-
+                &[
+                    MovU32ImmMemSimple(
+                        0b1111_1111_1111_1111_1111_1111_1111_1111,
+                        0x0,
+                    ),
+                    // The modulo of the bit should be taken, meaning the 0th bit should be tested.
+                    BitTestSetU32Mem(0x20, 0x0),
+                    MovMemU32RegSimple(0x0, RegisterId::ER8),
+                ],
+                &[
+                    (RegisterId::ER8, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF]))
+                ],
                 DEFAULT_U32_STACK_CAPACITY,
-                true,
-                "BTS - successfully executed instruction with invalid bit index",
+                false,
+                "BTS - incorrect result produced from the bit-test instruction - carry flag not set",
             ),
         ];
 
@@ -5868,6 +5903,7 @@ mod tests_cpu {
                     BitScanReverseU32RegU32Reg(RegisterId::ER1, RegisterId::ER2),
                 ],
                 &[
+                    // The modulo of the bit should be taken, meaning the last bit should be tested.
                     (RegisterId::ER2, 0x20),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::ZF])),
                 ],
@@ -5927,7 +5963,6 @@ mod tests_cpu {
                 &[
                     MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
                     BitScanReverseU32RegMemU32(RegisterId::ER1, 0x0),
-                    // Check that the value was written by reading it back into a register.
                     MovMemU32RegSimple(0x0, RegisterId::ER8),
                 ],
                 &[
@@ -5942,7 +5977,6 @@ mod tests_cpu {
                 &[
                     MovU32ImmU32Reg(0b0000_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
                     BitScanReverseU32RegMemU32(RegisterId::ER1, 0x0),
-                    // Check that the value was written by reading it back into a register.
                     MovMemU32RegSimple(0x0, RegisterId::ER8),
                 ],
                 &[
@@ -5956,7 +5990,6 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     BitScanReverseU32RegMemU32(RegisterId::ER1, 0x0),
-                    // Check that the value was written by reading it back into a register.
                     MovMemU32RegSimple(0x0, RegisterId::ER8),
                 ],
                 &[
@@ -6111,7 +6144,6 @@ mod tests_cpu {
                 &[
                     MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
                     BitScanForwardU32RegMemU32(RegisterId::ER1, 0x0),
-                    // Check that the value was written by reading it back into a register.
                     MovMemU32RegSimple(0x0, RegisterId::ER8),
                 ],
                 &[
@@ -6126,7 +6158,6 @@ mod tests_cpu {
                 &[
                     MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_0000, RegisterId::ER1),
                     BitScanForwardU32RegMemU32(RegisterId::ER1, 0x0),
-                    // Check that the value was written by reading it back into a register.
                     MovMemU32RegSimple(0x0, RegisterId::ER8),
                 ],
                 &[
@@ -6140,7 +6171,6 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     BitScanForwardU32RegMemU32(RegisterId::ER1, 0x0),
-                    // Check that the value was written by reading it back into a register.
                     MovMemU32RegSimple(0x0, RegisterId::ER8),
                 ],
                 &[
@@ -6164,7 +6194,6 @@ mod tests_cpu {
                 &[
                     MovU32ImmMemSimple(0b1111_1111_1111_1111_1111_1111_1111_1111, 0x1000),
                     BitScanForwardU32MemU32Mem(0x1000, 0x1004),
-                    // Check that the value was written by reading it back into a register.
                     MovMemU32RegSimple(0x1004, RegisterId::ER8),
                 ],
                 &[(RegisterId::ER8, 0x0)],
@@ -6176,7 +6205,6 @@ mod tests_cpu {
                 &[
                     MovU32ImmMemSimple(0b1111_1111_1111_1111_1111_1111_1111_0000, 0x1000),
                     BitScanForwardU32MemU32Mem(0x1000, 0x1004),
-                    // Check that the value was written by reading it back into a register.
                     MovMemU32RegSimple(0x1004, RegisterId::ER8),
                 ],
                 &[(RegisterId::ER8, 0x4)],
@@ -6187,7 +6215,6 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     BitScanForwardU32MemU32Mem(0x1000, 0x1004),
-                    // Check that the value was written by reading it back into a register.
                     MovMemU32RegSimple(0x1004, RegisterId::ER8),
                 ],
                 &[

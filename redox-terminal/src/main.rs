@@ -65,6 +65,7 @@ fn main() {
     if cfg!(target_endian = "big") {
         panic!("currently unsupported");
     }
+
     //let base_offset = vm::MIN_USER_SEGMENT_SIZE as u32;
 
     let instructions = &[
