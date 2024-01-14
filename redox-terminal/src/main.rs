@@ -4,6 +4,7 @@ use redox_core::{
     compiler::bytecode_compiler::Compiler,
     ins::instruction::Instruction,
     mem,
+    reg::registers::RegisterId,
     vm::{self, VirtualMachine},
 };
 
@@ -95,6 +96,7 @@ fn main() {
         /***** INT_FF - Interrupt handler for interrupt 0xff starts here. *****/
         Instruction::MovU32ImmU32Reg(0x5, RegisterId::ER1), // Starts at [base + 69]. Length = 9.
         Instruction::IntRet,*/
+        Instruction::MovU32ImmU32Reg(0xdeadbeef, RegisterId::ER1),
         Instruction::Halt,
     ];
 

@@ -4,7 +4,6 @@ use crate::{
     cpu::Cpu,
     ins::instruction::Instruction,
     mem::memory_handler::{MemoryHandler, MEGABYTE},
-    reg::registers::Registers,
 };
 
 /// The smallest permitted size of the user memory segment.
@@ -87,21 +86,6 @@ impl VirtualMachine {
             .get_mapped_segment_by_index_mut(boot_mem_id)
             .expect("failed to get memory segment")
             .set_contents(&boot_rom);
-    }
-
-    /// Reset the virtual machine back to a default configuration.
-    pub fn reset(&mut self) {
-        // Clear any stack type hints that may be present.
-        self.com_bus.mem.reset_stack_configuration();
-
-        // Completely clear the physical memory segment.
-        self.com_bus.mem.clear();
-
-        // Reset the registers to their startup configuration.
-        self.cpu.registers = Registers::default();
-
-        // Allow the CPU to run.
-        self.cpu.is_halted = false;
     }
 
     /// Run the virtual machine until completion.
