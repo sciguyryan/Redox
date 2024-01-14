@@ -1,9 +1,6 @@
+use rand::{rngs::OsRng, Rng, SeedableRng};
+use rand_xoshiro::Xoshiro256Plus;
 use std::cell::RefCell;
-
-use rand::{
-    rngs::{OsRng, StdRng},
-    Rng, SeedableRng,
-};
 
 use super::{
     com_bus_io::ComBusIO,
@@ -11,8 +8,8 @@ use super::{
 };
 
 thread_local! {
-    static PRNG: RefCell<StdRng> = RefCell::new(StdRng::from_entropy());
-    static OSRNG: RefCell<OsRng> = RefCell::new(OsRng);
+    static PRNG: RefCell<Xoshiro256Plus> = RefCell::new(Xoshiro256Plus::from_entropy());
+    static CRNG: RefCell<OsRng> = RefCell::new(OsRng);
 }
 
 #[derive(PartialEq, Eq)]
@@ -52,11 +49,11 @@ impl ComBusIO for RandomDevice {
             return DeviceResult::Err(DeviceError::Misconfigured);
         }
 
-        let value: u8 = match self.mode {
-            RandomMode::Crypto => OSRNG.with(|r| r.borrow_mut().gen::<u8>()),
-            RandomMode::Seeded | RandomMode::Standard => PRNG.with(|r| r.borrow_mut().gen::<u8>()),
-        };
-        Ok(value)
+        Ok(match self.mode {
+            RandomMode::Crypto => CRNG.with(|r| r.borrow_mut().gen::<u8>()),
+            RandomMode::Seeded => PRNG.with(|r| r.borrow_mut().gen::<u8>()),
+            RandomMode::Standard => rand::thread_rng().gen::<u8>(),
+        })
     }
 
     fn read_u32(&self) -> DeviceResult<u32> {
@@ -64,11 +61,11 @@ impl ComBusIO for RandomDevice {
             return DeviceResult::Err(DeviceError::Misconfigured);
         }
 
-        let value: u32 = match self.mode {
-            RandomMode::Crypto => OSRNG.with(|r| r.borrow_mut().gen::<u32>()),
-            RandomMode::Seeded | RandomMode::Standard => PRNG.with(|r| r.borrow_mut().gen::<u32>()),
-        };
-        Ok(value)
+        Ok(match self.mode {
+            RandomMode::Crypto => CRNG.with(|r| r.borrow_mut().gen::<u32>()),
+            RandomMode::Seeded => PRNG.with(|r| r.borrow_mut().gen::<u32>()),
+            RandomMode::Standard => rand::thread_rng().gen::<u32>(),
+        })
     }
 
     fn read_f32(&self) -> DeviceResult<f32> {
@@ -76,11 +73,11 @@ impl ComBusIO for RandomDevice {
             return DeviceResult::Err(DeviceError::Misconfigured);
         }
 
-        let value: f32 = match self.mode {
-            RandomMode::Crypto => OSRNG.with(|r| r.borrow_mut().gen::<f32>()),
-            RandomMode::Seeded | RandomMode::Standard => PRNG.with(|r| r.borrow_mut().gen::<f32>()),
-        };
-        Ok(value)
+        Ok(match self.mode {
+            RandomMode::Crypto => CRNG.with(|r| r.borrow_mut().gen::<f32>()),
+            RandomMode::Seeded => PRNG.with(|r| r.borrow_mut().gen::<f32>()),
+            RandomMode::Standard => rand::thread_rng().gen::<f32>(),
+        })
     }
 
     fn write_u8(&mut self, value: u8) -> DeviceResult<()> {
@@ -90,7 +87,7 @@ impl ComBusIO for RandomDevice {
         match value {
             0 => {
                 // Standard mode - a PRNG derived from entropy.
-                PRNG.with(|r| *r.borrow_mut() = StdRng::from_entropy());
+                PRNG.with(|r| *r.borrow_mut() = Xoshiro256Plus::from_entropy());
                 self.mode = RandomMode::Standard;
                 self.is_initialized = true;
             }
@@ -116,7 +113,7 @@ impl ComBusIO for RandomDevice {
         let mut result = DeviceResult::Ok(());
 
         if self.mode == RandomMode::Seeded {
-            PRNG.with(|r| *r.borrow_mut() = StdRng::seed_from_u64(value as u64));
+            PRNG.with(|r| *r.borrow_mut() = Xoshiro256Plus::seed_from_u64(value as u64));
 
             // Indicate that the PRNG has been seeded and initialized.
             self.is_initialized = true;
