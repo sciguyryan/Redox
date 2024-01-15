@@ -1,3 +1,5 @@
+use crate::ins::op_codes::OpCode;
+
 #[derive(Debug, Clone)]
 pub enum ArgTypeHint {
     F32,
@@ -11,17 +13,18 @@ pub enum ArgTypeHint {
 pub struct InstructionHint {
     name: String,
     args: Vec<ArgTypeHint>,
+    opcode: OpCode,
 }
 
 impl InstructionHint {
-    pub fn new(name: String, args: Vec<ArgTypeHint>) -> Self {
-        Self { name, args }
+    pub fn new(name: String, args: Vec<ArgTypeHint>, opcode: OpCode) -> Self {
+        Self { name, opcode, args }
     }
 }
 
 macro_rules! hint {
-    ($name:expr, $args:expr) => {{
-        InstructionHint::new($name.to_string(), $args.to_vec())
+    ($name:expr, $args:expr, $op:expr) => {{
+        InstructionHint::new($name.to_string(), $args.to_vec(), $op)
     }};
 }
 
@@ -33,7 +36,11 @@ pub struct InstructionHints {
 impl InstructionHints {
     pub fn new() -> Self {
         Self {
-            hints: vec![hint!("add", [ArgTypeHint::U32, ArgTypeHint::Register])],
+            hints: vec![hint!(
+                "add",
+                [ArgTypeHint::U32, ArgTypeHint::Register],
+                OpCode::AddU32ImmU32Reg
+            )],
         }
     }
 }

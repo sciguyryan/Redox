@@ -67,8 +67,11 @@ fn main() {
         panic!("currently unsupported");
     }
 
-    let hints = AsmParser::new();
-    hints.test();
+    let assembly = "add 0x123, R1";
+
+    let parser = AsmParser::new();
+    parser.parse(assembly);
+    return;
 
     let instructions = &[
         // Indicate that we want to make a seeded random number generator.
