@@ -4,11 +4,12 @@ use redox_core::{
     compiler::bytecode_compiler::Compiler,
     ins::instruction::Instruction,
     mem,
+    parsing::asm_parser::AsmParser,
     reg::registers::RegisterId,
     vm::{self, VirtualMachine},
 };
 
-use std::{arch::asm, time::Instant};
+use std::time::Instant;
 
 // https://onlinedocs.microchip.com/pr/GUID-0E320577-28E6-4365-9BB8-9E1416A0A6E4-en-US-6/index.html?GUID-4983CB0C-7FEB-40F1-99D3-0608805404F3
 // https://www.youtube.com/watch?v=KkenLT8S9Hs&list=WL&index=17
@@ -65,6 +66,9 @@ fn main() {
     if cfg!(target_endian = "big") {
         panic!("currently unsupported");
     }
+
+    let hints = AsmParser::new();
+    hints.test();
 
     let instructions = &[
         // Indicate that we want to make a seeded random number generator.
