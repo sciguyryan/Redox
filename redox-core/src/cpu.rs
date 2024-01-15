@@ -440,6 +440,8 @@ impl Cpu {
             return value;
         }
 
+        assert!(shift_by <= 31);
+
         let final_value = value << shift_by;
         self.set_flag_state(CpuFlag::SF, utils::is_bit_set(final_value, 31));
         self.set_flag_state(CpuFlag::ZF, final_value == 0);
@@ -448,7 +450,7 @@ impl Cpu {
         }
         self.set_flag_state(
             CpuFlag::CF,
-            utils::is_bit_set_32(value, (32 - shift_by) & 1),
+            utils::is_bit_set(value, ((32 - shift_by) as u8) & 1),
         );
         self.set_flag_state(CpuFlag::PF, Cpu::calculate_lowest_byte_parity(final_value));
 

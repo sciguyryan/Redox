@@ -8,7 +8,7 @@ use redox_core::{
     vm::{self, VirtualMachine},
 };
 
-use std::time::Instant;
+use std::{arch::asm, time::Instant};
 
 // https://onlinedocs.microchip.com/pr/GUID-0E320577-28E6-4365-9BB8-9E1416A0A6E4-en-US-6/index.html?GUID-4983CB0C-7FEB-40F1-99D3-0608805404F3
 // https://www.youtube.com/watch?v=KkenLT8S9Hs&list=WL&index=17
@@ -61,12 +61,38 @@ use std::time::Instant;
     );
 }*/
 
+const BIT_MASKS: [u32; 32] = [
+    0x1, 0x2, 0x4, 0x8, 0x10, 0x20, 0x40, 0x80, 0x100, 0x200, 0x400, 0x800, 0x1000, 0x2000, 0x4000,
+    0x8000, 0x10000, 0x20000, 0x40000, 0x80000, 0x100000, 0x200000, 0x400000, 0x800000, 0x1000000,
+    0x2000000, 0x4000000, 0x8000000, 0x10000000, 0x20000000, 0x40000000, 0x80000000,
+];
+
+#[inline(never)]
+pub fn is_bit_set_2(value: u32, bit: u8) -> bool {
+    unsafe { (value & BIT_MASKS.get_unchecked(bit as usize)) != 0 }
+}
+
+#[inline(never)]
+pub fn is_bit_set_3(value: u32, bit: u32) -> bool {
+    let result: u32;
+    unsafe {
+        asm!(
+            "bt {0:e}, {1:e}",
+            inout(reg) value => _,
+            in(reg) bit
+        );
+        asm!(
+            "adc {0:e}, 0",
+            out(reg) result
+        );
+    }
+    result != 0
+}
+
 fn main() {
     if cfg!(target_endian = "big") {
         panic!("currently unsupported");
     }
-
-    //let base_offset = vm::MIN_USER_SEGMENT_SIZE as u32;
 
     let instructions = &[
         // Indicate that we want to make a seeded random number generator.

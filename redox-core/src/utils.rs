@@ -6,22 +6,21 @@ const BIT_MASKS: [u32; 32] = [
 
 #[inline(always)]
 pub fn is_bit_set(value: u32, bit: u8) -> bool {
-    (value & BIT_MASKS[bit as usize]) != 0
-}
-
-#[inline(always)]
-pub fn is_bit_set_32(value: u32, bit: u32) -> bool {
-    is_bit_set(value, bit as u8)
+    unsafe { (value & BIT_MASKS.get_unchecked(bit as usize)) != 0 }
 }
 
 #[inline(always)]
 pub fn set_bit_state(value: u32, bit: u8, state: bool) -> u32 {
-    let mask = BIT_MASKS[bit as usize];
-    (value & !mask) | (((state as u32) << bit) & mask)
+    unsafe {
+        let mask = BIT_MASKS.get_unchecked(bit as usize);
+        (value & !mask) | (((state as u32) << bit) & mask)
+    }
 }
 
 #[inline(always)]
 pub fn set_bit_state_inline(value: &mut u32, bit: u8, state: bool) {
-    let mask = BIT_MASKS[bit as usize];
-    *value = (*value & !mask) | (((state as u32) << bit) & mask)
+    unsafe {
+        let mask = BIT_MASKS.get_unchecked(bit as usize);
+        *value = (*value & !mask) | (((state as u32) << bit) & mask)
+    }
 }
