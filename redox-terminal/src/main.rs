@@ -69,13 +69,12 @@ fn main() {
     //let base_offset = vm::MIN_USER_SEGMENT_SIZE as u32;
 
     let instructions = &[
-        /*// Indicate that we want to make a seeded random number generator.
+        // Indicate that we want to make a seeded random number generator.
         Instruction::OutU8Imm(0x1, 0x0),
         // Specify our seed.
         Instruction::OutU32Imm(0xdeadbeef, 0x0),
         // Read a PRNG from the device.
-        Instruction::InU32Reg(0x0, RegisterId::ER1),*/
-
+        Instruction::InU32Reg(0x0, RegisterId::ER1),
         /*// Write the handler addresses into the IVT.
         // Handler for 0x00. This is a non-maskable interrupt.
         // We are essentially replacing the default handler for the division by zero interrupt.
@@ -96,7 +95,6 @@ fn main() {
         /***** INT_FF - Interrupt handler for interrupt 0xff starts here. *****/
         Instruction::MovU32ImmU32Reg(0x5, RegisterId::ER1), // Starts at [base + 69]. Length = 9.
         Instruction::IntRet,*/
-        Instruction::MovU32ImmU32Reg(0xdeadbeef, RegisterId::ER1),
         Instruction::Halt,
     ];
 

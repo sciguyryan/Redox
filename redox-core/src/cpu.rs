@@ -1,5 +1,5 @@
 use core::fmt;
-use std::{panic, slice::Iter};
+use std::{arch::asm, panic, slice::Iter};
 
 use crate::{
     com_bus::communication_bus::CommunicationBus,
@@ -667,12 +667,23 @@ impl Cpu {
 
         let value = self.registers.read_reg_u32(source_reg, privilege);
 
-        // TODO - we can probably use the intrinsics here, e.g.:
-        // TODO - https://doc.rust-lang.org/stable/core/arch/x86_64/fn._bzhi_u32.html
-        let final_value = if index > 0 {
-            value & ((1 << (32 - index)) - 1)
+        let final_value: u32;
+        if is_x86_feature_detected!("bmi2") {
+            // We can use the inbuilt assembly instruction here for added performance gains.
+            unsafe {
+                asm!(
+                    "bzhi {0:e}, {1:e}, {2:e}",
+                    out(reg) final_value,
+                    in(reg) value,
+                    in(reg) index,
+                );
+            }
         } else {
-            value
+            final_value = if index > 0 {
+                value & ((1 << index) - 1)
+            } else {
+                value
+            };
         };
 
         self.set_flag_state(CpuFlag::SF, utils::is_bit_set(final_value, 31));
@@ -5270,13 +5281,43 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
-                    MovU32ImmU32Reg(0x4, RegisterId::ER2),
+                    MovU32ImmU32Reg(4, RegisterId::ER2),
                     ZeroHighBitsByIndexU32Reg(RegisterId::ER2, RegisterId::ER1, RegisterId::ER3),
                 ],
                 &[
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::ER2, 0x4),
-                    (RegisterId::ER3, 0b0000_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::ER2, 4),
+                    (RegisterId::ER3, 0b0000_0000_0000_0000_0000_0000_0000_1111),
+                ],
+                DEFAULT_U32_STACK_CAPACITY,
+                false,
+                "ZHBI - incorrect result value produced",
+            ),
+            TestU32::new(
+                &[
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
+                    MovU32ImmU32Reg(24, RegisterId::ER2),
+                    ZeroHighBitsByIndexU32Reg(RegisterId::ER2, RegisterId::ER1, RegisterId::ER3),
+                ],
+                &[
+                    (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::ER2, 24),
+                    (RegisterId::ER3, 0b0000_0000_1111_1111_1111_1111_1111_1111),
+                ],
+                DEFAULT_U32_STACK_CAPACITY,
+                false,
+                "ZHBI - incorrect result value produced",
+            ),
+            TestU32::new(
+                &[
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
+                    MovU32ImmU32Reg(25, RegisterId::ER2),
+                    ZeroHighBitsByIndexU32Reg(RegisterId::ER2, RegisterId::ER1, RegisterId::ER3),
+                ],
+                &[
+                    (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::ER2, 25),
+                    (RegisterId::ER3, 0b0000_0001_1111_1111_1111_1111_1111_1111),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -5286,14 +5327,13 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
-                    MovU32ImmU32Reg(0x18, RegisterId::ER2),
+                    MovU32ImmU32Reg(27, RegisterId::ER2),
                     ZeroHighBitsByIndexU32Reg(RegisterId::ER2, RegisterId::ER1, RegisterId::ER3),
                 ],
                 &[
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::ER2, 0x18),
-                    (RegisterId::ER3, 0b0000_0000_0000_0000_0000_0000_1111_1111),
-                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
+                    (RegisterId::ER2, 27),
+                    (RegisterId::ER3, 0b0000_0111_1111_1111_1111_1111_1111_1111),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -5301,39 +5341,8 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
-                    MovU32ImmU32Reg(0x19, RegisterId::ER2),
-                    ZeroHighBitsByIndexU32Reg(RegisterId::ER2, RegisterId::ER1, RegisterId::ER3),
-                ],
-                &[
-                    (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::ER2, 0x19),
-                    (RegisterId::ER3, 0b0000_0000_0000_0000_0000_0000_0111_1111),
-                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
-                ],
-                DEFAULT_U32_STACK_CAPACITY,
-                false,
-                "ZHBI - incorrect result value produced",
-            ),
-            TestU32::new(
-                &[
-                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
-                    MovU32ImmU32Reg(0x1b, RegisterId::ER2),
-                    ZeroHighBitsByIndexU32Reg(RegisterId::ER2, RegisterId::ER1, RegisterId::ER3),
-                ],
-                &[
-                    (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::ER2, 0x1b),
-                    (RegisterId::ER3, 0b0000_0000_0000_0000_0000_0000_0001_1111),
-                ],
-                DEFAULT_U32_STACK_CAPACITY,
-                false,
-                "ZHBI - incorrect result value produced",
-            ),
-            TestU32::new(
-                &[
-                    MovU32ImmU32Reg(0x0, RegisterId::ER1),
-                    MovU32ImmU32Reg(0x0, RegisterId::ER2),
+                    MovU32ImmU32Reg(0, RegisterId::ER1),
+                    MovU32ImmU32Reg(0, RegisterId::ER2),
                     ZeroHighBitsByIndexU32Reg(RegisterId::ER2, RegisterId::ER1, RegisterId::ER3),
                 ],
                 &[(RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::ZF]))],
@@ -5358,7 +5367,7 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0x20, RegisterId::ER2),
+                    MovU32ImmU32Reg(32, RegisterId::ER2),
                     ZeroHighBitsByIndexU32Reg(
                         RegisterId::ER2,
                         RegisterId::ER1, // Already has the value of 0.
@@ -5370,38 +5379,12 @@ mod tests_cpu {
                 true,
                 "ZHBI - successfully executed instruction with invalid bit index",
             ),
-            // Test the signed flag gets set.
-            TestU32::new(
-                &[
-                    // Clear every flag.
-                    MovU32ImmU32Reg(0x0, RegisterId::EFL),
-                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
-                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER3),
-                    ZeroHighBitsByIndexU32Reg(
-                        RegisterId::ER2, // Already has the value of 0.
-                        RegisterId::ER1,
-                        RegisterId::ER3,
-                    ),
-                ],
-                &[
-                    (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::ER3, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (
-                        RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::CF]),
-                    ),
-                ],
-                DEFAULT_U32_STACK_CAPACITY,
-                false,
-                "ZHBI - CPU signed flag not correctly set",
-            ),
             // Test the signed flag gets cleared.
             TestU32::new(
                 &[
                     // Manually set the signed flag.
                     MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
-                    MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER3),
                     ZeroHighBitsByIndexU32Reg(
                         RegisterId::ER2, // Already has the value of 0.
                         RegisterId::ER1,
@@ -5410,8 +5393,8 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::ER1, 0b0111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::ER3, 0b0111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
+                    (RegisterId::ER3, 0),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::ZF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -5433,8 +5416,7 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::ER2, 0b0000_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
+                    (RegisterId::ER2, 0b0000_0000_0000_0000_0000_0000_0000_1111),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -5447,7 +5429,7 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::ER2, 0b0000_0000_0000_0000_0000_0000_1111_1111),
+                    (RegisterId::ER2, 0b0000_0000_1111_1111_1111_1111_1111_1111),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -5461,7 +5443,7 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::ER2, 0b0000_0000_0000_0000_0000_0000_0111_1111),
+                    (RegisterId::ER2, 0b0000_0001_1111_1111_1111_1111_1111_1111),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -5475,7 +5457,7 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::ER2, 0b0000_0000_0000_0000_0000_0000_0001_1111),
+                    (RegisterId::ER2, 0b0000_0111_1111_1111_1111_1111_1111_1111),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -5483,7 +5465,7 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[ZeroHighBitsByIndexU32RegU32Imm(
-                    0x0,
+                    0,
                     RegisterId::ER1, // Already has the value of 0.
                     RegisterId::ER2,
                 )],
@@ -5497,7 +5479,7 @@ mod tests_cpu {
                     // Manually set the overflow flag state.
                     MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::OF]), RegisterId::EFL),
                     ZeroHighBitsByIndexU32RegU32Imm(
-                        0x0,
+                        0,
                         RegisterId::ER1,
                         RegisterId::ER2, // Already has the value of 0.
                     ),
@@ -5509,7 +5491,7 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[ZeroHighBitsByIndexU32RegU32Imm(
-                    0x20,
+                    32,
                     RegisterId::ER1,
                     RegisterId::ER2,
                 )],
@@ -5518,40 +5500,18 @@ mod tests_cpu {
                 true,
                 "ZHBI - successfully executed instruction with invalid bit index",
             ),
-            // Test the signed flag gets set.
-            TestU32::new(
-                &[
-                    // Clear every flag.
-                    MovU32ImmU32Reg(0x0, RegisterId::EFL),
-                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
-                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER2),
-                    ZeroHighBitsByIndexU32RegU32Imm(0x0, RegisterId::ER1, RegisterId::ER2),
-                ],
-                &[
-                    (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::ER2, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (
-                        RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::CF]),
-                    ),
-                ],
-                DEFAULT_U32_STACK_CAPACITY,
-                false,
-                "ZHBI - CPU signed flag not correctly set",
-            ),
             // Test the signed flag gets cleared.
             TestU32::new(
                 &[
                     // Manually set the signed flag.
                     MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
-                    MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER2),
                     ZeroHighBitsByIndexU32RegU32Imm(0x0, RegisterId::ER1, RegisterId::ER2),
                 ],
                 &[
                     (RegisterId::ER1, 0b0111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::ER2, 0b0111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
+                    (RegisterId::ER2, 0b0),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::ZF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,

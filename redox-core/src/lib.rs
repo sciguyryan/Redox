@@ -10,5 +10,5 @@ pub mod mem;
 mod parsing;
 mod privilege_level;
 pub mod reg;
-mod utils;
+pub mod utils;
 pub mod vm;
