@@ -17,58 +17,69 @@ impl AsmParser {
         }
     }
 
-    pub fn parse(&self, string: &str) {
+    pub fn parse(&self, string: &str) -> Vec<String> {
+        let mut output = vec![];
+
         // Split the string into lines.
         for line in string.lines() {
-            println!("line = {line}");
-            let bits = AsmParser::parse_line(line.trim_matches(' '));
-            println!("{bits:?}");
+            //println!("line = {line}");
+            let bits = AsmParser::parse_instruction_line(line.trim_matches(' '));
+            //println!("{bits:?}");
+            output = bits;
 
             // Next, we need to try and parse the arguments to see if we can figure out
             // the type of instruction we're dealing with.
             // That's a problem for tomorrow!
         }
+
+        output
     }
 
-    pub fn parse_line(line: &str) -> Vec<String> {
-        let mut segments = vec![];
-        let mut identifier_end = false;
-        let mut skip_char: bool;
+    pub fn parse_instruction_line(line: &str) -> Vec<String> {
+        let mut segments = Vec::with_capacity(5);
 
-        let mut current = Vec::with_capacity(100);
-        let count = line.chars().count();
-        for (i, c) in line.chars().enumerate() {
+        let mut segment_end = false;
+        let mut start_pos = 0;
+        let mut end_pos = 0;
+
+        let mut chars = line.chars().peekable();
+        loop {
+            let c = chars.next();
+            if c.is_none() {
+                break;
+            }
+
+            let c = c.unwrap();
+
             match c {
                 ' ' | ',' => {
-                    identifier_end = true;
-                    skip_char = true;
+                    segment_end = true;
                 }
-                _ => {
-                    skip_char = false;
-                }
+                _ => {}
             }
 
-            if !skip_char {
-                current.push(c);
+            // We always want to be sure to catch the last character.
+            if chars.peek().is_none() {
+                segment_end = true;
+                end_pos += 1;
             }
 
-            if identifier_end || i == count - 1 {
-                let string: String = current.iter().collect();
+            if segment_end {
+                let string = &line[start_pos..end_pos];
 
                 // If we have a non-empty string then we can add it to our processing list.
                 if !string.is_empty() {
-                    segments.push(string);
+                    segments.push(string.to_string());
                 }
 
-                identifier_end = false;
-                current.clear();
-            }
-        }
+                // Skip over the current character to the next one.
+                start_pos = end_pos + 1;
 
-        // We have one more change to make.
-        // The first entry should be the instruction identifier and we want that to be
-        // in lower case, just to make our lives easier.
-        segments[0] = segments[0].to_lowercase();
+                segment_end = false;
+            }
+
+            end_pos += 1;
+        }
 
         segments
     }
