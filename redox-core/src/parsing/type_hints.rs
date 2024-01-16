@@ -2,10 +2,21 @@ use crate::ins::op_codes::OpCode;
 
 #[derive(Debug, Clone)]
 pub enum ArgTypeHint {
+    /// A f32 argument.
     F32,
+    /// A u32 argument.
     U32,
+    /// A u32 pointer argument (memory address).
+    U32Pointer,
+    /// A u8 argument.
     U8,
+    /// A u8 pointer argument (memory address).
+    U8Pointer,
+    /// A register argument.
     Register,
+    /// A register pointer argument (memory address).
+    RegisterPointer,
+    /// An expression argument (memory address.
     Expression,
 }
 
