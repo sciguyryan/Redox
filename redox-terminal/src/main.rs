@@ -69,7 +69,7 @@ fn main() {
 
     let assembly = "nop\r\nadd 0x123, ER1\r\nbsr &0xdeadbeef, &0xdeadbeef";
     let parser = AsmParser::new();
-    parser.parse(assembly);
+    parser.parse_code(assembly);
     return;
 
     let instructions = &[
