@@ -225,93 +225,94 @@ impl Display for Instruction {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         use Instruction::*;
 
-        // NOTE: square brackets are used to indicate we are working with an address.
+        // NOTE - square brackets are used to indicate an expression argument.
+        // NOTE - a & prefix before a value indicates that it is being used as a pointer to a memory address.
         let asm_format = match self {
             Nop => String::from("nop"),
 
             /******** [Arithmetic Instructions] ********/
             AddU32ImmU32Reg(imm, reg) => {
-                format!("add 0x{imm:08x}, %{reg}")
+                format!("add 0x{imm:08x}, {reg}")
             }
             AddU32RegU32Reg(in_reg, out_reg) => {
-                format!("add %{in_reg}, %{out_reg}")
+                format!("add {in_reg}, {out_reg}")
             }
             SubU32ImmU32Reg(imm, reg) => {
-                format!("sub 0x{imm:08x}, %{reg}")
+                format!("sub 0x{imm:08x}, {reg}")
             }
             SubU32RegU32Imm(reg, imm) => {
-                format!("sub %{reg}, 0x{imm:08x}")
+                format!("sub {reg}, 0x{imm:08x}")
             }
             SubU32RegU32Reg(reg_1, reg_2) => {
-                format!("sub %{reg_1}, %{reg_2}")
+                format!("sub {reg_1}, {reg_2}")
             }
             MulU32ImmU32Reg(imm, reg) => {
-                format!("mul 0x{imm:08x}, %{reg}")
+                format!("mul 0x{imm:08x}, {reg}")
             }
             MulU32RegU32Reg(reg_1, reg_2) => {
-                format!("mul %{reg_1}, %{reg_2}")
+                format!("mul {reg_1}, {reg_2}")
             }
             DivU32ImmU32Reg(imm, reg) => {
-                format!("div 0x{imm:08x}, %{reg}")
+                format!("div 0x{imm:08x}, {reg}")
             }
             DivU32RegU32Imm(reg, imm) => {
-                format!("div %{reg}, 0x{imm:08x}")
+                format!("div {reg}, 0x{imm:08x}")
             }
             DivU32RegU32Reg(reg_1, reg_2) => {
-                format!("div %{reg_1}, %{reg_2}")
+                format!("div {reg_1}, {reg_2}")
             }
             ModU32ImmU32Reg(imm, reg) => {
-                format!("mod 0x{imm:08x}, %{reg}")
+                format!("mod 0x{imm:08x}, {reg}")
             }
             ModU32RegU32Imm(reg, imm) => {
-                format!("mod %{reg}, 0x{imm:08x}")
+                format!("mod {reg}, 0x{imm:08x}")
             }
             ModU32RegU32Reg(reg_1, reg_2) => {
-                format!("mod %{reg_1}, %{reg_2}")
+                format!("mod {reg_1}, {reg_2}")
             }
             IncU32Reg(reg) => {
-                format!("inc %{reg}")
+                format!("inc {reg}")
             }
             DecU32Reg(reg) => {
-                format!("dec %{reg}")
+                format!("dec {reg}")
             }
             AndU32ImmU32Reg(imm, reg) => {
-                format!("and 0x{imm:08x}, %{reg}")
+                format!("and 0x{imm:08x}, {reg}")
             }
 
             /******** [Bit Operation Instructions] ********/
             LeftShiftU32ImmU32Reg(imm, reg) => {
-                format!("shl 0x{imm:08x}, %{reg}")
+                format!("shl 0x{imm:08x}, {reg}")
             }
             LeftShiftU32RegU32Reg(shift_reg, reg) => {
-                format!("shl %{shift_reg}, %{reg}")
+                format!("shl {shift_reg}, {reg}")
             }
             ArithLeftShiftU32ImmU32Reg(imm, reg) => {
-                format!("sal 0x{imm:08x}, %{reg}")
+                format!("sal 0x{imm:08x}, {reg}")
             }
             ArithLeftShiftU32RegU32Reg(shift_reg, reg) => {
-                format!("sal %{shift_reg}, %{reg}")
+                format!("sal {shift_reg}, {reg}")
             }
             RightShiftU32ImmU32Reg(imm, reg) => {
-                format!("shr 0x{imm:08x}, %{reg}")
+                format!("shr 0x{imm:08x}, {reg}")
             }
             RightShiftU32RegU32Reg(shift_reg, reg) => {
-                format!("shr %{shift_reg}, %{reg}")
+                format!("shr {shift_reg}, {reg}")
             }
             ArithRightShiftU32ImmU32Reg(imm, reg) => {
-                format!("sar 0x{imm:08x}, %{reg}")
+                format!("sar 0x{imm:08x}, {reg}")
             }
             ArithRightShiftU32RegU32Reg(shift_reg, reg) => {
-                format!("sar %{shift_reg}, %{reg}")
+                format!("sar {shift_reg}, {reg}")
             }
 
             /******** [Branching Instructions] ********/
             CallU32Imm(addr) => {
                 // TODO - apply labels to these jumps - either dynamically generated or via binary file metadata.
-                format!("call [0x{addr:08x}]")
+                format!("call &0x{addr:08x}")
             }
             CallU32Reg(reg) => {
-                format!("call [%{reg}]")
+                format!("call &{reg}")
             }
             RetArgsU32 => String::from("iret"),
             Int(int_code) => {
@@ -320,33 +321,33 @@ impl Display for Instruction {
             IntRet => String::from("intret"),
             JumpAbsU32Imm(addr) => {
                 // TODO - apply labels to these jumps - either dynamically generated or via binary file metadata.
-                format!("jmp [0x{addr:08x}]")
+                format!("jmp &0x{addr:08x}")
             }
             JumpAbsU32Reg(reg) => {
-                format!("jmp [%{reg}]")
+                format!("jmp &{reg}")
             }
 
             /******** [Data Instructions] ********/
             SwapU32RegU32Reg(reg_1, reg_2) => {
-                format!("swap %{reg_1}, %{reg_2}")
+                format!("swap {reg_1}, {reg_2}")
             }
             MovU32ImmU32Reg(imm, reg) => {
-                format!("mov 0x{imm:08x}, %{reg}")
+                format!("mov 0x{imm:08x}, {reg}")
             }
             MovU32RegU32Reg(in_reg, out_reg) => {
-                format!("mov %{in_reg}, %{out_reg}")
+                format!("mov {in_reg}, {out_reg}")
             }
             MovU32ImmMemSimple(imm, addr) => {
-                format!("mov 0x{imm:08x}, [0x{addr:08x}]")
+                format!("mov 0x{imm:08x}, &0x{addr:08x}")
             }
             MovU32RegMemSimple(reg, addr) => {
-                format!("mov %{reg}, [0x{addr:08x}]")
+                format!("mov {reg}, &0x{addr:08x}")
             }
             MovMemU32RegSimple(addr, reg) => {
-                format!("mov [0x{addr:08x}], %{reg}")
+                format!("mov &0x{addr:08x}, {reg}")
             }
             MovU32RegPtrU32RegSimple(in_reg, out_reg) => {
-                format!("mov [%{in_reg}], %{out_reg}")
+                format!("mov &{in_reg}, {out_reg}")
             }
             MovU32ImmMemExpr(imm, expr) => {
                 let mut decoder = MoveExpressionHandler::new();
@@ -358,31 +359,31 @@ impl Display for Instruction {
                 let mut decoder = MoveExpressionHandler::new();
                 decoder.unpack(*expr);
 
-                format!("emov [{decoder}], %{reg}")
+                format!("emov [{decoder}], {reg}")
             }
             MovU32RegMemExpr(reg, expr) => {
                 let mut decoder = MoveExpressionHandler::new();
                 decoder.unpack(*expr);
 
-                format!("emov %{reg}, [{decoder}]")
+                format!("emov {reg}, [{decoder}]")
             }
             ByteSwapU32(reg) => {
-                format!("bswap %{reg}")
+                format!("bswap {reg}")
             }
             ZeroHighBitsByIndexU32Reg(index_reg, in_reg, out_reg) => {
-                format!("zhbi %{index_reg}, %{in_reg}, %{out_reg}")
+                format!("zhbi {index_reg}, {in_reg}, {out_reg}")
             }
             ZeroHighBitsByIndexU32RegU32Imm(index, in_reg, out_reg) => {
-                format!("zhbi 0x{index:08x}, %{in_reg}, %{out_reg}")
+                format!("zhbi 0x{index:08x}, {in_reg}, {out_reg}")
             }
             PushU32Imm(index) => {
                 format!("push 0x{index:08x}")
             }
             PushU32Reg(reg) => {
-                format!("push %{reg}")
+                format!("push {reg}")
             }
             PopU32ImmU32Reg(out_reg) => {
-                format!("pop %{out_reg}")
+                format!("pop {out_reg}")
             }
 
             /******** [IO Instructions] ********/
@@ -393,13 +394,13 @@ impl Display for Instruction {
                 format!("out 0x{value:08x}, 0x{port:02x}")
             }
             OutU32Reg(reg, port) => {
-                format!("out %{reg}, 0x{port:02x}")
+                format!("out {reg}, 0x{port:02x}")
             }
             OutU8Imm(value, port) => {
                 format!("out 0x{value:02x}, 0x{port:02x}")
             }
             InU8Reg(port, reg) | InU32Reg(port, reg) | InF32Reg(port, reg) => {
-                format!("in 0x{port:02x}, %{reg}")
+                format!("in 0x{port:02x}, {reg}")
             }
             InU8Mem(port, addr) | InU32Mem(port, addr) | InF32Mem(port, addr) => {
                 format!("in 0x{port:02x}, 0x{addr:08x}")
@@ -407,46 +408,46 @@ impl Display for Instruction {
 
             /******** [Logic Instructions] ********/
             BitTestU32Reg(bit, reg) => {
-                format!("bt 0x{bit:02x}, %{reg}")
+                format!("bt 0x{bit:02x}, {reg}")
             }
             BitTestU32Mem(bit, addr) => {
-                format!("bt 0x{bit:02x}, [0x{addr:08x}]")
+                format!("bt 0x{bit:02x}, &0x{addr:08x}")
             }
             BitTestResetU32Reg(bit, reg) => {
-                format!("btr 0x{bit:02x}, %{reg}")
+                format!("btr 0x{bit:02x}, {reg}")
             }
             BitTestResetU32Mem(bit, addr) => {
-                format!("btr 0x{bit:02x}, [0x{addr:08x}]")
+                format!("btr 0x{bit:02x}, &0x{addr:08x}")
             }
             BitTestSetU32Reg(bit, reg) => {
-                format!("bts 0x{bit:02x}, %{reg}")
+                format!("bts 0x{bit:02x}, {reg}")
             }
             BitTestSetU32Mem(bit, addr) => {
-                format!("bts 0x{bit:02x}, [0x{addr:08x}]")
+                format!("bts 0x{bit:02x}, &0x{addr:08x}")
             }
             BitScanReverseU32RegU32Reg(in_reg, out_reg) => {
-                format!("bsr %{in_reg}, %{out_reg}")
+                format!("bsr {in_reg}, {out_reg}")
             }
             BitScanReverseU32MemU32Reg(addr, reg) => {
-                format!("bsr [0x{addr:08x}], %{reg}")
+                format!("bsr &0x{addr:08x}], {reg}")
             }
             BitScanReverseU32RegMemU32(reg, out_addr) => {
-                format!("bsr %{reg}, [0x{out_addr:08x}]")
+                format!("bsr {reg}, &0x{out_addr:08x}")
             }
             BitScanReverseU32MemU32Mem(in_addr, out_addr) => {
-                format!("bsr [0x{in_addr:08x}], [0x{out_addr:08x}]")
+                format!("bsr &0x{in_addr:08x}, &0x{out_addr:08x}")
             }
             BitScanForwardU32RegU32Reg(in_reg, out_reg) => {
-                format!("bsf %{in_reg}, %{out_reg}")
+                format!("bsf {in_reg}, {out_reg}")
             }
             BitScanForwardU32MemU32Reg(addr, reg) => {
-                format!("bsf [0x{addr:08x}], %{reg}")
+                format!("bsf &0x{addr:08x}, {reg}")
             }
             BitScanForwardU32RegMemU32(reg, out_addr) => {
-                format!("bsr %{reg}, [0x{out_addr:08x}]")
+                format!("bsr {reg}, &0x{out_addr:08x}")
             }
             BitScanForwardU32MemU32Mem(in_addr, out_addr) => {
-                format!("bsr [0x{in_addr:08x}], [0x{out_addr:08x}]")
+                format!("bsr &0x{in_addr:08x}, &0x{out_addr:08x}")
             }
 
             /******** [Special Instructions] ********/
@@ -457,7 +458,7 @@ impl Display for Instruction {
                 format!("umint 0x{int_code:02x}")
             }
             LoadIVTAddrU32Imm(addr) => {
-                format!("livt [0x{addr:08x}]")
+                format!("livt &0x{addr:08x}")
             }
             MachineReturn => String::from("mret"),
             Halt => String::from("hlt"),
