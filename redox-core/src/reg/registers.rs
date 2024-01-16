@@ -1,6 +1,6 @@
 use core::fmt;
 use prettytable::{row, Table};
-use std::fmt::Display;
+use std::{fmt::Display, str::FromStr};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
@@ -71,6 +71,40 @@ pub enum RegisterId {
     ECS = 201,
     /// Data segment register.
     EDS = 202,
+}
+
+impl FromStr for RegisterId {
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<RegisterId, Self::Err> {
+        match input.to_uppercase().as_str() {
+            "ER1" => Ok(RegisterId::ER1),
+            "ER2" => Ok(RegisterId::ER2),
+            "ER3" => Ok(RegisterId::ER3),
+            "ER4" => Ok(RegisterId::ER4),
+            "ER5" => Ok(RegisterId::ER5),
+            "ER6" => Ok(RegisterId::ER6),
+            "ER7" => Ok(RegisterId::ER7),
+            "ER8" => Ok(RegisterId::ER8),
+
+            "FR1" => Ok(RegisterId::FR1),
+            "FR2" => Ok(RegisterId::FR2),
+
+            "EAC" => Ok(RegisterId::EAC),
+            "EIP" => Ok(RegisterId::EIP),
+            "EFP" => Ok(RegisterId::EFP),
+            "ESP" => Ok(RegisterId::ESP),
+            "EFL" => Ok(RegisterId::EFL),
+            "EIM" => Ok(RegisterId::EIM),
+            "IDTR" => Ok(RegisterId::IDTR),
+
+            "ESS" => Ok(RegisterId::ESS),
+            "ECS" => Ok(RegisterId::ECS),
+            "EDS" => Ok(RegisterId::EDS),
+
+            _ => Err(()),
+        }
+    }
 }
 
 impl From<u8> for RegisterId {

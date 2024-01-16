@@ -67,7 +67,7 @@ fn main() {
         panic!("currently unsupported");
     }
 
-    let assembly = "add 0x123, R1";
+    let assembly = "add 0x123, ER1";
     let parser = AsmParser::new();
     parser.parse(assembly);
     return;
