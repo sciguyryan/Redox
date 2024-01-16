@@ -1,2 +1,2 @@
 pub mod asm_parser;
-mod type_hints;
+pub mod type_hints;

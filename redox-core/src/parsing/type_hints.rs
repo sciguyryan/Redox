@@ -1,6 +1,6 @@
 use crate::ins::op_codes::OpCode;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum ArgTypeHint {
     /// A f32 argument.
     F32,
@@ -16,43 +16,53 @@ pub enum ArgTypeHint {
     Register,
     /// A register pointer argument (memory address).
     RegisterPointer,
-    /// An expression argument (memory address.
+    /// An expression argument (memory address).
     Expression,
 }
 
 #[derive(Debug, Clone)]
-pub struct InstructionHint {
+pub struct InstructionLookup {
     name: String,
     args: Vec<ArgTypeHint>,
     opcode: OpCode,
 }
 
-impl InstructionHint {
+impl InstructionLookup {
     pub fn new(name: String, args: Vec<ArgTypeHint>, opcode: OpCode) -> Self {
         Self { name, opcode, args }
     }
 }
 
-macro_rules! hint {
+macro_rules! gen_hint {
     ($name:expr, $args:expr, $op:expr) => {{
-        InstructionHint::new($name.to_string(), $args.to_vec(), $op)
+        InstructionLookup::new($name.to_string(), $args.to_vec(), $op)
     }};
 }
 
 #[derive(Debug, Clone)]
 pub struct InstructionHints {
-    pub hints: Vec<InstructionHint>,
+    pub hints: Vec<InstructionLookup>,
 }
 
 impl InstructionHints {
     pub fn new() -> Self {
+        use ArgTypeHint::*;
+
         Self {
-            hints: vec![hint!(
-                "add",
-                [ArgTypeHint::U32, ArgTypeHint::Register],
-                OpCode::AddU32ImmU32Reg
-            )],
+            hints: vec![
+                gen_hint!("nop", [], OpCode::Nop),
+                gen_hint!("add", [U32, Register], OpCode::AddU32ImmU32Reg),
+
+                gen_hint!("bsr", [U32Pointer, U32Pointer], OpCode::BitScanReverseU32MemU32Mem),
+            ],
         }
+    }
+
+    pub fn find_by(&self, name: &str, argument_hints: &[ArgTypeHint]) -> Option<OpCode> {
+        self.hints
+            .iter()
+            .find(|h| h.name == name && h.args == argument_hints)
+            .map(|h| h.opcode)
     }
 }
 

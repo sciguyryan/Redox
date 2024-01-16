@@ -1,7 +1,9 @@
 use std::{num::ParseIntError, str::FromStr};
 
 use crate::{
-    ins::instruction::Instruction, parsing::type_hints::ArgTypeHint, reg::registers::RegisterId,
+    ins::{instruction::Instruction, op_codes::OpCode},
+    parsing::type_hints::ArgTypeHint,
+    reg::registers::RegisterId,
 };
 
 use super::type_hints::InstructionHints;
@@ -12,18 +14,23 @@ pub enum Argument {
     F32(f32),
     /// A u32 argument.
     U32(u32),
-    /// A u32 pointer argument (memory address).
-    U32Pointer(u32),
     /// A u8 argument.
     U8(u8),
-    /// A u8 pointer argument (memory address).
-    U8Pointer(u8),
     /// A register argument.
     Register(RegisterId),
-    /// A register pointer argument (memory address).
-    RegisterPointer(RegisterId),
     /// An expression argument (memory address.
     Expression,
+}
+
+/// Cheekily get the inner value of an enum.
+macro_rules! get_inner {
+    ($target:expr, $enum:path) => {{
+        if let $enum(a) = $target {
+            a
+        } else {
+            panic!();
+        }
+    }};
 }
 
 pub struct AsmParser {
@@ -37,37 +44,30 @@ impl AsmParser {
         }
     }
 
-    pub fn test(&self) {
-        for hint in &self.hints.hints {
-            println!("{hint:?}");
-        }
-    }
-
-    pub fn parse(&self, string: &str) -> Vec<String> {
-        let instructions: Vec<Instruction> = vec![];
+    pub fn parse(&self, string: &str) -> Vec<Instruction> {
+        let mut instructions: Vec<Instruction> = vec![];
 
         // Split the string into lines.
         for line in string.lines() {
-            //println!("line = {line}");
-            let bits = AsmParser::parse_instruction_line(line.trim_matches(' '));
-            println!("{bits:?}");
+            let segments = AsmParser::parse_instruction_line(line.trim_matches(' '));
+            println!("{segments:?}");
 
             // Next, we need to try and parse the arguments to see if we can figure out
             // the type of instruction we're dealing with.
-            let name = bits[0].to_lowercase();
+            let name = segments[0].to_lowercase();
 
             let mut arguments = vec![];
             let mut argument_hints = vec![];
 
             // Do we have any arguments?
             let mut i = 0;
-            for bit in &bits[1..] {
+            for segment in &segments[1..] {
                 println!("------------------[Argument {i}]------------------");
                 i += 1;
 
                 let mut is_pointer = false;
 
-                let first_char = bit.chars().nth(0).unwrap();
+                let first_char = segment.chars().nth(0).unwrap();
                 if first_char == '&' {
                     is_pointer = true;
                 } else if first_char == '[' {
@@ -75,14 +75,14 @@ impl AsmParser {
                 }
 
                 // Skip past the address prefix identifier, if it exists.
-                let sub_string = if is_pointer { &bit[1..] } else { bit };
+                let sub_string = if is_pointer { &segment[1..] } else { segment };
 
                 // First, check if this could be a register identifier.
                 print!("Checking for a register identifier... ");
                 match RegisterId::from_str(sub_string) {
                     Ok(id) => {
                         if is_pointer {
-                            arguments.push(Argument::RegisterPointer(id));
+                            arguments.push(Argument::Register(id));
                             argument_hints.push(ArgTypeHint::RegisterPointer);
 
                             println!("found! ID = {id} (pointer).");
@@ -93,7 +93,7 @@ impl AsmParser {
                             println!("found! ID = {id}.");
                         }
                         // We're done with this argument!
-                        break;
+                        continue;
                     }
                     Err(_) => {
                         println!("not found.");
@@ -118,7 +118,7 @@ impl AsmParser {
                             println!("found! value = {val}.");
 
                             // We're done with this argument!
-                            break;
+                            continue;
                         }
                         Err(_) => {
                             println!("not found.")
@@ -135,7 +135,7 @@ impl AsmParser {
                 match AsmParser::try_parse_u8_immediate(sub_string) {
                     Ok(val) => {
                         if is_pointer {
-                            arguments.push(Argument::U8Pointer(val));
+                            arguments.push(Argument::U8(val));
                             argument_hints.push(ArgTypeHint::U8Pointer);
 
                             println!("found! Value = {val} (pointer).");
@@ -158,7 +158,7 @@ impl AsmParser {
                 match AsmParser::try_parse_u32_immediate(sub_string) {
                     Ok(val) => {
                         if is_pointer {
-                            arguments.push(Argument::U32Pointer(val));
+                            arguments.push(Argument::U32(val));
                             argument_hints.push(ArgTypeHint::U32Pointer);
 
                             println!("found! Value = {val} (pointer).");
@@ -169,16 +169,133 @@ impl AsmParser {
                             println!("found! Value = {val}.");
                         }
                         // We're done with this argument!
-                        break;
+                        continue;
                     }
                     Err(_) => {
                         println!("not found.");
                     }
                 }
             }
+
+            println!("------------------------------------");
+            println!("Instruction name = '{name}', argument types = {argument_hints:?}");
+
+            match self.hints.find_by(name.as_str(), &argument_hints) {
+                Some(op) => {
+                    println!("Matching instruction found! {op:?}");
+                    let ins = AsmParser::try_build_instruction(op, &arguments);
+                    println!("ins = {ins}");
+                    instructions.push(ins);
+                }
+                None => {
+                    panic!("unable to find an instruction that matches the name and provided arguments.");
+                }
+            }
         }
 
-        vec![]
+        instructions
+    }
+
+    fn try_build_instruction(opcode: OpCode, args: &[Argument]) -> Instruction {
+        // This will only ever be called internally and since we have confirmed that the arguments
+        // match those that would be needed for the instruction associated with the opcode, it's safe
+        // to make some assumptions regarding the sanity of the data.
+        match opcode {
+            OpCode::Nop => Instruction::Nop,
+            OpCode::AddU32ImmU32Reg => Instruction::AddU32ImmU32Reg(
+                get_inner!(args[0], Argument::U32),
+                get_inner!(args[1], Argument::Register),
+            ),
+            OpCode::AddU32RegU32Reg => todo!(),
+            OpCode::SubU32ImmU32Reg => todo!(),
+            OpCode::SubU32RegU32Imm => todo!(),
+            OpCode::SubU32RegU32Reg => todo!(),
+            OpCode::MulU32ImmU32Reg => todo!(),
+            OpCode::MulU32RegU32Reg => todo!(),
+            OpCode::DivU32ImmU32Reg => todo!(),
+            OpCode::DivU32RegU32Imm => todo!(),
+            OpCode::DivU32RegU32Reg => todo!(),
+            OpCode::ModU32ImmU32Reg => todo!(),
+            OpCode::ModU32RegU32Imm => todo!(),
+            OpCode::ModU32RegU32Reg => todo!(),
+            OpCode::IncU32Reg => todo!(),
+            OpCode::DecU32Reg => todo!(),
+            OpCode::AndU32ImmU32Reg => todo!(),
+            OpCode::LeftShiftU32ImmU32Reg => todo!(),
+            OpCode::LeftShiftU32RegU32Reg => todo!(),
+            OpCode::ArithLeftShiftU32ImmU32Reg => todo!(),
+            OpCode::ArithLeftShiftU32RegU32Reg => todo!(),
+            OpCode::RightShiftU32ImmU32Reg => todo!(),
+            OpCode::RightShiftU32RegU32Reg => todo!(),
+            OpCode::ArithRightShiftU32ImmU32Reg => todo!(),
+            OpCode::ArithRightShiftU32RegU32Reg => todo!(),
+            OpCode::CallU32Imm => todo!(),
+            OpCode::CallU32Reg => todo!(),
+            OpCode::RetArgsU32 => todo!(),
+            OpCode::Int => todo!(),
+            OpCode::IntRet => todo!(),
+            OpCode::JumpAbsU32Imm => todo!(),
+            OpCode::JumpAbsU32Reg => todo!(),
+            OpCode::SwapU32RegU32Reg => todo!(),
+            OpCode::MovU32ImmU32Reg => todo!(),
+            OpCode::MovU32RegU32Reg => todo!(),
+            OpCode::MovU32ImmMemSimple => todo!(),
+            OpCode::MovU32RegMemSimple => todo!(),
+            OpCode::MovMemU32RegSimple => todo!(),
+            OpCode::MovU32RegPtrU32RegSimple => todo!(),
+            OpCode::MovU32ImmMemExpr => todo!(),
+            OpCode::MovMemExprU32Reg => todo!(),
+            OpCode::MovU32RegMemExpr => todo!(),
+            OpCode::ByteSwapU32 => todo!(),
+            OpCode::ZeroHighBitsByIndexU32Reg => todo!(),
+            OpCode::ZeroHighBitsByIndexU32RegU32Imm => todo!(),
+            OpCode::PushU32Imm => todo!(),
+            OpCode::PushU32Reg => todo!(),
+            OpCode::PopU32ImmU32Reg => todo!(),
+            OpCode::OutF32Imm => todo!(),
+            OpCode::OutU32Imm => todo!(),
+            OpCode::OutU32Reg => todo!(),
+            OpCode::OutU8Imm => todo!(),
+            OpCode::InU8Reg => todo!(),
+            OpCode::InU8Mem => todo!(),
+            OpCode::InU32Reg => todo!(),
+            OpCode::InU32Mem => todo!(),
+            OpCode::InF32Reg => todo!(),
+            OpCode::InF32Mem => todo!(),
+            OpCode::BitTestU32Reg => todo!(),
+            OpCode::BitTestU32Mem => todo!(),
+            OpCode::BitTestResetU32Reg => todo!(),
+            OpCode::BitTestResetU32Mem => todo!(),
+            OpCode::BitTestSetU32Reg => todo!(),
+            OpCode::BitTestSetU32Mem => todo!(),
+            OpCode::BitScanReverseU32RegU32Reg => todo!(),
+            OpCode::BitScanReverseU32MemU32Reg => todo!(),
+            OpCode::BitScanReverseU32RegMemU32 => todo!(),
+            OpCode::BitScanReverseU32MemU32Mem => Instruction::BitScanReverseU32MemU32Mem(
+                get_inner!(args[0], Argument::U32),
+                get_inner!(args[1], Argument::U32),
+            ),
+            OpCode::BitScanForwardU32RegU32Reg => todo!(),
+            OpCode::BitScanForwardU32MemU32Reg => todo!(),
+            OpCode::BitScanForwardU32RegMemU32 => todo!(),
+            OpCode::BitScanForwardU32MemU32Mem => todo!(),
+            OpCode::MaskInterrupt => todo!(),
+            OpCode::UnmaskInterrupt => todo!(),
+            OpCode::LoadIVTAddrU32Imm => todo!(),
+            OpCode::MachineReturn => todo!(),
+            OpCode::Halt => todo!(),
+            OpCode::Reserved1 => todo!(),
+            OpCode::Reserved2 => todo!(),
+            OpCode::Reserved3 => todo!(),
+            OpCode::Reserved4 => todo!(),
+            OpCode::Reserved5 => todo!(),
+            OpCode::Reserved6 => todo!(),
+            OpCode::Reserved7 => todo!(),
+            OpCode::Reserved8 => todo!(),
+            OpCode::Reserved9 => todo!(),
+            OpCode::Label => todo!(),
+            OpCode::Unknown => todo!(),
+        }
     }
 
     fn try_parse_u8_immediate(string: &str) -> Result<u8, ParseIntError> {
