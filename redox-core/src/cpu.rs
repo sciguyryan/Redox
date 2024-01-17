@@ -1097,20 +1097,20 @@ impl Cpu {
                 self.write_reg_u32(out_reg, value, privilege);
             }
             MovU32ImmMemExpr(imm, expr) => {
-                // mov imm, [addr] - move immediate to address.
+                // mov imm, &[addr] - move immediate to address.
                 let addr = self.decode_evaluate_u32_move_expression(expr, privilege);
 
                 com_bus.mem.set_u32(addr as usize, *imm);
             }
             MovMemExprU32Reg(expr, reg) => {
-                // mov [addr], register - move value at address to register.
+                // mov &[addr], register - move value at address to register.
                 let addr = self.decode_evaluate_u32_move_expression(expr, privilege);
                 let value = com_bus.mem.get_u32(addr as usize);
 
                 self.write_reg_u32(reg, value, privilege);
             }
             MovU32RegMemExpr(reg, expr) => {
-                // mov reg, [addr] - move value of a register to an address.
+                // mov &reg, &[addr] - move value of a register to an address.
                 let addr = self.decode_evaluate_u32_move_expression(expr, privilege);
                 let value = self.registers.read_reg_u32(reg, privilege);
 

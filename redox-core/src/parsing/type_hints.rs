@@ -53,17 +53,38 @@ impl InstructionHints {
         Self {
             hints: vec![
                 gen_hint!("nop", [], OpCode::Nop),
+                /******** [Arithmetic Instructions] ********/
                 gen_hint!("add", [U32, Register], OpCode::AddU32ImmU32Reg),
+                /******** [Bit Operation Instructions] ********/
+
+
+                /******** [Branching Instructions] ********/
+                gen_hint!("call", [U32Pointer], OpCode::CallU32Imm),
+                gen_hint!("call", [RegisterPointer], OpCode::CallU32Reg),
+                /******** [Data Instructions] ********/
                 gen_hint!(
-                    "emov",
-                    [Expression, RegisterPointer],
+                    "mov",
+                    [ExpressionPointer, RegisterPointer],
                     OpCode::MovMemExprU32Reg
                 ),
+                gen_hint!("push", [U32], OpCode::PushU32Imm),
+                gen_hint!("push", [Register], OpCode::PushU32Reg),
+                /******** [IO Instructions] ********/
+
+
+                /******** [Logic Instructions] ********/
                 gen_hint!(
                     "bsr",
                     [U32Pointer, U32Pointer],
                     OpCode::BitScanReverseU32MemU32Mem
                 ),
+                /******** [Special Instructions] ********/
+
+
+                /******** [Reserved Instructions] ********/
+
+
+                /******** [Pseudo Instructions] ********/
             ],
         }
     }

@@ -353,19 +353,19 @@ impl Display for Instruction {
                 let mut decoder = Expression::new();
                 decoder.unpack(*expr);
 
-                format!("emov 0x{imm:08x}, &[{decoder}]")
+                format!("mov 0x{imm:08x}, &[{decoder}]")
             }
             MovMemExprU32Reg(expr, reg) => {
                 let mut decoder = Expression::new();
                 decoder.unpack(*expr);
 
-                format!("emov &[{decoder}], {reg}")
+                format!("mov &[{decoder}], {reg}")
             }
             MovU32RegMemExpr(reg, expr) => {
                 let mut decoder = Expression::new();
                 decoder.unpack(*expr);
 
-                format!("emov {reg}, &[{decoder}]")
+                format!("mov {reg}, &[{decoder}]")
             }
             ByteSwapU32(reg) => {
                 format!("bswap {reg}")
@@ -376,8 +376,8 @@ impl Display for Instruction {
             ZeroHighBitsByIndexU32RegU32Imm(index, in_reg, out_reg) => {
                 format!("zhbi 0x{index:08x}, {in_reg}, {out_reg}")
             }
-            PushU32Imm(index) => {
-                format!("push 0x{index:08x}")
+            PushU32Imm(value) => {
+                format!("push 0x{value:08x}")
             }
             PushU32Reg(reg) => {
                 format!("push {reg}")

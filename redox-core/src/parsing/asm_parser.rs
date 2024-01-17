@@ -133,7 +133,7 @@ impl AsmParser {
             match self.hints.find_by(name.as_str(), &argument_hints) {
                 Some(op) => {
                     let ins = AsmParser::try_build_instruction(op, &arguments);
-                    println!("Matching instruction found! {ins}");
+                    //println!("Matching instruction found! {ins}");
                     instructions.push(ins);
                 }
                 None => {
@@ -348,6 +348,8 @@ impl AsmParser {
         // to make some assumptions regarding the sanity of the data.
         match opcode {
             OpCode::Nop => Instruction::Nop,
+
+            /******** [Arithmetic Instructions] ********/
             OpCode::AddU32ImmU32Reg => Instruction::AddU32ImmU32Reg(
                 get_inner!(args[0], Argument::U32),
                 get_inner!(args[1], Argument::Register),
@@ -367,6 +369,8 @@ impl AsmParser {
             OpCode::IncU32Reg => todo!(),
             OpCode::DecU32Reg => todo!(),
             OpCode::AndU32ImmU32Reg => todo!(),
+
+            /******** [Bit Operation Instructions] ********/
             OpCode::LeftShiftU32ImmU32Reg => todo!(),
             OpCode::LeftShiftU32RegU32Reg => todo!(),
             OpCode::ArithLeftShiftU32ImmU32Reg => todo!(),
@@ -375,13 +379,17 @@ impl AsmParser {
             OpCode::RightShiftU32RegU32Reg => todo!(),
             OpCode::ArithRightShiftU32ImmU32Reg => todo!(),
             OpCode::ArithRightShiftU32RegU32Reg => todo!(),
-            OpCode::CallU32Imm => todo!(),
-            OpCode::CallU32Reg => todo!(),
+
+            /******** [Branching Instructions] ********/
+            OpCode::CallU32Imm => Instruction::CallU32Imm(get_inner!(args[0], Argument::U32)),
+            OpCode::CallU32Reg => Instruction::CallU32Reg(get_inner!(args[0], Argument::Register)),
             OpCode::RetArgsU32 => todo!(),
             OpCode::Int => todo!(),
             OpCode::IntRet => todo!(),
             OpCode::JumpAbsU32Imm => todo!(),
             OpCode::JumpAbsU32Reg => todo!(),
+
+            /******** [Data Instructions] ********/
             OpCode::SwapU32RegU32Reg => todo!(),
             OpCode::MovU32ImmU32Reg => todo!(),
             OpCode::MovU32RegU32Reg => todo!(),
@@ -398,9 +406,11 @@ impl AsmParser {
             OpCode::ByteSwapU32 => todo!(),
             OpCode::ZeroHighBitsByIndexU32Reg => todo!(),
             OpCode::ZeroHighBitsByIndexU32RegU32Imm => todo!(),
-            OpCode::PushU32Imm => todo!(),
-            OpCode::PushU32Reg => todo!(),
+            OpCode::PushU32Imm => Instruction::PushU32Imm(get_inner!(args[0], Argument::U32)),
+            OpCode::PushU32Reg => Instruction::PushU32Reg(get_inner!(args[0], Argument::Register)),
             OpCode::PopU32ImmU32Reg => todo!(),
+
+            /******** [IO Instructions] ********/
             OpCode::OutF32Imm => todo!(),
             OpCode::OutU32Imm => todo!(),
             OpCode::OutU32Reg => todo!(),
@@ -411,6 +421,8 @@ impl AsmParser {
             OpCode::InU32Mem => todo!(),
             OpCode::InF32Reg => todo!(),
             OpCode::InF32Mem => todo!(),
+
+            /******** [Logic Instructions] ********/
             OpCode::BitTestU32Reg => todo!(),
             OpCode::BitTestU32Mem => todo!(),
             OpCode::BitTestResetU32Reg => todo!(),
@@ -428,22 +440,28 @@ impl AsmParser {
             OpCode::BitScanForwardU32MemU32Reg => todo!(),
             OpCode::BitScanForwardU32RegMemU32 => todo!(),
             OpCode::BitScanForwardU32MemU32Mem => todo!(),
+
+            /******** [Special Instructions] ********/
             OpCode::MaskInterrupt => todo!(),
             OpCode::UnmaskInterrupt => todo!(),
             OpCode::LoadIVTAddrU32Imm => todo!(),
             OpCode::MachineReturn => todo!(),
             OpCode::Halt => todo!(),
-            OpCode::Reserved1 => todo!(),
-            OpCode::Reserved2 => todo!(),
-            OpCode::Reserved3 => todo!(),
-            OpCode::Reserved4 => todo!(),
-            OpCode::Reserved5 => todo!(),
-            OpCode::Reserved6 => todo!(),
-            OpCode::Reserved7 => todo!(),
-            OpCode::Reserved8 => todo!(),
-            OpCode::Reserved9 => todo!(),
-            OpCode::Label => todo!(),
-            OpCode::Unknown => todo!(),
+
+            /******** [Reserved Instructions] ********/
+            OpCode::Reserved1 => unreachable!(),
+            OpCode::Reserved2 => unreachable!(),
+            OpCode::Reserved3 => unreachable!(),
+            OpCode::Reserved4 => unreachable!(),
+            OpCode::Reserved5 => unreachable!(),
+            OpCode::Reserved6 => unreachable!(),
+            OpCode::Reserved7 => unreachable!(),
+            OpCode::Reserved8 => unreachable!(),
+            OpCode::Reserved9 => unreachable!(),
+
+            /******** [Pseudo Instructions] ********/
+            OpCode::Label => unreachable!(),
+            OpCode::Unknown => unreachable!(),
         }
     }
 
@@ -534,5 +552,203 @@ impl AsmParser {
 impl Default for AsmParser {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests_asm_parsing {
+    use std::panic;
+
+    use crate::{
+        ins::instruction::Instruction, parsing::asm_parser::AsmParser, reg::registers::RegisterId,
+    };
+
+    #[derive(Clone)]
+    struct ParserTest {
+        /// The input string to be tested.
+        pub input: String,
+        /// A vector of [`Instruction`]s that should result from the parsing.
+        pub expected_instructions: Vec<Instruction>,
+        /// A boolean indicating whether the test should panic or not.
+        pub should_panic: bool,
+        /// A string slice that provides the message to be displayed if the test fails.
+        pub fail_message: String,
+    }
+
+    impl ParserTest {
+        /// Create a new [`ParserTest`] instance.
+        ///
+        /// # Arguments
+        ///
+        /// * `input` - The input string to be tested.
+        /// * `parsed_instructions` - A slice of [`Instruction`]s that should result from the parsing.
+        /// * `should_panic` - A boolean indicating whether the test should panic or not.
+        /// * `fail_message` - A string slice that provides the message to be displayed if the test fails.
+        ///
+        /// # Note
+        ///
+        /// If the results need to check the user segment memory contents then the VM will automatically be
+        /// created with a memory segment of the correct size. It doesn't need to be specified manually.
+        fn new(
+            input: &str,
+            expected_instructions: &[Instruction],
+            should_panic: bool,
+            fail_message: &str,
+        ) -> Self {
+            Self {
+                input: input.to_string(),
+                expected_instructions: expected_instructions.to_vec(),
+                should_panic,
+                fail_message: fail_message.to_string(),
+            }
+        }
+
+        /// Run this specific test entry.
+        ///
+        /// # Arguments
+        ///
+        /// * `id` - The ID of this test.
+        pub fn run_test(&self, id: usize) {
+            let parser = AsmParser::new();
+
+            // Attempt to execute the code.
+            let result = panic::catch_unwind(|| parser.parse_code(&self.input));
+
+            // Confirm whether the test panicked, and whether that panic was expected or not.
+            let did_panic = result.is_err();
+            assert_eq!(
+                did_panic,
+                self.should_panic,
+                "{}",
+                self.fail_message(id, did_panic)
+            );
+
+            // We don't have a viable list to interrogate here.
+            if !did_panic {
+                assert_eq!(result.unwrap(), self.expected_instructions);
+            }
+        }
+
+        /// Generate a fail message for this test instance.
+        ///
+        /// # Arguments
+        ///
+        /// * `id` - The ID of this test.
+        /// * `did_panic` - Did the test panic?
+        pub fn fail_message(&self, id: usize, did_panic: bool) -> String {
+            format!(
+                "Test {id} Failed - Should Panic? {}, Panicked? {did_panic}. Message = {}",
+                self.should_panic, self.fail_message
+            )
+        }
+    }
+
+    struct ParserTests {
+        tests: Vec<ParserTest>,
+    }
+
+    impl ParserTests {
+        pub fn new(tests: &[ParserTest]) -> Self {
+            Self {
+                tests: tests.to_vec(),
+            }
+        }
+
+        /// Run each unit test in the specified sequence.
+        pub fn run_all(&self) {
+            for (id, test) in self.tests.iter().enumerate() {
+                test.run_test(id);
+            }
+        }
+    }
+
+    /// Single instruction parsing tests.
+    #[test]
+    fn code_parser_tests_single() {
+        let tests = [
+            ParserTest::new(
+                "nop",
+                &[Instruction::Nop],
+                false,
+                "failed to parse single instruction with no arguments.",
+            ),
+            ParserTest::new(
+                "push 1234",
+                &[Instruction::PushU32Imm(1234)],
+                false,
+                "failed to parse single instruction with one u32 argument.",
+            ),
+            ParserTest::new(
+                "push ER1",
+                &[Instruction::PushU32Reg(RegisterId::ER1)],
+                false,
+                "failed to parse single instruction with one u32 register argument.",
+            ),
+            ParserTest::new(
+                "call &0xdeadbeef",
+                &[Instruction::CallU32Imm(0xdeadbeef)],
+                false,
+                "failed to parse single instruction with one u32 immediate pointer argument.",
+            ),
+            ParserTest::new(
+                "call 0xdeadbeef",
+                &[],
+                true,
+                "succeeded in finding an instruction with invalid arguments.",
+            ),
+            ParserTest::new(
+                "call &ER1",
+                &[Instruction::CallU32Reg(RegisterId::ER1)],
+                false,
+                "failed to parse single instruction with one u32 register pointer argument.",
+            ),
+            ParserTest::new(
+                "call ER1",
+                &[],
+                true,
+                "succeeded in finding an instruction with invalid arguments.",
+            ),
+        ];
+
+        ParserTests::new(&tests).run_all();
+    }
+
+    /// Single instruction parsing tests - with numbers in different bases.
+    #[test]
+    fn code_parser_tests_numeric_bases() {
+        let tests = [
+            ParserTest::new(
+                "push 0b1111111111",
+                &[Instruction::PushU32Imm(0b1111111111)],
+                false,
+                "failed to parse instruction with u32 argument - binary edition.",
+            ),
+            ParserTest::new(
+                "push q12345",
+                &[Instruction::PushU32Imm(5349)],
+                false,
+                "failed to parse instruction with u32 argument - octal edition.",
+            ),
+            ParserTest::new(
+                "push q12345",
+                &[Instruction::PushU32Imm(5349)],
+                false,
+                "failed to parse instruction with u32 argument - octal edition.",
+            ),
+            ParserTest::new(
+                "push 1234",
+                &[Instruction::PushU32Imm(1234)],
+                false,
+                "failed to parse instruction with u32 argument - decimal edition.",
+            ),
+            ParserTest::new(
+                "push 0x1234",
+                &[Instruction::PushU32Imm(0x1234)],
+                false,
+                "failed to parse instruction with u32 argument - hex edition.",
+            ),
+        ];
+
+        ParserTests::new(&tests).run_all();
     }
 }
