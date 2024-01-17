@@ -113,9 +113,9 @@ pub enum Instruction {
     MovU32ImmMemExpr(u32, u32),
     /// Move the value at the address as given by an expression to a u32 register. The result is copied into the specified register.
     MovMemExprU32Reg(u32, RegisterId),
-    /// Move the value of a register to the address given by an expression. The result is copied into the specified memory address.
+    /// Move the value of a u32 register to the address given by an expression. The result is copied into the specified memory address.
     MovU32RegMemExpr(RegisterId, u32),
-    /// Reverse the order of bytes in a specified register.
+    /// Reverse the order of bytes in a specified u32 register.
     ByteSwapU32(RegisterId),
     /// Zero the high bits of the source value starting from a specified index.
     ZeroHighBitsByIndexU32Reg(RegisterId, RegisterId, RegisterId),
@@ -353,19 +353,19 @@ impl Display for Instruction {
                 let mut decoder = MoveExpression::new();
                 decoder.unpack(*expr);
 
-                format!("emov 0x{imm:08x}, [{decoder}]")
+                format!("emov 0x{imm:08x}, &[{decoder}]")
             }
             MovMemExprU32Reg(expr, reg) => {
                 let mut decoder = MoveExpression::new();
                 decoder.unpack(*expr);
 
-                format!("emov [{decoder}], &{reg}")
+                format!("emov &[{decoder}], {reg}")
             }
             MovU32RegMemExpr(reg, expr) => {
                 let mut decoder = MoveExpression::new();
                 decoder.unpack(*expr);
 
-                format!("emov {reg}, [{decoder}]")
+                format!("emov {reg}, &[{decoder}]")
             }
             ByteSwapU32(reg) => {
                 format!("bswap {reg}")

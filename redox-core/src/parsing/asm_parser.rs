@@ -22,7 +22,7 @@ pub enum Argument {
     U8(u8),
     /// A register argument.
     Register(RegisterId),
-    /// An expression argument (memory address.
+    /// An expression argument.
     Expression(MoveExpression),
 }
 
@@ -76,7 +76,7 @@ impl AsmParser {
             let mut argument_hints = vec![];
 
             // Do we have any arguments?
-            for (i, segment) in segments[1..].iter().enumerate() {
+            for segment in &segments[1..] {
                 //println!("------------------[Argument {i}]------------------");
 
                 let first_char = segment.chars().nth(0).unwrap();
@@ -151,7 +151,7 @@ impl AsmParser {
     ///
     /// * `is_pointer` - Is this argument a pointer?
     #[inline]
-    fn try_parse_expression(string: &str, _is_pointer: bool) -> Option<(Argument, ArgTypeHint)> {
+    fn try_parse_expression(string: &str, is_pointer: bool) -> Option<(Argument, ArgTypeHint)> {
         //print!("Checking for an expression... ");
         // Expressions must start with an open square bracket and end with a close square bracket.
         let first_char = string.chars().nth(0).unwrap();
@@ -237,10 +237,13 @@ impl AsmParser {
         // Is the expression argument list valid?
         if let Ok(expr) = MoveExpression::try_from(&expr_arguments[..]) {
             //println!("found! Expression = {expr}.");
-
-            Some((Argument::Expression(expr), ArgTypeHint::Expression))
+            if is_pointer {
+                Some((Argument::Expression(expr), ArgTypeHint::ExpressionPointer))
+            } else {
+                Some((Argument::Expression(expr), ArgTypeHint::Expression))
+            }
         } else {
-            panic!("no match. Invalid syntax - invalid or malformed move expression syntax");
+            panic!("Invalid expression syntax - {expr_substring}");
         }
     }
 

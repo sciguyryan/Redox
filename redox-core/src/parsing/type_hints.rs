@@ -16,8 +16,10 @@ pub enum ArgTypeHint {
     Register,
     /// A register pointer argument (memory address).
     RegisterPointer,
-    /// An expression argument (memory address).
+    /// An expression argument.
     Expression,
+    /// An expression argument (memory address).
+    ExpressionPointer,
 }
 
 #[derive(Debug, Clone)]
