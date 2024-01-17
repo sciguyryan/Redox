@@ -123,10 +123,14 @@ pub enum Instruction {
     ZeroHighBitsByIndexU32RegU32Imm(u32, RegisterId, RegisterId),
     /// Push a u32 immediate value onto the stack.
     PushU32Imm(u32),
+    /// Push a f32 immediate value onto the stack.
+    PushF32Imm(f32),
     /// Push the value of a u32 register onto the stack.
     PushU32Reg(RegisterId),
+    /// Pop a f32 value from the stack to a f32 register.
+    PopF32ToF32Reg(RegisterId),
     /// Pop a u32 value from the stack to a u32 register.
-    PopU32ImmU32Reg(RegisterId),
+    PopU32ToU32Reg(RegisterId),
 
     /******** [IO Instructions] ********/
     /// Output a f32 immediate value to a specific port.
@@ -379,11 +383,17 @@ impl Display for Instruction {
             PushU32Imm(value) => {
                 format!("push 0x{value:08x}")
             }
+            PushF32Imm(value) => {
+                format!("push {value}")
+            }
             PushU32Reg(reg) => {
                 format!("push {reg}")
             }
-            PopU32ImmU32Reg(out_reg) => {
-                format!("pop {out_reg}")
+            PopF32ToF32Reg(reg) => {
+                format!("pop {reg}")
+            }
+            PopU32ToU32Reg(reg) => {
+                format!("pop {reg}")
             }
 
             /******** [IO Instructions] ********/
@@ -556,8 +566,10 @@ impl Instruction {
             ZeroHighBitsByIndexU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
             ZeroHighBitsByIndexU32RegU32Imm => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
             PushU32Imm => ARG_U32_IMM_SIZE,
+            PushF32Imm => ARG_F32_IMM_SIZE,
             PushU32Reg => ARG_REG_ID_SIZE,
-            PopU32ImmU32Reg => ARG_REG_ID_SIZE,
+            PopF32ToF32Reg => ARG_REG_ID_SIZE,
+            PopU32ToU32Reg => ARG_REG_ID_SIZE,
 
             /******** [IO Instructions] ********/
             OutF32Imm => ARG_F32_IMM_SIZE + ARG_U8_IMM_SIZE,

@@ -407,8 +407,14 @@ impl AsmParser {
             OpCode::ZeroHighBitsByIndexU32Reg => todo!(),
             OpCode::ZeroHighBitsByIndexU32RegU32Imm => todo!(),
             OpCode::PushU32Imm => Instruction::PushU32Imm(get_inner!(args[0], Argument::U32)),
+            OpCode::PushF32Imm => Instruction::PushF32Imm(get_inner!(args[0], Argument::F32)),
             OpCode::PushU32Reg => Instruction::PushU32Reg(get_inner!(args[0], Argument::Register)),
-            OpCode::PopU32ImmU32Reg => todo!(),
+            OpCode::PopF32ToF32Reg => {
+                Instruction::PopF32ToF32Reg(get_inner!(args[0], Argument::Register))
+            }
+            OpCode::PopU32ToU32Reg => {
+                Instruction::PopU32ToU32Reg(get_inner!(args[0], Argument::Register))
+            }
 
             /******** [IO Instructions] ********/
             OpCode::OutF32Imm => todo!(),
@@ -677,6 +683,12 @@ mod tests_asm_parsing {
                 &[Instruction::PushU32Imm(1234)],
                 false,
                 "failed to parse single instruction with one u32 argument.",
+            ),
+            ParserTest::new(
+                "push 0.1",
+                &[Instruction::PushF32Imm(0.1)],
+                false,
+                "failed to parse single instruction with one f32 argument.",
             ),
             ParserTest::new(
                 "push ER1",

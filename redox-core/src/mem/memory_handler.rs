@@ -597,15 +597,25 @@ impl MemoryHandler {
 
                 Instruction::PushU32Imm(imm)
             }
+            PushF32Imm => {
+                let imm = Self::read_f32(arg_bytes, &mut cursor);
+
+                Instruction::PushF32Imm(imm)
+            }
             PushU32Reg => {
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
                 Instruction::PushU32Reg(reg)
             }
-            PopU32ImmU32Reg => {
+            PopF32ToF32Reg => {
                 let out_reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::PopU32ImmU32Reg(out_reg)
+                Instruction::PopF32ToF32Reg(out_reg)
+            }
+            PopU32ToU32Reg => {
+                let out_reg = Self::read_register_id(arg_bytes, &mut cursor);
+
+                Instruction::PopU32ToU32Reg(out_reg)
             }
 
             /******** [IO Instructions] ********/

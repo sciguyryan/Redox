@@ -67,8 +67,11 @@ impl InstructionHints {
                     [ExpressionPointer, RegisterPointer],
                     OpCode::MovMemExprU32Reg
                 ),
+                gen_hint!("push", [F32], OpCode::PushF32Imm),
                 gen_hint!("push", [U32], OpCode::PushU32Imm),
                 gen_hint!("push", [Register], OpCode::PushU32Reg),
+                gen_hint!("pop", [Register], OpCode::PopF32ToF32Reg),
+                gen_hint!("pop", [Register], OpCode::PopU32ToU32Reg),
                 /******** [IO Instructions] ********/
 
 

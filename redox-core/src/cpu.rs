@@ -7,7 +7,7 @@ use crate::{
         expressions::{Expression, ExpressionArgs},
         instruction::Instruction,
     },
-    mem::memory_handler::{MemoryHandler, StackArgType, SIZE_OF_U32},
+    mem::memory_handler::{MemoryHandler, StackArgType, SIZE_OF_F32, SIZE_OF_U32},
     privilege_level::PrivilegeLevel,
     reg::registers::{RegisterId, Registers},
     utils,
@@ -75,6 +75,8 @@ const NOT_U32_LOW_BYTE_MASK: u32 = !U32_LOW_BYTE_MASK;
 
 /// The size of a u32 value, in bytes.
 const SIZE_OF_U32_LOCAL: u32 = SIZE_OF_U32 as u32;
+/// The size of a f32 value, in bytes.
+const SIZE_OF_F32_LOCAL: u32 = SIZE_OF_F32 as u32;
 
 pub struct Cpu {
     /// The registers associated with this CPU.
@@ -1125,6 +1127,15 @@ impl Cpu {
                 // zhbi source_reg, index, out_reg
                 self.perform_zero_high_bit_u32_reg(source_reg, *index, out_reg, privilege);
             }
+            PushF32Imm(imm) => {
+                // push imm
+                com_bus.mem.push_f32(*imm);
+
+                // Update the stack pointer register.
+                self.registers
+                    .get_register_u32_mut(RegisterId::ESP)
+                    .subtract_unchecked(SIZE_OF_F32_LOCAL);
+            }
             PushU32Imm(imm) => {
                 // push imm
                 com_bus.mem.push_u32(*imm);
@@ -1135,7 +1146,7 @@ impl Cpu {
                     .subtract_unchecked(SIZE_OF_U32_LOCAL);
             }
             PushU32Reg(reg) => {
-                // push %reg
+                // push reg
                 let value = self.registers.read_reg_u32(reg, privilege);
                 com_bus.mem.push_u32(value);
 
@@ -1144,11 +1155,27 @@ impl Cpu {
                     .get_register_u32_mut(RegisterId::ESP)
                     .subtract_unchecked(SIZE_OF_U32_LOCAL);
             }
-            PopU32ImmU32Reg(out_reg) => {
-                // pop %out_reg
+            PopF32ToF32Reg(reg) => {
+                // pop reg
                 self.registers
-                    .get_register_u32_mut(*out_reg)
+                    .get_register_f32_mut(*reg)
+                    .write(com_bus.mem.pop_f32(), privilege);
+
+                // Update the stack pointer register.
+                self.registers
+                    .get_register_u32_mut(RegisterId::ESP)
+                    .add_unchecked(SIZE_OF_F32_LOCAL);
+            }
+            PopU32ToU32Reg(reg) => {
+                // pop reg
+                self.registers
+                    .get_register_u32_mut(*reg)
                     .write(com_bus.mem.pop_u32(), privilege);
+
+                // Update the stack pointer register.
+                self.registers
+                    .get_register_u32_mut(RegisterId::ESP)
+                    .add_unchecked(SIZE_OF_U32_LOCAL);
             }
 
             /******** [IO Instructions] ********/
@@ -1644,12 +1671,25 @@ mod tests_cpu {
     /// The default stack capacity (in terms of u32 values) for tests.
     const DEFAULT_U32_STACK_CAPACITY: usize = 30;
 
-    struct TestsU32 {
-        tests: Vec<TestU32>,
+    trait Test {
+        /// Run this specific test entry.
+        ///
+        /// # Arguments
+        ///
+        /// * `id` - The ID of this test.
+        ///
+        /// # Returns
+        ///
+        /// An option containing the [`VirtualMachine`] instance if the execution did not panic, or None otherwise.
+        fn run_test(&self, id: usize) -> Option<VirtualMachine>;
     }
 
-    impl TestsU32 {
-        pub fn new(tests: &[TestU32]) -> Self {
+    struct CpuTests<T: Test + Clone> {
+        tests: Vec<T>,
+    }
+
+    impl<T: Test + Clone> CpuTests<T> {
+        pub fn new(tests: &[T]) -> Self {
             Self {
                 tests: tests.to_vec(),
             }
@@ -1674,6 +1714,152 @@ mod tests_cpu {
             for (id, test) in self.tests.iter().enumerate() {
                 closure(id, test.run_test(id));
             }
+        }
+    }
+
+    #[derive(Clone)]
+    struct TestF32 {
+        /// A vector of [`Instruction`]s to be executed.
+        pub instructions: Vec<Instruction>,
+        /// A [`HashMap`] containing [`RegisterId`] and the expected value of the register after execution.
+        pub expected_changed_registers: HashMap<RegisterId, f32>,
+        /// The capacity of the stack memory segment, in bytes.
+        pub stack_seg_capacity_u32: usize,
+        /// A boolean indicating whether the test should panic or not.
+        pub should_panic: bool,
+        /// A string slice that provides the message to be displayed if the test fails.
+        pub fail_message: String,
+    }
+
+    impl TestF32 {
+        /// Create a new [`TestF32`] instance.
+        ///
+        /// # Arguments
+        ///
+        /// * `instructions` - A slice of [`Instruction`]s to be executed.
+        /// * `expected_registers` - A slice of a tuple containing the [`RegisterId`] and the expected value of the register after execution.
+        /// * `stack_seg_capacity_u32` - The capacity of the stack memory segment, in bytes.
+        /// * `should_panic` - A boolean indicating whether the test should panic or not.
+        /// * `fail_message` - A string slice that provides the message to be displayed if the test fails.
+        ///
+        /// # Note
+        ///
+        /// If the results need to check the user segment memory contents then the VM will automatically be
+        /// created with a memory segment of the correct size. It doesn't need to be specified manually.
+        fn new(
+            instructions: &[Instruction],
+            expected_registers: &[(RegisterId, f32)],
+            stack_seg_capacity_u32: usize,
+            should_panic: bool,
+            fail_message: &str,
+        ) -> Self {
+            // Ensure we always end with a halt instruction.
+            let mut instructions_vec = instructions.to_vec();
+            if let Some(ins) = instructions_vec.last() {
+                if !matches!(ins, Halt) {
+                    instructions_vec.push(Halt);
+                }
+            }
+
+            // Build the list of registers we expect to change.
+            let mut changed_registers = HashMap::new();
+            for (id, value) in expected_registers {
+                changed_registers.insert(*id, *value);
+            }
+
+            Self {
+                instructions: instructions_vec,
+                expected_changed_registers: changed_registers,
+                stack_seg_capacity_u32,
+                should_panic,
+                fail_message: fail_message.to_string(),
+            }
+        }
+
+        fn print_register_differences(&self, id: usize, vm: &VirtualMachine) {
+            let mut table = Table::new();
+            table.add_row(row!["Register", "Expected Value", "Actual Value"]);
+
+            // Did the test registers match their expected values?
+            self.expected_changed_registers
+                .iter()
+                .for_each(|(id, expected_value)| {
+                    let actual_value = vm.cpu.registers.read_reg_f32_unchecked(id);
+                    if *expected_value != actual_value {
+                        table.add_row(row![
+                            id,
+                            format!("{expected_value}"),
+                            format!("{actual_value}")
+                        ]);
+                    }
+                });
+
+            if table.len() > 1 {
+                println!();
+                println!("The following registers did not match their expected values:");
+                println!("{table}");
+                panic!("{}", self.fail_message(id, false));
+            }
+        }
+
+        /// Generate a fail message for this test instance.
+        ///
+        /// # Arguments
+        ///
+        /// * `id` - The ID of this test.
+        /// * `did_panic` - Did the test panic?
+        pub fn fail_message(&self, id: usize, did_panic: bool) -> String {
+            format!(
+                "Test {id} Failed - Should Panic? {}, Panicked? {did_panic}. Message = {}",
+                self.should_panic, self.fail_message
+            )
+        }
+    }
+
+    impl Test for TestF32 {
+        fn run_test(&self, id: usize) -> Option<VirtualMachine> {
+            // Compile the test code.
+            let mut compiler = Compiler::new();
+            let compiled = compiler.compile(&self.instructions);
+
+            // Attempt to execute the code.
+            let result = panic::catch_unwind(|| {
+                // Build the virtual machine instance.
+                let mut vm = VirtualMachine::new(
+                    vm::MIN_USER_SEGMENT_SIZE,
+                    compiled,
+                    &[],
+                    self.stack_seg_capacity_u32 * mem::memory_handler::SIZE_OF_U32,
+                );
+
+                // Execute the code.
+                vm.run();
+
+                // Return the completed VM instance.
+                vm
+            });
+
+            // Confirm whether the test panicked, and whether that panic was expected or not.
+            let did_panic = result.is_err();
+            assert_eq!(
+                did_panic,
+                self.should_panic,
+                "{}",
+                self.fail_message(id, did_panic)
+            );
+
+            // We don't have a viable virtual machine instance to return here.
+            if did_panic {
+                return None;
+            }
+
+            let vm = result.unwrap();
+
+            // This will be used to pretty print an output table in the event we
+            // fail the test.
+            self.print_register_differences(id, &vm);
+
+            Some(vm)
         }
     }
 
@@ -1762,16 +1948,22 @@ mod tests_cpu {
             }
         }
 
-        /// Run this specific test entry.
+        /// Generate a fail message for this test instance.
         ///
         /// # Arguments
         ///
         /// * `id` - The ID of this test.
-        ///
-        /// # Returns
-        ///
-        /// An option containing the [`VirtualMachine`] instance if the execution did not panic, or None otherwise.
-        pub fn run_test(&self, id: usize) -> Option<VirtualMachine> {
+        /// * `did_panic` - Did the test panic?
+        pub fn fail_message(&self, id: usize, did_panic: bool) -> String {
+            format!(
+                "Test {id} Failed - Should Panic? {}, Panicked? {did_panic}. Message = {}",
+                self.should_panic, self.fail_message
+            )
+        }
+    }
+
+    impl Test for TestU32 {
+        fn run_test(&self, id: usize) -> Option<VirtualMachine> {
             // Compile the test code.
             let mut compiler = Compiler::new();
             let compiled = compiler.compile(&self.instructions);
@@ -1815,19 +2007,6 @@ mod tests_cpu {
 
             Some(vm)
         }
-
-        /// Generate a fail message for this test instance.
-        ///
-        /// # Arguments
-        ///
-        /// * `id` - The ID of this test.
-        /// * `did_panic` - Did the test panic?
-        pub fn fail_message(&self, id: usize, did_panic: bool) -> String {
-            format!(
-                "Test {id} Failed - Should Panic? {}, Panicked? {did_panic}. Message = {}",
-                self.should_panic, self.fail_message
-            )
-        }
     }
 
     /// Test writing to a port that is unused.
@@ -1841,7 +2020,7 @@ mod tests_cpu {
             "OUT - successfully executed OUT instruction with an unused port",
         )];
 
-        TestsU32::new(&tests).run_all_special(|id, vm| {
+        CpuTests::new(&tests).run_all_special(|id, vm| {
             if let Some(v) = vm {
                 // The CPU should still be within an interrupt handler.
                 assert!(v.cpu.is_in_interrupt_handler);
@@ -1870,7 +2049,7 @@ mod tests_cpu {
             "OUT - failed to successfully execute OUT instruction with a valid port and data type",
         )];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test writing to a valid port with an unsupported data type.
@@ -1884,7 +2063,7 @@ mod tests_cpu {
             "OUT - successfully executed OUT instruction with unsupported data type",
         )];
 
-        TestsU32::new(&tests).run_all_special(|id, vm| {
+        CpuTests::new(&tests).run_all_special(|id, vm| {
             if let Some(v) = vm {
                 // The CPU should still be within an interrupt handler.
                 assert!(v.cpu.is_in_interrupt_handler);
@@ -1906,7 +2085,7 @@ mod tests_cpu {
             "LIVT - successfully executed instruction in user mode",
         )];
 
-        TestsU32::new(&tests).run_all_special(|id, vm| {
+        CpuTests::new(&tests).run_all_special(|id, vm| {
             if let Some(v) = vm {
                 // The CPU should still be within an interrupt handler.
                 assert!(v.cpu.is_in_interrupt_handler);
@@ -1944,7 +2123,7 @@ mod tests_cpu {
             "LIVT - failed to successfully execute LIVT instruction",
         )];
 
-        TestsU32::new(&tests).run_all_special(|id, vm| {
+        CpuTests::new(&tests).run_all_special(|id, vm| {
             if let Some(v) = vm {
                 // The CPU should still be within an interrupt handler.
                 assert!(v.cpu.is_in_interrupt_handler);
@@ -1981,7 +2160,7 @@ mod tests_cpu {
             "INT - failed to successfully execute INT instruction",
         )];
 
-        TestsU32::new(&tests).run_all_special(|id, vm| {
+        CpuTests::new(&tests).run_all_special(|id, vm| {
             if let Some(v) = vm {
                 // The interrupt handler should not be executed and so the value of 5 should be added
                 // to the value of the register ER1 (which is zero). Therefore, 5 should be moved to
@@ -2034,7 +2213,7 @@ mod tests_cpu {
             "INT - failed to successfully execute INT instruction",
         )];
 
-        TestsU32::new(&tests).run_all_special(|id, vm| {
+        CpuTests::new(&tests).run_all_special(|id, vm| {
             if let Some(v) = vm {
                 // The interrupt handler should not be executed and so the value of 5 should be added
                 // to the value of the register ER1 (which is zero). Therefore, 5 should be moved to
@@ -2084,7 +2263,7 @@ mod tests_cpu {
             "INT - failed to successfully execute INT instruction",
         )];
 
-        TestsU32::new(&tests).run_all_special(|id, vm| {
+        CpuTests::new(&tests).run_all_special(|id, vm| {
             if let Some(v) = vm {
                 // The interrupt handler should set the value of the ER1 register to 0x64.
                 // After returning, 0x5 should be added to the value of ER1, the result moved to the accumulator.
@@ -2123,7 +2302,7 @@ mod tests_cpu {
             Instruction::Halt, // Starts at [base + 47]. Length = 4.
             /***** FUNC_AAAA - Subroutine starts here. *****/
             Instruction::PushU32Imm(5), // Starts at [base + 51]. Length = 8.
-            Instruction::PopU32ImmU32Reg(RegisterId::ER1), // Starts at [base + 59]. Length = 5.
+            Instruction::PopU32ToU32Reg(RegisterId::ER1), // Starts at [base + 59]. Length = 5.
             Instruction::RetArgsU32,    // Starts at [base + 64]. Length = 4.
         ];
 
@@ -2135,7 +2314,7 @@ mod tests_cpu {
             "CALL - failed to successfully execute CALL instruction",
         )];
 
-        TestsU32::new(&tests).run_all_special(|id, vm| {
+        CpuTests::new(&tests).run_all_special(|id, vm| {
             if let Some(mut v) = vm {
                 // The subroutine should set the value of the ER1 register to 5.
                 // After returning, 100 should be added to the value of ER1, the result moved to the accumulator.
@@ -2210,7 +2389,7 @@ mod tests_cpu {
             "CALL - failed to successfully execute CALl instruction",
         )];
 
-        TestsU32::new(&tests).run_all_special(|id, vm| {
+        CpuTests::new(&tests).run_all_special(|id, vm| {
             if let Some(v) = vm {
                 // Check the registers were correctly set and restored.
                 for (id, value) in test_registers {
@@ -2240,7 +2419,7 @@ mod tests_cpu {
             Instruction::RetArgsU32,    // Starts at [base + 61]. Length = 4.
             /***** FUNC_BBBB - Subroutine 2 starts here. *****/
             Instruction::PushU32Imm(100), // Starts at [base + 65]. Length = 8. This should NOT be preserved.
-            Instruction::PopU32ImmU32Reg(RegisterId::ER1),
+            Instruction::PopU32ToU32Reg(RegisterId::ER1),
             Instruction::RetArgsU32,
         ];
 
@@ -2252,7 +2431,7 @@ mod tests_cpu {
             "CALL - failed to successfully execute CALl instruction",
         )];
 
-        TestsU32::new(&tests).run_all_special(|id, vm| {
+        CpuTests::new(&tests).run_all_special(|id, vm| {
             if let Some(mut v) = vm {
                 // The first subroutine should set the value of the EAC register to 100.
                 // The second subroutine should add 5 to the value of EAC and set the accumulator
@@ -2310,7 +2489,7 @@ mod tests_cpu {
             "NOP - failed to execute NOP instruction",
         )];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the halt instruction.
@@ -2335,7 +2514,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the mret instruction.
@@ -2349,7 +2528,7 @@ mod tests_cpu {
             "MRET - failed to execute MRET instruction",
         )];
 
-        TestsU32::new(&tests).run_all_special(|id, vm| {
+        CpuTests::new(&tests).run_all_special(|id, vm| {
             if let Some(v) = vm {
                 assert!(
                     !v.cpu.is_machine_mode,
@@ -2490,7 +2669,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the add u32 register to u32 register instruction.
@@ -2617,7 +2796,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test subtraction of u32 immediate from a u32 register instruction.
@@ -2731,7 +2910,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test subtraction of a u32 register from a u32 immediate instruction.
@@ -2845,7 +3024,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the subtract u32 register from u32 register instruction.
@@ -2974,7 +3153,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the multiply u32 immediate by a u32 register instruction.
@@ -3010,7 +3189,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the multiply u32 immediate by a u32 register instruction.
@@ -3053,7 +3232,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the division of a u32 register by a u32 immediate instruction.
@@ -3082,7 +3261,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
 
         // Additional division by zero exception tests.
         let div_zero_tests = [TestU32::new(
@@ -3093,7 +3272,7 @@ mod tests_cpu {
             "DIV - failed to panic when attempting to divide by zero",
         )];
 
-        TestsU32::new(&div_zero_tests).run_all_special(|id: usize, vm: Option<VirtualMachine>| {
+        CpuTests::new(&div_zero_tests).run_all_special(|id: usize, vm: Option<VirtualMachine>| {
             if let Some(v) = vm {
                 assert!(
                     v.cpu.is_in_interrupt_handler,
@@ -3137,7 +3316,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
 
         // Additional division by zero exception tests.
         let div_zero_tests = [TestU32::new(
@@ -3148,7 +3327,7 @@ mod tests_cpu {
             "DIV - failed to panic when attempting to divide by zero",
         )];
 
-        TestsU32::new(&div_zero_tests).run_all_special(|id: usize, vm: Option<VirtualMachine>| {
+        CpuTests::new(&div_zero_tests).run_all_special(|id: usize, vm: Option<VirtualMachine>| {
             if let Some(v) = vm {
                 assert!(
                     v.cpu.is_in_interrupt_handler,
@@ -3202,7 +3381,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
 
         // Additional division by zero exception tests.
         let div_zero_tests = [TestU32::new(
@@ -3216,7 +3395,7 @@ mod tests_cpu {
             "DIV - failed to panic when attempting to divide by zero",
         )];
 
-        TestsU32::new(&div_zero_tests).run_all_special(|id: usize, vm: Option<VirtualMachine>| {
+        CpuTests::new(&div_zero_tests).run_all_special(|id: usize, vm: Option<VirtualMachine>| {
             if let Some(v) = vm {
                 assert!(
                     v.cpu.is_in_interrupt_handler,
@@ -3260,7 +3439,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
 
         // Additional division by zero exception tests.
         let div_zero_tests = [TestU32::new(
@@ -3271,7 +3450,7 @@ mod tests_cpu {
             "MOD - failed to panic when attempting to divide by zero",
         )];
 
-        TestsU32::new(&div_zero_tests).run_all_special(|id: usize, vm: Option<VirtualMachine>| {
+        CpuTests::new(&div_zero_tests).run_all_special(|id: usize, vm: Option<VirtualMachine>| {
             if let Some(v) = vm {
                 assert!(
                     v.cpu.is_in_interrupt_handler,
@@ -3315,7 +3494,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
 
         // Additional division by zero exception tests.
         let div_zero_tests = [TestU32::new(
@@ -3326,7 +3505,7 @@ mod tests_cpu {
             "MOD - failed to panic when attempting to divide by zero",
         )];
 
-        TestsU32::new(&div_zero_tests).run_all_special(|id: usize, vm: Option<VirtualMachine>| {
+        CpuTests::new(&div_zero_tests).run_all_special(|id: usize, vm: Option<VirtualMachine>| {
             if let Some(v) = vm {
                 assert!(
                     v.cpu.is_in_interrupt_handler,
@@ -3380,7 +3559,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
 
         // Additional division by zero exception tests.
         let div_zero_tests = [TestU32::new(
@@ -3391,7 +3570,7 @@ mod tests_cpu {
             "MOD - failed to panic when attempting to divide by zero",
         )];
 
-        TestsU32::new(&div_zero_tests).run_all_special(|id: usize, vm: Option<VirtualMachine>| {
+        CpuTests::new(&div_zero_tests).run_all_special(|id: usize, vm: Option<VirtualMachine>| {
             if let Some(v) = vm {
                 assert!(
                     v.cpu.is_in_interrupt_handler,
@@ -3497,7 +3676,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the decrement u32 register instruction.
@@ -3593,7 +3772,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the bitwise and of a u32 immediate and a u32 register instruction.
@@ -3723,7 +3902,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the left-shift u32 register by u32 immediate value.
@@ -3873,7 +4052,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the left-shift u32 register by u32 register value.
@@ -4052,7 +4231,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the arithmetic left-shift u32 register by u32 immediate value.
@@ -4141,7 +4320,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the arithmetic left-shift u32 register by u32 register.
@@ -4244,7 +4423,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the right-shift u32 register by u32 immediate value.
@@ -4354,7 +4533,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the right-shift u32 register by u32 register.
@@ -4457,7 +4636,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the arithmetic right-shift u32 register by u32 immediate value.
@@ -4549,7 +4728,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the arithmetic right-shift u32 register by u32 register.
@@ -4655,7 +4834,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the move u32 immediate to u32 register instruction.
@@ -4681,7 +4860,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the move u32 register to u32 register instruction.
@@ -4711,7 +4890,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the move u32 literal to memory instruction.
@@ -4729,7 +4908,7 @@ mod tests_cpu {
             "MOV - immediate value not moved to memory",
         )];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the move u32 register to memory instruction.
@@ -4748,7 +4927,7 @@ mod tests_cpu {
             "MOV - u32 register value not moved to memory",
         )];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the move u32 register to memory instruction.
@@ -4768,7 +4947,7 @@ mod tests_cpu {
             "MOV - value not correctly moved from memory to register",
         )];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the move u32 to register from address provided by a different register.
@@ -4790,7 +4969,7 @@ mod tests_cpu {
             "MOV - value not correctly moved from memory to register via register pointer",
         )];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the swap u32 register to u32 register instruction.
@@ -4808,7 +4987,7 @@ mod tests_cpu {
             "SWAP - values of the two registers were not correctly swapped",
         )];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the byte swap u32 register instruction.
@@ -4825,7 +5004,7 @@ mod tests_cpu {
             "BSWAP - the byte order of the register was not correctly swapped",
         )];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the complex move value to expression-derived memory address.
@@ -4975,7 +5154,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the complex move from an expression-derived memory address to a register.
@@ -5131,7 +5310,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the complex move from a register to an expression-derived memory address.
@@ -5291,7 +5470,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the zero high bit by index instruction.
@@ -5422,7 +5601,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the zero high bit by index instruction.
@@ -5539,7 +5718,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the bit-test instruction with a u32 register.
@@ -5585,7 +5764,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the bit-test instruction with a memory address.
@@ -5625,7 +5804,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the bit-test and reset instruction with a u32 register.
@@ -5681,7 +5860,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the bit-test and reset instruction with a memory address.
@@ -5733,7 +5912,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the bit-test and set instruction with a u32 register.
@@ -5789,7 +5968,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the bit-test and set instruction with a memory address.
@@ -5847,7 +6026,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the reverse bit scan with a source u32 register and a destination u32 register.
@@ -5893,7 +6072,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the reverse bit scan with a source memory address and a destination u32 register.
@@ -5932,7 +6111,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the reverse bit scan with a register and a destination memory address.
@@ -5982,7 +6161,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the reverse bit scan with a source memory address and a destination memory address.
@@ -6029,7 +6208,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the forward bit scan with a source u32 register and a destination u32 register.
@@ -6074,7 +6253,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the forward bit scan with a source memory address and a destination u32 register.
@@ -6113,7 +6292,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the forward bit scan with a register and a destination memory address.
@@ -6163,7 +6342,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the forward bit scan with a source memory address and a destination memory address.
@@ -6207,7 +6386,24 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
+    }
+
+    /// Test push-pop a f32 immediate.
+    #[test]
+    fn test_push_f32_imm_f32_reg() {
+        let tests = [TestF32::new(
+            &[PushF32Imm(0.1)],
+            &[],
+            DEFAULT_U32_STACK_CAPACITY,
+            false,
+            "PUSH - failed to execute PUSH instruction",
+        )];
+
+        CpuTests::new(&tests).run_all_special(|_id: usize, vm: Option<VirtualMachine>| {
+            let mut vm = vm.expect("failed to correctly execute test code");
+            assert_eq!(vm.com_bus.mem.pop_f32(), 0.1);
+        });
     }
 
     /// Test the push u32 register instruction.
@@ -6226,7 +6422,7 @@ mod tests_cpu {
             "PUSH - failed to execute PUSH instruction",
         )];
 
-        TestsU32::new(&tests).run_all_special(|_id: usize, vm: Option<VirtualMachine>| {
+        CpuTests::new(&tests).run_all_special(|_id: usize, vm: Option<VirtualMachine>| {
             let mut vm = vm.expect("failed to correctly execute test code");
             assert_eq!(vm.com_bus.mem.pop_u32(), 0x321);
             assert_eq!(vm.com_bus.mem.pop_u32(), 0x123);
@@ -6247,7 +6443,7 @@ mod tests_cpu {
             "PUSH - failed to execute PUSH instruction",
         )];
 
-        TestsU32::new(&tests).run_all_special(|_id: usize, vm: Option<VirtualMachine>| {
+        CpuTests::new(&tests).run_all_special(|_id: usize, vm: Option<VirtualMachine>| {
             let mut vm = vm.expect("failed to correctly execute test code");
             assert_eq!(vm.com_bus.mem.pop_u32(), 0x123);
         });
@@ -6264,7 +6460,7 @@ mod tests_cpu {
             "PUSH - failed to execute PUSH instruction",
         )];
 
-        TestsU32::new(&tests).run_all_special(|_id: usize, vm: Option<VirtualMachine>| {
+        CpuTests::new(&tests).run_all_special(|_id: usize, vm: Option<VirtualMachine>| {
             let mut vm = vm.expect("failed to correctly execute test code");
             assert_eq!(vm.com_bus.mem.pop_u32(), 0x321);
             assert_eq!(vm.com_bus.mem.pop_u32(), 0x123);
@@ -6282,7 +6478,7 @@ mod tests_cpu {
             "PUSH - failed to execute PUSH instruction",
         )];
 
-        TestsU32::new(&tests).run_all_special(|_id: usize, vm: Option<VirtualMachine>| {
+        CpuTests::new(&tests).run_all_special(|_id: usize, vm: Option<VirtualMachine>| {
             let mut vm = vm.expect("failed to correctly execute test code");
             assert_eq!(vm.com_bus.mem.pop_u32(), 0x123);
         });
@@ -6300,7 +6496,7 @@ mod tests_cpu {
             "POP - failed to execute POP instruction",
         )];
 
-        TestsU32::new(&tests).run_all_special(|_id: usize, vm: Option<VirtualMachine>| {
+        CpuTests::new(&tests).run_all_special(|_id: usize, vm: Option<VirtualMachine>| {
             let mut vm = vm.expect("failed to correctly execute test code");
 
             // There is nothing on the stack, this should assert.
@@ -6313,7 +6509,7 @@ mod tests_cpu {
     fn test_pop_u32_reg() {
         let tests = [
             TestU32::new(
-                &[PushU32Imm(0x123), PopU32ImmU32Reg(RegisterId::ER1)],
+                &[PushU32Imm(0x123), PopU32ToU32Reg(RegisterId::ER1)],
                 &[(RegisterId::ER1, 0x123)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -6323,8 +6519,8 @@ mod tests_cpu {
                 &[
                     PushU32Imm(0x123),
                     PushU32Imm(0x321),
-                    PopU32ImmU32Reg(RegisterId::ER1),
-                    PopU32ImmU32Reg(RegisterId::ER2),
+                    PopU32ToU32Reg(RegisterId::ER1),
+                    PopU32ToU32Reg(RegisterId::ER2),
                 ],
                 &[(RegisterId::ER1, 0x321), (RegisterId::ER1, 0x321)],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -6332,7 +6528,7 @@ mod tests_cpu {
                 "POP - failed to execute POP instruction",
             ),
             TestU32::new(
-                &[PopU32ImmU32Reg(RegisterId::ER1)],
+                &[PopU32ToU32Reg(RegisterId::ER1)],
                 &[],
                 DEFAULT_U32_STACK_CAPACITY,
                 true,
@@ -6340,7 +6536,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the absolute jump by immediate address instruction.
@@ -6384,7 +6580,7 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the absolute jump by immediate address instruction.
@@ -6431,6 +6627,6 @@ mod tests_cpu {
             ),
         ];
 
-        TestsU32::new(&tests).run_all();
+        CpuTests::new(&tests).run_all();
     }
 }

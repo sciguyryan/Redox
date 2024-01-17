@@ -113,10 +113,14 @@ pub enum OpCode {
     ZeroHighBitsByIndexU32RegU32Imm,
     /// Push a u32 immediate value onto the stack.
     PushU32Imm,
+    /// Push a f32 immediate value onto the stack.
+    PushF32Imm,
     /// Push the value of a u32 register onto the stack.
     PushU32Reg,
+    /// Pop a f32 value from the stack to a f32 register.
+    PopF32ToF32Reg,
     /// Pop a u32 value from the stack to a u32 register.
-    PopU32ImmU32Reg,
+    PopU32ToU32Reg,
 
     /******** [IO Instructions] ********/
     /// Output a f32 immediate value to a specific port.
@@ -263,8 +267,10 @@ impl From<&Instruction> for OpCode {
             ZeroHighBitsByIndexU32Reg(_, _, _) => OpCode::ZeroHighBitsByIndexU32Reg,
             ZeroHighBitsByIndexU32RegU32Imm(_, _, _) => OpCode::ZeroHighBitsByIndexU32RegU32Imm,
             PushU32Imm(_) => OpCode::PushU32Imm,
+            PushF32Imm(_) => OpCode::PushF32Imm,
             PushU32Reg(_) => OpCode::PushU32Reg,
-            PopU32ImmU32Reg(_) => OpCode::PopU32ImmU32Reg,
+            PopF32ToF32Reg(_) => OpCode::PopF32ToF32Reg,
+            PopU32ToU32Reg(_) => OpCode::PopU32ToU32Reg,
 
             /******** [IO Instructions] ********/
             OutF32Imm(_, _) => OpCode::OutF32Imm,

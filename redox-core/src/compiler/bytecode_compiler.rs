@@ -136,8 +136,9 @@ impl Compiler {
             | Instruction::DecU32Reg(reg)
             | Instruction::JumpAbsU32Reg(reg)
             | Instruction::PushU32Reg(reg)
-            | Instruction::PopU32ImmU32Reg(reg)
-            | Instruction::CallU32Reg(reg) => {
+            | Instruction::PopU32ToU32Reg(reg)
+            | Instruction::CallU32Reg(reg)
+            | Instruction::PopF32ToF32Reg(reg) => {
                 self.write_register_id(&reg);
             }
 
@@ -201,6 +202,9 @@ impl Compiler {
                 self.write_u8(imm1);
                 self.write_u32(imm2);
             }
+
+            /******** [f32 immediate] ********/
+            Instruction::PushF32Imm(imm) => self.write_f32(imm),
 
             /******** [No Arguments] ********/
             Instruction::Nop
@@ -358,8 +362,10 @@ mod tests_compiler {
                     Instruction::ZeroHighBitsByIndexU32RegU32Imm(0x123, ER2, ER3)
                 }
                 PushU32Imm => Instruction::PushU32Imm(0x123),
+                PushF32Imm => Instruction::PushF32Imm(0.1),
                 PushU32Reg => Instruction::PushU32Reg(ER2),
-                PopU32ImmU32Reg => Instruction::PopU32ImmU32Reg(ER2),
+                PopF32ToF32Reg => Instruction::PopF32ToF32Reg(FR2),
+                PopU32ToU32Reg => Instruction::PopU32ToU32Reg(ER2),
                 OutF32Imm => Instruction::OutF32Imm(1.0, 0xab),
                 OutU32Imm => Instruction::OutU32Imm(0xdeadbeef, 0xab),
                 OutU32Reg => Instruction::OutU32Reg(ER2, 0xab),
