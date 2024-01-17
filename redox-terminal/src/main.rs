@@ -67,7 +67,8 @@ fn main() {
         panic!("currently unsupported");
     }
 
-    let assembly = "nop\r\nadd 0x123, ER1\r\nbsr &0xdeadbeef, &0xdeadbeef";
+    let assembly =
+        "nop\r\nadd 0x123, ER1\r\nbsr &0xdeadbeef, &0xdeadbeef\r\nemov [ER1*0x12*ER2], &ER1";
     let parser = AsmParser::new();
     parser.parse_code(assembly);
     return;

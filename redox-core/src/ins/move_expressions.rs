@@ -17,7 +17,7 @@ const OPERATOR_MASK: u32 = 0b00000011;
 const VALUE_MASK: u32 = 0b11111111;
 
 #[derive(Clone, Debug)]
-pub struct MoveExpressionHandler {
+pub struct MoveExpression {
     /// Is the expression a simple expression or an extended one?
     pub is_extended: bool,
 
@@ -34,7 +34,7 @@ pub struct MoveExpressionHandler {
     pub operand_3: ExpressionArgs,
 }
 
-impl MoveExpressionHandler {
+impl MoveExpression {
     pub fn new() -> Self {
         Self {
             is_extended: false,
@@ -201,14 +201,16 @@ impl MoveExpressionHandler {
     }
 }
 
-impl Default for MoveExpressionHandler {
+impl Default for MoveExpression {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl From<&[ExpressionArgs]> for MoveExpressionHandler {
-    fn from(args: &[ExpressionArgs]) -> Self {
+impl TryFrom<&[ExpressionArgs]> for MoveExpression {
+    type Error = ();
+
+    fn try_from(args: &[ExpressionArgs]) -> Result<Self, Self::Error> {
         let len = args.len();
         assert!(len == 3 || len == 5);
 
@@ -242,31 +244,31 @@ impl From<&[ExpressionArgs]> for MoveExpressionHandler {
             args[4]
         };
 
-        MoveExpressionHandler {
+        Ok(MoveExpression {
             is_extended: len == 5,
             operator_1: args[1],
             operator_2,
             operand_1: args[0],
             operand_2: args[2],
             operand_3: argument_3,
-        }
+        })
     }
 }
 
-impl Display for MoveExpressionHandler {
+impl Display for MoveExpression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut parts = vec![];
         for arg in self.as_vector() {
             let part = match arg {
-                ExpressionArgs::Register(id) => format!("%{id}"),
+                ExpressionArgs::Register(id) => format!("{id}"),
                 ExpressionArgs::Operator(id) => format!("{id}"),
-                ExpressionArgs::Immediate(imm) => format!("${imm:02x}"),
+                ExpressionArgs::Immediate(imm) => format!("0x{imm:02x}"),
             };
 
             parts.push(part);
         }
 
-        write!(f, "{}", parts.join(" "))
+        write!(f, "{}", parts.join(""))
     }
 }
 
@@ -322,7 +324,7 @@ impl ExpressionArgs {
 mod tests_move_expressions {
     use std::panic;
 
-    use crate::{ins::move_expressions::MoveExpressionHandler, reg::registers::RegisterId};
+    use crate::{ins::move_expressions::MoveExpression, reg::registers::RegisterId};
 
     use super::{ExpressionArgs, ExpressionOperator};
 
@@ -359,9 +361,11 @@ mod tests_move_expressions {
         pub fn run_test(&self, id: usize) {
             let result = panic::catch_unwind(|| {
                 // Perform a roundtrip encode and decode.
-                let encoded = MoveExpressionHandler::from(&self.arguments.to_vec()[..]).pack();
+                let encoded = MoveExpression::try_from(&self.arguments.to_vec()[..])
+                    .expect("")
+                    .pack();
 
-                let mut decoded = MoveExpressionHandler::new();
+                let mut decoded = MoveExpression::new();
                 decoded.unpack(encoded);
 
                 // Yield the decoded arguments.
@@ -387,7 +391,7 @@ mod tests_move_expressions {
         ///
         /// * `id` - The ID of this test.
         pub fn run_test_valuation(&self, id: usize) {
-            let handler = MoveExpressionHandler::from(&self.arguments.to_vec()[..]);
+            let handler = MoveExpression::try_from(&self.arguments.to_vec()[..]).expect("");
 
             let evaluation_result = if self.arguments.len() == 3 {
                 handler.evaluate(

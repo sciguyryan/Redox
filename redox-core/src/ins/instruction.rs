@@ -3,7 +3,7 @@ use std::fmt::{self, Display, Formatter};
 #[cfg(test)]
 use strum_macros::EnumIter;
 
-use crate::{ins::move_expressions::MoveExpressionHandler, reg::registers::RegisterId};
+use crate::{ins::move_expressions::MoveExpression, reg::registers::RegisterId};
 
 use super::op_codes::OpCode;
 
@@ -111,7 +111,7 @@ pub enum Instruction {
     MovU32RegPtrU32RegSimple(RegisterId, RegisterId),
     /// Move a u32 immediate to memory. The result is copied into the specified memory address.
     MovU32ImmMemExpr(u32, u32),
-    /// Move the address as given by an expression. The result is copied into the specified register.
+    /// Move the value at the address as given by an expression to a u32 register. The result is copied into the specified register.
     MovMemExprU32Reg(u32, RegisterId),
     /// Move the value of a register to the address given by an expression. The result is copied into the specified memory address.
     MovU32RegMemExpr(RegisterId, u32),
@@ -350,19 +350,19 @@ impl Display for Instruction {
                 format!("mov &{in_reg}, {out_reg}")
             }
             MovU32ImmMemExpr(imm, expr) => {
-                let mut decoder = MoveExpressionHandler::new();
+                let mut decoder = MoveExpression::new();
                 decoder.unpack(*expr);
 
                 format!("emov 0x{imm:08x}, [{decoder}]")
             }
             MovMemExprU32Reg(expr, reg) => {
-                let mut decoder = MoveExpressionHandler::new();
+                let mut decoder = MoveExpression::new();
                 decoder.unpack(*expr);
 
-                format!("emov [{decoder}], {reg}")
+                format!("emov [{decoder}], &{reg}")
             }
             MovU32RegMemExpr(reg, expr) => {
-                let mut decoder = MoveExpressionHandler::new();
+                let mut decoder = MoveExpression::new();
                 decoder.unpack(*expr);
 
                 format!("emov {reg}, [{decoder}]")

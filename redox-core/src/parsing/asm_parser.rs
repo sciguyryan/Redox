@@ -1,7 +1,11 @@
 use std::{num::ParseIntError, str::FromStr};
 
 use crate::{
-    ins::{instruction::Instruction, op_codes::OpCode},
+    ins::{
+        instruction::Instruction,
+        move_expressions::{ExpressionArgs, ExpressionOperator, MoveExpression},
+        op_codes::OpCode,
+    },
     parsing::type_hints::ArgTypeHint,
     reg::registers::RegisterId,
 };
@@ -19,7 +23,7 @@ pub enum Argument {
     /// A register argument.
     Register(RegisterId),
     /// An expression argument (memory address.
-    Expression,
+    Expression(MoveExpression),
 }
 
 /// Cheekily get the inner value of an enum.
@@ -28,7 +32,18 @@ macro_rules! get_inner {
         if let $enum(a) = $target {
             a
         } else {
-            panic!();
+            unreachable!();
+        }
+    }};
+}
+
+/// Cheekily get and pack an inner enum expression.
+macro_rules! get_inner_expr {
+    ($target:expr) => {{
+        if let Argument::Expression(expr) = &$target {
+            expr.pack()
+        } else {
+            unreachable!()
         }
     }};
 }
@@ -50,11 +65,11 @@ impl AsmParser {
         // Split the string into lines.
         for line in string.lines() {
             let segments = AsmParser::parse_instruction_line(line.trim_matches(' '));
-            println!("{segments:?}");
+            //println!("{segments:?}");
 
             // The name should always be the first argument we've extracted, the arguments should follow.
             let name = segments[0].to_lowercase();
-            println!("------------------[Instruction {name}]------------------");
+            //println!("------------------[Instruction {name}]------------------");
 
             // Used to hold the parsed arguments and the hints for the argument types.
             let mut arguments = vec![];
@@ -62,7 +77,7 @@ impl AsmParser {
 
             // Do we have any arguments?
             for (i, segment) in segments[1..].iter().enumerate() {
-                println!("------------------[Argument {i}]------------------");
+                //println!("------------------[Argument {i}]------------------");
 
                 let first_char = segment.chars().nth(0).unwrap();
 
@@ -72,15 +87,14 @@ impl AsmParser {
                 // Skip past the address prefix identifier, if it exists.
                 let substring = if is_pointer { &segment[1..] } else { segment };
 
-                // Expressions.
+                // Is the argument an expression?
                 if let Some((arg, hint)) = AsmParser::try_parse_expression(substring, is_pointer) {
-                    //arguments.push(arg);
-                    //argument_hints.push(hint);
-                    //continue;
-                    todo!();
+                    arguments.push(arg);
+                    argument_hints.push(hint);
+                    continue;
                 }
 
-                // Register identifier.
+                // Is the argument a register identifier?
                 if let Some((arg, hint)) = AsmParser::try_parse_register_id(substring, is_pointer) {
                     arguments.push(arg);
                     argument_hints.push(hint);
@@ -91,21 +105,21 @@ impl AsmParser {
                 // it's important to check ALL numeric values in reverse size order since,
                 // for example, all u8 values could be parsed as a u32, but the reverse isn't true!
 
-                // f32 immediate.
+                // Is the argument a f32 immediate?
                 if let Some((arg, hint)) = AsmParser::try_parse_f32(substring, is_pointer) {
                     arguments.push(arg);
                     argument_hints.push(hint);
                     continue;
                 }
 
-                // u8 immediate.
+                // Is the argument a u8 immediate?
                 if let Some((arg, hint)) = AsmParser::try_parse_u8(substring, is_pointer) {
                     arguments.push(arg);
                     argument_hints.push(hint);
                     continue;
                 }
 
-                // u32 immediate.
+                // Is the argument a u32 immediate?
                 if let Some((arg, hint)) = AsmParser::try_parse_u32(substring, is_pointer) {
                     arguments.push(arg);
                     argument_hints.push(hint);
@@ -113,14 +127,13 @@ impl AsmParser {
                 }
             }
 
-            println!("------------------------------------");
-            println!("Instruction name = '{name}', argument types = {argument_hints:?}");
+            //println!("------------------------------------");
+            //println!("Instruction name = '{name}', argument types = {argument_hints:?}");
 
             match self.hints.find_by(name.as_str(), &argument_hints) {
                 Some(op) => {
-                    println!("Matching instruction found! {op:?}");
                     let ins = AsmParser::try_build_instruction(op, &arguments);
-                    println!("ins = {ins}");
+                    println!("Matching instruction found! {ins}");
                     instructions.push(ins);
                 }
                 None => {
@@ -132,19 +145,103 @@ impl AsmParser {
         instructions
     }
 
-    /// Try to parse an expression..
+    /// Try to parse an expression.
     ///
     /// # Arguments
     ///
     /// * `is_pointer` - Is this argument a pointer?
-    fn try_parse_expression(string: &str, is_pointer: bool) -> Option<(Argument, ArgTypeHint)> {
-        print!("Checking for an expression... ");
+    #[inline]
+    fn try_parse_expression(string: &str, _is_pointer: bool) -> Option<(Argument, ArgTypeHint)> {
+        //print!("Checking for an expression... ");
+        // Expressions must start with an open square bracket and end with a close square bracket.
         let first_char = string.chars().nth(0).unwrap();
-        if first_char != '[' {
-            println!("none found.");
+        let last_char = string.chars().last().unwrap();
+        if first_char != '[' || last_char != ']' {
+            //println!("no match.");
+            return None;
+        } else {
+            //println!("found! Parsing and validating...");
+            //println!("-----");
         }
 
-        None
+        // Skip over the brackets.
+        let expr_substring = &string[1..string.len() - 1];
+
+        // An expression should be composed of two or three components separated by an operator.
+        // Each component may be either a register ID or a u8 value.
+        let mut expr_arguments = vec![];
+
+        let mut segment_end = false;
+        let mut start_pos = 0;
+        let mut end_pos = 0;
+
+        let mut chars = expr_substring.chars().peekable();
+        while let Some(c) = chars.next() {
+            match c {
+                ' ' | '+' | '-' | '*' => {
+                    segment_end = true;
+                }
+                _ => {}
+            }
+
+            // We always want to be sure to catch the last character.
+            if chars.peek().is_none() {
+                segment_end = true;
+                end_pos += 1;
+            }
+
+            if segment_end {
+                let argument = &expr_substring[start_pos..end_pos];
+
+                // If we have a non-empty string then we can add it to our processing list.
+                if !argument.is_empty() {
+                    if let Some((arg, _)) = AsmParser::try_parse_register_id(argument, false) {
+                        // Do we have a register identifier.
+                        let value = get_inner!(arg, Argument::Register);
+                        expr_arguments.push(ExpressionArgs::Register(value));
+                    } else if let Some((arg, _)) = AsmParser::try_parse_u8(argument, false) {
+                        // Do we have a u8 immediate?
+                        let value = get_inner!(arg, Argument::U8);
+                        expr_arguments.push(ExpressionArgs::Immediate(value));
+                    } else {
+                        // Something other than our permitted components.
+                        break;
+                    }
+                }
+
+                // Do we need to add an operator?
+                match c {
+                    '+' => {
+                        expr_arguments.push(ExpressionArgs::Operator(ExpressionOperator::Add));
+                    }
+                    '-' => {
+                        expr_arguments.push(ExpressionArgs::Operator(ExpressionOperator::Subtract));
+                    }
+                    '*' => {
+                        expr_arguments.push(ExpressionArgs::Operator(ExpressionOperator::Multiply));
+                    }
+                    _ => {}
+                }
+
+                // Skip over the current character to the next one.
+                start_pos = end_pos + 1;
+
+                segment_end = false;
+            }
+
+            end_pos += 1;
+        }
+
+        //println!("-----");
+
+        // Is the expression argument list valid?
+        if let Ok(expr) = MoveExpression::try_from(&expr_arguments[..]) {
+            //println!("found! Expression = {expr}.");
+
+            Some((Argument::Expression(expr), ArgTypeHint::Expression))
+        } else {
+            panic!("no match. Invalid syntax - invalid or malformed move expression syntax");
+        }
     }
 
     /// Try to parse an argument string as a u32.
@@ -152,20 +249,21 @@ impl AsmParser {
     /// # Arguments
     ///
     /// * `is_pointer` - Is this argument a pointer?
+    #[inline]
     fn try_parse_u32(string: &str, is_pointer: bool) -> Option<(Argument, ArgTypeHint)> {
-        print!("Checking for a u32 immediate... ");
+        //print!("Checking for a u32 immediate... ");
         match AsmParser::try_parse_u32_immediate(string) {
             Ok(val) => {
                 if is_pointer {
-                    println!("found! Value = {val} (pointer).");
+                    //println!("found! Value = {val} (pointer).");
                     Some((Argument::U32(val), ArgTypeHint::U32Pointer))
                 } else {
-                    println!("found! Value = {val}.");
+                    //println!("found! Value = {val}.");
                     Some((Argument::U32(val), ArgTypeHint::U32))
                 }
             }
             Err(_) => {
-                println!("none found.");
+                //println!("no match.");
                 None
             }
         }
@@ -176,19 +274,21 @@ impl AsmParser {
     /// # Arguments
     ///
     /// * `is_pointer` - Is this argument a pointer?
-    #[inline(always)]
+    #[inline]
     fn try_parse_u8(string: &str, is_pointer: bool) -> Option<(Argument, ArgTypeHint)> {
-        print!("Checking for a u8 immediate... ");
+        //print!("Checking for a u8 immediate... ");
         match AsmParser::try_parse_u8_immediate(string) {
             Ok(val) => {
                 if is_pointer {
+                    //println!("found! Value = {val} (pointer).");
                     Some((Argument::U8(val), ArgTypeHint::U8Pointer))
                 } else {
+                    //println!("found! Value = {val}.");
                     Some((Argument::U8(val), ArgTypeHint::U8))
                 }
             }
             Err(_) => {
-                println!("none found.");
+                //println!("no match.");
                 None
             }
         }
@@ -199,9 +299,9 @@ impl AsmParser {
     /// # Arguments
     ///
     /// * `is_pointer` - Is this argument a pointer?
-    #[inline(always)]
+    #[inline]
     fn try_parse_f32(string: &str, is_pointer: bool) -> Option<(Argument, ArgTypeHint)> {
-        print!("Checking for a f32 immediate... ");
+        //print!("Checking for a f32 immediate... ");
         if !string.contains('.') {
             return None;
         }
@@ -212,28 +312,28 @@ impl AsmParser {
         }
 
         if let Ok(val) = f32::from_str(string) {
-            println!("found! value = {val}.");
+            //println!("found! Value = {val}.");
             Some((Argument::F32(val), ArgTypeHint::F32))
         } else {
             None
         }
     }
 
-    #[inline(always)]
+    #[inline]
     fn try_parse_register_id(string: &str, is_pointer: bool) -> Option<(Argument, ArgTypeHint)> {
-        print!("Checking for a register identifier... ");
+        //print!("Checking for a register identifier... ");
         match RegisterId::from_str(string) {
             Ok(id) => {
                 if is_pointer {
-                    println!("found! ID = {id} (pointer).");
+                    //println!("found! ID = {id} (pointer).");
                     Some((Argument::Register(id), ArgTypeHint::RegisterPointer))
                 } else {
-                    println!("found! ID = {id}.");
+                    //println!("found! ID = {id}.");
                     Some((Argument::Register(id), ArgTypeHint::Register))
                 }
             }
             Err(_) => {
-                println!("none found.");
+                //println!("no match.");
                 None
             }
         }
@@ -287,7 +387,10 @@ impl AsmParser {
             OpCode::MovMemU32RegSimple => todo!(),
             OpCode::MovU32RegPtrU32RegSimple => todo!(),
             OpCode::MovU32ImmMemExpr => todo!(),
-            OpCode::MovMemExprU32Reg => todo!(),
+            OpCode::MovMemExprU32Reg => Instruction::MovMemExprU32Reg(
+                get_inner_expr!(args[0]),
+                get_inner!(args[1], Argument::Register),
+            ),
             OpCode::MovU32RegMemExpr => todo!(),
             OpCode::ByteSwapU32 => todo!(),
             OpCode::ZeroHighBitsByIndexU32Reg => todo!(),

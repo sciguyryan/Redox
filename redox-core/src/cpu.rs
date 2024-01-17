@@ -5,7 +5,7 @@ use crate::{
     com_bus::communication_bus::CommunicationBus,
     ins::{
         instruction::Instruction,
-        move_expressions::{ExpressionArgs, MoveExpressionHandler},
+        move_expressions::{ExpressionArgs, MoveExpression},
     },
     mem::memory_handler::{MemoryHandler, StackArgType, SIZE_OF_U32},
     privilege_level::PrivilegeLevel,
@@ -130,7 +130,7 @@ impl Cpu {
         expr: &u32,
         privilege: &PrivilegeLevel,
     ) -> u32 {
-        let mut decoder = MoveExpressionHandler::new();
+        let mut decoder = MoveExpression::new();
         decoder.unpack(*expr);
 
         // Determine the first and second operands.
@@ -1632,7 +1632,7 @@ mod tests_cpu {
         cpu::{DEVICE_ERROR_INT, DIVIDE_BY_ZERO_INT, GENERAL_PROTECTION_FAULT_INT},
         ins::{
             instruction::Instruction::{self, *},
-            move_expressions::{ExpressionArgs, ExpressionOperator, MoveExpressionHandler},
+            move_expressions::{ExpressionArgs, ExpressionOperator, MoveExpression},
         },
         mem,
         reg::registers::RegisterId,
@@ -4836,13 +4836,14 @@ mod tests_cpu {
                 &[
                     MovU32ImmMemExpr(
                         0x123,
-                        MoveExpressionHandler::from(
+                        MoveExpression::try_from(
                             &[
                                 ExpressionArgs::Immediate(0x8),
                                 ExpressionArgs::Operator(ExpressionOperator::Add),
                                 ExpressionArgs::Immediate(0x8),
                             ][..],
                         )
+                        .expect("")
                         .pack(),
                     ),
                     // Check that the value was written by reading it back into a register.
@@ -4859,13 +4860,14 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0x8, RegisterId::ER2),
                     MovU32ImmMemExpr(
                         0x123,
-                        MoveExpressionHandler::from(
+                        MoveExpression::try_from(
                             &[
                                 ExpressionArgs::Register(RegisterId::ER1),
                                 ExpressionArgs::Operator(ExpressionOperator::Add),
                                 ExpressionArgs::Register(RegisterId::ER2),
                             ][..],
                         )
+                        .expect("")
                         .pack(),
                     ),
                     // Check that the value was written by reading it back into a register.
@@ -4881,13 +4883,14 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0x8, RegisterId::ER1),
                     MovU32ImmMemExpr(
                         0x123,
-                        MoveExpressionHandler::from(
+                        MoveExpression::try_from(
                             &[
                                 ExpressionArgs::Register(RegisterId::ER1),
                                 ExpressionArgs::Operator(ExpressionOperator::Add),
                                 ExpressionArgs::Immediate(0x8),
                             ][..],
                         )
+                        .expect("")
                         .pack(),
                     ),
                     // Check that the value was written by reading it back into a register.
@@ -4904,13 +4907,14 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0x8, RegisterId::ER2),
                     MovU32ImmMemExpr(
                         0x123,
-                        MoveExpressionHandler::from(
+                        MoveExpression::try_from(
                             &[
                                 ExpressionArgs::Register(RegisterId::ER1),
                                 ExpressionArgs::Operator(ExpressionOperator::Multiply),
                                 ExpressionArgs::Register(RegisterId::ER2),
                             ][..],
                         )
+                        .expect("")
                         .pack(),
                     ),
                     // Check that the value was written by reading it back into a register.
@@ -4927,13 +4931,14 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0x4, RegisterId::ER2),
                     MovU32ImmMemExpr(
                         0x123,
-                        MoveExpressionHandler::from(
+                        MoveExpression::try_from(
                             &[
                                 ExpressionArgs::Register(RegisterId::ER1),
                                 ExpressionArgs::Operator(ExpressionOperator::Subtract),
                                 ExpressionArgs::Register(RegisterId::ER2),
                             ][..],
                         )
+                        .expect("")
                         .pack(),
                     ),
                     // Check that the value was written by reading it back into a register.
@@ -4948,7 +4953,7 @@ mod tests_cpu {
                 &[
                     MovU32ImmMemExpr(
                         0x123,
-                        MoveExpressionHandler::from(
+                        MoveExpression::try_from(
                             &[
                                 ExpressionArgs::Immediate(0x8),
                                 ExpressionArgs::Operator(ExpressionOperator::Add),
@@ -4957,6 +4962,7 @@ mod tests_cpu {
                                 ExpressionArgs::Immediate(0x2),
                             ][..],
                         )
+                        .expect("")
                         .pack(),
                     ),
                     // Check that the value was written by reading it back into a register.
@@ -4980,13 +4986,14 @@ mod tests_cpu {
                 &[
                     MovU32ImmMemSimple(0x123, 0x10),
                     MovMemExprU32Reg(
-                        MoveExpressionHandler::from(
+                        MoveExpression::try_from(
                             &[
                                 ExpressionArgs::Immediate(0x8),
                                 ExpressionArgs::Operator(ExpressionOperator::Add),
                                 ExpressionArgs::Immediate(0x8),
                             ][..],
                         )
+                        .expect("")
                         .pack(),
                         RegisterId::ER8,
                     ),
@@ -5002,13 +5009,14 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0x8, RegisterId::ER1),
                     MovU32ImmU32Reg(0x8, RegisterId::ER2),
                     MovMemExprU32Reg(
-                        MoveExpressionHandler::from(
+                        MoveExpression::try_from(
                             &[
                                 ExpressionArgs::Register(RegisterId::ER1),
                                 ExpressionArgs::Operator(ExpressionOperator::Add),
                                 ExpressionArgs::Register(RegisterId::ER2),
                             ][..],
                         )
+                        .expect("")
                         .pack(),
                         RegisterId::ER8,
                     ),
@@ -5027,13 +5035,14 @@ mod tests_cpu {
                     MovU32ImmMemSimple(0x123, 0x10),
                     MovU32ImmU32Reg(0x8, RegisterId::ER1),
                     MovMemExprU32Reg(
-                        MoveExpressionHandler::from(
+                        MoveExpression::try_from(
                             &[
                                 ExpressionArgs::Register(RegisterId::ER1),
                                 ExpressionArgs::Operator(ExpressionOperator::Add),
                                 ExpressionArgs::Immediate(0x8),
                             ][..],
                         )
+                        .expect("")
                         .pack(),
                         RegisterId::ER8,
                     ),
@@ -5049,13 +5058,14 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0x2, RegisterId::ER1),
                     MovU32ImmU32Reg(0x8, RegisterId::ER2),
                     MovMemExprU32Reg(
-                        MoveExpressionHandler::from(
+                        MoveExpression::try_from(
                             &[
                                 ExpressionArgs::Register(RegisterId::ER1),
                                 ExpressionArgs::Operator(ExpressionOperator::Multiply),
                                 ExpressionArgs::Register(RegisterId::ER2),
                             ][..],
                         )
+                        .expect("")
                         .pack(),
                         RegisterId::ER8,
                     ),
@@ -5075,13 +5085,14 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0x1A, RegisterId::ER1),
                     MovU32ImmU32Reg(0x4, RegisterId::ER2),
                     MovMemExprU32Reg(
-                        MoveExpressionHandler::from(
+                        MoveExpression::try_from(
                             &[
                                 ExpressionArgs::Register(RegisterId::ER1),
                                 ExpressionArgs::Operator(ExpressionOperator::Subtract),
                                 ExpressionArgs::Register(RegisterId::ER2),
                             ][..],
                         )
+                        .expect("")
                         .pack(),
                         RegisterId::ER8,
                     ),
@@ -5099,7 +5110,7 @@ mod tests_cpu {
                 &[
                     MovU32ImmMemSimple(0x123, 0x10),
                     MovMemExprU32Reg(
-                        MoveExpressionHandler::from(
+                        MoveExpression::try_from(
                             &[
                                 ExpressionArgs::Immediate(0x8),
                                 ExpressionArgs::Operator(ExpressionOperator::Add),
@@ -5108,6 +5119,7 @@ mod tests_cpu {
                                 ExpressionArgs::Immediate(0x2),
                             ][..],
                         )
+                        .expect("")
                         .pack(),
                         RegisterId::ER8,
                     ),
@@ -5131,13 +5143,14 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0x123, RegisterId::ER8),
                     MovU32RegMemExpr(
                         RegisterId::ER8,
-                        MoveExpressionHandler::from(
+                        MoveExpression::try_from(
                             &[
                                 ExpressionArgs::Immediate(0x8),
                                 ExpressionArgs::Operator(ExpressionOperator::Add),
                                 ExpressionArgs::Immediate(0x8),
                             ][..],
                         )
+                        .expect("")
                         .pack(),
                     ),
                 ],
@@ -5154,13 +5167,14 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0x123, RegisterId::ER8),
                     MovU32RegMemExpr(
                         RegisterId::ER8,
-                        MoveExpressionHandler::from(
+                        MoveExpression::try_from(
                             &[
                                 ExpressionArgs::Register(RegisterId::ER1),
                                 ExpressionArgs::Operator(ExpressionOperator::Add),
                                 ExpressionArgs::Register(RegisterId::ER2),
                             ][..],
                         )
+                        .expect("")
                         .pack(),
                     ),
                 ],
@@ -5180,13 +5194,14 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0x123, RegisterId::ER8),
                     MovU32RegMemExpr(
                         RegisterId::ER8,
-                        MoveExpressionHandler::from(
+                        MoveExpression::try_from(
                             &[
                                 ExpressionArgs::Register(RegisterId::ER1),
                                 ExpressionArgs::Operator(ExpressionOperator::Add),
                                 ExpressionArgs::Immediate(0x8),
                             ][..],
                         )
+                        .expect("")
                         .pack(),
                     ),
                 ],
@@ -5203,13 +5218,14 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0x123, RegisterId::ER8),
                     MovU32RegMemExpr(
                         RegisterId::ER8,
-                        MoveExpressionHandler::from(
+                        MoveExpression::try_from(
                             &[
                                 ExpressionArgs::Register(RegisterId::ER1),
                                 ExpressionArgs::Operator(ExpressionOperator::Multiply),
                                 ExpressionArgs::Register(RegisterId::ER2),
                             ][..],
                         )
+                        .expect("")
                         .pack(),
                     ),
                 ],
@@ -5230,13 +5246,14 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0x123, RegisterId::ER8),
                     MovU32RegMemExpr(
                         RegisterId::ER8,
-                        MoveExpressionHandler::from(
+                        MoveExpression::try_from(
                             &[
                                 ExpressionArgs::Register(RegisterId::ER1),
                                 ExpressionArgs::Operator(ExpressionOperator::Subtract),
                                 ExpressionArgs::Register(RegisterId::ER2),
                             ][..],
                         )
+                        .expect("")
                         .pack(),
                     ),
                 ],
@@ -5254,7 +5271,7 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0x123, RegisterId::ER8),
                     MovU32RegMemExpr(
                         RegisterId::ER8,
-                        MoveExpressionHandler::from(
+                        MoveExpression::try_from(
                             &[
                                 ExpressionArgs::Immediate(0x8),
                                 ExpressionArgs::Operator(ExpressionOperator::Add),
@@ -5263,6 +5280,7 @@ mod tests_cpu {
                                 ExpressionArgs::Immediate(0x2),
                             ][..],
                         )
+                        .expect("")
                         .pack(),
                     ),
                 ],

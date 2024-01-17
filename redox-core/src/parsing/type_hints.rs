@@ -53,6 +53,11 @@ impl InstructionHints {
                 gen_hint!("nop", [], OpCode::Nop),
                 gen_hint!("add", [U32, Register], OpCode::AddU32ImmU32Reg),
                 gen_hint!(
+                    "emov",
+                    [Expression, RegisterPointer],
+                    OpCode::MovMemExprU32Reg
+                ),
+                gen_hint!(
                     "bsr",
                     [U32Pointer, U32Pointer],
                     OpCode::BitScanReverseU32MemU32Mem

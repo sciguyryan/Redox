@@ -97,7 +97,7 @@ pub enum OpCode {
     MovU32RegPtrU32RegSimple,
     /// Move a u32 immediate to memory. The result is copied into the specified memory address.
     MovU32ImmMemExpr,
-    /// Move the address as given by an expression. The result is copied into the specified register.
+    /// Move the value at the address as given by an expression to a u32 register. The result is copied into the specified register.
     MovMemExprU32Reg,
     /// Move the value of a register to the address given by an expression. The result is copied into the specified memory address.
     MovU32RegMemExpr,
