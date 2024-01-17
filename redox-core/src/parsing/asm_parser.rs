@@ -101,9 +101,13 @@ impl AsmParser {
                     continue;
                 }
 
-                // IMPORTANT
-                // it's important to check ALL numeric values in reverse size order since,
-                // for example, all u8 values could be parsed as a u32, but the reverse isn't true!
+                /*
+                 * IMPORTANT
+                 * it's important to check ALL numeric values in -reverse- size order since,
+                 * for example, all u8 values could be a u32, but the reverse isn't true!
+                 * This means that the -smallest- numeric type that can hold the value
+                 * will be used, by default.
+                 */
 
                 // Is the argument a f32 immediate?
                 if let Some((arg, hint)) = AsmParser::try_parse_f32(substring, is_pointer) {
