@@ -472,9 +472,9 @@ impl AsmParser {
             // Binary.
             let stripped = string.strip_prefix("0b").expect("");
             u8::from_str_radix(stripped, 2)
-        } else if string.starts_with('q') {
+        } else if string.starts_with("0o") {
             // Octal.
-            let stripped = string.strip_prefix('q').expect("");
+            let stripped = string.strip_prefix("0o").expect("");
             u8::from_str_radix(stripped, 8)
         } else if string.starts_with("0x") {
             // Hex.
@@ -492,9 +492,9 @@ impl AsmParser {
             // Binary.
             let stripped = string.strip_prefix("0b").expect("");
             u32::from_str_radix(stripped, 2)
-        } else if string.starts_with('q') {
+        } else if string.starts_with("0o") {
             // Octal.
-            let stripped = string.strip_prefix('q').expect("");
+            let stripped = string.strip_prefix("0o").expect("");
             u32::from_str_radix(stripped, 8)
         } else if string.starts_with("0x") {
             // Hex.
@@ -662,9 +662,9 @@ mod tests_asm_parsing {
         }
     }
 
-    /// Single instruction parsing tests.
+    /// Single instruction parsing tests - all valid.
     #[test]
-    fn code_parser_tests_single() {
+    fn code_parser_tests_single_valid() {
         let tests = [
             ParserTest::new(
                 "nop",
@@ -691,19 +691,34 @@ mod tests_asm_parsing {
                 "failed to parse single instruction with one u32 immediate pointer argument.",
             ),
             ParserTest::new(
+                "call &ER1",
+                &[Instruction::CallU32Reg(RegisterId::ER1)],
+                false,
+                "failed to parse single instruction with one u32 register pointer argument.",
+            ),
+        ];
+
+        ParserTests::new(&tests).run_all();
+    }
+
+    /// Single instruction parsing tests - all invalid.
+    #[test]
+    fn code_parser_tests_single_invalid() {
+        let tests = [
+            ParserTest::new(
                 "call 0xdeadbeef",
                 &[],
                 true,
                 "succeeded in finding an instruction with invalid arguments.",
             ),
             ParserTest::new(
-                "call &ER1",
-                &[Instruction::CallU32Reg(RegisterId::ER1)],
-                false,
-                "failed to parse single instruction with one u32 register pointer argument.",
+                "call ER1",
+                &[],
+                true,
+                "succeeded in finding an instruction with invalid arguments.",
             ),
             ParserTest::new(
-                "call ER1",
+                "call 0.1234",
                 &[],
                 true,
                 "succeeded in finding an instruction with invalid arguments.",
@@ -724,14 +739,8 @@ mod tests_asm_parsing {
                 "failed to parse instruction with u32 argument - binary edition.",
             ),
             ParserTest::new(
-                "push q12345",
-                &[Instruction::PushU32Imm(5349)],
-                false,
-                "failed to parse instruction with u32 argument - octal edition.",
-            ),
-            ParserTest::new(
-                "push q12345",
-                &[Instruction::PushU32Imm(5349)],
+                "push 0o12345",
+                &[Instruction::PushU32Imm(0o12345)],
                 false,
                 "failed to parse instruction with u32 argument - octal edition.",
             ),
