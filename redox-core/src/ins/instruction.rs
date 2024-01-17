@@ -3,7 +3,7 @@ use std::fmt::{self, Display, Formatter};
 #[cfg(test)]
 use strum_macros::EnumIter;
 
-use crate::{ins::move_expressions::MoveExpression, reg::registers::RegisterId};
+use crate::{ins::expressions::Expression, reg::registers::RegisterId};
 
 use super::op_codes::OpCode;
 
@@ -350,19 +350,19 @@ impl Display for Instruction {
                 format!("mov &{in_reg}, {out_reg}")
             }
             MovU32ImmMemExpr(imm, expr) => {
-                let mut decoder = MoveExpression::new();
+                let mut decoder = Expression::new();
                 decoder.unpack(*expr);
 
                 format!("emov 0x{imm:08x}, &[{decoder}]")
             }
             MovMemExprU32Reg(expr, reg) => {
-                let mut decoder = MoveExpression::new();
+                let mut decoder = Expression::new();
                 decoder.unpack(*expr);
 
                 format!("emov &[{decoder}], {reg}")
             }
             MovU32RegMemExpr(reg, expr) => {
-                let mut decoder = MoveExpression::new();
+                let mut decoder = Expression::new();
                 decoder.unpack(*expr);
 
                 format!("emov {reg}, &[{decoder}]")

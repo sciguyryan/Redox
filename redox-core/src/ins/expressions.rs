@@ -17,7 +17,7 @@ const OPERATOR_MASK: u32 = 0b00000011;
 const VALUE_MASK: u32 = 0b11111111;
 
 #[derive(Clone, Debug)]
-pub struct MoveExpression {
+pub struct Expression {
     /// Is the expression a simple expression or an extended one?
     pub is_extended: bool,
 
@@ -34,7 +34,7 @@ pub struct MoveExpression {
     pub operand_3: ExpressionArgs,
 }
 
-impl MoveExpression {
+impl Expression {
     pub fn new() -> Self {
         Self {
             is_extended: false,
@@ -201,13 +201,13 @@ impl MoveExpression {
     }
 }
 
-impl Default for MoveExpression {
+impl Default for Expression {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl TryFrom<&[ExpressionArgs]> for MoveExpression {
+impl TryFrom<&[ExpressionArgs]> for Expression {
     type Error = ();
 
     fn try_from(args: &[ExpressionArgs]) -> Result<Self, Self::Error> {
@@ -244,7 +244,7 @@ impl TryFrom<&[ExpressionArgs]> for MoveExpression {
             args[4]
         };
 
-        Ok(MoveExpression {
+        Ok(Expression {
             is_extended: len == 5,
             operator_1: args[1],
             operator_2,
@@ -255,7 +255,7 @@ impl TryFrom<&[ExpressionArgs]> for MoveExpression {
     }
 }
 
-impl Display for MoveExpression {
+impl Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut parts = vec![];
         for arg in self.as_vector() {
@@ -324,7 +324,7 @@ impl ExpressionArgs {
 mod tests_move_expressions {
     use std::panic;
 
-    use crate::{ins::move_expressions::MoveExpression, reg::registers::RegisterId};
+    use crate::{ins::expressions::Expression, reg::registers::RegisterId};
 
     use super::{ExpressionArgs, ExpressionOperator};
 
@@ -361,11 +361,11 @@ mod tests_move_expressions {
         pub fn run_test(&self, id: usize) {
             let result = panic::catch_unwind(|| {
                 // Perform a roundtrip encode and decode.
-                let encoded = MoveExpression::try_from(&self.arguments.to_vec()[..])
+                let encoded = Expression::try_from(&self.arguments.to_vec()[..])
                     .expect("")
                     .pack();
 
-                let mut decoded = MoveExpression::new();
+                let mut decoded = Expression::new();
                 decoded.unpack(encoded);
 
                 // Yield the decoded arguments.
@@ -391,7 +391,7 @@ mod tests_move_expressions {
         ///
         /// * `id` - The ID of this test.
         pub fn run_test_valuation(&self, id: usize) {
-            let handler = MoveExpression::try_from(&self.arguments.to_vec()[..]).expect("");
+            let handler = Expression::try_from(&self.arguments.to_vec()[..]).expect("");
 
             let evaluation_result = if self.arguments.len() == 3 {
                 handler.evaluate(

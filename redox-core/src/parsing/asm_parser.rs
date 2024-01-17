@@ -2,8 +2,8 @@ use std::{num::ParseIntError, str::FromStr};
 
 use crate::{
     ins::{
+        expressions::{Expression, ExpressionArgs, ExpressionOperator},
         instruction::Instruction,
-        move_expressions::{ExpressionArgs, ExpressionOperator, MoveExpression},
         op_codes::OpCode,
     },
     parsing::type_hints::ArgTypeHint,
@@ -23,7 +23,7 @@ pub enum Argument {
     /// A register argument.
     Register(RegisterId),
     /// An expression argument.
-    Expression(MoveExpression),
+    Expression(Expression),
 }
 
 /// Cheekily get the inner value of an enum.
@@ -235,7 +235,7 @@ impl AsmParser {
         //println!("-----");
 
         // Is the expression argument list valid?
-        if let Ok(expr) = MoveExpression::try_from(&expr_arguments[..]) {
+        if let Ok(expr) = Expression::try_from(&expr_arguments[..]) {
             //println!("found! Expression = {expr}.");
             if is_pointer {
                 Some((Argument::Expression(expr), ArgTypeHint::ExpressionPointer))
