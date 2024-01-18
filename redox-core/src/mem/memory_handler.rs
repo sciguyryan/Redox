@@ -434,11 +434,11 @@ impl MemoryHandler {
             }
 
             /******** [Bit Operation Instructions] ********/
-            LeftShiftU32ImmU32Reg => {
-                let imm = Self::read_u32(arg_bytes, &mut cursor);
+            LeftShiftU8ImmU32Reg => {
+                let imm = Self::read_u8(arg_bytes, &mut cursor);
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::LeftShiftU32ImmU32Reg(imm, reg)
+                Instruction::LeftShiftU8ImmU32Reg(imm, reg)
             }
             LeftShiftU32RegU32Reg => {
                 let shift_reg = Self::read_register_id(arg_bytes, &mut cursor);
@@ -446,11 +446,11 @@ impl MemoryHandler {
 
                 Instruction::LeftShiftU32RegU32Reg(shift_reg, reg)
             }
-            ArithLeftShiftU32ImmU32Reg => {
-                let imm = Self::read_u32(arg_bytes, &mut cursor);
+            ArithLeftShiftU8ImmU32Reg => {
+                let imm = Self::read_u8(arg_bytes, &mut cursor);
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::ArithLeftShiftU32ImmU32Reg(imm, reg)
+                Instruction::ArithLeftShiftU8ImmU32Reg(imm, reg)
             }
             ArithLeftShiftU32RegU32Reg => {
                 let shift_reg = Self::read_register_id(arg_bytes, &mut cursor);
@@ -458,11 +458,11 @@ impl MemoryHandler {
 
                 Instruction::ArithLeftShiftU32RegU32Reg(shift_reg, reg)
             }
-            RightShiftU32ImmU32Reg => {
-                let imm = Self::read_u32(arg_bytes, &mut cursor);
+            RightShiftU8ImmU32Reg => {
+                let imm = Self::read_u8(arg_bytes, &mut cursor);
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::RightShiftU32ImmU32Reg(imm, reg)
+                Instruction::RightShiftU8ImmU32Reg(imm, reg)
             }
             RightShiftU32RegU32Reg => {
                 let shift_reg = Self::read_register_id(arg_bytes, &mut cursor);
@@ -470,11 +470,11 @@ impl MemoryHandler {
 
                 Instruction::RightShiftU32RegU32Reg(shift_reg, reg)
             }
-            ArithRightShiftU32ImmU32Reg => {
-                let imm = Self::read_u32(arg_bytes, &mut cursor);
+            ArithRightShiftU8ImmU32Reg => {
+                let imm = Self::read_u8(arg_bytes, &mut cursor);
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::ArithRightShiftU32ImmU32Reg(imm, reg)
+                Instruction::ArithRightShiftU8ImmU32Reg(imm, reg)
             }
             ArithRightShiftU32RegU32Reg => {
                 let shift_reg = Self::read_register_id(arg_bytes, &mut cursor);

@@ -61,20 +61,20 @@ pub enum Instruction {
     AndU32ImmU32Reg(u32, RegisterId),
 
     /******** [Bit Operation Instructions] ********/
-    /// Left-shift a u32 register by a u32 immediate. The result remains in the origin register.
-    LeftShiftU32ImmU32Reg(u32, RegisterId),
+    /// Left-shift a u32 register by a u8 immediate. The result remains in the origin register.
+    LeftShiftU8ImmU32Reg(u8, RegisterId),
     /// Left-shift a u32 register (B) by a u32 register (A). The result remains in register A.
     LeftShiftU32RegU32Reg(RegisterId, RegisterId),
-    /// Arithmetic left-shift a u32 register by a u32 immediate. The result remains in the origin register.
-    ArithLeftShiftU32ImmU32Reg(u32, RegisterId),
+    /// Arithmetic left-shift a u32 register by a u8 immediate. The result remains in the origin register.
+    ArithLeftShiftU8ImmU32Reg(u8, RegisterId),
     /// Arithmetic left-shift a u32 register (B) by a u32 register (A). The result remains in register A.
     ArithLeftShiftU32RegU32Reg(RegisterId, RegisterId),
-    /// Right-shift a u32 register by a u32 immediate. The result remains in the origin register.
-    RightShiftU32ImmU32Reg(u32, RegisterId),
+    /// Right-shift a u32 register by a u8 immediate. The result remains in the origin register.
+    RightShiftU8ImmU32Reg(u8, RegisterId),
     /// Right-shift a u32 register (B) by a u32 register (A). The result remains in register A.
     RightShiftU32RegU32Reg(RegisterId, RegisterId),
-    /// Arithmetic right-shift a u32 register by a u32 immediate. The result remains in the origin register.
-    ArithRightShiftU32ImmU32Reg(u32, RegisterId),
+    /// Arithmetic right-shift a u32 register by a u8 immediate. The result remains in the origin register.
+    ArithRightShiftU8ImmU32Reg(u8, RegisterId),
     /// Arithmetic right-shift a u32 register (B) by a u32 register (A). The result remains in register A.
     ArithRightShiftU32RegU32Reg(RegisterId, RegisterId),
 
@@ -107,11 +107,11 @@ pub enum Instruction {
     MovU32RegMemSimple(RegisterId, u32),
     /// Move a u32 value from memory to a u32 register. The result is copied into the specified register.
     MovMemU32RegSimple(u32, RegisterId),
-    /// Move the value from the memory address specified by a register. The result is copied into the specified register.
+    /// Move a u32 value from the memory address specified by a register. The result is copied into the specified register.
     MovU32RegPtrU32RegSimple(RegisterId, RegisterId),
-    /// Move a u32 immediate to memory. The result is copied into the specified memory address.
+    /// Move a u32 value to the memory address as given by an expression. The result is copied into the specified memory address.
     MovU32ImmMemExpr(u32, u32),
-    /// Move the value at the address as given by an expression to a u32 register. The result is copied into the specified register.
+    /// Move a u32 value from the address as given by an expression to a u32 register. The result is copied into the specified register.
     MovMemExprU32Reg(u32, RegisterId),
     /// Move the value of a u32 register to the address given by an expression. The result is copied into the specified memory address.
     MovU32RegMemExpr(RegisterId, u32),
@@ -121,10 +121,10 @@ pub enum Instruction {
     ZeroHighBitsByIndexU32Reg(RegisterId, RegisterId, RegisterId),
     /// Zero the high bits of the source value starting from a specified index.
     ZeroHighBitsByIndexU32RegU32Imm(u32, RegisterId, RegisterId),
-    /// Push a u32 immediate value onto the stack.
-    PushU32Imm(u32),
     /// Push a f32 immediate value onto the stack.
     PushF32Imm(f32),
+    /// Push a u32 immediate value onto the stack.
+    PushU32Imm(u32),
     /// Push the value of a u32 register onto the stack.
     PushU32Reg(RegisterId),
     /// Pop a f32 value from the stack to a f32 register.
@@ -229,8 +229,9 @@ impl Display for Instruction {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         use Instruction::*;
 
-        // NOTE - square brackets are used to indicate an expression argument.
-        // NOTE - a & prefix before a value indicates that it is being used as a pointer to a memory address.
+        // Syntax notes:
+        // A set of square brackets are used to indicate an expression.
+        // An "&" prefix before an argument type indicates that it is being used as a pointer to a memory address.
         let asm_format = match self {
             Nop => String::from("nop"),
 
@@ -285,26 +286,26 @@ impl Display for Instruction {
             }
 
             /******** [Bit Operation Instructions] ********/
-            LeftShiftU32ImmU32Reg(imm, reg) => {
-                format!("shl 0x{imm:08x}, {reg}")
+            LeftShiftU8ImmU32Reg(imm, reg) => {
+                format!("shl 0x{imm:02x}, {reg}")
             }
             LeftShiftU32RegU32Reg(shift_reg, reg) => {
                 format!("shl {shift_reg}, {reg}")
             }
-            ArithLeftShiftU32ImmU32Reg(imm, reg) => {
-                format!("sal 0x{imm:08x}, {reg}")
+            ArithLeftShiftU8ImmU32Reg(imm, reg) => {
+                format!("sal 0x{imm:02x}, {reg}")
             }
             ArithLeftShiftU32RegU32Reg(shift_reg, reg) => {
                 format!("sal {shift_reg}, {reg}")
             }
-            RightShiftU32ImmU32Reg(imm, reg) => {
-                format!("shr 0x{imm:08x}, {reg}")
+            RightShiftU8ImmU32Reg(imm, reg) => {
+                format!("shr 0x{imm:02x}, {reg}")
             }
             RightShiftU32RegU32Reg(shift_reg, reg) => {
                 format!("shr {shift_reg}, {reg}")
             }
-            ArithRightShiftU32ImmU32Reg(imm, reg) => {
-                format!("sar 0x{imm:08x}, {reg}")
+            ArithRightShiftU8ImmU32Reg(imm, reg) => {
+                format!("sar 0x{imm:02x}, {reg}")
             }
             ArithRightShiftU32RegU32Reg(shift_reg, reg) => {
                 format!("sar {shift_reg}, {reg}")
@@ -380,11 +381,11 @@ impl Display for Instruction {
             ZeroHighBitsByIndexU32RegU32Imm(index, in_reg, out_reg) => {
                 format!("zhbi 0x{index:08x}, {in_reg}, {out_reg}")
             }
-            PushU32Imm(value) => {
-                format!("push 0x{value:08x}")
-            }
             PushF32Imm(value) => {
                 format!("push {value}")
+            }
+            PushU32Imm(value) => {
+                format!("push 0x{value:08x}")
             }
             PushU32Reg(reg) => {
                 format!("push {reg}")
@@ -398,22 +399,34 @@ impl Display for Instruction {
 
             /******** [IO Instructions] ********/
             OutF32Imm(value, port) => {
-                format!("out {value}, 0x{port:02x}")
+                format!("out.f32 {value:.1}, 0x{port:02x}")
             }
             OutU32Imm(value, port) => {
-                format!("out 0x{value:08x}, 0x{port:02x}")
+                format!("out.i32 0x{value:08x}, 0x{port:02x}")
             }
             OutU32Reg(reg, port) => {
-                format!("out {reg}, 0x{port:02x}")
+                format!("out.ir32 {reg}, 0x{port:02x}")
             }
             OutU8Imm(value, port) => {
-                format!("out 0x{value:02x}, 0x{port:02x}")
+                format!("out.i8 0x{value:02x}, 0x{port:02x}")
             }
-            InU8Reg(port, reg) | InU32Reg(port, reg) | InF32Reg(port, reg) => {
-                format!("in 0x{port:02x}, {reg}")
+            InU8Reg(port, reg) => {
+                format!("in.ir8 0x{port:02x}, {reg}")
             }
-            InU8Mem(port, addr) | InU32Mem(port, addr) | InF32Mem(port, addr) => {
-                format!("in 0x{port:02x}, 0x{addr:08x}")
+            InU32Reg(port, reg) => {
+                format!("in.ir32 0x{port:02x}, {reg}")
+            }
+            InF32Reg(port, reg) => {
+                format!("in.fr32 0x{port:02x}, {reg}")
+            }
+            InU8Mem(port, addr) => {
+                format!("in.m8 0x{port:02x}, &0x{addr:08x}")
+            }
+            InU32Mem(port, addr) => {
+                format!("in.m32 0x{port:02x}, &0x{addr:08x}")
+            }
+            InF32Mem(port, addr) => {
+                format!("in.fm32 0x{port:02x}, &0x{addr:08x}")
             }
 
             /******** [Logic Instructions] ********/
@@ -439,7 +452,7 @@ impl Display for Instruction {
                 format!("bsr {in_reg}, {out_reg}")
             }
             BitScanReverseU32MemU32Reg(addr, reg) => {
-                format!("bsr &0x{addr:08x}], {reg}")
+                format!("bsr &0x{addr:08x}, {reg}")
             }
             BitScanReverseU32RegMemU32(reg, out_addr) => {
                 format!("bsr {reg}, &0x{out_addr:08x}")
@@ -454,10 +467,10 @@ impl Display for Instruction {
                 format!("bsf &0x{addr:08x}, {reg}")
             }
             BitScanForwardU32RegMemU32(reg, out_addr) => {
-                format!("bsr {reg}, &0x{out_addr:08x}")
+                format!("bsf {reg}, &0x{out_addr:08x}")
             }
             BitScanForwardU32MemU32Mem(in_addr, out_addr) => {
-                format!("bsr &0x{in_addr:08x}, &0x{out_addr:08x}")
+                format!("bsf &0x{in_addr:08x}, &0x{out_addr:08x}")
             }
 
             /******** [Special Instructions] ********/
@@ -533,13 +546,13 @@ impl Instruction {
             AndU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Bit Operation Instructions] ********/
-            LeftShiftU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
+            LeftShiftU8ImmU32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
             LeftShiftU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-            ArithLeftShiftU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
+            ArithLeftShiftU8ImmU32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
             ArithLeftShiftU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-            RightShiftU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
+            RightShiftU8ImmU32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
             RightShiftU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-            ArithRightShiftU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
+            ArithRightShiftU8ImmU32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
             ArithRightShiftU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Branching Instructions] ********/

@@ -1,21 +1,22 @@
 [package]
-name = "redox_terminal"
+name = "redox_parser"
 version = "0.1.0"
 authors = ["Ryan Jones-Ward <sciguyryan@gmail.com>"]
 edition = "2021"
 readme = "README.md"
-description = "A testing terminal for Redox"
+description = "A new toy virtual machine, assembler and compiler, written in Rust."
 license = "LGPL 2.1"
 repository = "https://github.com/sciguyryan/Redox"
 homepage = "https://github.com/sciguyryan/Redox"
-build = "build.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rand.workspace = true
+strum.workspace = true
+strum_macros.workspace = true
 redox_core = { path = "../redox-core" }
-redox_parser = { path = "../redox-parser" }
 
-[target.'cfg(windows)'.build-dependencies]
-winres.workspace = true
+[dev-dependencies]
+
+[features]
+default = []

@@ -420,12 +420,12 @@ impl Cpu {
         new_value
     }
 
-    /// Perform a checked left-shift of two u32 values.
+    /// Perform a checked left-shift a u32 value by a u8 value.
     ///
     /// # Arguments
     ///
     /// * `value` - The first u32 value.
-    /// * `shift_by` - The second u32 value.
+    /// * `shift_by` - The value giving the number of places to shift.
     ///
     /// # Returns
     ///
@@ -437,7 +437,7 @@ impl Cpu {
     ///
     /// The Overflow (OF) flag will only be affected by 1-bit shifts. Any other flags are undefined.
     #[inline(always)]
-    fn perform_checked_left_shift_u32(&mut self, value: u32, shift_by: u32) -> u32 {
+    fn perform_checked_left_shift_u32(&mut self, value: u32, shift_by: u8) -> u32 {
         if shift_by == 0 {
             return value;
         }
@@ -450,10 +450,7 @@ impl Cpu {
         if shift_by == 1 {
             self.set_flag_state(CpuFlag::OF, final_value < value);
         }
-        self.set_flag_state(
-            CpuFlag::CF,
-            utils::is_bit_set(value, ((32 - shift_by) as u8) & 1),
-        );
+        self.set_flag_state(CpuFlag::CF, utils::is_bit_set(value, (32 - shift_by) & 1));
         self.set_flag_state(CpuFlag::PF, Cpu::calculate_lowest_byte_parity(final_value));
 
         final_value
@@ -464,7 +461,7 @@ impl Cpu {
     /// # Arguments
     ///
     /// * `value` - The first u32 value.
-    /// * `shift_by` - The second u32 value.
+    /// * `shift_by` - The value giving the number of places to shift.
     ///
     /// # Returns
     ///
@@ -503,12 +500,12 @@ impl Cpu {
         self.set_instruction_pointer(addr);
     }
 
-    /// Perform a right-shift of two u32 values.
+    /// Perform a right-shift of a u32 value by a u8 value.
     ///
     /// # Arguments
     ///
     /// * `value` - The first u32 value.
-    /// * `shift_by` - The second u32 value.
+    /// * `shift_by` - The value giving the number of places to shift.
     ///
     /// # Returns
     ///
@@ -520,7 +517,7 @@ impl Cpu {
     ///
     /// The Overflow (OF) flag will always be cleared. Any other flags are undefined.
     #[inline(always)]
-    fn perform_right_shift_u32(&mut self, value: u32, shift_by: u32) -> u32 {
+    fn perform_right_shift_u32(&mut self, value: u32, shift_by: u8) -> u32 {
         if shift_by == 0 {
             return value;
         }
@@ -545,7 +542,7 @@ impl Cpu {
     /// # Arguments
     ///
     /// * `value` - The first u32 value.
-    /// * `shift_by` - The second u32 value.
+    /// * `shift_by` - The value giving the number of places to shift.
     ///
     /// # Returns
     ///
@@ -969,7 +966,7 @@ impl Cpu {
             }
 
             /******** [Bit Operation Instructions] ********/
-            LeftShiftU32ImmU32Reg(imm, reg) => {
+            LeftShiftU8ImmU32Reg(imm, reg) => {
                 let old_value = self.registers.read_reg_u32(reg, privilege);
                 let shifted = self.perform_checked_left_shift_u32(old_value, *imm);
 
@@ -978,13 +975,13 @@ impl Cpu {
             LeftShiftU32RegU32Reg(shift_reg, reg) => {
                 let shift_by = self.registers.read_reg_u32(shift_reg, privilege);
                 let old_value = self.registers.read_reg_u32(reg, privilege);
-                let shifted = self.perform_checked_left_shift_u32(old_value, shift_by);
+                let shifted = self.perform_checked_left_shift_u32(old_value, shift_by as u8);
 
                 self.write_reg_u32(reg, shifted, privilege);
             }
-            ArithLeftShiftU32ImmU32Reg(imm, reg) => {
+            ArithLeftShiftU8ImmU32Reg(imm, reg) => {
                 let old_value = self.registers.read_reg_u32(reg, privilege);
-                let shifted = self.perform_arithmetic_left_shift_u32(old_value, *imm);
+                let shifted = self.perform_arithmetic_left_shift_u32(old_value, *imm as u32);
 
                 self.write_reg_u32(reg, shifted, privilege);
             }
@@ -995,7 +992,7 @@ impl Cpu {
 
                 self.write_reg_u32(reg, shifted, privilege);
             }
-            RightShiftU32ImmU32Reg(imm, reg) => {
+            RightShiftU8ImmU32Reg(imm, reg) => {
                 let old_value = self.registers.read_reg_u32(reg, privilege);
                 let shifted = self.perform_right_shift_u32(old_value, *imm);
 
@@ -1004,13 +1001,13 @@ impl Cpu {
             RightShiftU32RegU32Reg(shift_reg, reg) => {
                 let shift_by = self.registers.read_reg_u32(shift_reg, privilege);
                 let old_value = self.registers.read_reg_u32(reg, privilege);
-                let shifted = self.perform_right_shift_u32(old_value, shift_by);
+                let shifted = self.perform_right_shift_u32(old_value, shift_by as u8);
 
                 self.write_reg_u32(reg, shifted, privilege);
             }
-            ArithRightShiftU32ImmU32Reg(imm, reg) => {
+            ArithRightShiftU8ImmU32Reg(imm, reg) => {
                 let old_value = self.registers.read_reg_u32(reg, privilege);
-                let shifted = self.perform_arithmetic_right_shift_u32(old_value, *imm);
+                let shifted = self.perform_arithmetic_right_shift_u32(old_value, *imm as u32);
 
                 self.write_reg_u32(reg, shifted, privilege);
             }
@@ -1180,32 +1177,32 @@ impl Cpu {
 
             /******** [IO Instructions] ********/
             OutF32Imm(value, port) => {
-                // out 0.1, $ff
+                // out 0.1, 0xff
                 if com_bus.write_f32(*value, *port).is_err() {
                     self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
                 }
             }
             OutU32Imm(value, port) => {
-                // out $deadbeef, $ff
+                // out 0xdeadbeef, 0xff
                 if com_bus.write_u32(*value, *port).is_err() {
                     self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
                 }
             }
             OutU32Reg(reg, port) => {
-                // out %reg, $ff
+                // out reg, 0xff
                 let value = self.registers.read_reg_u32(reg, privilege);
                 if com_bus.write_u32(value, *port).is_err() {
                     self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
                 }
             }
             OutU8Imm(value, port) => {
-                // out $ff, $ff
+                // out 0xff, 0xff
                 if com_bus.write_u8(*value, *port).is_err() {
                     self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
                 }
             }
             InU8Reg(port, reg) => {
-                // in $ff, %reg
+                // in 0xff, reg
                 match com_bus.read_u8(*port) {
                     Err(_) => {
                         self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
@@ -1216,7 +1213,7 @@ impl Cpu {
                 }
             }
             InU8Mem(port, addr) => {
-                // in $ff, [$addr]
+                // in 0xff, &[addr]
                 match com_bus.read_u8(*port) {
                     Err(_) => {
                         self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
@@ -1227,7 +1224,7 @@ impl Cpu {
                 }
             }
             InU32Reg(port, reg) => {
-                // in $ff, %reg
+                // in 0xff, reg
                 match com_bus.read_u32(*port) {
                     Err(_) => {
                         self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
@@ -1238,7 +1235,7 @@ impl Cpu {
                 }
             }
             InU32Mem(port, addr) => {
-                // in $ff, [$addr]
+                // in 0xff, &[addr]
                 match com_bus.read_u32(*port) {
                     Err(_) => {
                         self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
@@ -1249,7 +1246,7 @@ impl Cpu {
                 }
             }
             InF32Reg(port, reg) => {
-                // in $ff, %reg
+                // in 0xff, reg
                 match com_bus.read_f32(*port) {
                     Err(_) => {
                         self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
@@ -1260,7 +1257,7 @@ impl Cpu {
                 }
             }
             InF32Mem(port, addr) => {
-                // in $ff, [$addr]
+                // in 0xff, &[addr]
                 match com_bus.read_f32(*port) {
                     Err(_) => {
                         self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
@@ -1278,7 +1275,7 @@ impl Cpu {
                 self.perform_bit_test_with_carry_flag(value, *bit % 32);
             }
             BitTestU32Mem(bit, addr) => {
-                // bt bit, [addr]
+                // bt bit, &[addr]
                 let value = com_bus.mem.get_u32(*addr as usize);
                 self.perform_bit_test_with_carry_flag(value, *bit % 32);
             }
@@ -1292,7 +1289,7 @@ impl Cpu {
                 self.write_reg_u32(reg, value, privilege);
             }
             BitTestResetU32Mem(bit, addr) => {
-                // btr bit, [addr]
+                // btr bit, &[addr]
                 // Read the value and set the carry flag state, then clear the bit.
                 let mut value = com_bus.mem.get_u32(*addr as usize);
                 self.perform_bit_test_with_carry_flag_with_set(&mut value, *bit % 32, false);
@@ -1309,7 +1306,7 @@ impl Cpu {
                 self.write_reg_u32(reg, value, privilege);
             }
             BitTestSetU32Mem(bit, addr) => {
-                // bts bit, [addr]
+                // bts bit, &[addr]
                 // Read the value and set the carry flag state, then set the bit.
                 let mut value = com_bus.mem.get_u32(*addr as usize);
                 self.perform_bit_test_with_carry_flag_with_set(&mut value, *bit % 32, true);
@@ -1324,21 +1321,21 @@ impl Cpu {
                 self.write_reg_u32(out_reg, index, privilege);
             }
             BitScanReverseU32MemU32Reg(addr, reg) => {
-                // bsr [addr], reg
+                // bsr &[addr], reg
                 let value = com_bus.mem.get_u32(*addr as usize);
                 let index = self.perform_reverse_bit_search(value);
 
                 self.write_reg_u32(reg, index, privilege);
             }
             BitScanReverseU32RegMemU32(reg, out_addr) => {
-                // bsr reg, [out_addr]
+                // bsr reg, &[out_addr]
                 let value = self.registers.read_reg_u32(reg, privilege);
                 let index = self.perform_reverse_bit_search(value);
 
                 com_bus.mem.set_u32(*out_addr as usize, index);
             }
             BitScanReverseU32MemU32Mem(in_addr, out_addr) => {
-                // bsr [in_addr], [out_addr]
+                // bsr &[in_addr], &[out_addr]
                 let value = com_bus.mem.get_u32(*in_addr as usize);
                 let index = self.perform_reverse_bit_search(value);
 
@@ -1352,21 +1349,21 @@ impl Cpu {
                 self.write_reg_u32(out_reg, index, privilege);
             }
             BitScanForwardU32MemU32Reg(addr, reg) => {
-                // bsf [addr], reg
+                // bsf &[addr], reg
                 let value = com_bus.mem.get_u32(*addr as usize);
                 let index = self.perform_forward_bit_search(value);
 
                 self.write_reg_u32(reg, index, privilege);
             }
             BitScanForwardU32RegMemU32(reg, out_addr) => {
-                // bsf reg, [out_addr]
+                // bsf reg, &[out_addr]
                 let value = self.registers.read_reg_u32(reg, privilege);
                 let index = self.perform_forward_bit_search(value);
 
                 com_bus.mem.set_u32(*out_addr as usize, index);
             }
             BitScanForwardU32MemU32Mem(in_addr, out_addr) => {
-                // bsf [in_addr], [out_addr]
+                // bsf &[in_addr], &[out_addr]
                 let value = com_bus.mem.get_u32(*in_addr as usize);
                 let index = self.perform_forward_bit_search(value);
 
@@ -3912,7 +3909,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0x1, RegisterId::ER1),
-                    LeftShiftU32ImmU32Reg(0x1, RegisterId::ER1),
+                    LeftShiftU8ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x2)],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -3924,7 +3921,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0b1011_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
-                    LeftShiftU32ImmU32Reg(0x3, RegisterId::ER1),
+                    LeftShiftU8ImmU32Reg(0x3, RegisterId::ER1),
                 ],
                 &[
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1000),
@@ -3942,7 +3939,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
-                    LeftShiftU32ImmU32Reg(0x1, RegisterId::ER1),
+                    LeftShiftU8ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
@@ -3959,7 +3956,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0x0, RegisterId::ER1),
-                    LeftShiftU32ImmU32Reg(0x1, RegisterId::ER1),
+                    LeftShiftU8ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(
                     RegisterId::EFL,
@@ -3976,7 +3973,7 @@ mod tests_cpu {
                     MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::OF]), RegisterId::EFL),
                     // This will unset the overflow flag and set the zero flag instead.
                     MovU32ImmU32Reg(0x0, RegisterId::ER1),
-                    LeftShiftU32ImmU32Reg(0x1, RegisterId::ER1),
+                    LeftShiftU8ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(
                     RegisterId::EFL,
@@ -3988,7 +3985,7 @@ mod tests_cpu {
             ),
             // This should assert as a shift of value higher than 31 is unsupported.
             TestU32::new(
-                &[LeftShiftU32ImmU32Reg(0x20, RegisterId::ER1)],
+                &[LeftShiftU8ImmU32Reg(0x20, RegisterId::ER1)],
                 &[],
                 DEFAULT_U32_STACK_CAPACITY,
                 true,
@@ -4000,7 +3997,7 @@ mod tests_cpu {
                     // Manually set the parity flag.
                     MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::PF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x1, RegisterId::ER1),
-                    LeftShiftU32ImmU32Reg(0x1, RegisterId::ER1),
+                    LeftShiftU8ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x2), (RegisterId::EFL, 0x0)],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -4011,7 +4008,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0x1, RegisterId::ER1),
-                    LeftShiftU32ImmU32Reg(0x0, RegisterId::ER1),
+                    LeftShiftU8ImmU32Reg(0x0, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1)],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -4024,7 +4021,7 @@ mod tests_cpu {
                     // Clear every flag.
                     MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0b0100_0000_0000_0000_0000_0000_0000_0000, RegisterId::ER1),
-                    LeftShiftU32ImmU32Reg(0x1, RegisterId::ER1),
+                    LeftShiftU8ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[
                     (RegisterId::ER1, 0b1000_0000_0000_0000_0000_0000_0000_0000),
@@ -4043,7 +4040,7 @@ mod tests_cpu {
                     // Manually set the signed flag.
                     MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x1, RegisterId::ER1),
-                    LeftShiftU32ImmU32Reg(0x1, RegisterId::ER1),
+                    LeftShiftU8ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x2), (RegisterId::EFL, 0x0)],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -4241,7 +4238,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0x1, RegisterId::ER1),
-                    ArithLeftShiftU32ImmU32Reg(0x1, RegisterId::ER1),
+                    ArithLeftShiftU8ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x2)],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -4251,7 +4248,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1110, RegisterId::ER1),
-                    ArithLeftShiftU32ImmU32Reg(0x1, RegisterId::ER1),
+                    ArithLeftShiftU8ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1101),
@@ -4265,7 +4262,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0x0, RegisterId::ER1),
-                    ArithLeftShiftU32ImmU32Reg(0x1, RegisterId::ER1),
+                    ArithLeftShiftU8ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(
                     RegisterId::EFL,
@@ -4279,7 +4276,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0x1, RegisterId::ER1),
-                    ArithLeftShiftU32ImmU32Reg(0x0, RegisterId::ER1),
+                    ArithLeftShiftU8ImmU32Reg(0x0, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1)],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -4292,7 +4289,7 @@ mod tests_cpu {
                     // Clear any set flags.
                     MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0b0100_0000_0000_0000_0000_0000_0000_0000, RegisterId::ER1),
-                    ArithLeftShiftU32ImmU32Reg(0x1, RegisterId::ER1),
+                    ArithLeftShiftU8ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[
                     (RegisterId::ER1, 0b1000_0000_0000_0000_0000_0000_0000_0000),
@@ -4311,7 +4308,7 @@ mod tests_cpu {
                     // Manually set the signed flag.
                     MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x1, RegisterId::ER1),
-                    ArithLeftShiftU32ImmU32Reg(0x1, RegisterId::ER1),
+                    ArithLeftShiftU8ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x2), (RegisterId::EFL, 0x0)],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -4433,7 +4430,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0x2, RegisterId::ER1),
-                    RightShiftU32ImmU32Reg(0x1, RegisterId::ER1),
+                    RightShiftU8ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1)],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -4448,7 +4445,7 @@ mod tests_cpu {
                     MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::OF]), RegisterId::EFL),
                     // Execute the test instruction.
                     MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
-                    RightShiftU32ImmU32Reg(0x1, RegisterId::ER1),
+                    RightShiftU8ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[
                     (RegisterId::ER1, 0b0011_1111_1111_1111_1111_1111_1111_1111),
@@ -4469,7 +4466,7 @@ mod tests_cpu {
                     MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::OF]), RegisterId::EFL),
                     // Execute the test instruction.
                     MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1110, RegisterId::ER1),
-                    RightShiftU32ImmU32Reg(0x1, RegisterId::ER1),
+                    RightShiftU8ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[
                     (RegisterId::ER1, 0b0011_1111_1111_1111_1111_1111_1111_1111),
@@ -4483,7 +4480,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0x0, RegisterId::ER1),
-                    RightShiftU32ImmU32Reg(0x1, RegisterId::ER1),
+                    RightShiftU8ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(
                     RegisterId::EFL,
@@ -4495,7 +4492,7 @@ mod tests_cpu {
             ),
             // This should assert as a shift of value higher than 31 is unsupported.
             TestU32::new(
-                &[RightShiftU32ImmU32Reg(0x20, RegisterId::ER1)],
+                &[RightShiftU8ImmU32Reg(0x20, RegisterId::ER1)],
                 &[],
                 DEFAULT_U32_STACK_CAPACITY,
                 true,
@@ -4505,7 +4502,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0x1, RegisterId::ER1),
-                    RightShiftU32ImmU32Reg(0x0, RegisterId::ER1),
+                    RightShiftU8ImmU32Reg(0x0, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1)],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -4518,7 +4515,7 @@ mod tests_cpu {
                     // Manually set the signed flag.
                     MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x1, RegisterId::ER1),
-                    RightShiftU32ImmU32Reg(0x1, RegisterId::ER1),
+                    RightShiftU8ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[
                     (RegisterId::ER1, 0x0),
@@ -4646,7 +4643,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0x2, RegisterId::ER1),
-                    ArithRightShiftU32ImmU32Reg(0x1, RegisterId::ER1),
+                    ArithRightShiftU8ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1)],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -4656,7 +4653,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::ER1),
-                    ArithRightShiftU32ImmU32Reg(0x1, RegisterId::ER1),
+                    ArithRightShiftU8ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[
                     (RegisterId::ER1, 0b1011_1111_1111_1111_1111_1111_1111_1111),
@@ -4673,7 +4670,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0x0, RegisterId::ER1),
-                    ArithRightShiftU32ImmU32Reg(0x1, RegisterId::ER1),
+                    ArithRightShiftU8ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(
                     RegisterId::EFL,
@@ -4687,7 +4684,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0x1, RegisterId::ER1),
-                    ArithRightShiftU32ImmU32Reg(0x0, RegisterId::ER1),
+                    ArithRightShiftU8ImmU32Reg(0x0, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1)],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -4700,7 +4697,7 @@ mod tests_cpu {
                     // Clear every flag.
                     MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0b0000_0000_0000_0000_0000_0000_0000_0001, RegisterId::ER1),
-                    ArithRightShiftU32ImmU32Reg(0x1, RegisterId::ER1),
+                    ArithRightShiftU8ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[
                     (RegisterId::ER1, 0b1000_0000_0000_0000_0000_0000_0000_0000),
@@ -4719,7 +4716,7 @@ mod tests_cpu {
                     // Manually set the signed flag.
                     MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x2, RegisterId::ER1),
-                    ArithRightShiftU32ImmU32Reg(0x1, RegisterId::ER1),
+                    ArithRightShiftU8ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[(RegisterId::ER1, 0x1), (RegisterId::EFL, 0x0)],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -6393,115 +6390,76 @@ mod tests_cpu {
     #[test]
     fn test_push_f32_imm_f32_reg() {
         let tests = [TestF32::new(
-            &[PushF32Imm(0.1)],
-            &[],
+            &[PushF32Imm(0.1), PopF32ToF32Reg(RegisterId::FR1)],
+            &[(RegisterId::FR1, 0.1)],
             DEFAULT_U32_STACK_CAPACITY,
             false,
             "PUSH - failed to execute PUSH instruction",
         )];
 
-        CpuTests::new(&tests).run_all_special(|_id: usize, vm: Option<VirtualMachine>| {
-            let mut vm = vm.expect("failed to correctly execute test code");
-            assert_eq!(vm.com_bus.mem.pop_f32(), 0.1);
-        });
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the push u32 register instruction.
     #[test]
-    fn test_push_u32_reg_multiple() {
-        let tests = [TestU32::new(
-            &[
-                MovU32ImmU32Reg(0x123, RegisterId::ER1),
-                MovU32ImmU32Reg(0x321, RegisterId::ER2),
-                PushU32Reg(RegisterId::ER1),
-                PushU32Reg(RegisterId::ER2),
-            ],
-            &[],
-            DEFAULT_U32_STACK_CAPACITY,
-            false,
-            "PUSH - failed to execute PUSH instruction",
-        )];
+    fn test_push_u32_reg_() {
+        let tests = [
+            TestU32::new(
+                &[
+                    MovU32ImmU32Reg(0x123, RegisterId::ER1),
+                    MovU32ImmU32Reg(0x321, RegisterId::ER2),
+                    PushU32Reg(RegisterId::ER1),
+                    PushU32Reg(RegisterId::ER2),
+                    PopU32ToU32Reg(RegisterId::ER3),
+                    PopU32ToU32Reg(RegisterId::ER4),
+                ],
+                &[(RegisterId::ER3, 0x321), (RegisterId::ER4, 0x123)],
+                DEFAULT_U32_STACK_CAPACITY,
+                false,
+                "POP - failed to execute POP instruction",
+            ),
+            TestU32::new(
+                &[
+                    MovU32ImmU32Reg(0x123, RegisterId::ER1),
+                    PushU32Reg(RegisterId::ER1),
+                    PopU32ToU32Reg(RegisterId::ER2),
+                ],
+                &[(RegisterId::ER2, 0x123)],
+                DEFAULT_U32_STACK_CAPACITY,
+                false,
+                "PUSH - failed to execute PUSH instruction",
+            ),
+        ];
 
-        CpuTests::new(&tests).run_all_special(|_id: usize, vm: Option<VirtualMachine>| {
-            let mut vm = vm.expect("failed to correctly execute test code");
-            assert_eq!(vm.com_bus.mem.pop_u32(), 0x321);
-            assert_eq!(vm.com_bus.mem.pop_u32(), 0x123);
-        });
-    }
-
-    /// Test the push u32 register instruction.
-    #[test]
-    fn test_push_u32_reg_single() {
-        let tests = [TestU32::new(
-            &[
-                MovU32ImmU32Reg(0x123, RegisterId::ER1),
-                PushU32Reg(RegisterId::ER1),
-            ],
-            &[],
-            DEFAULT_U32_STACK_CAPACITY,
-            false,
-            "PUSH - failed to execute PUSH instruction",
-        )];
-
-        CpuTests::new(&tests).run_all_special(|_id: usize, vm: Option<VirtualMachine>| {
-            let mut vm = vm.expect("failed to correctly execute test code");
-            assert_eq!(vm.com_bus.mem.pop_u32(), 0x123);
-        });
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the push u32 immediate instruction.
     #[test]
     fn test_push_u32_imm_multiple() {
-        let tests = [TestU32::new(
-            &[PushU32Imm(0x123), PushU32Imm(0x321)],
-            &[],
-            DEFAULT_U32_STACK_CAPACITY,
-            false,
-            "PUSH - failed to execute PUSH instruction",
-        )];
+        let tests = [
+            TestU32::new(
+                &[
+                    PushU32Imm(0x123),
+                    PushU32Imm(0x321),
+                    PopU32ToU32Reg(RegisterId::ER1),
+                    PopU32ToU32Reg(RegisterId::ER2),
+                ],
+                &[(RegisterId::ER1, 0x321), (RegisterId::ER2, 0x123)],
+                DEFAULT_U32_STACK_CAPACITY,
+                false,
+                "PUSH - failed to execute PUSH instruction",
+            ),
+            TestU32::new(
+                &[PushU32Imm(0x123), PopU32ToU32Reg(RegisterId::ER1)],
+                &[(RegisterId::ER1, 0x123)],
+                DEFAULT_U32_STACK_CAPACITY,
+                false,
+                "PUSH - failed to execute PUSH instruction",
+            ),
+        ];
 
-        CpuTests::new(&tests).run_all_special(|_id: usize, vm: Option<VirtualMachine>| {
-            let mut vm = vm.expect("failed to correctly execute test code");
-            assert_eq!(vm.com_bus.mem.pop_u32(), 0x321);
-            assert_eq!(vm.com_bus.mem.pop_u32(), 0x123);
-        });
-    }
-
-    /// Test the push u32 immediate instruction.
-    #[test]
-    fn test_push_u32_imm_single() {
-        let tests = [TestU32::new(
-            &[PushU32Imm(0x123)],
-            &[],
-            DEFAULT_U32_STACK_CAPACITY,
-            false,
-            "PUSH - failed to execute PUSH instruction",
-        )];
-
-        CpuTests::new(&tests).run_all_special(|_id: usize, vm: Option<VirtualMachine>| {
-            let mut vm = vm.expect("failed to correctly execute test code");
-            assert_eq!(vm.com_bus.mem.pop_u32(), 0x123);
-        });
-    }
-
-    /// Test the pop u32 immediate instruction.
-    #[test]
-    #[should_panic]
-    fn test_pop_u32_imm_invalid_pop() {
-        let tests = [TestU32::new(
-            &[Nop],
-            &[],
-            DEFAULT_U32_STACK_CAPACITY,
-            false,
-            "POP - failed to execute POP instruction",
-        )];
-
-        CpuTests::new(&tests).run_all_special(|_id: usize, vm: Option<VirtualMachine>| {
-            let mut vm = vm.expect("failed to correctly execute test code");
-
-            // There is nothing on the stack, this should assert.
-            _ = vm.com_bus.mem.pop_u32();
-        });
+        CpuTests::new(&tests).run_all();
     }
 
     /// Test the pop to u32 register instruction.
@@ -6533,6 +6491,13 @@ mod tests_cpu {
                 DEFAULT_U32_STACK_CAPACITY,
                 true,
                 "POP - failed to execute POP instruction",
+            ),
+            TestU32::new(
+                &[PopU32ToU32Reg(RegisterId::ER1)],
+                &[],
+                DEFAULT_U32_STACK_CAPACITY,
+                true,
+                "POP - succeeded in executing POP instruction with empty stack",
             ),
         ];
 

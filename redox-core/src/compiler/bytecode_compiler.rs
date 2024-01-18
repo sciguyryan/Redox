@@ -48,10 +48,6 @@ impl Compiler {
         match *instruction {
             /******** [u32 immediate and u32 register] ********/
             Instruction::AddU32ImmU32Reg(imm, reg)
-            | Instruction::LeftShiftU32ImmU32Reg(imm, reg)
-            | Instruction::ArithLeftShiftU32ImmU32Reg(imm, reg)
-            | Instruction::RightShiftU32ImmU32Reg(imm, reg)
-            | Instruction::ArithRightShiftU32ImmU32Reg(imm, reg)
             | Instruction::MovU32ImmU32Reg(imm, reg)
             | Instruction::MovMemU32RegSimple(imm, reg)
             | Instruction::MovMemExprU32Reg(imm, reg)
@@ -115,7 +111,11 @@ impl Compiler {
             }
 
             /******** [u8 immediate and u32 register] ********/
-            Instruction::BitTestU32Reg(imm, reg)
+            Instruction::LeftShiftU8ImmU32Reg(imm, reg)
+            | Instruction::RightShiftU8ImmU32Reg(imm, reg)
+            | Instruction::ArithLeftShiftU8ImmU32Reg(imm, reg)
+            | Instruction::ArithRightShiftU8ImmU32Reg(imm, reg)
+            | Instruction::BitTestU32Reg(imm, reg)
             | Instruction::BitTestResetU32Reg(imm, reg)
             | Instruction::BitTestSetU32Reg(imm, reg) => {
                 self.write_u8(imm);
@@ -331,13 +331,13 @@ mod tests_compiler {
                 IncU32Reg => Instruction::IncU32Reg(ER2),
                 DecU32Reg => Instruction::DecU32Reg(ER2),
                 AndU32ImmU32Reg => Instruction::AndU32ImmU32Reg(0x123, ER2),
-                LeftShiftU32ImmU32Reg => Instruction::LeftShiftU32ImmU32Reg(31, ER2),
+                LeftShiftU8ImmU32Reg => Instruction::LeftShiftU8ImmU32Reg(31, ER2),
                 LeftShiftU32RegU32Reg => Instruction::LeftShiftU32RegU32Reg(ER2, ER3),
-                ArithLeftShiftU32ImmU32Reg => Instruction::ArithLeftShiftU32ImmU32Reg(31, ER2),
+                ArithLeftShiftU8ImmU32Reg => Instruction::ArithLeftShiftU8ImmU32Reg(31, ER2),
                 ArithLeftShiftU32RegU32Reg => Instruction::ArithLeftShiftU32RegU32Reg(ER2, ER3),
-                RightShiftU32ImmU32Reg => Instruction::RightShiftU32ImmU32Reg(31, ER2),
+                RightShiftU8ImmU32Reg => Instruction::RightShiftU8ImmU32Reg(31, ER2),
                 RightShiftU32RegU32Reg => Instruction::RightShiftU32RegU32Reg(ER2, ER3),
-                ArithRightShiftU32ImmU32Reg => Instruction::ArithRightShiftU32ImmU32Reg(31, ER2),
+                ArithRightShiftU8ImmU32Reg => Instruction::ArithRightShiftU8ImmU32Reg(31, ER2),
                 ArithRightShiftU32RegU32Reg => Instruction::ArithRightShiftU32RegU32Reg(ER2, ER3),
                 CallU32Imm => Instruction::CallU32Imm(0xdeafbeed),
                 CallU32Reg => Instruction::CallU32Reg(RegisterId::ER2),

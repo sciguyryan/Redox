@@ -4,10 +4,10 @@ use redox_core::{
     compiler::bytecode_compiler::Compiler,
     ins::instruction::Instruction,
     mem,
-    parsing::asm_parser::AsmParser,
     reg::registers::RegisterId,
     vm::{self, VirtualMachine},
 };
+use redox_parser::asm_parser::AsmParser;
 
 use std::time::Instant;
 
@@ -70,7 +70,7 @@ fn main() {
     let assembly =
         "nop\r\nadd 0x123, ER1\r\nbsr &0xdeadbeef, &0xdeadbeef\r\nmov &[ER1*0x12*ER2], &ER1";
     let parser = AsmParser::new();
-    parser.parse_code(assembly);
+    println!("{:?}", parser.parse_code(assembly));
     return;
 
     let instructions = &[

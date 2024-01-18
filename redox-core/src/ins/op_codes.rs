@@ -47,20 +47,20 @@ pub enum OpCode {
     AndU32ImmU32Reg,
 
     /******** [Bit Operation Instructions] ********/
-    /// Left-shift a u32 register by a u32 immediate. The result remains in the origin register.
-    LeftShiftU32ImmU32Reg,
+    /// Left-shift a u32 register by a u8 immediate. The result remains in the origin register.
+    LeftShiftU8ImmU32Reg,
     /// Left-shift a u32 register (B) by a u32 register (A). The result remains in register A.
     LeftShiftU32RegU32Reg,
-    /// Arithmetic left-shift a u32 register by a u32 immediate. The result remains in the origin register.
-    ArithLeftShiftU32ImmU32Reg,
+    /// Arithmetic left-shift a u32 register by a u8 immediate. The result remains in the origin register.
+    ArithLeftShiftU8ImmU32Reg,
     /// Arithmetic left-shift a u32 register (B) by a u32 register (A). The result remains in register A.
     ArithLeftShiftU32RegU32Reg,
-    /// Right-shift a u32 register by a u32 immediate. The result remains in the origin register.
-    RightShiftU32ImmU32Reg,
+    /// Right-shift a u32 register by a u8 immediate. The result remains in the origin register.
+    RightShiftU8ImmU32Reg,
     /// Right-shift a u32 register (B) by a u32 register (A). The result remains in register A.
     RightShiftU32RegU32Reg,
     /// Arithmetic right-shift a u32 register by a u32 immediate. The result remains in the origin register.
-    ArithRightShiftU32ImmU32Reg,
+    ArithRightShiftU8ImmU32Reg,
     /// Arithmetic right-shift a u32 register (B) by a u32 register (A). The result remains in register A.
     ArithRightShiftU32RegU32Reg,
 
@@ -93,11 +93,11 @@ pub enum OpCode {
     MovU32RegMemSimple,
     /// Move a u32 value from memory to a u32 register. The result is copied into the specified register.
     MovMemU32RegSimple,
-    /// Move the value from the memory address specified by a register. The result is copied into the specified register.
+    /// Move a u32 value from the memory address specified by a register. The result is copied into the specified register.
     MovU32RegPtrU32RegSimple,
-    /// Move a u32 immediate to memory. The result is copied into the specified memory address.
+    /// Move a u32 value to the memory address as given by an expression. The result is copied into the specified memory address.
     MovU32ImmMemExpr,
-    /// Move the value at the address as given by an expression to a u32 register. The result is copied into the specified register.
+    /// Move a u32 value from address as given by an expression to a u32 register. The result is copied into the specified register.
     MovMemExprU32Reg,
     /// Move the value of a u32 register to the address given by an expression. The result is copied into the specified memory address.
     MovU32RegMemExpr,
@@ -111,10 +111,10 @@ pub enum OpCode {
     ///
     /// The carry and zero flags may be set depending on the result and the overflow flag will always be cleared.
     ZeroHighBitsByIndexU32RegU32Imm,
-    /// Push a u32 immediate value onto the stack.
-    PushU32Imm,
     /// Push a f32 immediate value onto the stack.
     PushF32Imm,
+    /// Push a u32 immediate value onto the stack.
+    PushU32Imm,
     /// Push the value of a u32 register onto the stack.
     PushU32Reg,
     /// Pop a f32 value from the stack to a f32 register.
@@ -234,13 +234,13 @@ impl From<&Instruction> for OpCode {
             AndU32ImmU32Reg(_, _) => OpCode::AndU32ImmU32Reg,
 
             /******** [Bit Operation Instructions] ********/
-            LeftShiftU32ImmU32Reg(_, _) => OpCode::LeftShiftU32ImmU32Reg,
+            LeftShiftU8ImmU32Reg(_, _) => OpCode::LeftShiftU8ImmU32Reg,
             LeftShiftU32RegU32Reg(_, _) => OpCode::LeftShiftU32RegU32Reg,
-            ArithLeftShiftU32ImmU32Reg(_, _) => OpCode::ArithLeftShiftU32ImmU32Reg,
+            ArithLeftShiftU8ImmU32Reg(_, _) => OpCode::ArithLeftShiftU8ImmU32Reg,
             ArithLeftShiftU32RegU32Reg(_, _) => OpCode::ArithLeftShiftU32RegU32Reg,
-            RightShiftU32ImmU32Reg(_, _) => OpCode::RightShiftU32ImmU32Reg,
+            RightShiftU8ImmU32Reg(_, _) => OpCode::RightShiftU8ImmU32Reg,
             RightShiftU32RegU32Reg(_, _) => OpCode::RightShiftU32RegU32Reg,
-            ArithRightShiftU32ImmU32Reg(_, _) => OpCode::ArithRightShiftU32ImmU32Reg,
+            ArithRightShiftU8ImmU32Reg(_, _) => OpCode::ArithRightShiftU8ImmU32Reg,
             ArithRightShiftU32RegU32Reg(_, _) => OpCode::ArithRightShiftU32RegU32Reg,
 
             /******** [Branching Instructions] ********/
