@@ -1,5 +1,6 @@
 use std::{num::ParseIntError, str::FromStr};
 
+use itertools::Itertools;
 use redox_core::{
     ins::{
         expressions::{
@@ -12,7 +13,7 @@ use redox_core::{
     reg::registers::RegisterId,
 };
 
-use crate::type_hints::ArgTypeHint;
+use crate::type_hints::{ArgTypeHint, InstructionLookup};
 
 use super::type_hints::InstructionHints;
 
@@ -41,12 +42,10 @@ const U32_REGISTERS: [RegisterId; 18] = [
 
 #[derive(Debug, Clone)]
 pub enum Argument {
-    /// A f32 argument.
-    F32(f32),
-    /// A u32 argument.
-    U32(u32),
-    /// A u8 argument.
-    U8(u8),
+    /// A f64 argument.
+    Float(f64),
+    /// A u128 argument.
+    UnsignedInt(u128),
     /// A f32 register argument.
     RegisterF32(RegisterId),
     /// A u32 register argument.
@@ -60,6 +59,17 @@ macro_rules! get_inner_arg {
     ($target:expr, $enum:path) => {{
         if let $enum(a) = $target {
             a
+        } else {
+            unreachable!();
+        }
+    }};
+}
+
+/// Cheekily get the inner value of an enum, with casting.
+macro_rules! get_inner_arg_and_cast {
+    ($target:expr, $enum:path, $cast:ident) => {{
+        if let $enum(a) = $target {
+            a as $cast
         } else {
             unreachable!();
         }
@@ -107,8 +117,19 @@ impl<'a> AsmParser<'a> {
             let mut arguments = vec![];
             let mut argument_hints = vec![];
 
+            let shortlist: Vec<InstructionLookup> = self
+                .hints
+                .hints
+                .iter()
+                .filter(|h| h.names.contains(&name.as_str()))
+                .cloned()
+                .collect();
+
             // Do we have any arguments to process.
             for raw_arg in &raw_args[1..] {
+                let mut has_value_pushed = false;
+                let mut hints = vec![];
+
                 let first_char = raw_arg.chars().nth(0).unwrap();
 
                 // This will track whether the argument is a pointer.
@@ -116,20 +137,6 @@ impl<'a> AsmParser<'a> {
 
                 // Skip past the address prefix identifier, if it exists.
                 let substring = if is_pointer { &raw_arg[1..] } else { raw_arg };
-
-                // Is the argument an expression?
-                if let Some((arg, hint)) = AsmParser::try_parse_expression(substring, is_pointer) {
-                    arguments.push(arg);
-                    argument_hints.push(hint);
-                    continue;
-                }
-
-                // Is the argument a register identifier?
-                if let Some((arg, hint)) = AsmParser::try_parse_register_id(substring, is_pointer) {
-                    arguments.push(arg);
-                    argument_hints.push(hint);
-                    continue;
-                }
 
                 /*
                  * IMPORTANT -
@@ -139,48 +146,136 @@ impl<'a> AsmParser<'a> {
                  * will be used, by default.
                  */
 
-                // Is the argument a u8 immediate?
-                if let Some((arg, hint)) = AsmParser::try_parse_u8(substring, is_pointer) {
-                    arguments.push(arg);
-                    argument_hints.push(hint);
-                    continue;
+                if let Some((arg, hint)) = AsmParser::try_parse_expression(substring, is_pointer) {
+                    // The argument could be an expression?
+                    if !has_value_pushed {
+                        arguments.push(arg);
+                        has_value_pushed = true;
+                    }
+
+                    hints.push(hint);
                 }
 
-                // Is the argument a u32 immediate?
-                if let Some((arg, hint)) = AsmParser::try_parse_u32(substring, is_pointer) {
-                    arguments.push(arg);
-                    argument_hints.push(hint);
-                    continue;
+                if let Some((arg, hint)) = AsmParser::try_parse_register_id(substring, is_pointer) {
+                    // The argument could be a register identifier?
+                    if !has_value_pushed {
+                        arguments.push(arg);
+                        has_value_pushed = true;
+                    }
+                    hints.push(hint);
                 }
 
-                // Is the argument a f32 immediate?
-                if let Some((arg, hint)) = AsmParser::try_parse_f32(substring, is_pointer) {
-                    arguments.push(arg);
-                    argument_hints.push(hint);
-                    continue;
+                if let Ok(val) = AsmParser::try_parse_u8_immediate(substring) {
+                    // The argument could be a u8 immediate.
+                    if !has_value_pushed {
+                        arguments.push(Argument::UnsignedInt(val as u128));
+                        has_value_pushed = true;
+                    }
+
+                    if is_pointer {
+                        // A u8 argument could also represent a u32 argument.
+                        hints.push(ArgTypeHint::U8Pointer);
+                    } else {
+                        // A u8 argument could also represent a u32 argument.
+                        hints.push(ArgTypeHint::U8);
+                    }
                 }
+
+                if let Ok(val) = AsmParser::try_parse_u32_immediate(substring) {
+                    // The argument could be a u32 immediate.
+                    if !has_value_pushed {
+                        arguments.push(Argument::UnsignedInt(val as u128));
+                        has_value_pushed = true;
+                    }
+
+                    if is_pointer {
+                        hints.push(ArgTypeHint::U32Pointer);
+                    } else {
+                        hints.push(ArgTypeHint::U32);
+                    }
+                }
+
+                if substring.contains('.') {
+                    // Was an address prefix used? This is invalid syntax since f32 values can't
+                    // be used as pointers.
+                    if is_pointer {
+                        panic!(
+                            "invalid syntax - unable to use a 32-bit floating value as a pointer!"
+                        );
+                    }
+
+                    if let Ok(val) = f32::from_str(substring) {
+                        // The argument could be a f32 immediate?
+                        if !has_value_pushed {
+                            arguments.push(Argument::Float(val as f64));
+                            has_value_pushed = true;
+                        }
+
+                        hints.push(ArgTypeHint::F32);
+                    }
+
+                    if let Ok(val) = f64::from_str(substring) {
+                        // The argument could be a f64 immediate?
+                        if !has_value_pushed {
+                            arguments.push(Argument::Float(val));
+
+                            // TODO - Uncomment if further types are added below.
+                            //has_value_pushed = true;
+                        }
+
+                        hints.push(ArgTypeHint::F64);
+                    }
+
+                    // The argument was expected to be a valid floating-point value,
+                    // but we failed to parse it as such. We can't go any further.
+                    if !hints
+                        .iter()
+                        .any(|h| *h == ArgTypeHint::F32 || *h == ArgTypeHint::F64)
+                    {
+                        panic!("Failed to parse floating-point value.");
+                    }
+                }
+
+                argument_hints.push(hints);
             }
 
-            match self.hints.find_by(name.as_str(), &argument_hints) {
-                Some(op) => {
-                    let ins = AsmParser::try_build_instruction(op, &arguments);
-                    instructions.push(ins);
+            // Calculate the multi-Cartesian product of the argument types.
+            let arg_permutations = argument_hints
+                .into_iter()
+                .multi_cartesian_product()
+                .collect_vec();
+
+            let mut final_options = vec![];
+            if !arguments.is_empty() {
+                for permutation in arg_permutations {
+                    for entry in &shortlist {
+                        if entry.args == permutation {
+                            final_options.push(entry);
+                        }
+                    }
                 }
-                None => {
-                    /*
-                     * So, this can happen because a shortname isn't valid, or because the number or type
-                     * of arguments aren't valid, but it can also happen in cases where there is a valid
-                     * instruction.
-                     * This can occur when, for example, the value 0xaa could be read as a u8 value,
-                     * but the argument of the instruction takes a u32 value.
-                     *
-                     * The simplest way I can think to solve this right now is to ensure that there is always
-                     * a smallest numeric variant available for each instruction and by adding specific
-                     * instruction aliases where needed.
-                     */
-                    panic!("unable to find an instruction that matches the name and provided arguments.");
-                }
+            } else {
+                final_options = shortlist.iter().collect();
             }
+
+            // Did we fail to find a match?
+            // This can happen because a shortname isn't valid, or because the number or type
+            // of arguments don't match.
+            assert!(
+                !final_options.is_empty(),
+                "unable to find an instruction that matches the name and provided arguments."
+            );
+
+            // We will want to select the match with the lowest total argument size.
+            final_options.sort_by_key(|a| a.total_argument_size());
+
+            // Finally, the final match will be whatever entry has been sorted at the top
+            // of our vector. The unwrap is safe since we know there is at least one.
+            let final_option = final_options.first().unwrap();
+
+            // Build our instruction and push it to the list.
+            let ins = AsmParser::try_build_instruction(final_option.opcode, &arguments);
+            instructions.push(ins);
         }
 
         instructions
@@ -234,11 +329,11 @@ impl<'a> AsmParser<'a> {
                 if !argument.is_empty() {
                     if let Some((arg, _)) = AsmParser::try_parse_register_id(argument, false) {
                         // Do we have a register identifier.
-                        let value = get_inner_arg!(arg, Argument::RegisterF32);
+                        let value = get_inner_arg!(arg, Argument::RegisterU32);
                         expr_arguments.push(Register(value));
                     } else if let Some((arg, _)) = AsmParser::try_parse_u8(argument, false) {
                         // Do we have a u8 immediate?
-                        let value = get_inner_arg!(arg, Argument::U8);
+                        let value = get_inner_arg_and_cast!(arg, Argument::UnsignedInt, u8);
                         expr_arguments.push(Immediate(value));
                     } else {
                         // Something other than our permitted components.
@@ -281,26 +376,6 @@ impl<'a> AsmParser<'a> {
         }
     }
 
-    /// Try to parse an argument string as a u32.
-    ///
-    /// # Arguments
-    ///
-    /// * `string` - The input string.
-    /// * `is_pointer` - Is this argument a pointer?
-    #[inline]
-    fn try_parse_u32(string: &str, is_pointer: bool) -> Option<(Argument, ArgTypeHint)> {
-        match AsmParser::try_parse_u32_immediate(string) {
-            Ok(val) => {
-                if is_pointer {
-                    Some((Argument::U32(val), ArgTypeHint::U32Pointer))
-                } else {
-                    Some((Argument::U32(val), ArgTypeHint::U32))
-                }
-            }
-            Err(_) => None,
-        }
-    }
-
     /// Try to parse an argument string as a u8.
     ///
     /// # Arguments
@@ -312,36 +387,12 @@ impl<'a> AsmParser<'a> {
         match AsmParser::try_parse_u8_immediate(string) {
             Ok(val) => {
                 if is_pointer {
-                    Some((Argument::U8(val), ArgTypeHint::U8Pointer))
+                    Some((Argument::UnsignedInt(val as u128), ArgTypeHint::U8Pointer))
                 } else {
-                    Some((Argument::U8(val), ArgTypeHint::U8))
+                    Some((Argument::UnsignedInt(val as u128), ArgTypeHint::U8))
                 }
             }
             Err(_) => None,
-        }
-    }
-
-    /// Try to parse an argument string as a u8.
-    ///
-    /// # Arguments
-    ///
-    /// * `string` - The input string.
-    /// * `is_pointer` - Is this argument a pointer?
-    #[inline]
-    fn try_parse_f32(string: &str, is_pointer: bool) -> Option<(Argument, ArgTypeHint)> {
-        if !string.contains('.') {
-            return None;
-        }
-
-        // Was an address prefix used? If so that is invalid syntax.
-        if is_pointer {
-            panic!("invalid syntax - unable to use a 32-bit floating value as a pointer!");
-        }
-
-        if let Ok(val) = f32::from_str(string) {
-            Some((Argument::F32(val), ArgTypeHint::F32))
-        } else {
-            None
         }
     }
 
@@ -392,7 +443,7 @@ impl<'a> AsmParser<'a> {
 
             /******** [Arithmetic Instructions] ********/
             AddU32ImmU32Reg => Instruction::AddU32ImmU32Reg(
-                get_inner_arg!(args[0], U32),
+                get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
             AddU32RegU32Reg => Instruction::AddU32RegU32Reg(
@@ -400,19 +451,19 @@ impl<'a> AsmParser<'a> {
                 get_inner_arg!(args[1], RegisterU32),
             ),
             SubU32ImmU32Reg => Instruction::SubU32ImmU32Reg(
-                get_inner_arg!(args[0], U32),
+                get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
             SubU32RegU32Imm => Instruction::SubU32RegU32Imm(
                 get_inner_arg!(args[0], RegisterU32),
-                get_inner_arg!(args[1], U32),
+                get_inner_arg_and_cast!(args[1], UnsignedInt, u32),
             ),
             SubU32RegU32Reg => Instruction::SubU32RegU32Reg(
                 get_inner_arg!(args[0], RegisterU32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
             MulU32ImmU32Reg => Instruction::MulU32ImmU32Reg(
-                get_inner_arg!(args[0], U32),
+                get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
             MulU32RegU32Reg => Instruction::MulU32RegU32Reg(
@@ -420,24 +471,24 @@ impl<'a> AsmParser<'a> {
                 get_inner_arg!(args[1], RegisterU32),
             ),
             DivU32ImmU32Reg => Instruction::DivU32ImmU32Reg(
-                get_inner_arg!(args[0], U32),
+                get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
             DivU32RegU32Imm => Instruction::DivU32RegU32Imm(
                 get_inner_arg!(args[0], RegisterU32),
-                get_inner_arg!(args[1], U32),
+                get_inner_arg_and_cast!(args[1], UnsignedInt, u32),
             ),
             DivU32RegU32Reg => Instruction::DivU32RegU32Reg(
                 get_inner_arg!(args[0], RegisterU32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
             ModU32ImmU32Reg => Instruction::ModU32ImmU32Reg(
-                get_inner_arg!(args[0], U32),
+                get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
             ModU32RegU32Imm => Instruction::ModU32RegU32Imm(
                 get_inner_arg!(args[0], RegisterU32),
-                get_inner_arg!(args[1], U32),
+                get_inner_arg_and_cast!(args[1], UnsignedInt, u32),
             ),
             ModU32RegU32Reg => Instruction::ModU32RegU32Reg(
                 get_inner_arg!(args[0], RegisterU32),
@@ -446,13 +497,13 @@ impl<'a> AsmParser<'a> {
             IncU32Reg => Instruction::IncU32Reg(get_inner_arg!(args[0], RegisterU32)),
             DecU32Reg => Instruction::DecU32Reg(get_inner_arg!(args[0], RegisterU32)),
             AndU32ImmU32Reg => Instruction::AndU32ImmU32Reg(
-                get_inner_arg!(args[0], U32),
+                get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
 
             /******** [Bit Operation Instructions] ********/
             LeftShiftU8ImmU32Reg => Instruction::LeftShiftU8ImmU32Reg(
-                get_inner_arg!(args[0], U8),
+                get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
                 get_inner_arg!(args[1], RegisterU32),
             ),
             LeftShiftU32RegU32Reg => Instruction::LeftShiftU32RegU32Reg(
@@ -460,7 +511,7 @@ impl<'a> AsmParser<'a> {
                 get_inner_arg!(args[1], RegisterU32),
             ),
             ArithLeftShiftU8ImmU32Reg => Instruction::ArithLeftShiftU8ImmU32Reg(
-                get_inner_arg!(args[0], U8),
+                get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
                 get_inner_arg!(args[1], RegisterU32),
             ),
             ArithLeftShiftU32RegU32Reg => Instruction::ArithLeftShiftU32RegU32Reg(
@@ -468,7 +519,7 @@ impl<'a> AsmParser<'a> {
                 get_inner_arg!(args[1], RegisterU32),
             ),
             RightShiftU8ImmU32Reg => Instruction::RightShiftU8ImmU32Reg(
-                get_inner_arg!(args[0], U8),
+                get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
                 get_inner_arg!(args[1], RegisterU32),
             ),
             RightShiftU32RegU32Reg => Instruction::RightShiftU32RegU32Reg(
@@ -476,7 +527,7 @@ impl<'a> AsmParser<'a> {
                 get_inner_arg!(args[1], RegisterU32),
             ),
             ArithRightShiftU8ImmU32Reg => Instruction::ArithRightShiftU8ImmU32Reg(
-                get_inner_arg!(args[0], U8),
+                get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
                 get_inner_arg!(args[1], RegisterU32),
             ),
             ArithRightShiftU32RegU32Reg => Instruction::ArithRightShiftU32RegU32Reg(
@@ -485,12 +536,16 @@ impl<'a> AsmParser<'a> {
             ),
 
             /******** [Branching Instructions] ********/
-            CallU32Imm => Instruction::CallU32Imm(get_inner_arg!(args[0], U32)),
+            CallU32Imm => {
+                Instruction::CallU32Imm(get_inner_arg_and_cast!(args[0], UnsignedInt, u32))
+            }
             CallU32Reg => Instruction::CallU32Reg(get_inner_arg!(args[0], RegisterU32)),
             RetArgsU32 => Instruction::RetArgsU32,
-            Int => Instruction::Int(get_inner_arg!(args[0], U8)),
+            Int => Instruction::Int(get_inner_arg_and_cast!(args[0], UnsignedInt, u8)),
             IntRet => Instruction::IntRet,
-            JumpAbsU32Imm => Instruction::JumpAbsU32Imm(get_inner_arg!(args[0], U32)),
+            JumpAbsU32Imm => {
+                Instruction::JumpAbsU32Imm(get_inner_arg_and_cast!(args[0], UnsignedInt, u32))
+            }
             JumpAbsU32Reg => Instruction::JumpAbsU32Reg(get_inner_arg!(args[0], RegisterU32)),
 
             /******** [Data Instructions] ********/
@@ -499,7 +554,7 @@ impl<'a> AsmParser<'a> {
                 get_inner_arg!(args[1], RegisterU32),
             ),
             MovU32ImmU32Reg => Instruction::MovU32ImmU32Reg(
-                get_inner_arg!(args[0], U32),
+                get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
             MovU32RegU32Reg => Instruction::MovU32RegU32Reg(
@@ -507,15 +562,15 @@ impl<'a> AsmParser<'a> {
                 get_inner_arg!(args[1], RegisterU32),
             ),
             MovU32ImmMemSimple => Instruction::MovU32ImmMemSimple(
-                get_inner_arg!(args[0], U32),
-                get_inner_arg!(args[1], U32),
+                get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
+                get_inner_arg_and_cast!(args[1], UnsignedInt, u32),
             ),
             MovU32RegMemSimple => Instruction::MovU32RegMemSimple(
                 get_inner_arg!(args[0], RegisterU32),
-                get_inner_arg!(args[1], U32),
+                get_inner_arg_and_cast!(args[1], UnsignedInt, u32),
             ),
             MovMemU32RegSimple => Instruction::MovMemU32RegSimple(
-                get_inner_arg!(args[0], U32),
+                get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
             MovU32RegPtrU32RegSimple => Instruction::MovU32RegPtrU32RegSimple(
@@ -523,7 +578,7 @@ impl<'a> AsmParser<'a> {
                 get_inner_arg!(args[1], RegisterU32),
             ),
             MovU32ImmMemExpr => Instruction::MovU32ImmMemExpr(
-                get_inner_arg!(args[0], U32),
+                get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
                 get_inner_expr_arg!(args[1]),
             ),
             MovMemExprU32Reg => Instruction::MovMemExprU32Reg(
@@ -541,114 +596,128 @@ impl<'a> AsmParser<'a> {
                 get_inner_arg!(args[2], RegisterU32),
             ),
             ZeroHighBitsByIndexU32RegU32Imm => Instruction::ZeroHighBitsByIndexU32RegU32Imm(
-                get_inner_arg!(args[0], U32),
+                get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
                 get_inner_arg!(args[1], RegisterU32),
                 get_inner_arg!(args[2], RegisterU32),
             ),
-            PushF32Imm => Instruction::PushF32Imm(get_inner_arg!(args[0], F32)),
-            PushU32Imm => Instruction::PushU32Imm(get_inner_arg!(args[0], U32)),
+            PushF32Imm => Instruction::PushF32Imm(get_inner_arg_and_cast!(args[0], Float, f32)),
+            PushU32Imm => {
+                Instruction::PushU32Imm(get_inner_arg_and_cast!(args[0], UnsignedInt, u32))
+            }
             PushU32Reg => Instruction::PushU32Reg(get_inner_arg!(args[0], RegisterU32)),
             PopF32ToF32Reg => Instruction::PopF32ToF32Reg(get_inner_arg!(args[0], RegisterF32)),
             PopU32ToU32Reg => Instruction::PopU32ToU32Reg(get_inner_arg!(args[0], RegisterU32)),
 
             /******** [IO Instructions] ********/
-            OutF32Imm => {
-                Instruction::OutF32Imm(get_inner_arg!(args[0], F32), get_inner_arg!(args[1], U8))
-            }
-            OutU32Imm => {
-                Instruction::OutU32Imm(get_inner_arg!(args[0], U32), get_inner_arg!(args[1], U8))
-            }
+            OutF32Imm => Instruction::OutF32Imm(
+                get_inner_arg_and_cast!(args[0], Float, f32),
+                get_inner_arg_and_cast!(args[1], UnsignedInt, u8),
+            ),
+            OutU32Imm => Instruction::OutU32Imm(
+                get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
+                get_inner_arg_and_cast!(args[1], UnsignedInt, u8),
+            ),
             OutU32Reg => Instruction::OutU32Reg(
                 get_inner_arg!(args[0], RegisterU32),
-                get_inner_arg!(args[1], U8),
+                get_inner_arg_and_cast!(args[1], UnsignedInt, u8),
             ),
-            OutU8Imm => {
-                Instruction::OutU8Imm(get_inner_arg!(args[0], U8), get_inner_arg!(args[1], U8))
-            }
+            OutU8Imm => Instruction::OutU8Imm(
+                get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
+                get_inner_arg_and_cast!(args[1], UnsignedInt, u8),
+            ),
             InU8Reg => Instruction::InU8Reg(
-                get_inner_arg!(args[0], U8),
+                get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
                 get_inner_arg!(args[1], RegisterU32),
             ),
-            InU8Mem => {
-                Instruction::InU8Mem(get_inner_arg!(args[0], U8), get_inner_arg!(args[1], U32))
-            }
+            InU8Mem => Instruction::InU8Mem(
+                get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
+                get_inner_arg_and_cast!(args[1], UnsignedInt, u32),
+            ),
             InU32Reg => Instruction::InU32Reg(
-                get_inner_arg!(args[0], U8),
+                get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
                 get_inner_arg!(args[1], RegisterU32),
             ),
-            InU32Mem => {
-                Instruction::InU32Mem(get_inner_arg!(args[0], U8), get_inner_arg!(args[1], U32))
-            }
+            InU32Mem => Instruction::InU32Mem(
+                get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
+                get_inner_arg_and_cast!(args[1], UnsignedInt, u32),
+            ),
             InF32Reg => Instruction::InF32Reg(
-                get_inner_arg!(args[0], U8),
+                get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
                 get_inner_arg!(args[1], RegisterF32),
             ),
-            InF32Mem => {
-                Instruction::InF32Mem(get_inner_arg!(args[0], U8), get_inner_arg!(args[1], U32))
-            }
+            InF32Mem => Instruction::InF32Mem(
+                get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
+                get_inner_arg_and_cast!(args[1], UnsignedInt, u32),
+            ),
 
             /******** [Logic Instructions] ********/
             BitTestU32Reg => Instruction::BitTestU32Reg(
-                get_inner_arg!(args[0], U8),
+                get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
                 get_inner_arg!(args[1], RegisterU32),
             ),
             BitTestU32Mem => Instruction::BitTestU32Mem(
-                get_inner_arg!(args[0], U8),
-                get_inner_arg!(args[1], U32),
+                get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
+                get_inner_arg_and_cast!(args[1], UnsignedInt, u32),
             ),
             BitTestResetU32Reg => Instruction::BitTestResetU32Reg(
-                get_inner_arg!(args[0], U8),
+                get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
                 get_inner_arg!(args[1], RegisterU32),
             ),
             BitTestResetU32Mem => Instruction::BitTestResetU32Mem(
-                get_inner_arg!(args[0], U8),
-                get_inner_arg!(args[1], U32),
+                get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
+                get_inner_arg_and_cast!(args[1], UnsignedInt, u32),
             ),
             BitTestSetU32Reg => Instruction::BitTestSetU32Reg(
-                get_inner_arg!(args[0], U8),
+                get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
                 get_inner_arg!(args[1], RegisterU32),
             ),
             BitTestSetU32Mem => Instruction::BitTestSetU32Mem(
-                get_inner_arg!(args[0], U8),
-                get_inner_arg!(args[1], U32),
+                get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
+                get_inner_arg_and_cast!(args[1], UnsignedInt, u32),
             ),
             BitScanReverseU32RegU32Reg => Instruction::BitScanReverseU32RegU32Reg(
                 get_inner_arg!(args[0], RegisterU32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
             BitScanReverseU32MemU32Reg => Instruction::BitScanReverseU32MemU32Reg(
-                get_inner_arg!(args[0], U32),
+                get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
             BitScanReverseU32RegMemU32 => Instruction::BitScanReverseU32RegMemU32(
                 get_inner_arg!(args[0], RegisterU32),
-                get_inner_arg!(args[1], U32),
+                get_inner_arg_and_cast!(args[1], UnsignedInt, u32),
             ),
             BitScanReverseU32MemU32Mem => Instruction::BitScanReverseU32MemU32Mem(
-                get_inner_arg!(args[0], U32),
-                get_inner_arg!(args[1], U32),
+                get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
+                get_inner_arg_and_cast!(args[1], UnsignedInt, u32),
             ),
             BitScanForwardU32RegU32Reg => Instruction::BitScanForwardU32RegU32Reg(
                 get_inner_arg!(args[0], RegisterU32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
             BitScanForwardU32MemU32Reg => Instruction::BitScanForwardU32MemU32Reg(
-                get_inner_arg!(args[0], U32),
+                get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
             BitScanForwardU32RegMemU32 => Instruction::BitScanForwardU32RegMemU32(
                 get_inner_arg!(args[0], RegisterU32),
-                get_inner_arg!(args[1], U32),
+                get_inner_arg_and_cast!(args[1], UnsignedInt, u32),
             ),
             BitScanForwardU32MemU32Mem => Instruction::BitScanForwardU32MemU32Mem(
-                get_inner_arg!(args[0], U32),
-                get_inner_arg!(args[1], U32),
+                get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
+                get_inner_arg_and_cast!(args[1], UnsignedInt, u32),
             ),
 
             /******** [Special Instructions] ********/
-            MaskInterrupt => Instruction::MaskInterrupt(get_inner_arg!(args[0], U8)),
-            UnmaskInterrupt => Instruction::UnmaskInterrupt(get_inner_arg!(args[0], U8)),
-            LoadIVTAddrU32Imm => Instruction::LoadIVTAddrU32Imm(get_inner_arg!(args[0], U32)),
+            MaskInterrupt => {
+                Instruction::MaskInterrupt(get_inner_arg_and_cast!(args[0], UnsignedInt, u8))
+            }
+            UnmaskInterrupt => {
+                Instruction::UnmaskInterrupt(get_inner_arg_and_cast!(args[0], UnsignedInt, u8))
+            }
+            LoadIVTAddrU32Imm => {
+                Instruction::LoadIVTAddrU32Imm(get_inner_arg_and_cast!(args[0], UnsignedInt, u32))
+            }
             MachineReturn => Instruction::MachineReturn,
             Halt => Instruction::Halt,
 
@@ -1150,11 +1219,11 @@ mod tests_asm_parsing {
             if let Ok(p) = parsed {
                 let result = p.first().expect("");
                 if result != ins {
-                    println!("Test {i} failed - expected = {ins}, actual = {result}.");
+                    println!("Test {i} failed! Original = {ins:?}, actual = {result:?}.");
                     failed = true;
                 }
             } else {
-                println!("Test {i} failed - no matching instruction was found.");
+                println!("Test {i} failed! No matching instruction was found. Input = {ins_str}");
                 failed = true;
             }
         }

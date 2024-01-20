@@ -8,6 +8,7 @@ default-members = ["redox-terminal", "redox-core", "redox-parser"]
 bitflags = "2.4.2"
 float-cmp = "0.9.0"
 hashbrown = "0.14.3"
+itertools = "0.12.0"
 num-traits = "0.2.17"
 num-derive = "0.4.1"
 prettytable = "0.10.0"

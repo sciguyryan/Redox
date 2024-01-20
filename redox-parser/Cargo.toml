@@ -12,6 +12,7 @@ homepage = "https://github.com/sciguyryan/Redox"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+itertools.workspace = true
 strum.workspace = true
 strum_macros.workspace = true
 redox_core = { path = "../redox-core" }

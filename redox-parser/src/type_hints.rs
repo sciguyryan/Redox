@@ -4,8 +4,12 @@ use redox_core::ins::op_codes::OpCode;
 pub enum ArgTypeHint {
     /// A f32 argument.
     F32,
+    /// A f64 argument.
+    F64,
     /// A u32 argument.
     U32,
+    /// A u64 argument.
+    U64,
     /// A u32 pointer argument (memory address).
     U32Pointer,
     /// A u8 argument.
@@ -24,11 +28,18 @@ pub enum ArgTypeHint {
     ExpressionPointer,
 }
 
+const SIZE_OF_F32: usize = 4;
+const SIZE_OF_F64: usize = 8;
+const SIZE_OF_U32: usize = 4;
+const SIZE_OF_U64: usize = 8;
+const SIZE_OF_U8: usize = 1;
+const SIZE_OF_REGISTER_ID: usize = 1;
+
 #[derive(Debug, Clone)]
 pub struct InstructionLookup<'a> {
-    names: Vec<&'a str>,
-    args: Vec<ArgTypeHint>,
-    opcode: OpCode,
+    pub names: Vec<&'a str>,
+    pub args: Vec<ArgTypeHint>,
+    pub opcode: OpCode,
 }
 
 impl<'a> InstructionLookup<'a> {
@@ -38,6 +49,27 @@ impl<'a> InstructionLookup<'a> {
             opcode,
             args,
         }
+    }
+
+    pub fn total_argument_size(&self) -> usize {
+        let mut total = 0;
+        for arg in &self.args {
+            total += match arg {
+                ArgTypeHint::F32 => SIZE_OF_F32,
+                ArgTypeHint::F64 => SIZE_OF_F64,
+                ArgTypeHint::U32 => SIZE_OF_U32,
+                ArgTypeHint::U32Pointer => SIZE_OF_U32,
+                ArgTypeHint::U64 => SIZE_OF_U64,
+                ArgTypeHint::U8 => SIZE_OF_U8,
+                ArgTypeHint::U8Pointer => SIZE_OF_U8,
+                ArgTypeHint::RegisterF32 => SIZE_OF_REGISTER_ID,
+                ArgTypeHint::RegisterU32 => SIZE_OF_REGISTER_ID,
+                ArgTypeHint::RegisterU32Pointer => SIZE_OF_REGISTER_ID,
+                ArgTypeHint::Expression => SIZE_OF_U32,
+                ArgTypeHint::ExpressionPointer => SIZE_OF_U32,
+            };
+        }
+        total
     }
 }
 
@@ -203,18 +235,14 @@ impl<'a> InstructionHints<'a> {
                 /******** [IO Instructions] ********/
                 gen_hint!(vec!["out", "out.f32"], [F32, U8], OpCode::OutF32Imm),
                 gen_hint!(vec!["out", "out.i32"], [U32, U8], OpCode::OutU32Imm),
-                gen_hint!(
-                    vec!["out", "out.ir32"],
-                    [RegisterU32, U8],
-                    OpCode::OutU32Reg
-                ),
+                gen_hint!(vec!["out", "out.r32"], [RegisterU32, U8], OpCode::OutU32Reg),
                 gen_hint!(vec!["out", "out.i8"], [U8, U8], OpCode::OutU8Imm),
-                gen_hint!(vec!["in", "in.ir8"], [U8, RegisterU32], OpCode::InU8Reg),
-                gen_hint!(vec!["in", "in.ir32"], [U8, RegisterU32], OpCode::InU32Reg),
-                gen_hint!(vec!["in", "in.fr32"], [U8, RegisterF32], OpCode::InF32Reg),
+                gen_hint!(vec!["in", "in.r8"], [U8, RegisterU32], OpCode::InU8Reg),
+                gen_hint!(vec!["in", "in.r32"], [U8, RegisterU32], OpCode::InU32Reg),
+                gen_hint!(vec!["in", "in.rf32"], [U8, RegisterF32], OpCode::InF32Reg),
                 gen_hint!(vec!["in", "in.m8"], [U8, U32Pointer], OpCode::InU8Mem),
                 gen_hint!(vec!["in", "in.m32"], [U8, U32Pointer], OpCode::InU32Mem),
-                gen_hint!(vec!["in", "in.fm32"], [U8, U32Pointer], OpCode::InF32Mem),
+                gen_hint!(vec!["in", "in.mf32"], [U8, U32Pointer], OpCode::InF32Mem),
                 /******** [Logic Instructions] ********/
                 gen_hint!(vec!["bt"], [U8, RegisterU32], OpCode::BitTestU32Reg),
                 gen_hint!(vec!["bt"], [U8, U32Pointer], OpCode::BitTestU32Mem),
@@ -270,13 +298,6 @@ impl<'a> InstructionHints<'a> {
                 gen_hint!(vec!["hlt"], [], OpCode::Halt),
             ],
         }
-    }
-
-    pub fn find_by(&self, name: &str, argument_hints: &[ArgTypeHint]) -> Option<OpCode> {
-        self.hints
-            .iter()
-            .find(|h| h.names.contains(&name) && h.args == argument_hints)
-            .map(|h| h.opcode)
     }
 }
 

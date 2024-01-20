@@ -67,12 +67,6 @@ fn main() {
         panic!("currently unsupported");
     }
 
-    let assembly =
-        "nop\r\nadd 0x123, ER1\r\nbsr &0xdeadbeef, &0xdeadbeef\r\nmov &[ER1*0x12*ER2], &ER1";
-    let parser = AsmParser::new();
-    println!("{:?}", parser.parse_code(assembly));
-    return;
-
     let instructions = &[
         // Indicate that we want to make a seeded random number generator.
         Instruction::OutU8Imm(0x1, 0x0),
