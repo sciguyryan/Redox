@@ -1,4 +1,4 @@
-use std::{num::ParseIntError, str::FromStr};
+use std::{collections::HashMap, num::ParseIntError, str::FromStr};
 
 use itertools::Itertools;
 use redox_core::{
@@ -39,6 +39,9 @@ const U32_REGISTERS: [RegisterId; 18] = [
     RegisterId::ECS,
     RegisterId::EDS,
 ];
+
+/// A dummy label jump address used when handling a label.
+const DUMMY_LABEL_JUMP_ADDRESS: u128 = u32::MAX as u128;
 
 #[derive(Debug, Clone)]
 pub enum Argument {
@@ -88,17 +91,29 @@ macro_rules! get_inner_expr_arg {
 }
 
 pub struct AsmParser<'a> {
+    /// The instruction hints for the parser.
     hints: InstructionHints<'a>,
+
+    /// A vector of the parsed instructions.
+    pub parsed_instructions: Vec<Instruction>,
+
+    /// A vector containing any label hints that were encountered.
+    pub labeled_instructions: HashMap<usize, String>,
 }
 
 impl<'a> AsmParser<'a> {
     pub fn new() -> Self {
         Self {
             hints: InstructionHints::new(),
+            parsed_instructions: vec![],
+            labeled_instructions: HashMap::new(),
         }
     }
 
-    pub fn parse_code(&self, string: &str) -> Vec<Instruction> {
+    pub fn parse_code(&mut self, string: &str) {
+        // Clear the list of label instruction hints.
+        self.labeled_instructions = HashMap::with_capacity(string.lines().count());
+
         let mut instructions: Vec<Instruction> = vec![];
 
         // Split the string into lines.
@@ -109,6 +124,14 @@ impl<'a> AsmParser<'a> {
             }
 
             let raw_args = AsmParser::parse_instruction_line(line.trim_matches(' '));
+
+            // Are we dealing with a label marker. These are found at the start of a line
+            // and act as a target for branching instructions.
+            if raw_args.len() == 1 && raw_args[0].starts_with(':') {
+                let ins = Instruction::Label(raw_args[0].to_string());
+                instructions.push(ins);
+                continue;
+            }
 
             // The name should always be the first argument we've extracted, the arguments should follow.
             let name = raw_args[0].to_lowercase();
@@ -126,7 +149,7 @@ impl<'a> AsmParser<'a> {
                 .collect();
 
             // Do we have any arguments to process.
-            for raw_arg in &raw_args[1..] {
+            for (i, raw_arg) in raw_args[1..].iter().enumerate() {
                 let mut has_value_pushed = false;
                 let mut hints = vec![];
 
@@ -236,6 +259,21 @@ impl<'a> AsmParser<'a> {
                     }
                 }
 
+                // Are we dealing with a label? These are placeholders that will be replaced with an
+                // address at compile time. For now we'll use dummy values and keep track of the
+                // used labels for reference later.
+                if substring.starts_with(':') {
+                    self.labeled_instructions.insert(i, substring.to_string());
+
+                    // We want to insert a dummy 32-bit address argument for now.
+                    arguments.push(Argument::UnsignedInt(DUMMY_LABEL_JUMP_ADDRESS));
+
+                    // We also want to use an argument hint that will correspond with
+                    // the value we're substituting. Since we're working with a 32-bit
+                    // virtual machine the address size will always be a u32 integer.
+                    hints.push(ArgTypeHint::U32Pointer);
+                }
+
                 argument_hints.push(hints);
             }
 
@@ -278,7 +316,7 @@ impl<'a> AsmParser<'a> {
             instructions.push(ins);
         }
 
-        instructions
+        self.parsed_instructions = instructions;
     }
 
     /// Try to parse an expression.
@@ -796,7 +834,6 @@ impl<'a> AsmParser<'a> {
     pub fn parse_instruction_line(line: &str) -> Vec<String> {
         let mut segments = Vec::with_capacity(5);
 
-        let mut skip_to_end = false;
         let mut segment_end = false;
         let mut start_pos = 0;
         let mut end_pos = 0;
@@ -805,12 +842,8 @@ impl<'a> AsmParser<'a> {
         while let Some(c) = chars.next() {
             // What type of character are we dealing with?
             match c {
-                ' ' | ',' => {
+                ' ' | ',' | ';' => {
                     segment_end = true;
-                }
-                ';' => {
-                    segment_end = true;
-                    skip_to_end = true;
                 }
                 _ => {}
             }
@@ -835,7 +868,7 @@ impl<'a> AsmParser<'a> {
                 segment_end = false;
             }
 
-            if skip_to_end {
+            if c == ';' {
                 break;
             }
 
@@ -864,6 +897,8 @@ mod tests_asm_parsing {
     };
 
     use crate::asm_parser::AsmParser;
+
+    use super::DUMMY_LABEL_JUMP_ADDRESS;
 
     #[derive(Clone)]
     struct ParserTest {
@@ -911,10 +946,13 @@ mod tests_asm_parsing {
         ///
         /// * `id` - The ID of this test.
         pub fn run_test(&self, id: usize) {
-            let parser = AsmParser::new();
-
             // Attempt to execute the code.
-            let result = panic::catch_unwind(|| parser.parse_code(&self.input));
+            let result = panic::catch_unwind(|| {
+                let mut parser = AsmParser::new();
+                parser.parse_code(&self.input);
+
+                parser
+            });
 
             // Confirm whether the test panicked, and whether that panic was expected or not.
             let did_panic = result.is_err();
@@ -927,7 +965,10 @@ mod tests_asm_parsing {
 
             // We don't have a viable list to interrogate here.
             if !did_panic {
-                assert_eq!(result.unwrap(), self.expected_instructions);
+                assert_eq!(
+                    result.unwrap().parsed_instructions,
+                    self.expected_instructions
+                );
             }
         }
 
@@ -962,6 +1003,29 @@ mod tests_asm_parsing {
                 test.run_test(id);
             }
         }
+    }
+
+    #[test]
+    fn code_labels() {
+        let tests = [
+            ParserTest::new(
+                "nop\r\n:LABEL_1",
+                &[
+                    Instruction::Nop,
+                    Instruction::Label(String::from(":LABEL_1")),
+                ],
+                false,
+                "failed to correctly parse label instruction.",
+            ),
+            ParserTest::new(
+                "call :LABEL_1",
+                &[Instruction::CallU32Imm(DUMMY_LABEL_JUMP_ADDRESS as u32)],
+                false,
+                "failed to correctly parse instruction label.",
+            ),
+        ];
+
+        ParserTests::new(&tests).run_all();
     }
 
     #[test]
@@ -1144,8 +1208,6 @@ mod tests_asm_parsing {
             reg::registers::RegisterId::*,
         };
 
-        let asm_parser = AsmParser::new();
-
         let expr = Expression::try_from(&[Immediate(0x8), Operator(Add), Immediate(0x8)][..])
             .expect("")
             .pack();
@@ -1250,9 +1312,13 @@ mod tests_asm_parsing {
         let mut failed = false;
         for (i, ins) in instructions.iter().enumerate() {
             let ins_str = ins.to_string();
-            let parsed = panic::catch_unwind(|| asm_parser.parse_code(&ins_str));
-            if let Ok(p) = parsed {
-                let result = p.first().expect("");
+            let parser = panic::catch_unwind(|| {
+                let mut asm_parser = AsmParser::new();
+                asm_parser.parse_code(&ins_str);
+                asm_parser
+            });
+            if let Ok(p) = parser {
+                let result = p.parsed_instructions.first().expect("");
                 if result != ins {
                     println!("Test {i} failed! Original = {ins:?}, actual = {result:?}.");
                     failed = true;
