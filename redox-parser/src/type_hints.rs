@@ -1,5 +1,6 @@
 use redox_core::ins::op_codes::OpCode;
 
+#[allow(unused)]
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum ArgTypeHint {
     /// A f32 argument.
@@ -28,11 +29,17 @@ pub enum ArgTypeHint {
     ExpressionPointer,
 }
 
+/// The size of a f32 value, in bytes.
 const SIZE_OF_F32: usize = 4;
+/// The size of a f64 value, in bytes.
 const SIZE_OF_F64: usize = 8;
+/// The size of a u32 value, in bytes.
 const SIZE_OF_U32: usize = 4;
+/// The size of a u64 value, in bytes.
 const SIZE_OF_U64: usize = 8;
+/// The size of a u8 value, in bytes.
 const SIZE_OF_U8: usize = 1;
+/// The size of a register identifier, in bytes.
 const SIZE_OF_REGISTER_ID: usize = 1;
 
 #[derive(Debug, Clone)]

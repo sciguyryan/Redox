@@ -117,12 +117,7 @@ impl<'a> AsmParser<'a> {
         let mut instructions: Vec<Instruction> = vec![];
 
         // Split the string into lines.
-        for line in string.lines() {
-            // Skip comment lines.
-            if line.starts_with(';') {
-                continue;
-            }
-
+        for line in string.lines().filter(|l| !l.starts_with(';')) {
             let raw_args = AsmParser::parse_instruction_line(line.trim_matches(' '));
 
             // Are we dealing with a label marker?
@@ -152,15 +147,18 @@ impl<'a> AsmParser<'a> {
                 .cloned()
                 .collect();
 
+            assert!(
+                !shortlist.is_empty(),
+                "unable to find an instruction that matches the name."
+            );
+
             // Do we have any arguments to process.
-            for (i, raw_arg) in raw_args[1..].iter().enumerate() {
+            for (i, raw_arg) in raw_args.iter().enumerate().skip(1) {
                 let mut has_value_pushed = false;
                 let mut hints = vec![];
 
-                let first_char = raw_arg.chars().nth(0).unwrap();
-
                 // This will track whether the argument is a pointer.
-                let is_pointer = first_char == '&';
+                let is_pointer = raw_arg.chars().nth(0).unwrap() == '&';
 
                 // Skip past the address prefix identifier, if it exists.
                 let substring = if is_pointer { &raw_arg[1..] } else { raw_arg };
@@ -181,9 +179,9 @@ impl<'a> AsmParser<'a> {
                     }
 
                     hints.push(hint);
-                }
-
-                if let Some((arg, hint)) = AsmParser::try_parse_register_id(substring, is_pointer) {
+                } else if let Some((arg, hint)) =
+                    AsmParser::try_parse_register_id(substring, is_pointer)
+                {
                     // The argument could be a register identifier?
                     if !has_value_pushed {
                         arguments.push(arg);
@@ -257,7 +255,7 @@ impl<'a> AsmParser<'a> {
                     // but we failed to parse it as such. We can't go any further.
                     if !hints
                         .iter()
-                        .any(|h| *h == ArgTypeHint::F32 || *h == ArgTypeHint::F64)
+                        .any(|h| matches!(*h, ArgTypeHint::F32 | ArgTypeHint::F64))
                     {
                         panic!("Failed to parse floating-point value.");
                     }
@@ -267,9 +265,10 @@ impl<'a> AsmParser<'a> {
                 // address at compile time. For now we'll use dummy values and keep track of the
                 // used labels for reference later.
                 if substring.starts_with(':') {
-                    if substring.len() == 1 {
-                        panic!("invalid syntax - a label designator without a name!");
-                    }
+                    assert!(
+                        substring.len() > 1,
+                        "invalid syntax - a label designator without a name!"
+                    );
 
                     self.labeled_instructions.insert(i, substring.to_string());
 
@@ -291,33 +290,29 @@ impl<'a> AsmParser<'a> {
                 .multi_cartesian_product()
                 .collect_vec();
 
-            let mut final_options = vec![];
-            if !arguments.is_empty() {
-                for permutation in arg_permutations {
-                    for entry in &shortlist {
-                        if entry.args == permutation {
-                            final_options.push(entry);
-                        }
-                    }
-                }
+            let mut possible_matches: Vec<&InstructionLookup<'a>> = if !arguments.is_empty() {
+                shortlist
+                    .iter()
+                    .filter(|sl| arg_permutations.iter().any(|perm| sl.args == *perm))
+                    .collect()
             } else {
-                final_options = shortlist.iter().collect();
-            }
+                shortlist.iter().collect()
+            };
+
+            // We will want to select the match with the lowest total argument size.
+            possible_matches.sort_by_key(|a| a.total_argument_size());
 
             // Did we fail to find a match?
             // This can happen because a shortname isn't valid, or because the number or type
             // of arguments don't match.
             assert!(
-                !final_options.is_empty(),
+                !possible_matches.is_empty(),
                 "unable to find an instruction that matches the name and provided arguments."
             );
 
-            // We will want to select the match with the lowest total argument size.
-            final_options.sort_by_key(|a| a.total_argument_size());
-
             // Finally, the final match will be whatever entry has been sorted at the top
             // of our vector. The unwrap is safe since we know there is at least one.
-            let final_option = final_options.first().unwrap();
+            let final_option = possible_matches.first().unwrap();
 
             // Build our instruction and push it to the list.
             let ins = AsmParser::try_build_instruction(final_option.opcode, &arguments);
@@ -838,26 +833,33 @@ impl<'a> AsmParser<'a> {
     ///
     /// # Arguments
     ///
-    /// * `line` - A string giving the line to be parsed.
+    /// * `line` - A string slice giving the line to be parsed.
     pub fn parse_instruction_line(line: &str) -> Vec<String> {
         let mut segments = Vec::with_capacity(5);
 
+        let mut skip_to_end = false;
         let mut segment_end = false;
         let mut start_pos = 0;
         let mut end_pos = 0;
-        let mut chars = line.chars().peekable();
 
-        while let Some(c) = chars.next() {
+        let chars = line.chars().collect_vec();
+        let len = chars.len();
+
+        for (i, c) in chars.iter().enumerate() {
             // What type of character are we dealing with?
             match c {
-                ' ' | ',' | ';' => {
+                ' ' | ',' => {
+                    segment_end = true;
+                }
+                ';' => {
+                    skip_to_end = true;
                     segment_end = true;
                 }
                 _ => {}
             }
 
             // We always want to be sure to catch the last character.
-            if chars.peek().is_none() {
+            if i == len - 1 {
                 segment_end = true;
                 end_pos += 1;
             }
@@ -873,10 +875,12 @@ impl<'a> AsmParser<'a> {
                 // Skip over the current character to the next one.
                 start_pos = end_pos + 1;
 
+                // Start a new segment.
                 segment_end = false;
             }
 
-            if c == ';' {
+            // If we have encountered a comment then we want to skip everything on the rest of this line.
+            if skip_to_end {
                 break;
             }
 
@@ -926,7 +930,7 @@ mod tests_asm_parsing {
         /// # Arguments
         ///
         /// * `input` - The input string to be tested.
-        /// * `parsed_instructions` - A slice of [`Instruction`]s that should result from the parsing.
+        /// * `expected_instructions` - A slice of [`Instruction`]s that should result from the parsing.
         /// * `should_panic` - A boolean indicating whether the test should panic or not.
         /// * `fail_message` - A string slice that provides the message to be displayed if the test fails.
         ///
