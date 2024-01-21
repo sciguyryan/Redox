@@ -125,9 +125,9 @@ impl<'a> AsmParser<'a> {
 
             let raw_args = AsmParser::parse_instruction_line(line.trim_matches(' '));
 
-            // Are we dealing with a label marker. These are found at the start of a line
-            // and act as a target for branching instructions.
-            if raw_args.len() == 1 && raw_args[0].starts_with(':') {
+            // Are we dealing with a label marker?
+            // These are found at the start of a line and act as a target for branching instructions.
+            if raw_args[0].starts_with(':') {
                 let ins = Instruction::Label(raw_args[0].to_string());
                 instructions.push(ins);
                 continue;
@@ -1006,7 +1006,7 @@ mod tests_asm_parsing {
     }
 
     #[test]
-    fn code_labels() {
+    fn code_parser_labels() {
         let tests = [
             ParserTest::new(
                 "nop\r\n:LABEL_1",
@@ -1022,6 +1022,12 @@ mod tests_asm_parsing {
                 &[Instruction::CallU32Imm(DUMMY_LABEL_JUMP_ADDRESS as u32)],
                 false,
                 "failed to correctly parse instruction label.",
+            ),
+            ParserTest::new(
+                ":LABEL_1 EVERYTHING HERE SHOULD BE IGNORED",
+                &[Instruction::Label(String::from(":LABEL_1"))],
+                false,
+                "failed to correctly parse label instruction.",
             ),
         ];
 

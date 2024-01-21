@@ -67,7 +67,7 @@ fn main() {
         panic!("currently unsupported");
     }
 
-    let code = "call :LABEL";
+    let code = ":LABEL_1 EVERYTHING HERE SHOULD BE IGNORED";
 
     let mut parser = AsmParser::new();
     parser.parse_code(code);
