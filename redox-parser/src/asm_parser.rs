@@ -796,16 +796,21 @@ impl<'a> AsmParser<'a> {
     pub fn parse_instruction_line(line: &str) -> Vec<String> {
         let mut segments = Vec::with_capacity(5);
 
+        let mut skip_to_end = false;
         let mut segment_end = false;
         let mut start_pos = 0;
         let mut end_pos = 0;
-
         let mut chars = line.chars().peekable();
+
         while let Some(c) = chars.next() {
             // What type of character are we dealing with?
             match c {
                 ' ' | ',' => {
                     segment_end = true;
+                }
+                ';' => {
+                    segment_end = true;
+                    skip_to_end = true;
                 }
                 _ => {}
             }
@@ -828,6 +833,10 @@ impl<'a> AsmParser<'a> {
                 start_pos = end_pos + 1;
 
                 segment_end = false;
+            }
+
+            if skip_to_end {
+                break;
             }
 
             end_pos += 1;
@@ -953,6 +962,32 @@ mod tests_asm_parsing {
                 test.run_test(id);
             }
         }
+    }
+
+    #[test]
+    fn code_parser_comments() {
+        let tests = [
+            ParserTest::new(
+                "call &0xdeadbeef ; this comment should be ignored.",
+                &[Instruction::CallU32Imm(0xdeadbeef)],
+                false,
+                "failed to correctly parse instruction and comment.",
+            ),
+            ParserTest::new(
+                "nop\r\n;this should be ignored\r\nnop",
+                &[Instruction::Nop, Instruction::Nop],
+                false,
+                "failed to correctly parse instruction and comment.",
+            ),
+            ParserTest::new(
+                "nop\r\n;nop\r\nnop",
+                &[Instruction::Nop, Instruction::Nop],
+                false,
+                "failed to correctly parse instruction and comment.",
+            ),
+        ];
+
+        ParserTests::new(&tests).run_all();
     }
 
     /// Instruction parsing tests - all invalid.
