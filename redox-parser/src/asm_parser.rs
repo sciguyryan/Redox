@@ -128,6 +128,10 @@ impl<'a> AsmParser<'a> {
             // Are we dealing with a label marker?
             // These are found at the start of a line and act as a target for branching instructions.
             if raw_args[0].starts_with(':') {
+                if raw_args[0].len() == 1 {
+                    panic!("invalid syntax - a label designator without a name!");
+                }
+
                 let ins = Instruction::Label(raw_args[0].to_string());
                 instructions.push(ins);
                 continue;
@@ -263,6 +267,10 @@ impl<'a> AsmParser<'a> {
                 // address at compile time. For now we'll use dummy values and keep track of the
                 // used labels for reference later.
                 if substring.starts_with(':') {
+                    if substring.len() == 1 {
+                        panic!("invalid syntax - a label designator without a name!");
+                    }
+
                     self.labeled_instructions.insert(i, substring.to_string());
 
                     // We want to insert a dummy 32-bit address argument for now.
@@ -1029,6 +1037,8 @@ mod tests_asm_parsing {
                 false,
                 "failed to correctly parse label instruction.",
             ),
+            ParserTest::new(":", &[], true, "succeeded in parsing an empty label."),
+            ParserTest::new("call :", &[], true, "succeeded in parsing an empty label."),
         ];
 
         ParserTests::new(&tests).run_all();
