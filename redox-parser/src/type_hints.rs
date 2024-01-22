@@ -112,12 +112,8 @@ impl<'a> InstructionHints<'a> {
                     [RegisterU32, RegisterU32],
                     OpCode::SubU32RegU32Reg
                 ),
-                gen_hint!(vec!["mul"], [U32, RegisterU32], OpCode::MulU32ImmU32Reg),
-                gen_hint!(
-                    vec!["mul"],
-                    [RegisterU32, RegisterU32],
-                    OpCode::MulU32RegU32Reg
-                ),
+                gen_hint!(vec!["mul"], [U32], OpCode::MulU32Imm),
+                gen_hint!(vec!["mul"], [RegisterU32], OpCode::MulU32Reg),
                 gen_hint!(vec!["div"], [U32, RegisterU32], OpCode::DivU32ImmU32Reg),
                 gen_hint!(vec!["div"], [RegisterU32, U32], OpCode::DivU32RegU32Imm),
                 gen_hint!(

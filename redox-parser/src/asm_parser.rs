@@ -505,14 +505,8 @@ impl<'a> AsmParser<'a> {
                 get_inner_arg!(args[0], RegisterU32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
-            MulU32ImmU32Reg => Instruction::MulU32ImmU32Reg(
-                get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
-                get_inner_arg!(args[1], RegisterU32),
-            ),
-            MulU32RegU32Reg => Instruction::MulU32RegU32Reg(
-                get_inner_arg!(args[0], RegisterU32),
-                get_inner_arg!(args[1], RegisterU32),
-            ),
+            MulU32Imm => Instruction::MulU32Imm(get_inner_arg_and_cast!(args[0], UnsignedInt, u32)),
+            MulU32Reg => Instruction::MulU32Reg(get_inner_arg!(args[0], RegisterU32)),
             DivU32ImmU32Reg => Instruction::DivU32ImmU32Reg(
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
                 get_inner_arg!(args[1], RegisterU32),
@@ -1247,8 +1241,8 @@ mod tests_asm_parsing {
                 SubU32ImmU32Reg => Instruction::SubU32ImmU32Reg(0x123, ER2),
                 SubU32RegU32Imm => Instruction::SubU32RegU32Imm(ER2, 0x123),
                 SubU32RegU32Reg => Instruction::SubU32RegU32Reg(ER2, ER3),
-                MulU32ImmU32Reg => Instruction::MulU32ImmU32Reg(0x123, ER2),
-                MulU32RegU32Reg => Instruction::MulU32RegU32Reg(ER2, ER3),
+                MulU32Imm => Instruction::MulU32Imm(0x123),
+                MulU32Reg => Instruction::MulU32Reg(ER2),
                 DivU32ImmU32Reg => Instruction::DivU32ImmU32Reg(0x123, ER2),
                 DivU32RegU32Imm => Instruction::DivU32RegU32Imm(ER2, 0x123),
                 DivU32RegU32Reg => Instruction::DivU32RegU32Reg(ER2, ER3),

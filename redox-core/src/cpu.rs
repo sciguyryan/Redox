@@ -865,18 +865,18 @@ impl Cpu {
 
                 self.set_u32_accumulator(new_value);
             }
-            MulU32ImmU32Reg(imm, reg) => {
-                let old_value = self.registers.read_reg_u32(reg, privilege);
+            MulU32Imm(imm) => {
+                let old_value = self.registers.read_reg_u32(&RegisterId::ER1, privilege);
                 let new_value = self.perform_checked_mul_u32(old_value, *imm);
 
-                self.set_u32_accumulator(new_value);
+                self.write_reg_u32(&RegisterId::ER1, new_value, privilege);
             }
-            MulU32RegU32Reg(reg_1, reg_2) => {
-                let reg_1_val = self.registers.read_reg_u32(reg_1, privilege);
-                let reg_2_val = self.registers.read_reg_u32(reg_2, privilege);
-                let new_value = self.perform_checked_mul_u32(reg_1_val, reg_2_val);
+            MulU32Reg(reg) => {
+                let er1_val = self.registers.read_reg_u32(&RegisterId::ER1, privilege);
+                let other_reg_val = self.registers.read_reg_u32(reg, privilege);
+                let new_value = self.perform_checked_mul_u32(er1_val, other_reg_val);
 
-                self.set_u32_accumulator(new_value);
+                self.write_reg_u32(&RegisterId::ER1, new_value, privilege);
             }
             DivU32ImmU32Reg(divisor, reg) => {
                 if *divisor == 0 {
@@ -3153,28 +3153,21 @@ mod tests_cpu {
         CpuTests::new(&tests).run_all();
     }
 
-    /// Test the multiply u32 immediate by a u32 register instruction.
+    /// Test the multiplication of the value of the ER1 register by a u32 immediate instruction.
     #[test]
     fn test_mul_u32_imm_u32_reg() {
         let tests = [
             TestU32::new(
-                &[
-                    MovU32ImmU32Reg(0x1, RegisterId::ER1),
-                    MulU32ImmU32Reg(0x2, RegisterId::ER1),
-                ],
-                &[(RegisterId::ER1, 0x1), (RegisterId::EAC, 0x2)],
+                &[MovU32ImmU32Reg(0x1, RegisterId::ER1), MulU32Imm(0x2)],
+                &[(RegisterId::ER1, 0x2)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MUL - incorrect result value produced",
             ),
             TestU32::new(
+                &[MovU32ImmU32Reg(u32::MAX, RegisterId::ER1), MulU32Imm(0x2)],
                 &[
-                    MovU32ImmU32Reg(u32::MAX, RegisterId::ER1),
-                    MulU32ImmU32Reg(0x2, RegisterId::ER1),
-                ],
-                &[
-                    (RegisterId::ER1, u32::MAX),
-                    (RegisterId::EAC, 4294967294),
+                    (RegisterId::ER1, 4294967294),
                     (
                         RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::CF]),
@@ -3189,7 +3182,7 @@ mod tests_cpu {
         CpuTests::new(&tests).run_all();
     }
 
-    /// Test the multiply u32 immediate by a u32 register instruction.
+    /// Test the multiplication of the value of the ER1 register by a u32 register instruction.
     #[test]
     fn test_mul_u32_reg_u32_reg() {
         let tests = [
@@ -3197,13 +3190,9 @@ mod tests_cpu {
                 &[
                     MovU32ImmU32Reg(0x1, RegisterId::ER1),
                     MovU32ImmU32Reg(0x2, RegisterId::ER2),
-                    MulU32RegU32Reg(RegisterId::ER1, RegisterId::ER2),
+                    MulU32Reg(RegisterId::ER2),
                 ],
-                &[
-                    (RegisterId::ER1, 0x1),
-                    (RegisterId::ER2, 0x2),
-                    (RegisterId::EAC, 0x2),
-                ],
+                &[(RegisterId::ER1, 0x2), (RegisterId::ER2, 0x2)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MUL - incorrect result value produced",
@@ -3212,12 +3201,11 @@ mod tests_cpu {
                 &[
                     MovU32ImmU32Reg(u32::MAX, RegisterId::ER1),
                     MovU32ImmU32Reg(0x2, RegisterId::ER2),
-                    MulU32RegU32Reg(RegisterId::ER1, RegisterId::ER2),
+                    MulU32Reg(RegisterId::ER2),
                 ],
                 &[
-                    (RegisterId::ER1, u32::MAX),
+                    (RegisterId::ER1, 4294967294),
                     (RegisterId::ER2, 0x2),
-                    (RegisterId::EAC, 4294967294),
                     (
                         RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::CF]),
