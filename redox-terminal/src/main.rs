@@ -67,12 +67,13 @@ fn main() {
         panic!("currently unsupported");
     }
 
-    let code = ":LABEL_1 EVERYTHING HERE SHOULD BE IGNORED";
+    let code = "call :LABEL_1";
 
     let mut parser = AsmParser::new();
     parser.parse_code(code);
 
     println!("parsed = {:?}", parser.parsed_instructions);
+    println!("labels = {:?}", parser.labeled_instructions);
     return;
 
     let instructions = &[

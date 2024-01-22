@@ -98,7 +98,7 @@ pub struct AsmParser<'a> {
     pub parsed_instructions: Vec<Instruction>,
 
     /// A vector containing any label hints that were encountered.
-    pub labeled_instructions: HashMap<usize, String>,
+    pub labeled_instructions: HashMap<usize, (usize, String)>,
 }
 
 impl<'a> AsmParser<'a> {
@@ -270,7 +270,9 @@ impl<'a> AsmParser<'a> {
                         "invalid syntax - a label designator without a name!"
                     );
 
-                    self.labeled_instructions.insert(i, substring.to_string());
+                    // Hold the argument index and the label string for later processing.
+                    self.labeled_instructions
+                        .insert(i, (arguments.len(), substring.to_string()));
 
                     // We want to insert a dummy 32-bit address argument for now.
                     arguments.push(Argument::UnsignedInt(DUMMY_LABEL_JUMP_ADDRESS));
