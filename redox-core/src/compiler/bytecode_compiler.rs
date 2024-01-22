@@ -54,7 +54,6 @@ impl Compiler {
             | Instruction::BitScanReverseU32MemU32Reg(imm, reg)
             | Instruction::BitScanForwardU32MemU32Reg(imm, reg)
             | Instruction::SubU32ImmU32Reg(imm, reg)
-            | Instruction::DivU32ImmU32Reg(imm, reg)
             | Instruction::ModU32ImmU32Reg(imm, reg)
             | Instruction::AndU32ImmU32Reg(imm, reg) => {
                 self.write_u32(imm);
@@ -73,7 +72,6 @@ impl Compiler {
             | Instruction::BitScanReverseU32RegU32Reg(reg_1, reg_2)
             | Instruction::BitScanForwardU32RegU32Reg(reg_1, reg_2)
             | Instruction::SubU32RegU32Reg(reg_1, reg_2)
-            | Instruction::DivU32RegU32Reg(reg_1, reg_2)
             | Instruction::ModU32RegU32Reg(reg_1, reg_2) => {
                 self.write_register_id(&reg_1);
                 self.write_register_id(&reg_2);
@@ -94,7 +92,6 @@ impl Compiler {
             | Instruction::BitScanReverseU32RegMemU32(reg, imm)
             | Instruction::BitScanForwardU32RegMemU32(reg, imm)
             | Instruction::SubU32RegU32Imm(reg, imm)
-            | Instruction::DivU32RegU32Imm(reg, imm)
             | Instruction::ModU32RegU32Imm(reg, imm) => {
                 self.write_register_id(&reg);
                 self.write_u32(imm);
@@ -102,6 +99,7 @@ impl Compiler {
 
             /******** [u32 immediate] ********/
             Instruction::MulU32Imm(imm)
+            | Instruction::DivU32Imm(imm)
             | Instruction::PushU32Imm(imm)
             | Instruction::CallU32Imm(imm)
             | Instruction::JumpAbsU32Imm(imm)
@@ -130,8 +128,9 @@ impl Compiler {
             }
 
             /******** [u32 register] ********/
-            Instruction::MulU32Reg(reg)
-            | Instruction::ByteSwapU32(reg)
+            Instruction::ByteSwapU32(reg)
+            | Instruction::MulU32Reg(reg)
+            | Instruction::DivU32Reg(reg)
             | Instruction::IncU32Reg(reg)
             | Instruction::DecU32Reg(reg)
             | Instruction::JumpAbsU32Reg(reg)
@@ -322,9 +321,8 @@ mod tests_compiler {
                 SubU32RegU32Reg => Instruction::SubU32RegU32Reg(ER2, ER3),
                 MulU32Imm => Instruction::MulU32Imm(0x123),
                 MulU32Reg => Instruction::MulU32Reg(ER2),
-                DivU32ImmU32Reg => Instruction::DivU32ImmU32Reg(0x123, ER2),
-                DivU32RegU32Imm => Instruction::DivU32RegU32Imm(ER2, 0x123),
-                DivU32RegU32Reg => Instruction::DivU32RegU32Reg(ER2, ER3),
+                DivU32Imm => Instruction::DivU32Imm(0x123),
+                DivU32Reg => Instruction::DivU32Reg(ER2),
                 ModU32ImmU32Reg => Instruction::ModU32ImmU32Reg(0x123, ER2),
                 ModU32RegU32Imm => Instruction::ModU32RegU32Imm(ER2, 0x123),
                 ModU32RegU32Reg => Instruction::ModU32RegU32Reg(ER2, ER3),

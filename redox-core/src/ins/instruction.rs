@@ -37,16 +37,14 @@ pub enum Instruction {
     SubU32RegU32Imm(RegisterId, u32),
     /// Subtract a u32 register (A) from a u32 register (B). The result is stored in the accumulator register.
     SubU32RegU32Reg(RegisterId, RegisterId),
-    /// Unsigned multiplication of the register ER1 a u32 immediate. The result is stored in the register ER1.
+    /// Unsigned multiplication of the register ER1 by a u32 immediate. The result is stored in the register ER1.
     MulU32Imm(u32),
     /// Unsigned multiplication of the register ER1 by a u32 register. The result is stored in the register ER1.
     MulU32Reg(RegisterId),
-    /// Unsigned division of a u32 register by a u32 immediate. The result is stored in the accumulator register.
-    DivU32ImmU32Reg(u32, RegisterId),
-    /// Unsigned division of u32 immediate by a u32 register. The result is stored in the accumulator register.
-    DivU32RegU32Imm(RegisterId, u32),
-    /// Unsigned division of u32 register (B) by a u32 register (A). The result is stored in the accumulator register.
-    DivU32RegU32Reg(RegisterId, RegisterId),
+    /// Unsigned division of the register ER1 by a u32 immediate. The result is stored in the register ER1.
+    DivU32Imm(u32),
+    /// Unsigned division of the register ER1 by a u32 register. The result is stored in the register ER1.
+    DivU32Reg(RegisterId),
     /// Calculate the modulo of a u32 register by a u32 immediate. The result is stored in the accumulator register.
     ModU32ImmU32Reg(u32, RegisterId),
     /// Calculate the modulo of a u32 immediate by a u32 register. The result is stored in the accumulator register.
@@ -257,14 +255,11 @@ impl Display for Instruction {
             MulU32Reg(reg) => {
                 format!("mul {reg}")
             }
-            DivU32ImmU32Reg(imm, reg) => {
-                format!("div 0x{imm:08x}, {reg}")
+            DivU32Imm(imm) => {
+                format!("div 0x{imm:08x}")
             }
-            DivU32RegU32Imm(reg, imm) => {
-                format!("div {reg}, 0x{imm:08x}")
-            }
-            DivU32RegU32Reg(reg_1, reg_2) => {
-                format!("div {reg_1}, {reg_2}")
+            DivU32Reg(reg) => {
+                format!("div {reg}")
             }
             ModU32ImmU32Reg(imm, reg) => {
                 format!("mod 0x{imm:08x}, {reg}")
@@ -535,9 +530,8 @@ impl Instruction {
             SubU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
             MulU32Imm => ARG_U32_IMM_SIZE,
             MulU32Reg => ARG_REG_ID_SIZE,
-            DivU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
-            DivU32RegU32Imm => ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE,
-            DivU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
+            DivU32Imm => ARG_U32_IMM_SIZE,
+            DivU32Reg => ARG_REG_ID_SIZE,
             ModU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
             ModU32RegU32Imm => ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE,
             ModU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,

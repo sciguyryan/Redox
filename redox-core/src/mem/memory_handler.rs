@@ -378,23 +378,15 @@ impl MemoryHandler {
 
                 Instruction::MulU32Reg(reg)
             }
-            DivU32ImmU32Reg => {
-                let imm = Self::read_u32(arg_bytes, &mut cursor);
-                let reg = Self::read_register_id(arg_bytes, &mut cursor);
-
-                Instruction::DivU32ImmU32Reg(imm, reg)
-            }
-            DivU32RegU32Imm => {
-                let reg = Self::read_register_id(arg_bytes, &mut cursor);
+            DivU32Imm => {
                 let imm = Self::read_u32(arg_bytes, &mut cursor);
 
-                Instruction::DivU32RegU32Imm(reg, imm)
+                Instruction::DivU32Imm(imm)
             }
-            DivU32RegU32Reg => {
-                let reg_1 = Self::read_register_id(arg_bytes, &mut cursor);
-                let reg_2 = Self::read_register_id(arg_bytes, &mut cursor);
+            DivU32Reg => {
+                let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::DivU32RegU32Reg(reg_1, reg_2)
+                Instruction::DivU32Reg(reg)
             }
             ModU32ImmU32Reg => {
                 let imm = Self::read_u32(arg_bytes, &mut cursor);

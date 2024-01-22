@@ -878,39 +878,28 @@ impl Cpu {
 
                 self.write_reg_u32(&RegisterId::ER1, new_value, privilege);
             }
-            DivU32ImmU32Reg(divisor, reg) => {
-                if *divisor == 0 {
+            DivU32Imm(divisor_imm) => {
+                if *divisor_imm == 0 {
                     self.handle_interrupt(DIVIDE_BY_ZERO_INT, &mut com_bus.mem);
                     return;
                 }
 
-                let old_value = self.registers.read_reg_u32(reg, privilege);
-                let new_value = self.perform_checked_div_u32(old_value, *divisor);
+                let old_value = self.registers.read_reg_u32(&RegisterId::ER1, privilege);
+                let new_value = self.perform_checked_div_u32(old_value, *divisor_imm);
 
-                self.set_u32_accumulator(new_value);
+                self.write_reg_u32(&RegisterId::ER1, new_value, privilege);
             }
-            DivU32RegU32Imm(divisor_reg, imm) => {
+            DivU32Reg(divisor_reg) => {
                 let divisor = self.registers.read_reg_u32(divisor_reg, privilege);
                 if divisor == 0 {
                     self.handle_interrupt(DIVIDE_BY_ZERO_INT, &mut com_bus.mem);
                     return;
                 }
 
-                let new_value = self.perform_checked_div_u32(*imm, divisor);
-
-                self.set_u32_accumulator(new_value);
-            }
-            DivU32RegU32Reg(divisor_reg, reg) => {
-                let divisor = self.registers.read_reg_u32(divisor_reg, privilege);
-                if divisor == 0 {
-                    self.handle_interrupt(DIVIDE_BY_ZERO_INT, &mut com_bus.mem);
-                    return;
-                }
-
-                let old_value = self.registers.read_reg_u32(reg, privilege);
+                let old_value = self.registers.read_reg_u32(&RegisterId::ER1, privilege);
                 let new_value = self.perform_checked_div_u32(old_value, divisor);
 
-                self.set_u32_accumulator(new_value);
+                self.write_reg_u32(&RegisterId::ER1, new_value, privilege);
             }
             ModU32ImmU32Reg(imm, reg) => {
                 let divisor = self.registers.read_reg_u32(reg, privilege);
@@ -3220,26 +3209,20 @@ mod tests_cpu {
         CpuTests::new(&tests).run_all();
     }
 
-    /// Test the division of a u32 register by a u32 immediate instruction.
+    /// Test the division of the value of the ER1 register by a u32 register instruction.
     #[test]
-    fn test_div_u32_imm_u32_reg() {
+    fn test_div_u32_imm() {
         let tests = [
             TestU32::new(
-                &[
-                    MovU32ImmU32Reg(0x2, RegisterId::ER1),
-                    DivU32ImmU32Reg(0x1, RegisterId::ER1),
-                ],
-                &[(RegisterId::ER1, 0x2), (RegisterId::EAC, 0x2)],
+                &[MovU32ImmU32Reg(0x2, RegisterId::ER1), DivU32Imm(0x1)],
+                &[(RegisterId::ER1, 0x2)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "DIV - incorrect result value produced",
             ),
             TestU32::new(
-                &[
-                    MovU32ImmU32Reg(u32::MAX, RegisterId::ER1),
-                    DivU32ImmU32Reg(0x2, RegisterId::ER1),
-                ],
-                &[(RegisterId::ER1, u32::MAX), (RegisterId::EAC, 2147483647)],
+                &[MovU32ImmU32Reg(u32::MAX, RegisterId::ER1), DivU32Imm(0x2)],
+                &[(RegisterId::ER1, 2147483647)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "DIV - CPU flags not correctly set",
@@ -3250,7 +3233,7 @@ mod tests_cpu {
 
         // Additional division by zero exception tests.
         let div_zero_tests = [TestU32::new(
-            &[DivU32ImmU32Reg(0x0, RegisterId::ER1)],
+            &[DivU32Imm(0x0)],
             &[],
             DEFAULT_U32_STACK_CAPACITY,
             false,
@@ -3275,76 +3258,17 @@ mod tests_cpu {
         });
     }
 
-    /// Test the division of a u32 immediate by a u32 register instruction.
+    /// Test the division of the value of the ER1 register by a u32 register instruction.
     #[test]
-    fn test_div_u32_reg_u32_imm() {
-        let tests = [
-            TestU32::new(
-                &[
-                    MovU32ImmU32Reg(0x1, RegisterId::ER1),
-                    DivU32RegU32Imm(RegisterId::ER1, 0x2),
-                ],
-                &[(RegisterId::ER1, 0x1), (RegisterId::EAC, 0x2)],
-                DEFAULT_U32_STACK_CAPACITY,
-                false,
-                "DIV - incorrect result value produced",
-            ),
-            TestU32::new(
-                &[
-                    MovU32ImmU32Reg(0x2, RegisterId::ER1),
-                    DivU32RegU32Imm(RegisterId::ER1, u32::MAX),
-                ],
-                &[(RegisterId::ER1, 0x2), (RegisterId::EAC, 2147483647)],
-                DEFAULT_U32_STACK_CAPACITY,
-                false,
-                "DIV - CPU flags not correctly set",
-            ),
-        ];
-
-        CpuTests::new(&tests).run_all();
-
-        // Additional division by zero exception tests.
-        let div_zero_tests = [TestU32::new(
-            &[DivU32RegU32Imm(RegisterId::ER1, 0x0)],
-            &[],
-            DEFAULT_U32_STACK_CAPACITY,
-            false,
-            "DIV - failed to panic when attempting to divide by zero",
-        )];
-
-        CpuTests::new(&div_zero_tests).run_all_special(|id: usize, vm: Option<VirtualMachine>| {
-            if let Some(v) = vm {
-                assert!(
-                    v.cpu.is_in_interrupt_handler,
-                    "Test {id} Failed - machine is not in an interrupt handler!"
-                );
-                assert_eq!(
-                    v.cpu.last_interrupt_code,
-                    Some(DIVIDE_BY_ZERO_INT),
-                    "Test {id} Failed - incorrect interrupt handler code!"
-                );
-            } else {
-                // We can't do anything here. The test asserted and so we didn't
-                // yield a valid virtual machine instance to interrogate.
-            }
-        });
-    }
-
-    /// Test the division of a u32 register by a u32 register instruction.
-    #[test]
-    fn test_div_u32_reg_u32_reg() {
+    fn test_div_u32_reg() {
         let tests = [
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0x2, RegisterId::ER1),
                     MovU32ImmU32Reg(0x1, RegisterId::ER2),
-                    DivU32RegU32Reg(RegisterId::ER2, RegisterId::ER1),
+                    DivU32Reg(RegisterId::ER2),
                 ],
-                &[
-                    (RegisterId::ER1, 0x2),
-                    (RegisterId::ER2, 0x1),
-                    (RegisterId::EAC, 0x2),
-                ],
+                &[(RegisterId::ER1, 0x2), (RegisterId::ER2, 0x1)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "DIV - incorrect result value produced",
@@ -3353,13 +3277,9 @@ mod tests_cpu {
                 &[
                     MovU32ImmU32Reg(u32::MAX, RegisterId::ER1),
                     MovU32ImmU32Reg(0x2, RegisterId::ER2),
-                    DivU32RegU32Reg(RegisterId::ER2, RegisterId::ER1),
+                    DivU32Reg(RegisterId::ER2),
                 ],
-                &[
-                    (RegisterId::ER1, u32::MAX),
-                    (RegisterId::ER2, 0x2),
-                    (RegisterId::EAC, 2147483647),
-                ],
+                &[(RegisterId::ER1, 2147483647), (RegisterId::ER2, 0x2)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "DIV - CPU flags not correctly set",
@@ -3370,10 +3290,7 @@ mod tests_cpu {
 
         // Additional division by zero exception tests.
         let div_zero_tests = [TestU32::new(
-            &[
-                MovU32ImmU32Reg(0x1, RegisterId::ER1),
-                DivU32RegU32Reg(RegisterId::ER2, RegisterId::ER1),
-            ],
+            &[DivU32Reg(RegisterId::ER2)],
             &[],
             DEFAULT_U32_STACK_CAPACITY,
             false,
