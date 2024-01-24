@@ -3,6 +3,9 @@ use std::fmt::Display;
 
 use crate::reg::registers::RegisterId;
 
+use ExpressionArgs as EA;
+use ExpressionOperator as EO;
+
 const OPERATOR_1_SHIFT: u32 = 4;
 const OPERATOR_2_SHIFT: u32 = 6;
 const VALUE_1_SHIFT: u32 = 8;
@@ -38,11 +41,11 @@ impl Expression {
     pub fn new() -> Self {
         Self {
             is_extended: false,
-            operator_1: ExpressionArgs::Operator(ExpressionOperator::default()),
-            operator_2: ExpressionArgs::Operator(ExpressionOperator::default()),
-            operand_1: ExpressionArgs::Immediate(0),
-            operand_2: ExpressionArgs::Immediate(0),
-            operand_3: ExpressionArgs::Immediate(0),
+            operator_1: EA::Operator(EO::default()),
+            operator_2: EA::Operator(EO::default()),
+            operand_1: EA::Immediate(0),
+            operand_2: EA::Immediate(0),
+            operand_3: EA::Immediate(0),
         }
     }
 
@@ -75,7 +78,7 @@ impl Expression {
     /// A u32 that is the calculated result of the expression.
     pub fn evaluate(&self, value_1: u32, value_2: u32, value_3: u32) -> u32 {
         let op_1 = match self.operator_1 {
-            ExpressionArgs::Operator(op) => op,
+            EA::Operator(op) => op,
             _ => panic!(),
         };
 
@@ -83,42 +86,42 @@ impl Expression {
         // as the arguments can always be evaluated left-to-right.
         if !self.is_extended {
             return match op_1 {
-                ExpressionOperator::Add => value_1 + value_2,
-                ExpressionOperator::Subtract => value_1 - value_2,
-                ExpressionOperator::Multiply => value_1 * value_2,
+                EO::Add => value_1 + value_2,
+                EO::Subtract => value_1 - value_2,
+                EO::Multiply => value_1 * value_2,
             };
         }
 
         let op_2 = match self.operator_2 {
-            ExpressionArgs::Operator(op) => op,
+            EA::Operator(op) => op,
             _ => panic!(),
         };
 
         // In this case we need to pay attention to the ordering precedence of the
         // arguments, specifically this depends on the priority of the operators.
-        if matches!(op_2, ExpressionOperator::Multiply) {
+        if matches!(op_2, EO::Multiply) {
             // We need to calculate the second set of arguments first.
             let temp = value_2 * value_3;
 
             // Now we can finish the calculation.
             return match op_1 {
-                ExpressionOperator::Add => value_1 + temp,
-                ExpressionOperator::Subtract => value_1 - temp,
-                ExpressionOperator::Multiply => value_1 * temp,
+                EO::Add => value_1 + temp,
+                EO::Subtract => value_1 - temp,
+                EO::Multiply => value_1 * temp,
             };
         }
 
         // We need to calculate the first set of arguments first.
         let temp = match op_1 {
-            ExpressionOperator::Add => value_1 + value_2,
-            ExpressionOperator::Subtract => value_1 - value_2,
-            ExpressionOperator::Multiply => value_1 * value_2,
+            EO::Add => value_1 + value_2,
+            EO::Subtract => value_1 - value_2,
+            EO::Multiply => value_1 * value_2,
         };
 
         match op_2 {
-            ExpressionOperator::Add => temp + value_3,
-            ExpressionOperator::Subtract => temp - value_3,
-            ExpressionOperator::Multiply => temp * value_3,
+            EO::Add => temp + value_3,
+            EO::Subtract => temp - value_3,
+            EO::Multiply => temp * value_3,
         }
     }
 
@@ -137,13 +140,13 @@ impl Expression {
         if self.is_extended {
             packed |= IS_EXTENDED_MASK;
         }
-        if matches!(self.operand_1, ExpressionArgs::Immediate(_)) {
+        if matches!(self.operand_1, EA::Immediate(_)) {
             packed |= IS_VALUE_1_IMM_MASK;
         }
-        if matches!(self.operand_2, ExpressionArgs::Immediate(_)) {
+        if matches!(self.operand_2, EA::Immediate(_)) {
             packed |= IS_VALUE_2_IMM_MASK;
         }
-        if matches!(self.operand_3, ExpressionArgs::Immediate(_)) {
+        if matches!(self.operand_3, EA::Immediate(_)) {
             packed |= IS_VALUE_3_IMM_MASK;
         }
 
@@ -171,32 +174,32 @@ impl Expression {
         let is_argument_2_immediate = (packed & IS_VALUE_2_IMM_MASK) != 0;
         let is_argument_3_immediate = (packed & IS_VALUE_3_IMM_MASK) != 0;
 
-        self.operator_1 = ExpressionArgs::Operator(ExpressionOperator::from(
+        self.operator_1 = EA::Operator(EO::from(
             ((packed >> OPERATOR_1_SHIFT) & OPERATOR_MASK) as u8,
         ));
-        self.operator_2 = ExpressionArgs::Operator(ExpressionOperator::from(
+        self.operator_2 = EA::Operator(EO::from(
             ((packed >> OPERATOR_2_SHIFT) & OPERATOR_MASK) as u8,
         ));
 
         let value_1 = (packed >> VALUE_1_SHIFT) & VALUE_MASK;
         self.operand_1 = if is_argument_1_immediate {
-            ExpressionArgs::Immediate(value_1 as u8)
+            EA::Immediate(value_1 as u8)
         } else {
-            ExpressionArgs::Register(RegisterId::from(value_1 as u8))
+            EA::Register(RegisterId::from(value_1 as u8))
         };
 
         let value_2 = (packed >> VALUE_2_SHIFT) & VALUE_MASK;
         self.operand_2 = if is_argument_2_immediate {
-            ExpressionArgs::Immediate(value_2 as u8)
+            EA::Immediate(value_2 as u8)
         } else {
-            ExpressionArgs::Register(RegisterId::from(value_2 as u8))
+            EA::Register(RegisterId::from(value_2 as u8))
         };
 
         let value_3 = (packed >> VALUE_3_SHIFT) & VALUE_MASK;
         self.operand_3 = if is_argument_3_immediate {
-            ExpressionArgs::Immediate(value_3 as u8)
+            EA::Immediate(value_3 as u8)
         } else {
-            ExpressionArgs::Register(RegisterId::from(value_3 as u8))
+            EA::Register(RegisterId::from(value_3 as u8))
         };
     }
 }
@@ -214,35 +217,24 @@ impl TryFrom<&[ExpressionArgs]> for Expression {
         let len = args.len();
         assert!(len == 3 || len == 5);
 
-        assert!(matches!(
-            args[0],
-            ExpressionArgs::Register(_) | ExpressionArgs::Immediate(_)
-        ));
-        assert!(matches!(args[1], ExpressionArgs::Operator(_)));
-        assert!(matches!(
-            args[2],
-            ExpressionArgs::Register(_) | ExpressionArgs::Immediate(_)
-        ));
+        // There should be an argument, followed by an operator, followed by another argument.
+        assert!(matches!(args[0], EA::Register(_) | EA::Immediate(_)));
+        assert!(matches!(args[1], EA::Operator(_)));
+        assert!(matches!(args[2], EA::Register(_) | EA::Immediate(_)));
 
+        // If there are 5 slots then there should be an additional operator, followed by another argument.
         if len == 5 {
-            assert!(matches!(args[3], ExpressionArgs::Operator(_)));
-            assert!(matches!(
-                args[4],
-                ExpressionArgs::Register(_) | ExpressionArgs::Immediate(_)
-            ));
+            assert!(matches!(args[3], EA::Operator(_)));
+            assert!(matches!(args[4], EA::Register(_) | EA::Immediate(_)));
         }
 
         let operator_2 = if len == 3 {
-            ExpressionArgs::Operator(ExpressionOperator::default())
+            EA::Operator(EO::default())
         } else {
             args[3]
         };
 
-        let argument_3 = if len == 3 {
-            ExpressionArgs::Immediate(0)
-        } else {
-            args[4]
-        };
+        let argument_3 = if len == 3 { EA::Immediate(0) } else { args[4] };
 
         Ok(Expression {
             is_extended: len == 5,
@@ -260,9 +252,9 @@ impl Display for Expression {
         let mut parts = vec![];
         for arg in self.as_vector() {
             let part = match arg {
-                ExpressionArgs::Register(id) => format!("{id}"),
-                ExpressionArgs::Operator(id) => format!("{id}"),
-                ExpressionArgs::Immediate(imm) => format!("0x{imm:02x}"),
+                EA::Register(id) => format!("{id}"),
+                EA::Operator(id) => format!("{id}"),
+                EA::Immediate(imm) => format!("0x{imm:02x}"),
             };
 
             parts.push(part);
@@ -284,9 +276,9 @@ pub enum ExpressionOperator {
 impl From<u8> for ExpressionOperator {
     fn from(value: u8) -> Self {
         match value {
-            0 => ExpressionOperator::Add,
-            1 => ExpressionOperator::Subtract,
-            2 => ExpressionOperator::Multiply,
+            0 => EO::Add,
+            1 => EO::Subtract,
+            2 => EO::Multiply,
             id => panic!("invalid expression operator id {id}"),
         }
     }
@@ -295,9 +287,9 @@ impl From<u8> for ExpressionOperator {
 impl Display for ExpressionOperator {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let printable = match *self {
-            ExpressionOperator::Add => "+",
-            ExpressionOperator::Subtract => "-",
-            ExpressionOperator::Multiply => "*",
+            EO::Add => "+",
+            EO::Subtract => "-",
+            EO::Multiply => "*",
         };
         write!(f, "{printable}")
     }
@@ -313,9 +305,9 @@ pub enum ExpressionArgs {
 impl ExpressionArgs {
     pub fn get_as_value(&self) -> u32 {
         match self {
-            ExpressionArgs::Register(id) => *id as u32,
-            ExpressionArgs::Operator(id) => *id as u32,
-            ExpressionArgs::Immediate(imm) => *imm as u32,
+            EA::Register(id) => *id as u32,
+            EA::Operator(id) => *id as u32,
+            EA::Immediate(imm) => *imm as u32,
         }
     }
 }

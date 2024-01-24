@@ -40,6 +40,8 @@ impl Compiler {
     ///
     /// A vector of u8 bytes containing the compiled data in byte form.
     fn compile_instruction(&mut self, instruction: &Instruction) {
+        use Instruction as I;
+
         // First, we push the bytes for the opcode.
         self.write_opcode(OpCode::from(instruction));
 
@@ -47,191 +49,181 @@ impl Compiler {
         // This is done based on the type and order of the arguments.
         match *instruction {
             /******** [u32 immediate and u32 register] ********/
-            Instruction::AddU32ImmU32Reg(imm, reg)
-            | Instruction::MovU32ImmU32Reg(imm, reg)
-            | Instruction::MovMemU32RegSimple(imm, reg)
-            | Instruction::MovMemExprU32Reg(imm, reg)
-            | Instruction::BitScanReverseU32MemU32Reg(imm, reg)
-            | Instruction::BitScanForwardU32MemU32Reg(imm, reg)
-            | Instruction::SubU32ImmU32Reg(imm, reg)
-            | Instruction::ModU32ImmU32Reg(imm, reg)
-            | Instruction::AndU32ImmU32Reg(imm, reg) => {
+            I::AddU32ImmU32Reg(imm, reg)
+            | I::MovU32ImmU32Reg(imm, reg)
+            | I::MovMemU32RegSimple(imm, reg)
+            | I::MovMemExprU32Reg(imm, reg)
+            | I::BitScanReverseU32MemU32Reg(imm, reg)
+            | I::BitScanForwardU32MemU32Reg(imm, reg)
+            | I::SubU32ImmU32Reg(imm, reg)
+            | I::ModU32ImmU32Reg(imm, reg)
+            | I::AndU32ImmU32Reg(imm, reg) => {
                 self.write_u32(imm);
                 self.write_register_id(&reg);
             }
 
             /******** [u32 register and u32 register] ********/
-            Instruction::AddU32RegU32Reg(reg_1, reg_2)
-            | Instruction::LeftShiftU32RegU32Reg(reg_1, reg_2)
-            | Instruction::ArithLeftShiftU32RegU32Reg(reg_1, reg_2)
-            | Instruction::RightShiftU32RegU32Reg(reg_1, reg_2)
-            | Instruction::ArithRightShiftU32RegU32Reg(reg_1, reg_2)
-            | Instruction::SwapU32RegU32Reg(reg_1, reg_2)
-            | Instruction::MovU32RegU32Reg(reg_1, reg_2)
-            | Instruction::MovU32RegPtrU32RegSimple(reg_1, reg_2)
-            | Instruction::BitScanReverseU32RegU32Reg(reg_1, reg_2)
-            | Instruction::BitScanForwardU32RegU32Reg(reg_1, reg_2)
-            | Instruction::SubU32RegU32Reg(reg_1, reg_2)
-            | Instruction::ModU32RegU32Reg(reg_1, reg_2) => {
+            I::AddU32RegU32Reg(reg_1, reg_2)
+            | I::LeftShiftU32RegU32Reg(reg_1, reg_2)
+            | I::ArithLeftShiftU32RegU32Reg(reg_1, reg_2)
+            | I::RightShiftU32RegU32Reg(reg_1, reg_2)
+            | I::ArithRightShiftU32RegU32Reg(reg_1, reg_2)
+            | I::SwapU32RegU32Reg(reg_1, reg_2)
+            | I::MovU32RegU32Reg(reg_1, reg_2)
+            | I::MovU32RegPtrU32RegSimple(reg_1, reg_2)
+            | I::BitScanReverseU32RegU32Reg(reg_1, reg_2)
+            | I::BitScanForwardU32RegU32Reg(reg_1, reg_2)
+            | I::SubU32RegU32Reg(reg_1, reg_2)
+            | I::ModU32RegU32Reg(reg_1, reg_2) => {
                 self.write_register_id(&reg_1);
                 self.write_register_id(&reg_2);
             }
 
             /******** [u32 immediate and u32 immediate] ********/
-            Instruction::MovU32ImmMemSimple(imm_1, imm_2)
-            | Instruction::MovU32ImmMemExpr(imm_1, imm_2)
-            | Instruction::BitScanReverseU32MemU32Mem(imm_1, imm_2)
-            | Instruction::BitScanForwardU32MemU32Mem(imm_1, imm_2) => {
+            I::MovU32ImmMemSimple(imm_1, imm_2)
+            | I::MovU32ImmMemExpr(imm_1, imm_2)
+            | I::BitScanReverseU32MemU32Mem(imm_1, imm_2)
+            | I::BitScanForwardU32MemU32Mem(imm_1, imm_2) => {
                 self.write_u32(imm_1);
                 self.write_u32(imm_2);
             }
 
             /******** [u32 register and u32 immediate] ********/
-            Instruction::MovU32RegMemSimple(reg, imm)
-            | Instruction::MovU32RegMemExpr(reg, imm)
-            | Instruction::BitScanReverseU32RegMemU32(reg, imm)
-            | Instruction::BitScanForwardU32RegMemU32(reg, imm)
-            | Instruction::SubU32RegU32Imm(reg, imm)
-            | Instruction::ModU32RegU32Imm(reg, imm) => {
+            I::MovU32RegMemSimple(reg, imm)
+            | I::MovU32RegMemExpr(reg, imm)
+            | I::BitScanReverseU32RegMemU32(reg, imm)
+            | I::BitScanForwardU32RegMemU32(reg, imm)
+            | I::SubU32RegU32Imm(reg, imm)
+            | I::ModU32RegU32Imm(reg, imm) => {
                 self.write_register_id(&reg);
                 self.write_u32(imm);
             }
 
             /******** [u32 immediate] ********/
-            Instruction::MulU32Imm(imm)
-            | Instruction::DivU32Imm(imm)
-            | Instruction::PushU32Imm(imm)
-            | Instruction::CallU32Imm(imm)
-            | Instruction::JumpAbsU32Imm(imm)
-            | Instruction::LoadIVTAddrU32Imm(imm) => {
+            I::MulU32Imm(imm)
+            | I::DivU32Imm(imm)
+            | I::PushU32Imm(imm)
+            | I::CallU32Imm(imm)
+            | I::JumpAbsU32Imm(imm)
+            | I::LoadIVTAddrU32Imm(imm) => {
                 self.write_u32(imm);
             }
 
             /******** [u8 immediate and u32 register] ********/
-            Instruction::LeftShiftU8ImmU32Reg(imm, reg)
-            | Instruction::RightShiftU8ImmU32Reg(imm, reg)
-            | Instruction::ArithLeftShiftU8ImmU32Reg(imm, reg)
-            | Instruction::ArithRightShiftU8ImmU32Reg(imm, reg)
-            | Instruction::BitTestU32Reg(imm, reg)
-            | Instruction::BitTestResetU32Reg(imm, reg)
-            | Instruction::BitTestSetU32Reg(imm, reg) => {
+            I::LeftShiftU8ImmU32Reg(imm, reg)
+            | I::RightShiftU8ImmU32Reg(imm, reg)
+            | I::ArithLeftShiftU8ImmU32Reg(imm, reg)
+            | I::ArithRightShiftU8ImmU32Reg(imm, reg)
+            | I::BitTestU32Reg(imm, reg)
+            | I::BitTestResetU32Reg(imm, reg)
+            | I::BitTestSetU32Reg(imm, reg) => {
                 self.write_u8(imm);
                 self.write_register_id(&reg);
             }
 
             /******** [u8 immediate and u32 immediate] ********/
-            Instruction::BitTestU32Mem(imm_1, imm_2)
-            | Instruction::BitTestResetU32Mem(imm_1, imm_2)
-            | Instruction::BitTestSetU32Mem(imm_1, imm_2) => {
+            I::BitTestU32Mem(imm_1, imm_2)
+            | I::BitTestResetU32Mem(imm_1, imm_2)
+            | I::BitTestSetU32Mem(imm_1, imm_2) => {
                 self.write_u8(imm_1);
                 self.write_u32(imm_2);
             }
 
             /******** [u32 register] ********/
-            Instruction::ByteSwapU32(reg)
-            | Instruction::MulU32Reg(reg)
-            | Instruction::DivU32Reg(reg)
-            | Instruction::IncU32Reg(reg)
-            | Instruction::DecU32Reg(reg)
-            | Instruction::JumpAbsU32Reg(reg)
-            | Instruction::PushU32Reg(reg)
-            | Instruction::PopU32ToU32Reg(reg)
-            | Instruction::CallU32Reg(reg)
-            | Instruction::PopF32ToF32Reg(reg) => {
+            I::ByteSwapU32(reg)
+            | I::MulU32Reg(reg)
+            | I::DivU32Reg(reg)
+            | I::IncU32Reg(reg)
+            | I::DecU32Reg(reg)
+            | I::JumpAbsU32Reg(reg)
+            | I::PushU32Reg(reg)
+            | I::PopU32ToU32Reg(reg)
+            | I::CallU32Reg(reg)
+            | I::PopF32ToF32Reg(reg) => {
                 self.write_register_id(&reg);
             }
 
             /******** [u32 register, u32 register and u32 register] ********/
-            Instruction::ZeroHighBitsByIndexU32Reg(reg_1, reg_2, reg_3) => {
+            I::ZeroHighBitsByIndexU32Reg(reg_1, reg_2, reg_3) => {
                 self.write_register_id(&reg_1);
                 self.write_register_id(&reg_2);
                 self.write_register_id(&reg_3);
             }
 
             /******** [u32 immediate, u32 register, and u32 register] ********/
-            Instruction::ZeroHighBitsByIndexU32RegU32Imm(imm, reg_1, reg_2) => {
+            I::ZeroHighBitsByIndexU32RegU32Imm(imm, reg_1, reg_2) => {
                 self.write_u32(imm);
                 self.write_register_id(&reg_1);
                 self.write_register_id(&reg_2);
             }
 
             /******** [u8 immediate] ********/
-            Instruction::Int(imm)
-            | Instruction::MaskInterrupt(imm)
-            | Instruction::UnmaskInterrupt(imm) => {
+            I::Int(imm) | I::MaskInterrupt(imm) | I::UnmaskInterrupt(imm) => {
                 self.write_u8(imm);
             }
 
             /******** [u32 immediate and u8 immediate] ********/
-            Instruction::OutU32Imm(imm1, imm2) => {
+            I::OutU32Imm(imm1, imm2) => {
                 self.write_u32(imm1);
                 self.write_u8(imm2);
             }
 
             /******** [u8 immediate and u8 immediate] ********/
-            Instruction::OutU8Imm(imm1, imm2) => {
+            I::OutU8Imm(imm1, imm2) => {
                 self.write_u8(imm1);
                 self.write_u8(imm2)
             }
 
             /******** [f32 immediate and u8 immediate] ********/
-            Instruction::OutF32Imm(imm1, imm2) => {
+            I::OutF32Imm(imm1, imm2) => {
                 self.write_f32(imm1);
                 self.write_u8(imm2);
             }
 
             /******** [register ID and u8 immediate] ********/
-            Instruction::OutU32Reg(reg, imm) => {
+            I::OutU32Reg(reg, imm) => {
                 self.write_register_id(&reg);
                 self.write_u8(imm);
             }
 
             /******** [u8 immediate and register ID] ********/
-            Instruction::InU8Reg(imm, reg)
-            | Instruction::InU32Reg(imm, reg)
-            | Instruction::InF32Reg(imm, reg) => {
+            I::InU8Reg(imm, reg) | I::InU32Reg(imm, reg) | I::InF32Reg(imm, reg) => {
                 self.write_u8(imm);
                 self.write_register_id(&reg);
             }
 
             /******** [u8 immediate and u32 immediate] ********/
-            Instruction::InU8Mem(imm1, imm2)
-            | Instruction::InU32Mem(imm1, imm2)
-            | Instruction::InF32Mem(imm1, imm2) => {
+            I::InU8Mem(imm1, imm2) | I::InU32Mem(imm1, imm2) | I::InF32Mem(imm1, imm2) => {
                 self.write_u8(imm1);
                 self.write_u32(imm2);
             }
 
             /******** [f32 immediate] ********/
-            Instruction::PushF32Imm(imm) => self.write_f32(imm),
+            I::PushF32Imm(imm) => self.write_f32(imm),
 
             /******** [No Arguments] ********/
-            Instruction::Nop
-            | Instruction::IntRet
-            | Instruction::RetArgsU32
-            | Instruction::MachineReturn
-            | Instruction::Halt => {}
+            I::Nop | I::IntRet | I::RetArgsU32 | I::MachineReturn | I::Halt => {}
 
             /* These instructions are reserved for future use and shouldn't be constructed. */
-            Instruction::Reserved1
-            | Instruction::Reserved2
-            | Instruction::Reserved3
-            | Instruction::Reserved4
-            | Instruction::Reserved5
-            | Instruction::Reserved6
-            | Instruction::Reserved7
-            | Instruction::Reserved8
-            | Instruction::Reserved9 => {
+            I::Reserved1
+            | I::Reserved2
+            | I::Reserved3
+            | I::Reserved4
+            | I::Reserved5
+            | I::Reserved6
+            | I::Reserved7
+            | I::Reserved8
+            | I::Reserved9 => {
                 unreachable!();
             }
 
             /* This pseudo-instruction shouldn't be constructed and exists as a compiler hint. */
-            Instruction::Label(_) => {
+            I::Label(_) => {
                 unreachable!();
             }
 
             /* This pseudo-instruction shouldn't be constructed and exists to preserve the provided opcode when debugging. */
-            Instruction::Unknown(imm) => {
+            I::Unknown(imm) => {
                 unreachable!("invalid opcode id {imm}");
             }
         }
@@ -304,7 +296,9 @@ mod tests_compiler {
     /// Test a round trip instruction compile and decompile.
     #[test]
     fn test_compile_roundtrip() {
-        use {OpCode::*, RegisterId::*};
+        use Instruction as I;
+        use OpCode as O;
+        use RegisterId::*;
 
         let mut instructions_in = Vec::new();
 
@@ -313,90 +307,99 @@ mod tests_compiler {
         // is added here.
         for opcode in OpCode::iter() {
             let ins = match opcode {
-                Nop => Instruction::Nop,
-                AddU32ImmU32Reg => Instruction::AddU32ImmU32Reg(0x123, ER2),
-                AddU32RegU32Reg => Instruction::AddU32RegU32Reg(ER2, ER3),
-                SubU32ImmU32Reg => Instruction::SubU32ImmU32Reg(0x123, ER2),
-                SubU32RegU32Imm => Instruction::SubU32RegU32Imm(ER2, 0x123),
-                SubU32RegU32Reg => Instruction::SubU32RegU32Reg(ER2, ER3),
-                MulU32Imm => Instruction::MulU32Imm(0x123),
-                MulU32Reg => Instruction::MulU32Reg(ER2),
-                DivU32Imm => Instruction::DivU32Imm(0x123),
-                DivU32Reg => Instruction::DivU32Reg(ER2),
-                ModU32ImmU32Reg => Instruction::ModU32ImmU32Reg(0x123, ER2),
-                ModU32RegU32Imm => Instruction::ModU32RegU32Imm(ER2, 0x123),
-                ModU32RegU32Reg => Instruction::ModU32RegU32Reg(ER2, ER3),
-                IncU32Reg => Instruction::IncU32Reg(ER2),
-                DecU32Reg => Instruction::DecU32Reg(ER2),
-                AndU32ImmU32Reg => Instruction::AndU32ImmU32Reg(0x123, ER2),
-                LeftShiftU8ImmU32Reg => Instruction::LeftShiftU8ImmU32Reg(31, ER2),
-                LeftShiftU32RegU32Reg => Instruction::LeftShiftU32RegU32Reg(ER2, ER3),
-                ArithLeftShiftU8ImmU32Reg => Instruction::ArithLeftShiftU8ImmU32Reg(31, ER2),
-                ArithLeftShiftU32RegU32Reg => Instruction::ArithLeftShiftU32RegU32Reg(ER2, ER3),
-                RightShiftU8ImmU32Reg => Instruction::RightShiftU8ImmU32Reg(31, ER2),
-                RightShiftU32RegU32Reg => Instruction::RightShiftU32RegU32Reg(ER2, ER3),
-                ArithRightShiftU8ImmU32Reg => Instruction::ArithRightShiftU8ImmU32Reg(31, ER2),
-                ArithRightShiftU32RegU32Reg => Instruction::ArithRightShiftU32RegU32Reg(ER2, ER3),
-                CallU32Imm => Instruction::CallU32Imm(0xdeafbeed),
-                CallU32Reg => Instruction::CallU32Reg(RegisterId::ER2),
-                RetArgsU32 => Instruction::RetArgsU32,
-                Int => Instruction::Int(0xff),
-                IntRet => Instruction::IntRet,
-                JumpAbsU32Imm => Instruction::JumpAbsU32Imm(0xdeadbeef),
-                JumpAbsU32Reg => Instruction::JumpAbsU32Reg(ER1),
-                SwapU32RegU32Reg => Instruction::SwapU32RegU32Reg(ER2, ER3),
-                MovU32ImmU32Reg => Instruction::MovU32ImmU32Reg(0x123, ER2),
-                MovU32RegU32Reg => Instruction::MovU32RegU32Reg(ER2, ER3),
-                MovU32ImmMemSimple => Instruction::MovU32ImmMemSimple(0x123, 0x321),
-                MovU32RegMemSimple => Instruction::MovU32RegMemSimple(ER2, 0x123),
-                MovMemU32RegSimple => Instruction::MovMemU32RegSimple(0x123, ER2),
-                MovU32RegPtrU32RegSimple => Instruction::MovU32RegPtrU32RegSimple(ER2, ER3),
-                MovU32ImmMemExpr => Instruction::MovU32ImmMemExpr(0x123, 0x321),
-                MovMemExprU32Reg => Instruction::MovMemExprU32Reg(0x123, ER2),
-                MovU32RegMemExpr => Instruction::MovU32RegMemExpr(ER2, 0x123),
-                ByteSwapU32 => Instruction::ByteSwapU32(ER2),
-                ZeroHighBitsByIndexU32Reg => Instruction::ZeroHighBitsByIndexU32Reg(ER2, ER3, ER4),
-                ZeroHighBitsByIndexU32RegU32Imm => {
-                    Instruction::ZeroHighBitsByIndexU32RegU32Imm(0x123, ER2, ER3)
+                O::Nop => I::Nop,
+                O::AddU32ImmU32Reg => I::AddU32ImmU32Reg(0x123, ER2),
+                O::AddU32RegU32Reg => I::AddU32RegU32Reg(ER2, ER3),
+                O::SubU32ImmU32Reg => I::SubU32ImmU32Reg(0x123, ER2),
+                O::SubU32RegU32Imm => I::SubU32RegU32Imm(ER2, 0x123),
+                O::SubU32RegU32Reg => I::SubU32RegU32Reg(ER2, ER3),
+                O::MulU32Imm => I::MulU32Imm(0x123),
+                O::MulU32Reg => I::MulU32Reg(ER2),
+                O::DivU32Imm => I::DivU32Imm(0x123),
+                O::DivU32Reg => I::DivU32Reg(ER2),
+                O::ModU32ImmU32Reg => I::ModU32ImmU32Reg(0x123, ER2),
+                O::ModU32RegU32Imm => I::ModU32RegU32Imm(ER2, 0x123),
+                O::ModU32RegU32Reg => I::ModU32RegU32Reg(ER2, ER3),
+                O::IncU32Reg => I::IncU32Reg(ER2),
+                O::DecU32Reg => I::DecU32Reg(ER2),
+                O::AndU32ImmU32Reg => I::AndU32ImmU32Reg(0x123, ER2),
+                O::LeftShiftU8ImmU32Reg => I::LeftShiftU8ImmU32Reg(31, ER2),
+                O::LeftShiftU32RegU32Reg => I::LeftShiftU32RegU32Reg(ER2, ER3),
+                O::ArithLeftShiftU8ImmU32Reg => I::ArithLeftShiftU8ImmU32Reg(31, ER2),
+                O::ArithLeftShiftU32RegU32Reg => I::ArithLeftShiftU32RegU32Reg(ER2, ER3),
+                O::RightShiftU8ImmU32Reg => I::RightShiftU8ImmU32Reg(31, ER2),
+                O::RightShiftU32RegU32Reg => I::RightShiftU32RegU32Reg(ER2, ER3),
+                O::ArithRightShiftU8ImmU32Reg => I::ArithRightShiftU8ImmU32Reg(31, ER2),
+                O::ArithRightShiftU32RegU32Reg => I::ArithRightShiftU32RegU32Reg(ER2, ER3),
+                O::CallU32Imm => I::CallU32Imm(0xdeafbeed),
+                O::CallU32Reg => I::CallU32Reg(RegisterId::ER2),
+                O::RetArgsU32 => I::RetArgsU32,
+                O::Int => I::Int(0xff),
+                O::IntRet => I::IntRet,
+                O::JumpAbsU32Imm => I::JumpAbsU32Imm(0xdeadbeef),
+                O::JumpAbsU32Reg => I::JumpAbsU32Reg(ER1),
+                O::SwapU32RegU32Reg => I::SwapU32RegU32Reg(ER2, ER3),
+                O::MovU32ImmU32Reg => I::MovU32ImmU32Reg(0x123, ER2),
+                O::MovU32RegU32Reg => I::MovU32RegU32Reg(ER2, ER3),
+                O::MovU32ImmMemSimple => I::MovU32ImmMemSimple(0x123, 0x321),
+                O::MovU32RegMemSimple => I::MovU32RegMemSimple(ER2, 0x123),
+                O::MovMemU32RegSimple => I::MovMemU32RegSimple(0x123, ER2),
+                O::MovU32RegPtrU32RegSimple => I::MovU32RegPtrU32RegSimple(ER2, ER3),
+                O::MovU32ImmMemExpr => I::MovU32ImmMemExpr(0x123, 0x321),
+                O::MovMemExprU32Reg => I::MovMemExprU32Reg(0x123, ER2),
+                O::MovU32RegMemExpr => I::MovU32RegMemExpr(ER2, 0x123),
+                O::ByteSwapU32 => I::ByteSwapU32(ER2),
+                O::ZeroHighBitsByIndexU32Reg => I::ZeroHighBitsByIndexU32Reg(ER2, ER3, ER4),
+                O::ZeroHighBitsByIndexU32RegU32Imm => {
+                    I::ZeroHighBitsByIndexU32RegU32Imm(0x123, ER2, ER3)
                 }
-                PushU32Imm => Instruction::PushU32Imm(0x123),
-                PushF32Imm => Instruction::PushF32Imm(0.1),
-                PushU32Reg => Instruction::PushU32Reg(ER2),
-                PopF32ToF32Reg => Instruction::PopF32ToF32Reg(FR2),
-                PopU32ToU32Reg => Instruction::PopU32ToU32Reg(ER2),
-                OutF32Imm => Instruction::OutF32Imm(1.0, 0xab),
-                OutU32Imm => Instruction::OutU32Imm(0xdeadbeef, 0xab),
-                OutU32Reg => Instruction::OutU32Reg(ER2, 0xab),
-                OutU8Imm => Instruction::OutU8Imm(0xba, 0xab),
-                InU8Reg => Instruction::InU8Reg(0xab, ER2),
-                InU8Mem => Instruction::InU8Mem(0xab, 0xdeadbeef),
-                InU32Reg => Instruction::InU32Reg(0xab, ER2),
-                InU32Mem => Instruction::InU32Mem(0xab, 0xdeadbeef),
-                InF32Reg => Instruction::InF32Reg(0xab, FR2),
-                InF32Mem => Instruction::InF32Mem(0xab, 0xdeadbeef),
-                BitTestU32Reg => Instruction::BitTestU32Reg(0x40, ER2),
-                BitTestU32Mem => Instruction::BitTestU32Mem(0x40, 0x123),
-                BitTestResetU32Reg => Instruction::BitTestResetU32Reg(0x40, ER2),
-                BitTestResetU32Mem => Instruction::BitTestResetU32Mem(0x40, 0x123),
-                BitTestSetU32Reg => Instruction::BitTestSetU32Reg(0x40, ER2),
-                BitTestSetU32Mem => Instruction::BitTestSetU32Mem(0x40, 0x123),
-                BitScanReverseU32RegU32Reg => Instruction::BitScanReverseU32RegU32Reg(ER2, ER3),
-                BitScanReverseU32MemU32Reg => Instruction::BitScanReverseU32MemU32Reg(0x123, ER2),
-                BitScanReverseU32RegMemU32 => Instruction::BitScanReverseU32RegMemU32(ER2, 0x123),
-                BitScanReverseU32MemU32Mem => Instruction::BitScanReverseU32MemU32Mem(0x123, 0x321),
-                BitScanForwardU32RegU32Reg => Instruction::BitScanForwardU32RegU32Reg(ER2, ER3),
-                BitScanForwardU32MemU32Reg => Instruction::BitScanForwardU32MemU32Reg(0x123, ER2),
-                BitScanForwardU32RegMemU32 => Instruction::BitScanForwardU32RegMemU32(ER2, 0x123),
-                BitScanForwardU32MemU32Mem => Instruction::BitScanForwardU32MemU32Mem(0x123, 0x321),
-                MaskInterrupt => Instruction::MaskInterrupt(0xff),
-                UnmaskInterrupt => Instruction::UnmaskInterrupt(0xff),
-                LoadIVTAddrU32Imm => Instruction::LoadIVTAddrU32Imm(0xdeadbeef),
-                MachineReturn => Instruction::MachineReturn,
-                Halt => Instruction::Halt,
+                O::PushU32Imm => I::PushU32Imm(0x123),
+                O::PushF32Imm => I::PushF32Imm(0.1),
+                O::PushU32Reg => I::PushU32Reg(ER2),
+                O::PopF32ToF32Reg => I::PopF32ToF32Reg(FR2),
+                O::PopU32ToU32Reg => I::PopU32ToU32Reg(ER2),
+                O::OutF32Imm => I::OutF32Imm(1.0, 0xab),
+                O::OutU32Imm => I::OutU32Imm(0xdeadbeef, 0xab),
+                O::OutU32Reg => I::OutU32Reg(ER2, 0xab),
+                O::OutU8Imm => I::OutU8Imm(0xba, 0xab),
+                O::InU8Reg => I::InU8Reg(0xab, ER2),
+                O::InU8Mem => I::InU8Mem(0xab, 0xdeadbeef),
+                O::InU32Reg => I::InU32Reg(0xab, ER2),
+                O::InU32Mem => I::InU32Mem(0xab, 0xdeadbeef),
+                O::InF32Reg => I::InF32Reg(0xab, FR2),
+                O::InF32Mem => I::InF32Mem(0xab, 0xdeadbeef),
+                O::BitTestU32Reg => I::BitTestU32Reg(0x40, ER2),
+                O::BitTestU32Mem => I::BitTestU32Mem(0x40, 0x123),
+                O::BitTestResetU32Reg => I::BitTestResetU32Reg(0x40, ER2),
+                O::BitTestResetU32Mem => I::BitTestResetU32Mem(0x40, 0x123),
+                O::BitTestSetU32Reg => I::BitTestSetU32Reg(0x40, ER2),
+                O::BitTestSetU32Mem => I::BitTestSetU32Mem(0x40, 0x123),
+                O::BitScanReverseU32RegU32Reg => I::BitScanReverseU32RegU32Reg(ER2, ER3),
+                O::BitScanReverseU32MemU32Reg => I::BitScanReverseU32MemU32Reg(0x123, ER2),
+                O::BitScanReverseU32RegMemU32 => I::BitScanReverseU32RegMemU32(ER2, 0x123),
+                O::BitScanReverseU32MemU32Mem => I::BitScanReverseU32MemU32Mem(0x123, 0x321),
+                O::BitScanForwardU32RegU32Reg => I::BitScanForwardU32RegU32Reg(ER2, ER3),
+                O::BitScanForwardU32MemU32Reg => I::BitScanForwardU32MemU32Reg(0x123, ER2),
+                O::BitScanForwardU32RegMemU32 => I::BitScanForwardU32RegMemU32(ER2, 0x123),
+                O::BitScanForwardU32MemU32Mem => I::BitScanForwardU32MemU32Mem(0x123, 0x321),
+                O::MaskInterrupt => I::MaskInterrupt(0xff),
+                O::UnmaskInterrupt => I::UnmaskInterrupt(0xff),
+                O::LoadIVTAddrU32Imm => I::LoadIVTAddrU32Imm(0xdeadbeef),
+                O::MachineReturn => I::MachineReturn,
+                O::Halt => I::Halt,
 
                 // We don't want to test constructing these instructions.
-                Reserved1 | Reserved2 | Reserved3 | Reserved4 | Reserved5 | Reserved6
-                | Reserved7 | Reserved8 | Reserved9 | Label | Unknown => continue,
+                O::Reserved1
+                | O::Reserved2
+                | O::Reserved3
+                | O::Reserved4
+                | O::Reserved5
+                | O::Reserved6
+                | O::Reserved7
+                | O::Reserved8
+                | O::Reserved9
+                | O::Label
+                | O::Unknown => continue,
             };
 
             instructions_in.push(ins);

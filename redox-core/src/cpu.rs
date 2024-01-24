@@ -822,7 +822,7 @@ impl Cpu {
     /// * `com_bus` - A mutable reference to the [`CommunicationBus`] for the virtual machine.
     /// * `instruction` - An [`Instruction`] instance to be executed.
     fn run_instruction(&mut self, com_bus: &mut CommunicationBus, instruction: &Instruction) {
-        use Instruction::*;
+        use Instruction as I;
 
         let privilege = &self.get_privilege();
 
@@ -830,55 +830,55 @@ impl Cpu {
         self.increment_ip_register(instruction.get_total_instruction_size());
 
         match instruction {
-            Nop => {}
+            I::Nop => {}
 
             /******** [Arithmetic Instructions] ********/
-            AddU32ImmU32Reg(imm, reg) => {
+            I::AddU32ImmU32Reg(imm, reg) => {
                 let old_value = self.registers.read_reg_u32(reg, privilege);
                 let new_value = self.perform_checked_add_u32(old_value, *imm);
 
                 self.set_u32_accumulator(new_value);
             }
-            AddU32RegU32Reg(in_reg, out_reg) => {
+            I::AddU32RegU32Reg(in_reg, out_reg) => {
                 let value1 = self.registers.read_reg_u32(in_reg, privilege);
                 let value2 = self.registers.read_reg_u32(out_reg, privilege);
                 let new_value = self.perform_checked_add_u32(value1, value2);
 
                 self.set_u32_accumulator(new_value);
             }
-            SubU32ImmU32Reg(imm, reg) => {
+            I::SubU32ImmU32Reg(imm, reg) => {
                 let old_value = self.registers.read_reg_u32(reg, privilege);
                 let new_value = self.perform_checked_subtract_u32(old_value, *imm);
 
                 self.set_u32_accumulator(new_value);
             }
-            SubU32RegU32Imm(reg, imm) => {
+            I::SubU32RegU32Imm(reg, imm) => {
                 let old_value = self.registers.read_reg_u32(reg, privilege);
                 let new_value = self.perform_checked_subtract_u32(*imm, old_value);
 
                 self.set_u32_accumulator(new_value);
             }
-            SubU32RegU32Reg(reg_1, reg_2) => {
+            I::SubU32RegU32Reg(reg_1, reg_2) => {
                 let reg_1_val = self.registers.read_reg_u32(reg_1, privilege);
                 let reg_2_val = self.registers.read_reg_u32(reg_2, privilege);
                 let new_value = self.perform_checked_subtract_u32(reg_2_val, reg_1_val);
 
                 self.set_u32_accumulator(new_value);
             }
-            MulU32Imm(imm) => {
+            I::MulU32Imm(imm) => {
                 let old_value = self.registers.read_reg_u32(&RegisterId::ER1, privilege);
                 let new_value = self.perform_checked_mul_u32(old_value, *imm);
 
                 self.write_reg_u32(&RegisterId::ER1, new_value, privilege);
             }
-            MulU32Reg(reg) => {
+            I::MulU32Reg(reg) => {
                 let er1_val = self.registers.read_reg_u32(&RegisterId::ER1, privilege);
                 let other_reg_val = self.registers.read_reg_u32(reg, privilege);
                 let new_value = self.perform_checked_mul_u32(er1_val, other_reg_val);
 
                 self.write_reg_u32(&RegisterId::ER1, new_value, privilege);
             }
-            DivU32Imm(divisor_imm) => {
+            I::DivU32Imm(divisor_imm) => {
                 if *divisor_imm == 0 {
                     self.handle_interrupt(DIVIDE_BY_ZERO_INT, &mut com_bus.mem);
                     return;
@@ -889,7 +889,7 @@ impl Cpu {
 
                 self.write_reg_u32(&RegisterId::ER1, new_value, privilege);
             }
-            DivU32Reg(divisor_reg) => {
+            I::DivU32Reg(divisor_reg) => {
                 let divisor = self.registers.read_reg_u32(divisor_reg, privilege);
                 if divisor == 0 {
                     self.handle_interrupt(DIVIDE_BY_ZERO_INT, &mut com_bus.mem);
@@ -901,7 +901,7 @@ impl Cpu {
 
                 self.write_reg_u32(&RegisterId::ER1, new_value, privilege);
             }
-            ModU32ImmU32Reg(imm, reg) => {
+            I::ModU32ImmU32Reg(imm, reg) => {
                 let divisor = self.registers.read_reg_u32(reg, privilege);
                 if divisor == 0 {
                     self.handle_interrupt(DIVIDE_BY_ZERO_INT, &mut com_bus.mem);
@@ -912,7 +912,7 @@ impl Cpu {
 
                 self.set_u32_accumulator(new_value);
             }
-            ModU32RegU32Imm(reg, imm) => {
+            I::ModU32RegU32Imm(reg, imm) => {
                 let divisor = self.registers.read_reg_u32(reg, privilege);
                 if divisor == 0 {
                     self.handle_interrupt(DIVIDE_BY_ZERO_INT, &mut com_bus.mem);
@@ -923,7 +923,7 @@ impl Cpu {
 
                 self.set_u32_accumulator(new_value);
             }
-            ModU32RegU32Reg(divisor_reg, reg) => {
+            I::ModU32RegU32Reg(divisor_reg, reg) => {
                 let divisor = self.registers.read_reg_u32(divisor_reg, privilege);
                 if divisor == 0 {
                     self.handle_interrupt(DIVIDE_BY_ZERO_INT, &mut com_bus.mem);
@@ -935,19 +935,19 @@ impl Cpu {
 
                 self.set_u32_accumulator(new_value);
             }
-            IncU32Reg(reg) => {
+            I::IncU32Reg(reg) => {
                 let value = self.registers.read_reg_u32(reg, privilege);
                 let new_value = self.perform_checked_add_u32(value, 1);
 
                 self.write_reg_u32(reg, new_value, privilege);
             }
-            DecU32Reg(reg) => {
+            I::DecU32Reg(reg) => {
                 let value = self.registers.read_reg_u32(reg, privilege);
                 let new_value = self.perform_checked_subtract_u32(value, 1);
 
                 self.write_reg_u32(reg, new_value, privilege);
             }
-            AndU32ImmU32Reg(imm, reg) => {
+            I::AndU32ImmU32Reg(imm, reg) => {
                 let value = self.registers.read_reg_u32(reg, privilege);
                 let new_value = self.perform_bitwise_and_u32(*imm, value);
 
@@ -955,52 +955,52 @@ impl Cpu {
             }
 
             /******** [Bit Operation Instructions] ********/
-            LeftShiftU8ImmU32Reg(imm, reg) => {
+            I::LeftShiftU8ImmU32Reg(imm, reg) => {
                 let old_value = self.registers.read_reg_u32(reg, privilege);
                 let shifted = self.perform_checked_left_shift_u32(old_value, *imm);
 
                 self.write_reg_u32(reg, shifted, privilege);
             }
-            LeftShiftU32RegU32Reg(shift_reg, reg) => {
+            I::LeftShiftU32RegU32Reg(shift_reg, reg) => {
                 let shift_by = self.registers.read_reg_u32(shift_reg, privilege);
                 let old_value = self.registers.read_reg_u32(reg, privilege);
                 let shifted = self.perform_checked_left_shift_u32(old_value, shift_by as u8);
 
                 self.write_reg_u32(reg, shifted, privilege);
             }
-            ArithLeftShiftU8ImmU32Reg(imm, reg) => {
+            I::ArithLeftShiftU8ImmU32Reg(imm, reg) => {
                 let old_value = self.registers.read_reg_u32(reg, privilege);
                 let shifted = self.perform_arithmetic_left_shift_u32(old_value, *imm as u32);
 
                 self.write_reg_u32(reg, shifted, privilege);
             }
-            ArithLeftShiftU32RegU32Reg(shift_reg, reg) => {
+            I::ArithLeftShiftU32RegU32Reg(shift_reg, reg) => {
                 let shift_by = self.registers.read_reg_u32(shift_reg, privilege);
                 let old_value = self.registers.read_reg_u32(reg, privilege);
                 let shifted = self.perform_arithmetic_left_shift_u32(old_value, shift_by);
 
                 self.write_reg_u32(reg, shifted, privilege);
             }
-            RightShiftU8ImmU32Reg(imm, reg) => {
+            I::RightShiftU8ImmU32Reg(imm, reg) => {
                 let old_value = self.registers.read_reg_u32(reg, privilege);
                 let shifted = self.perform_right_shift_u32(old_value, *imm);
 
                 self.write_reg_u32(reg, shifted, privilege);
             }
-            RightShiftU32RegU32Reg(shift_reg, reg) => {
+            I::RightShiftU32RegU32Reg(shift_reg, reg) => {
                 let shift_by = self.registers.read_reg_u32(shift_reg, privilege);
                 let old_value = self.registers.read_reg_u32(reg, privilege);
                 let shifted = self.perform_right_shift_u32(old_value, shift_by as u8);
 
                 self.write_reg_u32(reg, shifted, privilege);
             }
-            ArithRightShiftU8ImmU32Reg(imm, reg) => {
+            I::ArithRightShiftU8ImmU32Reg(imm, reg) => {
                 let old_value = self.registers.read_reg_u32(reg, privilege);
                 let shifted = self.perform_arithmetic_right_shift_u32(old_value, *imm as u32);
 
                 self.write_reg_u32(reg, shifted, privilege);
             }
-            ArithRightShiftU32RegU32Reg(shift_reg, reg) => {
+            I::ArithRightShiftU32RegU32Reg(shift_reg, reg) => {
                 let shift_by = self.registers.read_reg_u32(shift_reg, privilege);
                 let old_value = self.registers.read_reg_u32(reg, privilege);
                 let shifted = self.perform_arithmetic_right_shift_u32(old_value, shift_by);
@@ -1009,39 +1009,39 @@ impl Cpu {
             }
 
             /******** [Branching Instructions] ********/
-            CallU32Imm(addr) => {
+            I::CallU32Imm(addr) => {
                 // call 0xdeafbeef
                 // call :label
                 self.perform_call_jump(&mut com_bus.mem, *addr);
             }
-            CallU32Reg(reg) => {
+            I::CallU32Reg(reg) => {
                 // call %reg
                 // Get the value of the register.
                 let addr = self.registers.read_reg_u32(reg, privilege);
                 self.perform_call_jump(&mut com_bus.mem, addr);
             }
-            RetArgsU32 => {
+            I::RetArgsU32 => {
                 // iret
                 // Restore the state of the last stack frame.
                 self.pop_state(&mut com_bus.mem, StackArgType::U32);
             }
-            Int(int_type) => {
+            I::Int(int_type) => {
                 self.handle_interrupt(*int_type, &mut com_bus.mem);
             }
-            IntRet => {
+            I::IntRet => {
                 self.is_in_interrupt_handler = false;
                 self.last_interrupt_code = None;
 
                 self.set_instruction_pointer(com_bus.mem.pop_u32());
                 self.set_flags(com_bus.mem.pop_u32());
             }
-            JumpAbsU32Imm(addr) => {
+            I::JumpAbsU32Imm(addr) => {
                 // jmp 0xaaaa
                 // jmp :label
                 // Set the instruction pointer to the jump address.
                 self.set_instruction_pointer(*addr);
             }
-            JumpAbsU32Reg(reg) => {
+            I::JumpAbsU32Reg(reg) => {
                 // jmp %cs
                 let shift_by = self.registers.read_reg_u32(reg, privilege);
 
@@ -1050,70 +1050,70 @@ impl Cpu {
             }
 
             /******** [Data Instructions] ********/
-            SwapU32RegU32Reg(reg_1, reg_2) => {
+            I::SwapU32RegU32Reg(reg_1, reg_2) => {
                 let reg_1_val = self.registers.read_reg_u32(reg_1, privilege);
                 let reg_2_val = self.registers.read_reg_u32(reg_2, privilege);
 
                 self.write_reg_u32(reg_1, reg_2_val, privilege);
                 self.write_reg_u32(reg_2, reg_1_val, privilege);
             }
-            MovU32ImmU32Reg(imm, reg) => {
+            I::MovU32ImmU32Reg(imm, reg) => {
                 self.write_reg_u32(reg, *imm, privilege);
             }
-            MovU32RegU32Reg(in_reg, out_reg) => {
+            I::MovU32RegU32Reg(in_reg, out_reg) => {
                 let value = self.registers.read_reg_u32(in_reg, privilege);
 
                 self.write_reg_u32(out_reg, value, privilege);
             }
-            MovU32ImmMemSimple(imm, addr) => {
+            I::MovU32ImmMemSimple(imm, addr) => {
                 com_bus.mem.set_u32(*addr as usize, *imm);
             }
-            MovU32RegMemSimple(reg, addr) => {
+            I::MovU32RegMemSimple(reg, addr) => {
                 let value = self.registers.read_reg_u32(reg, privilege);
 
                 com_bus.mem.set_u32(*addr as usize, value);
             }
-            MovMemU32RegSimple(addr, reg) => {
+            I::MovMemU32RegSimple(addr, reg) => {
                 let value = com_bus.mem.get_u32(*addr as usize);
 
                 self.write_reg_u32(reg, value, privilege);
             }
-            MovU32RegPtrU32RegSimple(in_reg, out_reg) => {
+            I::MovU32RegPtrU32RegSimple(in_reg, out_reg) => {
                 let address = self.registers.read_reg_u32(in_reg, privilege) as usize;
                 let value = com_bus.mem.get_u32(address);
 
                 self.write_reg_u32(out_reg, value, privilege);
             }
-            MovU32ImmMemExpr(imm, expr) => {
+            I::MovU32ImmMemExpr(imm, expr) => {
                 // mov imm, &[addr] - move immediate to address.
                 let addr = self.decode_evaluate_u32_move_expression(expr, privilege);
 
                 com_bus.mem.set_u32(addr as usize, *imm);
             }
-            MovMemExprU32Reg(expr, reg) => {
+            I::MovMemExprU32Reg(expr, reg) => {
                 // mov &[addr], register - move value at address to register.
                 let addr = self.decode_evaluate_u32_move_expression(expr, privilege);
                 let value = com_bus.mem.get_u32(addr as usize);
 
                 self.write_reg_u32(reg, value, privilege);
             }
-            MovU32RegMemExpr(reg, expr) => {
+            I::MovU32RegMemExpr(reg, expr) => {
                 // mov &reg, &[addr] - move value of a register to an address.
                 let addr = self.decode_evaluate_u32_move_expression(expr, privilege);
                 let value = self.registers.read_reg_u32(reg, privilege);
 
                 com_bus.mem.set_u32(addr as usize, value);
             }
-            ZeroHighBitsByIndexU32Reg(index_reg, source_reg, out_reg) => {
+            I::ZeroHighBitsByIndexU32Reg(index_reg, source_reg, out_reg) => {
                 // zhbi source_reg, index_reg, out_reg
                 let index = self.registers.read_reg_u32(index_reg, privilege);
                 self.perform_zero_high_bit_u32_reg(source_reg, index, out_reg, privilege);
             }
-            ZeroHighBitsByIndexU32RegU32Imm(index, source_reg, out_reg) => {
+            I::ZeroHighBitsByIndexU32RegU32Imm(index, source_reg, out_reg) => {
                 // zhbi source_reg, index, out_reg
                 self.perform_zero_high_bit_u32_reg(source_reg, *index, out_reg, privilege);
             }
-            PushF32Imm(imm) => {
+            I::PushF32Imm(imm) => {
                 // push imm
                 com_bus.mem.push_f32(*imm);
 
@@ -1122,7 +1122,7 @@ impl Cpu {
                     .get_register_u32_mut(RegisterId::ESP)
                     .subtract_unchecked(SIZE_OF_F32_LOCAL);
             }
-            PushU32Imm(imm) => {
+            I::PushU32Imm(imm) => {
                 // push imm
                 com_bus.mem.push_u32(*imm);
 
@@ -1131,7 +1131,7 @@ impl Cpu {
                     .get_register_u32_mut(RegisterId::ESP)
                     .subtract_unchecked(SIZE_OF_U32_LOCAL);
             }
-            PushU32Reg(reg) => {
+            I::PushU32Reg(reg) => {
                 // push reg
                 let value = self.registers.read_reg_u32(reg, privilege);
                 com_bus.mem.push_u32(value);
@@ -1141,7 +1141,7 @@ impl Cpu {
                     .get_register_u32_mut(RegisterId::ESP)
                     .subtract_unchecked(SIZE_OF_U32_LOCAL);
             }
-            PopF32ToF32Reg(reg) => {
+            I::PopF32ToF32Reg(reg) => {
                 // pop reg
                 self.registers
                     .get_register_f32_mut(*reg)
@@ -1152,7 +1152,7 @@ impl Cpu {
                     .get_register_u32_mut(RegisterId::ESP)
                     .add_unchecked(SIZE_OF_F32_LOCAL);
             }
-            PopU32ToU32Reg(reg) => {
+            I::PopU32ToU32Reg(reg) => {
                 // pop reg
                 self.registers
                     .get_register_u32_mut(*reg)
@@ -1165,32 +1165,32 @@ impl Cpu {
             }
 
             /******** [IO Instructions] ********/
-            OutF32Imm(value, port) => {
+            I::OutF32Imm(value, port) => {
                 // out 0.1, 0xff
                 if com_bus.write_f32(*value, *port).is_err() {
                     self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
                 }
             }
-            OutU32Imm(value, port) => {
+            I::OutU32Imm(value, port) => {
                 // out 0xdeadbeef, 0xff
                 if com_bus.write_u32(*value, *port).is_err() {
                     self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
                 }
             }
-            OutU32Reg(reg, port) => {
+            I::OutU32Reg(reg, port) => {
                 // out reg, 0xff
                 let value = self.registers.read_reg_u32(reg, privilege);
                 if com_bus.write_u32(value, *port).is_err() {
                     self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
                 }
             }
-            OutU8Imm(value, port) => {
+            I::OutU8Imm(value, port) => {
                 // out 0xff, 0xff
                 if com_bus.write_u8(*value, *port).is_err() {
                     self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
                 }
             }
-            InU8Reg(port, reg) => {
+            I::InU8Reg(port, reg) => {
                 // in 0xff, reg
                 match com_bus.read_u8(*port) {
                     Err(_) => {
@@ -1201,7 +1201,7 @@ impl Cpu {
                     }
                 }
             }
-            InU8Mem(port, addr) => {
+            I::InU8Mem(port, addr) => {
                 // in 0xff, &[addr]
                 match com_bus.read_u8(*port) {
                     Err(_) => {
@@ -1212,7 +1212,7 @@ impl Cpu {
                     }
                 }
             }
-            InU32Reg(port, reg) => {
+            I::InU32Reg(port, reg) => {
                 // in 0xff, reg
                 match com_bus.read_u32(*port) {
                     Err(_) => {
@@ -1223,7 +1223,7 @@ impl Cpu {
                     }
                 }
             }
-            InU32Mem(port, addr) => {
+            I::InU32Mem(port, addr) => {
                 // in 0xff, &[addr]
                 match com_bus.read_u32(*port) {
                     Err(_) => {
@@ -1234,7 +1234,7 @@ impl Cpu {
                     }
                 }
             }
-            InF32Reg(port, reg) => {
+            I::InF32Reg(port, reg) => {
                 // in 0xff, reg
                 match com_bus.read_f32(*port) {
                     Err(_) => {
@@ -1245,7 +1245,7 @@ impl Cpu {
                     }
                 }
             }
-            InF32Mem(port, addr) => {
+            I::InF32Mem(port, addr) => {
                 // in 0xff, &[addr]
                 match com_bus.read_f32(*port) {
                     Err(_) => {
@@ -1258,17 +1258,17 @@ impl Cpu {
             }
 
             /******** [Logic Instructions] ********/
-            BitTestU32Reg(bit, reg) => {
+            I::BitTestU32Reg(bit, reg) => {
                 // bt bit, reg
                 let value = self.registers.read_reg_u32(reg, privilege);
                 self.perform_bit_test_with_carry_flag(value, *bit % 32);
             }
-            BitTestU32Mem(bit, addr) => {
+            I::BitTestU32Mem(bit, addr) => {
                 // bt bit, &[addr]
                 let value = com_bus.mem.get_u32(*addr as usize);
                 self.perform_bit_test_with_carry_flag(value, *bit % 32);
             }
-            BitTestResetU32Reg(bit, reg) => {
+            I::BitTestResetU32Reg(bit, reg) => {
                 // btr bit, reg
                 // Read the value and set the carry flag state, clear the bit.
                 let mut value = self.registers.read_reg_u32(reg, privilege);
@@ -1277,7 +1277,7 @@ impl Cpu {
                 // Write the value back to the register.
                 self.write_reg_u32(reg, value, privilege);
             }
-            BitTestResetU32Mem(bit, addr) => {
+            I::BitTestResetU32Mem(bit, addr) => {
                 // btr bit, &[addr]
                 // Read the value and set the carry flag state, then clear the bit.
                 let mut value = com_bus.mem.get_u32(*addr as usize);
@@ -1285,7 +1285,7 @@ impl Cpu {
 
                 com_bus.mem.set_u32(*addr as usize, value);
             }
-            BitTestSetU32Reg(bit, reg) => {
+            I::BitTestSetU32Reg(bit, reg) => {
                 // bts bit, reg
                 // Read the value and set the carry flag state, set the bit.
                 let mut value = self.registers.read_reg_u32(reg, privilege);
@@ -1294,7 +1294,7 @@ impl Cpu {
                 // Write the value back to the register.
                 self.write_reg_u32(reg, value, privilege);
             }
-            BitTestSetU32Mem(bit, addr) => {
+            I::BitTestSetU32Mem(bit, addr) => {
                 // bts bit, &[addr]
                 // Read the value and set the carry flag state, then set the bit.
                 let mut value = com_bus.mem.get_u32(*addr as usize);
@@ -1302,63 +1302,63 @@ impl Cpu {
 
                 com_bus.mem.set_u32(*addr as usize, value);
             }
-            BitScanReverseU32RegU32Reg(in_reg, out_reg) => {
+            I::BitScanReverseU32RegU32Reg(in_reg, out_reg) => {
                 // bsr in_reg, out_reg
                 let value = self.registers.read_reg_u32(in_reg, privilege);
                 let index = self.perform_reverse_bit_search(value);
 
                 self.write_reg_u32(out_reg, index, privilege);
             }
-            BitScanReverseU32MemU32Reg(addr, reg) => {
+            I::BitScanReverseU32MemU32Reg(addr, reg) => {
                 // bsr &[addr], reg
                 let value = com_bus.mem.get_u32(*addr as usize);
                 let index = self.perform_reverse_bit_search(value);
 
                 self.write_reg_u32(reg, index, privilege);
             }
-            BitScanReverseU32RegMemU32(reg, out_addr) => {
+            I::BitScanReverseU32RegMemU32(reg, out_addr) => {
                 // bsr reg, &[out_addr]
                 let value = self.registers.read_reg_u32(reg, privilege);
                 let index = self.perform_reverse_bit_search(value);
 
                 com_bus.mem.set_u32(*out_addr as usize, index);
             }
-            BitScanReverseU32MemU32Mem(in_addr, out_addr) => {
+            I::BitScanReverseU32MemU32Mem(in_addr, out_addr) => {
                 // bsr &[in_addr], &[out_addr]
                 let value = com_bus.mem.get_u32(*in_addr as usize);
                 let index = self.perform_reverse_bit_search(value);
 
                 com_bus.mem.set_u32(*out_addr as usize, index);
             }
-            BitScanForwardU32RegU32Reg(in_reg, out_reg) => {
+            I::BitScanForwardU32RegU32Reg(in_reg, out_reg) => {
                 // bsf in_reg, out_reg
                 let value = self.registers.read_reg_u32(in_reg, privilege);
                 let index = self.perform_forward_bit_search(value);
 
                 self.write_reg_u32(out_reg, index, privilege);
             }
-            BitScanForwardU32MemU32Reg(addr, reg) => {
+            I::BitScanForwardU32MemU32Reg(addr, reg) => {
                 // bsf &[addr], reg
                 let value = com_bus.mem.get_u32(*addr as usize);
                 let index = self.perform_forward_bit_search(value);
 
                 self.write_reg_u32(reg, index, privilege);
             }
-            BitScanForwardU32RegMemU32(reg, out_addr) => {
+            I::BitScanForwardU32RegMemU32(reg, out_addr) => {
                 // bsf reg, &[out_addr]
                 let value = self.registers.read_reg_u32(reg, privilege);
                 let index = self.perform_forward_bit_search(value);
 
                 com_bus.mem.set_u32(*out_addr as usize, index);
             }
-            BitScanForwardU32MemU32Mem(in_addr, out_addr) => {
+            I::BitScanForwardU32MemU32Mem(in_addr, out_addr) => {
                 // bsf &[in_addr], &[out_addr]
                 let value = com_bus.mem.get_u32(*in_addr as usize);
                 let index = self.perform_forward_bit_search(value);
 
                 com_bus.mem.set_u32(*out_addr as usize, index);
             }
-            ByteSwapU32(reg) => {
+            I::ByteSwapU32(reg) => {
                 // bswap reg
                 let value = self.registers.read_reg_u32(reg, privilege).swap_bytes();
 
@@ -1366,17 +1366,17 @@ impl Cpu {
             }
 
             /******** [Special Instructions] ********/
-            MaskInterrupt(int_code) => {
+            I::MaskInterrupt(int_code) => {
                 let im = self.registers.get_register_u32_mut(RegisterId::EIM);
                 let new_mask = im.read_unchecked() & !*int_code as u32;
                 im.write_unchecked(new_mask);
             }
-            UnmaskInterrupt(int_code) => {
+            I::UnmaskInterrupt(int_code) => {
                 let im = self.registers.get_register_u32_mut(RegisterId::EIM);
                 let new_mask = (im.read_unchecked() & NOT_U32_LOW_BYTE_MASK) | *int_code as u32;
                 im.write_unchecked(new_mask);
             }
-            LoadIVTAddrU32Imm(addr) => {
+            I::LoadIVTAddrU32Imm(addr) => {
                 // livt [addr]
                 if !self.is_machine_mode {
                     self.handle_interrupt(GENERAL_PROTECTION_FAULT_INT, &mut com_bus.mem);
@@ -1385,24 +1385,31 @@ impl Cpu {
 
                 self.write_reg_u32_unchecked(&RegisterId::IDTR, *addr);
             }
-            MachineReturn => {
+            I::MachineReturn => {
                 self.set_machine_mode(false);
             }
-            Halt => {
+            I::Halt => {
                 self.set_halted(true);
             }
 
             /******** [Reserved Instructions] ********/
-            Reserved1 | Reserved2 | Reserved3 | Reserved4 | Reserved5 | Reserved6 | Reserved7
-            | Reserved8 | Reserved9 => {
+            I::Reserved1
+            | I::Reserved2
+            | I::Reserved3
+            | I::Reserved4
+            | I::Reserved5
+            | I::Reserved6
+            | I::Reserved7
+            | I::Reserved8
+            | I::Reserved9 => {
                 self.handle_interrupt(INVALID_OPCODE_INT, &mut com_bus.mem);
             }
 
             /******** [Pseudo Instructions] ********/
-            Label(_) => {
+            I::Label(_) => {
                 self.handle_interrupt(INVALID_OPCODE_INT, &mut com_bus.mem);
             }
-            Unknown(_id) => {
+            I::Unknown(_id) => {
                 self.handle_interrupt(INVALID_OPCODE_INT, &mut com_bus.mem);
             }
         };

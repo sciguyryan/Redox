@@ -225,271 +225,278 @@ impl PartialEq for Instruction {
 
 impl Display for Instruction {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        use Instruction::*;
+        use Instruction as I;
 
         // Syntax notes:
         // A set of square brackets are used to indicate an expression.
         // An "&" prefix before an argument type indicates that it is being used as a pointer to a memory address.
         let asm_format = match self {
-            Nop => String::from("nop"),
+            I::Nop => String::from("nop"),
 
             /******** [Arithmetic Instructions] ********/
-            AddU32ImmU32Reg(imm, reg) => {
+            I::AddU32ImmU32Reg(imm, reg) => {
                 format!("add 0x{imm:08x}, {reg}")
             }
-            AddU32RegU32Reg(in_reg, out_reg) => {
+            I::AddU32RegU32Reg(in_reg, out_reg) => {
                 format!("add {in_reg}, {out_reg}")
             }
-            SubU32ImmU32Reg(imm, reg) => {
+            I::SubU32ImmU32Reg(imm, reg) => {
                 format!("sub 0x{imm:08x}, {reg}")
             }
-            SubU32RegU32Imm(reg, imm) => {
+            I::SubU32RegU32Imm(reg, imm) => {
                 format!("sub {reg}, 0x{imm:08x}")
             }
-            SubU32RegU32Reg(reg_1, reg_2) => {
+            I::SubU32RegU32Reg(reg_1, reg_2) => {
                 format!("sub {reg_1}, {reg_2}")
             }
-            MulU32Imm(imm) => {
+            I::MulU32Imm(imm) => {
                 format!("mul 0x{imm:08x}")
             }
-            MulU32Reg(reg) => {
+            I::MulU32Reg(reg) => {
                 format!("mul {reg}")
             }
-            DivU32Imm(imm) => {
+            I::DivU32Imm(imm) => {
                 format!("div 0x{imm:08x}")
             }
-            DivU32Reg(reg) => {
+            I::DivU32Reg(reg) => {
                 format!("div {reg}")
             }
-            ModU32ImmU32Reg(imm, reg) => {
+            I::ModU32ImmU32Reg(imm, reg) => {
                 format!("mod 0x{imm:08x}, {reg}")
             }
-            ModU32RegU32Imm(reg, imm) => {
+            I::ModU32RegU32Imm(reg, imm) => {
                 format!("mod {reg}, 0x{imm:08x}")
             }
-            ModU32RegU32Reg(reg_1, reg_2) => {
+            I::ModU32RegU32Reg(reg_1, reg_2) => {
                 format!("mod {reg_1}, {reg_2}")
             }
-            IncU32Reg(reg) => {
+            I::IncU32Reg(reg) => {
                 format!("inc {reg}")
             }
-            DecU32Reg(reg) => {
+            I::DecU32Reg(reg) => {
                 format!("dec {reg}")
             }
-            AndU32ImmU32Reg(imm, reg) => {
+            I::AndU32ImmU32Reg(imm, reg) => {
                 format!("and 0x{imm:08x}, {reg}")
             }
 
             /******** [Bit Operation Instructions] ********/
-            LeftShiftU8ImmU32Reg(imm, reg) => {
+            I::LeftShiftU8ImmU32Reg(imm, reg) => {
                 format!("shl 0x{imm:02x}, {reg}")
             }
-            LeftShiftU32RegU32Reg(shift_reg, reg) => {
+            I::LeftShiftU32RegU32Reg(shift_reg, reg) => {
                 format!("shl {shift_reg}, {reg}")
             }
-            ArithLeftShiftU8ImmU32Reg(imm, reg) => {
+            I::ArithLeftShiftU8ImmU32Reg(imm, reg) => {
                 format!("sal 0x{imm:02x}, {reg}")
             }
-            ArithLeftShiftU32RegU32Reg(shift_reg, reg) => {
+            I::ArithLeftShiftU32RegU32Reg(shift_reg, reg) => {
                 format!("sal {shift_reg}, {reg}")
             }
-            RightShiftU8ImmU32Reg(imm, reg) => {
+            I::RightShiftU8ImmU32Reg(imm, reg) => {
                 format!("shr 0x{imm:02x}, {reg}")
             }
-            RightShiftU32RegU32Reg(shift_reg, reg) => {
+            I::RightShiftU32RegU32Reg(shift_reg, reg) => {
                 format!("shr {shift_reg}, {reg}")
             }
-            ArithRightShiftU8ImmU32Reg(imm, reg) => {
+            I::ArithRightShiftU8ImmU32Reg(imm, reg) => {
                 format!("sar 0x{imm:02x}, {reg}")
             }
-            ArithRightShiftU32RegU32Reg(shift_reg, reg) => {
+            I::ArithRightShiftU32RegU32Reg(shift_reg, reg) => {
                 format!("sar {shift_reg}, {reg}")
             }
 
             /******** [Branching Instructions] ********/
-            CallU32Imm(addr) => {
+            I::CallU32Imm(addr) => {
                 // TODO - apply labels to these jumps - either dynamically generated or via binary file metadata.
                 format!("call &0x{addr:08x}")
             }
-            CallU32Reg(reg) => {
+            I::CallU32Reg(reg) => {
                 format!("call &{reg}")
             }
-            RetArgsU32 => String::from("iret"),
-            Int(int_code) => {
+            I::RetArgsU32 => String::from("iret"),
+            I::Int(int_code) => {
                 format!("int 0x{int_code:02x}")
             }
-            IntRet => String::from("intret"),
-            JumpAbsU32Imm(addr) => {
+            I::IntRet => String::from("intret"),
+            I::JumpAbsU32Imm(addr) => {
                 // TODO - apply labels to these jumps - either dynamically generated or via binary file metadata.
                 format!("jmp &0x{addr:08x}")
             }
-            JumpAbsU32Reg(reg) => {
+            I::JumpAbsU32Reg(reg) => {
                 format!("jmp &{reg}")
             }
 
             /******** [Data Instructions] ********/
-            SwapU32RegU32Reg(reg_1, reg_2) => {
+            I::SwapU32RegU32Reg(reg_1, reg_2) => {
                 format!("swap {reg_1}, {reg_2}")
             }
-            MovU32ImmU32Reg(imm, reg) => {
+            I::MovU32ImmU32Reg(imm, reg) => {
                 format!("mov 0x{imm:08x}, {reg}")
             }
-            MovU32RegU32Reg(in_reg, out_reg) => {
+            I::MovU32RegU32Reg(in_reg, out_reg) => {
                 format!("mov {in_reg}, {out_reg}")
             }
-            MovU32ImmMemSimple(imm, addr) => {
+            I::MovU32ImmMemSimple(imm, addr) => {
                 format!("mov 0x{imm:08x}, &0x{addr:08x}")
             }
-            MovU32RegMemSimple(reg, addr) => {
+            I::MovU32RegMemSimple(reg, addr) => {
                 format!("mov {reg}, &0x{addr:08x}")
             }
-            MovMemU32RegSimple(addr, reg) => {
+            I::MovMemU32RegSimple(addr, reg) => {
                 format!("mov &0x{addr:08x}, {reg}")
             }
-            MovU32RegPtrU32RegSimple(in_reg, out_reg) => {
+            I::MovU32RegPtrU32RegSimple(in_reg, out_reg) => {
                 format!("mov &{in_reg}, {out_reg}")
             }
-            MovU32ImmMemExpr(imm, expr) => {
+            I::MovU32ImmMemExpr(imm, expr) => {
                 let mut decoder = Expression::new();
                 decoder.unpack(*expr);
 
                 format!("mov 0x{imm:08x}, &[{decoder}]")
             }
-            MovMemExprU32Reg(expr, reg) => {
+            I::MovMemExprU32Reg(expr, reg) => {
                 let mut decoder = Expression::new();
                 decoder.unpack(*expr);
 
                 format!("mov &[{decoder}], {reg}")
             }
-            MovU32RegMemExpr(reg, expr) => {
+            I::MovU32RegMemExpr(reg, expr) => {
                 let mut decoder = Expression::new();
                 decoder.unpack(*expr);
 
                 format!("mov {reg}, &[{decoder}]")
             }
-            ByteSwapU32(reg) => {
+            I::ByteSwapU32(reg) => {
                 format!("bswap {reg}")
             }
-            ZeroHighBitsByIndexU32Reg(index_reg, in_reg, out_reg) => {
+            I::ZeroHighBitsByIndexU32Reg(index_reg, in_reg, out_reg) => {
                 format!("zhbi {index_reg}, {in_reg}, {out_reg}")
             }
-            ZeroHighBitsByIndexU32RegU32Imm(index, in_reg, out_reg) => {
+            I::ZeroHighBitsByIndexU32RegU32Imm(index, in_reg, out_reg) => {
                 format!("zhbi 0x{index:08x}, {in_reg}, {out_reg}")
             }
-            PushF32Imm(value) => {
+            I::PushF32Imm(value) => {
                 format!("push {value}")
             }
-            PushU32Imm(value) => {
+            I::PushU32Imm(value) => {
                 format!("push 0x{value:08x}")
             }
-            PushU32Reg(reg) => {
+            I::PushU32Reg(reg) => {
                 format!("push {reg}")
             }
-            PopF32ToF32Reg(reg) => {
+            I::PopF32ToF32Reg(reg) => {
                 format!("pop {reg}")
             }
-            PopU32ToU32Reg(reg) => {
+            I::PopU32ToU32Reg(reg) => {
                 format!("pop {reg}")
             }
 
             /******** [IO Instructions] ********/
-            OutF32Imm(value, port) => {
+            I::OutF32Imm(value, port) => {
                 format!("out.f32 {value:.1}, 0x{port:02x}")
             }
-            OutU32Imm(value, port) => {
+            I::OutU32Imm(value, port) => {
                 format!("out.i32 0x{value:08x}, 0x{port:02x}")
             }
-            OutU32Reg(reg, port) => {
+            I::OutU32Reg(reg, port) => {
                 format!("out.r32 {reg}, 0x{port:02x}")
             }
-            OutU8Imm(value, port) => {
+            I::OutU8Imm(value, port) => {
                 format!("out.i8 0x{value:02x}, 0x{port:02x}")
             }
-            InU8Reg(port, reg) => {
+            I::InU8Reg(port, reg) => {
                 format!("in.r8 0x{port:02x}, {reg}")
             }
-            InU32Reg(port, reg) => {
+            I::InU32Reg(port, reg) => {
                 format!("in.r32 0x{port:02x}, {reg}")
             }
-            InF32Reg(port, reg) => {
+            I::InF32Reg(port, reg) => {
                 format!("in.rf32 0x{port:02x}, {reg}")
             }
-            InU8Mem(port, addr) => {
+            I::InU8Mem(port, addr) => {
                 format!("in.m8 0x{port:02x}, &0x{addr:08x}")
             }
-            InU32Mem(port, addr) => {
+            I::InU32Mem(port, addr) => {
                 format!("in.m32 0x{port:02x}, &0x{addr:08x}")
             }
-            InF32Mem(port, addr) => {
+            I::InF32Mem(port, addr) => {
                 format!("in.mf32 0x{port:02x}, &0x{addr:08x}")
             }
 
             /******** [Logic Instructions] ********/
-            BitTestU32Reg(bit, reg) => {
+            I::BitTestU32Reg(bit, reg) => {
                 format!("bt 0x{bit:02x}, {reg}")
             }
-            BitTestU32Mem(bit, addr) => {
+            I::BitTestU32Mem(bit, addr) => {
                 format!("bt 0x{bit:02x}, &0x{addr:08x}")
             }
-            BitTestResetU32Reg(bit, reg) => {
+            I::BitTestResetU32Reg(bit, reg) => {
                 format!("btr 0x{bit:02x}, {reg}")
             }
-            BitTestResetU32Mem(bit, addr) => {
+            I::BitTestResetU32Mem(bit, addr) => {
                 format!("btr 0x{bit:02x}, &0x{addr:08x}")
             }
-            BitTestSetU32Reg(bit, reg) => {
+            I::BitTestSetU32Reg(bit, reg) => {
                 format!("bts 0x{bit:02x}, {reg}")
             }
-            BitTestSetU32Mem(bit, addr) => {
+            I::BitTestSetU32Mem(bit, addr) => {
                 format!("bts 0x{bit:02x}, &0x{addr:08x}")
             }
-            BitScanReverseU32RegU32Reg(in_reg, out_reg) => {
+            I::BitScanReverseU32RegU32Reg(in_reg, out_reg) => {
                 format!("bsr {in_reg}, {out_reg}")
             }
-            BitScanReverseU32MemU32Reg(addr, reg) => {
+            I::BitScanReverseU32MemU32Reg(addr, reg) => {
                 format!("bsr &0x{addr:08x}, {reg}")
             }
-            BitScanReverseU32RegMemU32(reg, out_addr) => {
+            I::BitScanReverseU32RegMemU32(reg, out_addr) => {
                 format!("bsr {reg}, &0x{out_addr:08x}")
             }
-            BitScanReverseU32MemU32Mem(in_addr, out_addr) => {
+            I::BitScanReverseU32MemU32Mem(in_addr, out_addr) => {
                 format!("bsr &0x{in_addr:08x}, &0x{out_addr:08x}")
             }
-            BitScanForwardU32RegU32Reg(in_reg, out_reg) => {
+            I::BitScanForwardU32RegU32Reg(in_reg, out_reg) => {
                 format!("bsf {in_reg}, {out_reg}")
             }
-            BitScanForwardU32MemU32Reg(addr, reg) => {
+            I::BitScanForwardU32MemU32Reg(addr, reg) => {
                 format!("bsf &0x{addr:08x}, {reg}")
             }
-            BitScanForwardU32RegMemU32(reg, out_addr) => {
+            I::BitScanForwardU32RegMemU32(reg, out_addr) => {
                 format!("bsf {reg}, &0x{out_addr:08x}")
             }
-            BitScanForwardU32MemU32Mem(in_addr, out_addr) => {
+            I::BitScanForwardU32MemU32Mem(in_addr, out_addr) => {
                 format!("bsf &0x{in_addr:08x}, &0x{out_addr:08x}")
             }
 
             /******** [Special Instructions] ********/
-            MaskInterrupt(int_code) => {
+            I::MaskInterrupt(int_code) => {
                 format!("mint 0x{int_code:02x}")
             }
-            UnmaskInterrupt(int_code) => {
+            I::UnmaskInterrupt(int_code) => {
                 format!("umint 0x{int_code:02x}")
             }
-            LoadIVTAddrU32Imm(addr) => {
+            I::LoadIVTAddrU32Imm(addr) => {
                 format!("livt &0x{addr:08x}")
             }
-            MachineReturn => String::from("mret"),
-            Halt => String::from("hlt"),
+            I::MachineReturn => String::from("mret"),
+            I::Halt => String::from("hlt"),
 
             /******** [Reserved Instructions] ********/
-            Reserved1 | Reserved2 | Reserved3 | Reserved4 | Reserved5 | Reserved6 | Reserved7
-            | Reserved8 | Reserved9 => unreachable!("attempted to use a reserved instruction"),
+            I::Reserved1
+            | I::Reserved2
+            | I::Reserved3
+            | I::Reserved4
+            | I::Reserved5
+            | I::Reserved6
+            | I::Reserved7
+            | I::Reserved8
+            | I::Reserved9 => unreachable!("attempted to use a reserved instruction"),
 
             /******** [Pseudo Instructions] ********/
-            Label(_label) => {
+            I::Label(_label) => {
                 todo!();
             }
-            Unknown(id) => format!("UNKNOWN! ID = 0x{id:08x}"),
+            I::Unknown(id) => format!("UNKNOWN! ID = 0x{id:08x}"),
         };
         write!(f, "{asm_format}")
     }
@@ -517,107 +524,116 @@ impl Instruction {
     /// A usize giving the expected argument size, in bytes.
     #[inline(always)]
     pub fn get_instruction_arg_size_from_op(opcode: OpCode) -> usize {
-        use OpCode::*;
+        use OpCode as O;
 
         match opcode {
-            Nop => 0,
+            O::Nop => 0,
 
             /******** [Arithmetic Instructions] ********/
-            AddU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
-            AddU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-            SubU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
-            SubU32RegU32Imm => ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE,
-            SubU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-            MulU32Imm => ARG_U32_IMM_SIZE,
-            MulU32Reg => ARG_REG_ID_SIZE,
-            DivU32Imm => ARG_U32_IMM_SIZE,
-            DivU32Reg => ARG_REG_ID_SIZE,
-            ModU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
-            ModU32RegU32Imm => ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE,
-            ModU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-            IncU32Reg => ARG_REG_ID_SIZE,
-            DecU32Reg => ARG_REG_ID_SIZE,
-            AndU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
+            O::AddU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
+            O::AddU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
+            O::SubU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
+            O::SubU32RegU32Imm => ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE,
+            O::SubU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
+            O::MulU32Imm => ARG_U32_IMM_SIZE,
+            O::MulU32Reg => ARG_REG_ID_SIZE,
+            O::DivU32Imm => ARG_U32_IMM_SIZE,
+            O::DivU32Reg => ARG_REG_ID_SIZE,
+            O::ModU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
+            O::ModU32RegU32Imm => ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE,
+            O::ModU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
+            O::IncU32Reg => ARG_REG_ID_SIZE,
+            O::DecU32Reg => ARG_REG_ID_SIZE,
+            O::AndU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Bit Operation Instructions] ********/
-            LeftShiftU8ImmU32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
-            LeftShiftU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-            ArithLeftShiftU8ImmU32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
-            ArithLeftShiftU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-            RightShiftU8ImmU32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
-            RightShiftU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-            ArithRightShiftU8ImmU32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
-            ArithRightShiftU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
+            O::LeftShiftU8ImmU32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
+            O::LeftShiftU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
+            O::ArithLeftShiftU8ImmU32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
+            O::ArithLeftShiftU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
+            O::RightShiftU8ImmU32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
+            O::RightShiftU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
+            O::ArithRightShiftU8ImmU32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
+            O::ArithRightShiftU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Branching Instructions] ********/
-            CallU32Imm => ARG_MEM_ADDR_SIZE,
-            CallU32Reg => ARG_REG_ID_SIZE,
-            RetArgsU32 => 0,
-            Int => ARG_U8_IMM_SIZE,
-            IntRet => 0,
-            JumpAbsU32Imm => ARG_MEM_ADDR_SIZE,
-            JumpAbsU32Reg => ARG_REG_ID_SIZE,
+            O::CallU32Imm => ARG_MEM_ADDR_SIZE,
+            O::CallU32Reg => ARG_REG_ID_SIZE,
+            O::RetArgsU32 => 0,
+            O::Int => ARG_U8_IMM_SIZE,
+            O::IntRet => 0,
+            O::JumpAbsU32Imm => ARG_MEM_ADDR_SIZE,
+            O::JumpAbsU32Reg => ARG_REG_ID_SIZE,
 
             /******** [Data Instructions] ********/
-            SwapU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-            MovU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
-            MovU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-            MovU32ImmMemSimple => ARG_U32_IMM_SIZE + ARG_MEM_ADDR_SIZE,
-            MovU32RegMemSimple => ARG_REG_ID_SIZE + ARG_MEM_ADDR_SIZE,
-            MovMemU32RegSimple => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
-            MovU32RegPtrU32RegSimple => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-            MovU32ImmMemExpr => ARG_U32_IMM_SIZE + ARG_MEM_ADDR_SIZE,
-            MovMemExprU32Reg => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
-            MovU32RegMemExpr => ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE,
-            ByteSwapU32 => ARG_REG_ID_SIZE,
-            ZeroHighBitsByIndexU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-            ZeroHighBitsByIndexU32RegU32Imm => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-            PushU32Imm => ARG_U32_IMM_SIZE,
-            PushF32Imm => ARG_F32_IMM_SIZE,
-            PushU32Reg => ARG_REG_ID_SIZE,
-            PopF32ToF32Reg => ARG_REG_ID_SIZE,
-            PopU32ToU32Reg => ARG_REG_ID_SIZE,
+            O::SwapU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
+            O::MovU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
+            O::MovU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
+            O::MovU32ImmMemSimple => ARG_U32_IMM_SIZE + ARG_MEM_ADDR_SIZE,
+            O::MovU32RegMemSimple => ARG_REG_ID_SIZE + ARG_MEM_ADDR_SIZE,
+            O::MovMemU32RegSimple => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
+            O::MovU32RegPtrU32RegSimple => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
+            O::MovU32ImmMemExpr => ARG_U32_IMM_SIZE + ARG_MEM_ADDR_SIZE,
+            O::MovMemExprU32Reg => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
+            O::MovU32RegMemExpr => ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE,
+            O::ByteSwapU32 => ARG_REG_ID_SIZE,
+            O::ZeroHighBitsByIndexU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
+            O::ZeroHighBitsByIndexU32RegU32Imm => {
+                ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE + ARG_REG_ID_SIZE
+            }
+            O::PushU32Imm => ARG_U32_IMM_SIZE,
+            O::PushF32Imm => ARG_F32_IMM_SIZE,
+            O::PushU32Reg => ARG_REG_ID_SIZE,
+            O::PopF32ToF32Reg => ARG_REG_ID_SIZE,
+            O::PopU32ToU32Reg => ARG_REG_ID_SIZE,
 
             /******** [IO Instructions] ********/
-            OutF32Imm => ARG_F32_IMM_SIZE + ARG_U8_IMM_SIZE,
-            OutU32Imm => ARG_U32_IMM_SIZE + ARG_U8_IMM_SIZE,
-            OutU32Reg => ARG_REG_ID_SIZE + ARG_U8_IMM_SIZE,
-            OutU8Imm => ARG_U8_IMM_SIZE + ARG_U8_IMM_SIZE,
-            InU8Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
-            InU8Mem => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
-            InU32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
-            InU32Mem => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
-            InF32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
-            InF32Mem => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
+            O::OutF32Imm => ARG_F32_IMM_SIZE + ARG_U8_IMM_SIZE,
+            O::OutU32Imm => ARG_U32_IMM_SIZE + ARG_U8_IMM_SIZE,
+            O::OutU32Reg => ARG_REG_ID_SIZE + ARG_U8_IMM_SIZE,
+            O::OutU8Imm => ARG_U8_IMM_SIZE + ARG_U8_IMM_SIZE,
+            O::InU8Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
+            O::InU8Mem => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
+            O::InU32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
+            O::InU32Mem => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
+            O::InF32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
+            O::InF32Mem => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
 
             /******** [Logic Instructions] ********/
-            BitTestU32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
-            BitTestU32Mem => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
-            BitTestResetU32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
-            BitTestResetU32Mem => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
-            BitTestSetU32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
-            BitTestSetU32Mem => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
-            BitScanReverseU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-            BitScanReverseU32MemU32Reg => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
-            BitScanReverseU32RegMemU32 => ARG_REG_ID_SIZE + ARG_MEM_ADDR_SIZE,
-            BitScanReverseU32MemU32Mem => ARG_MEM_ADDR_SIZE + ARG_MEM_ADDR_SIZE,
-            BitScanForwardU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
-            BitScanForwardU32MemU32Reg => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
-            BitScanForwardU32RegMemU32 => ARG_REG_ID_SIZE + ARG_MEM_ADDR_SIZE,
-            BitScanForwardU32MemU32Mem => ARG_MEM_ADDR_SIZE + ARG_MEM_ADDR_SIZE,
+            O::BitTestU32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
+            O::BitTestU32Mem => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
+            O::BitTestResetU32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
+            O::BitTestResetU32Mem => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
+            O::BitTestSetU32Reg => ARG_U8_IMM_SIZE + ARG_REG_ID_SIZE,
+            O::BitTestSetU32Mem => ARG_U8_IMM_SIZE + ARG_MEM_ADDR_SIZE,
+            O::BitScanReverseU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
+            O::BitScanReverseU32MemU32Reg => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
+            O::BitScanReverseU32RegMemU32 => ARG_REG_ID_SIZE + ARG_MEM_ADDR_SIZE,
+            O::BitScanReverseU32MemU32Mem => ARG_MEM_ADDR_SIZE + ARG_MEM_ADDR_SIZE,
+            O::BitScanForwardU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
+            O::BitScanForwardU32MemU32Reg => ARG_MEM_ADDR_SIZE + ARG_REG_ID_SIZE,
+            O::BitScanForwardU32RegMemU32 => ARG_REG_ID_SIZE + ARG_MEM_ADDR_SIZE,
+            O::BitScanForwardU32MemU32Mem => ARG_MEM_ADDR_SIZE + ARG_MEM_ADDR_SIZE,
 
             /******** [Special Instructions] ********/
-            MaskInterrupt => ARG_U8_IMM_SIZE,
-            UnmaskInterrupt => ARG_U8_IMM_SIZE,
-            LoadIVTAddrU32Imm => ARG_MEM_ADDR_SIZE,
-            MachineReturn | Halt => 0,
+            O::MaskInterrupt => ARG_U8_IMM_SIZE,
+            O::UnmaskInterrupt => ARG_U8_IMM_SIZE,
+            O::LoadIVTAddrU32Imm => ARG_MEM_ADDR_SIZE,
+            O::MachineReturn | O::Halt => 0,
 
             /******** [Reserved Instructions] ********/
-            Reserved1 | Reserved2 | Reserved3 | Reserved4 | Reserved5 | Reserved6 | Reserved7
-            | Reserved8 | Reserved9 => 0,
+            O::Reserved1
+            | O::Reserved2
+            | O::Reserved3
+            | O::Reserved4
+            | O::Reserved5
+            | O::Reserved6
+            | O::Reserved7
+            | O::Reserved8
+            | O::Reserved9 => 0,
 
             /******** [Pseudo Instructions] ********/
-            Label | Unknown => 0,
+            O::Label | O::Unknown => 0,
         }
     }
 
