@@ -1,4 +1,5 @@
 #![crate_name = "redox_core"]
+#![deny(unsafe_op_in_unsafe_fn)]
 
 mod boot_rom;
 mod com_bus;
