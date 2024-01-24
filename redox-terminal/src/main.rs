@@ -1,6 +1,5 @@
 #![crate_name = "redox_terminal"]
 
-use rand::Rng;
 use redox_core::{
     compiler::bytecode_compiler::Compiler,
     ins::instruction::Instruction,
@@ -44,11 +43,11 @@ use std::time::Instant;
     let elapsed2 = now2.elapsed().as_nanos() as f32;
 
     println!(
-        "Elapsed (1): {:.2?} microseconds per iteration. Total = {elapsed1}",
+        "Elapsed (1): {:.2?} nanoseconds per iteration. Total = {elapsed1}",
         elapsed1 / iterations as f32
     );
     println!(
-        "Elapsed (2): {:.2?} microseconds per iteration. Total = {elapsed2}",
+        "Elapsed (2): {:.2?} nanoseconds per iteration. Total = {elapsed2}",
         elapsed2 / iterations as f32
     );
 
@@ -63,87 +62,10 @@ use std::time::Instant;
     );
 }*/
 
-use core::arch::asm;
-
-#[inline(never)]
-pub fn div(src: i32, inx: i32) -> (i32, i32) {
-    assert!(inx != 0);
-
-    let division = src / inx;
-    let modulo = src % inx;
-    (division, modulo)
-}
-
-#[inline(never)]
-pub fn div_2(src: i32, inx: i32) -> (i32, i32) {
-    assert!(inx != 0);
-
-    let quotient: i32;
-    let remainder: i32;
-
-    unsafe {
-        asm!(
-            "xor edx, edx",
-            "idiv ecx",  // idiv instruction
-            inout("eax") src => quotient,  // input: eax (dividend), output: quotient
-            in("ecx") inx,  // input: eax (dividend), output: quotient
-            lateout("edx") remainder   // late output: rdx (remainder)
-        );
-    }
-
-    (quotient, remainder)
-}
-
-fn run_test_2() {
-    let iterations = 100_000_000;
-
-    let mut out_div_1 = 0;
-    let mut out_rem_1 = 0;
-    let mut out_div_2 = 0;
-    let mut out_rem_2 = 0;
-
-    let a: i32 = rand::thread_rng().gen_range(0..100);
-    let b: i32 = rand::thread_rng().gen_range(1..100);
-
-    println!("a = {a}, b = {b}");
-
-    let now1 = Instant::now();
-    {
-        for _ in 0..iterations {
-            (out_div_1, out_rem_1) = div(a, b);
-        }
-    }
-    let elapsed1 = now1.elapsed().as_nanos() as f64;
-
-    let now2 = Instant::now();
-    {
-        for _ in 0..iterations {
-            (out_div_2, out_rem_2) = div_2(a, b);
-        }
-    }
-    let elapsed2 = now2.elapsed().as_nanos() as f64;
-
-    println!(
-        "Elapsed (1): {:.2?} nanoseconds per iteration. Total = {elapsed1}",
-        elapsed1 / iterations as f64
-    );
-    println!(
-        "Elapsed (2): {:.2?} nanoseconds per iteration. Total = {elapsed2}",
-        elapsed2 / iterations as f64
-    );
-
-    assert_eq!(out_div_1, out_div_2);
-    assert_eq!(out_rem_1, out_rem_2);
-    println!("({out_div_1}, {out_rem_1}) - ({out_div_2}, {out_rem_2})");
-}
-
 fn main() {
     if cfg!(target_endian = "big") {
         panic!("currently unsupported");
     }
-
-    run_test_2();
-    return;
 
     let code = "call :LABEL_1";
 
