@@ -394,34 +394,34 @@ impl Display for Instruction {
 
             /******** [IO Instructions] ********/
             I::OutF32Imm(value, port) => {
-                format!("out.f32 {value:.1}, 0x{port:02x}")
+                format!("outf {value:.1}, 0x{port:02x}")
             }
             I::OutU32Imm(value, port) => {
-                format!("out.i32 0x{value:08x}, 0x{port:02x}")
+                format!("outwd 0x{value:08x}, 0x{port:02x}")
             }
             I::OutU32Reg(reg, port) => {
-                format!("out.r32 {reg}, 0x{port:02x}")
+                format!("outrw {reg}, 0x{port:02x}")
             }
             I::OutU8Imm(value, port) => {
-                format!("out.i8 0x{value:02x}, 0x{port:02x}")
+                format!("outb 0x{value:02x}, 0x{port:02x}")
             }
             I::InU8Reg(port, reg) => {
-                format!("in.r8 0x{port:02x}, {reg}")
+                format!("inrb 0x{port:02x}, {reg}")
             }
             I::InU32Reg(port, reg) => {
-                format!("in.r32 0x{port:02x}, {reg}")
+                format!("inrw 0x{port:02x}, {reg}")
             }
             I::InF32Reg(port, reg) => {
-                format!("in.rf32 0x{port:02x}, {reg}")
+                format!("inrf 0x{port:02x}, {reg}")
             }
             I::InU8Mem(port, addr) => {
-                format!("in.m8 0x{port:02x}, &0x{addr:08x}")
+                format!("inmb 0x{port:02x}, &0x{addr:08x}")
             }
             I::InU32Mem(port, addr) => {
-                format!("in.m32 0x{port:02x}, &0x{addr:08x}")
+                format!("inmw 0x{port:02x}, &0x{addr:08x}")
             }
             I::InF32Mem(port, addr) => {
-                format!("in.mf32 0x{port:02x}, &0x{addr:08x}")
+                format!("inmf 0x{port:02x}, &0x{addr:08x}")
             }
 
             /******** [Logic Instructions] ********/

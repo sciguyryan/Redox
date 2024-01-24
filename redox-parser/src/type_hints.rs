@@ -59,21 +59,23 @@ impl<'a> InstructionLookup<'a> {
     }
 
     pub fn total_argument_size(&self) -> usize {
+        use ArgTypeHint as AH;
+
         let mut total = 0;
         for arg in &self.args {
             total += match arg {
-                ArgTypeHint::F32 => SIZE_OF_F32,
-                ArgTypeHint::F64 => SIZE_OF_F64,
-                ArgTypeHint::U32 => SIZE_OF_U32,
-                ArgTypeHint::U32Pointer => SIZE_OF_U32,
-                ArgTypeHint::U64 => SIZE_OF_U64,
-                ArgTypeHint::U8 => SIZE_OF_U8,
-                ArgTypeHint::U8Pointer => SIZE_OF_U8,
-                ArgTypeHint::RegisterF32 => SIZE_OF_REGISTER_ID,
-                ArgTypeHint::RegisterU32 => SIZE_OF_REGISTER_ID,
-                ArgTypeHint::RegisterU32Pointer => SIZE_OF_REGISTER_ID,
-                ArgTypeHint::Expression => SIZE_OF_U32,
-                ArgTypeHint::ExpressionPointer => SIZE_OF_U32,
+                AH::F32 => SIZE_OF_F32,
+                AH::F64 => SIZE_OF_F64,
+                AH::U32 => SIZE_OF_U32,
+                AH::U32Pointer => SIZE_OF_U32,
+                AH::U64 => SIZE_OF_U64,
+                AH::U8 => SIZE_OF_U8,
+                AH::U8Pointer => SIZE_OF_U8,
+                AH::RegisterF32 => SIZE_OF_REGISTER_ID,
+                AH::RegisterU32 => SIZE_OF_REGISTER_ID,
+                AH::RegisterU32Pointer => SIZE_OF_REGISTER_ID,
+                AH::Expression => SIZE_OF_U32,
+                AH::ExpressionPointer => SIZE_OF_U32,
             };
         }
         total
@@ -94,206 +96,179 @@ pub struct InstructionHints<'a> {
 impl<'a> InstructionHints<'a> {
     pub fn new() -> Self {
         use ArgTypeHint::*;
+        use OpCode as O;
 
         Self {
             hints: vec![
-                gen_hint!(vec!["nop"], [], OpCode::Nop),
+                gen_hint!(vec!["nop"], [], O::Nop),
                 /******** [Arithmetic Instructions] ********/
-                gen_hint!(vec!["add"], [U32, RegisterU32], OpCode::AddU32ImmU32Reg),
-                gen_hint!(
-                    vec!["add"],
-                    [RegisterU32, RegisterU32],
-                    OpCode::AddU32RegU32Reg
-                ),
-                gen_hint!(vec!["sub"], [U32, RegisterU32], OpCode::SubU32ImmU32Reg),
-                gen_hint!(vec!["sub"], [RegisterU32, U32], OpCode::SubU32RegU32Imm),
-                gen_hint!(
-                    vec!["sub"],
-                    [RegisterU32, RegisterU32],
-                    OpCode::SubU32RegU32Reg
-                ),
-                gen_hint!(vec!["mul"], [U32], OpCode::MulU32Imm),
-                gen_hint!(vec!["mul"], [RegisterU32], OpCode::MulU32Reg),
-                gen_hint!(vec!["div"], [U32], OpCode::DivU32Imm),
-                gen_hint!(vec!["div"], [RegisterU32], OpCode::DivU32Reg),
-                gen_hint!(vec!["mod"], [U32, RegisterU32], OpCode::ModU32ImmU32Reg),
-                gen_hint!(vec!["mod"], [RegisterU32, U32], OpCode::ModU32RegU32Imm),
-                gen_hint!(
-                    vec!["mod"],
-                    [RegisterU32, RegisterU32],
-                    OpCode::ModU32RegU32Reg
-                ),
-                gen_hint!(vec!["inc"], [RegisterU32], OpCode::IncU32Reg),
-                gen_hint!(vec!["dec"], [RegisterU32], OpCode::DecU32Reg),
-                gen_hint!(vec!["and"], [U32, RegisterU32], OpCode::AndU32ImmU32Reg),
+                gen_hint!(vec!["add"], [U32, RegisterU32], O::AddU32ImmU32Reg),
+                gen_hint!(vec!["add"], [RegisterU32, RegisterU32], O::AddU32RegU32Reg),
+                gen_hint!(vec!["sub"], [U32, RegisterU32], O::SubU32ImmU32Reg),
+                gen_hint!(vec!["sub"], [RegisterU32, U32], O::SubU32RegU32Imm),
+                gen_hint!(vec!["sub"], [RegisterU32, RegisterU32], O::SubU32RegU32Reg),
+                gen_hint!(vec!["mul"], [U32], O::MulU32Imm),
+                gen_hint!(vec!["mul"], [RegisterU32], O::MulU32Reg),
+                gen_hint!(vec!["div"], [U32], O::DivU32Imm),
+                gen_hint!(vec!["div"], [RegisterU32], O::DivU32Reg),
+                gen_hint!(vec!["mod"], [U32, RegisterU32], O::ModU32ImmU32Reg),
+                gen_hint!(vec!["mod"], [RegisterU32, U32], O::ModU32RegU32Imm),
+                gen_hint!(vec!["mod"], [RegisterU32, RegisterU32], O::ModU32RegU32Reg),
+                gen_hint!(vec!["inc"], [RegisterU32], O::IncU32Reg),
+                gen_hint!(vec!["dec"], [RegisterU32], O::DecU32Reg),
+                gen_hint!(vec!["and"], [U32, RegisterU32], O::AndU32ImmU32Reg),
                 /******** [Bit Operation Instructions] ********/
-                gen_hint!(vec!["shl"], [U8, RegisterU32], OpCode::LeftShiftU8ImmU32Reg),
+                gen_hint!(vec!["shl"], [U8, RegisterU32], O::LeftShiftU8ImmU32Reg),
                 gen_hint!(
                     vec!["shl"],
                     [RegisterU32, RegisterU32],
-                    OpCode::LeftShiftU32RegU32Reg
+                    O::LeftShiftU32RegU32Reg
                 ),
-                gen_hint!(
-                    vec!["sal"],
-                    [U8, RegisterU32],
-                    OpCode::ArithLeftShiftU8ImmU32Reg
-                ),
+                gen_hint!(vec!["sal"], [U8, RegisterU32], O::ArithLeftShiftU8ImmU32Reg),
                 gen_hint!(
                     vec!["sal"],
                     [RegisterU32, RegisterU32],
-                    OpCode::ArithLeftShiftU32RegU32Reg
+                    O::ArithLeftShiftU32RegU32Reg
                 ),
-                gen_hint!(
-                    vec!["shr"],
-                    [U8, RegisterU32],
-                    OpCode::RightShiftU8ImmU32Reg
-                ),
+                gen_hint!(vec!["shr"], [U8, RegisterU32], O::RightShiftU8ImmU32Reg),
                 gen_hint!(
                     vec!["shr"],
                     [RegisterU32, RegisterU32],
-                    OpCode::RightShiftU32RegU32Reg
+                    O::RightShiftU32RegU32Reg
                 ),
                 gen_hint!(
                     vec!["sar"],
                     [U8, RegisterU32],
-                    OpCode::ArithRightShiftU8ImmU32Reg
+                    O::ArithRightShiftU8ImmU32Reg
                 ),
                 gen_hint!(
                     vec!["sar"],
                     [RegisterU32, RegisterU32],
-                    OpCode::ArithRightShiftU32RegU32Reg
+                    O::ArithRightShiftU32RegU32Reg
                 ),
                 /******** [Branching Instructions] ********/
-                gen_hint!(vec!["call"], [U32Pointer], OpCode::CallU32Imm),
-                gen_hint!(vec!["call"], [RegisterU32Pointer], OpCode::CallU32Reg),
-                gen_hint!(vec!["iret"], [], OpCode::RetArgsU32),
-                gen_hint!(vec!["int"], [U8], OpCode::Int),
-                gen_hint!(vec!["intret"], [], OpCode::IntRet),
-                gen_hint!(vec!["jmp"], [U32Pointer], OpCode::JumpAbsU32Imm),
-                gen_hint!(vec!["jmp"], [RegisterU32Pointer], OpCode::JumpAbsU32Reg),
+                gen_hint!(vec!["call"], [U32Pointer], O::CallU32Imm),
+                gen_hint!(vec!["call"], [RegisterU32Pointer], O::CallU32Reg),
+                gen_hint!(vec!["iret"], [], O::RetArgsU32),
+                gen_hint!(vec!["int"], [U8], O::Int),
+                gen_hint!(vec!["intret"], [], O::IntRet),
+                gen_hint!(vec!["jmp"], [U32Pointer], O::JumpAbsU32Imm),
+                gen_hint!(vec!["jmp"], [RegisterU32Pointer], O::JumpAbsU32Reg),
                 /******** [Data Instructions] ********/
                 gen_hint!(
                     vec!["swap"],
                     [RegisterU32, RegisterU32],
-                    OpCode::SwapU32RegU32Reg
+                    O::SwapU32RegU32Reg
                 ),
-                gen_hint!(vec!["mov"], [U32, RegisterU32], OpCode::MovU32ImmU32Reg),
-                gen_hint!(
-                    vec!["mov"],
-                    [RegisterU32, RegisterU32],
-                    OpCode::MovU32RegU32Reg
-                ),
-                gen_hint!(vec!["mov"], [U32, U32Pointer], OpCode::MovU32ImmMemSimple),
+                gen_hint!(vec!["mov"], [U32, RegisterU32], O::MovU32ImmU32Reg),
+                gen_hint!(vec!["mov"], [RegisterU32, RegisterU32], O::MovU32RegU32Reg),
+                gen_hint!(vec!["mov"], [U32, U32Pointer], O::MovU32ImmMemSimple),
                 gen_hint!(
                     vec!["mov"],
                     [RegisterU32, U32Pointer],
-                    OpCode::MovU32RegMemSimple
+                    O::MovU32RegMemSimple
                 ),
                 gen_hint!(
                     vec!["mov"],
                     [U32Pointer, RegisterU32],
-                    OpCode::MovMemU32RegSimple
+                    O::MovMemU32RegSimple
                 ),
                 gen_hint!(
                     vec!["mov"],
                     [RegisterU32Pointer, RegisterU32],
-                    OpCode::MovU32RegPtrU32RegSimple
+                    O::MovU32RegPtrU32RegSimple
                 ),
-                gen_hint!(
-                    vec!["mov"],
-                    [U32, ExpressionPointer],
-                    OpCode::MovU32ImmMemExpr
-                ),
+                gen_hint!(vec!["mov"], [U32, ExpressionPointer], O::MovU32ImmMemExpr),
                 gen_hint!(
                     vec!["mov"],
                     [ExpressionPointer, RegisterU32],
-                    OpCode::MovMemExprU32Reg
+                    O::MovMemExprU32Reg
                 ),
                 gen_hint!(
                     vec!["mov"],
                     [RegisterU32, ExpressionPointer],
-                    OpCode::MovU32RegMemExpr
+                    O::MovU32RegMemExpr
                 ),
-                gen_hint!(vec!["bswap"], [RegisterU32], OpCode::ByteSwapU32),
+                gen_hint!(vec!["bswap"], [RegisterU32], O::ByteSwapU32),
                 gen_hint!(
                     vec!["zhbi"],
                     [RegisterU32, RegisterU32, RegisterU32],
-                    OpCode::ZeroHighBitsByIndexU32Reg
+                    O::ZeroHighBitsByIndexU32Reg
                 ),
                 gen_hint!(
                     vec!["zhbi"],
                     [U32, RegisterU32, RegisterU32],
-                    OpCode::ZeroHighBitsByIndexU32RegU32Imm
+                    O::ZeroHighBitsByIndexU32RegU32Imm
                 ),
-                gen_hint!(vec!["push"], [F32], OpCode::PushF32Imm),
-                gen_hint!(vec!["push"], [U32], OpCode::PushU32Imm),
-                gen_hint!(vec!["push"], [RegisterU32], OpCode::PushU32Reg),
-                gen_hint!(vec!["pop"], [RegisterF32], OpCode::PopF32ToF32Reg),
-                gen_hint!(vec!["pop"], [RegisterU32], OpCode::PopU32ToU32Reg),
+                gen_hint!(vec!["push"], [F32], O::PushF32Imm),
+                gen_hint!(vec!["push"], [U32], O::PushU32Imm),
+                gen_hint!(vec!["push"], [RegisterU32], O::PushU32Reg),
+                gen_hint!(vec!["pop"], [RegisterF32], O::PopF32ToF32Reg),
+                gen_hint!(vec!["pop"], [RegisterU32], O::PopU32ToU32Reg),
                 /******** [IO Instructions] ********/
-                gen_hint!(vec!["out", "out.f32"], [F32, U8], OpCode::OutF32Imm),
-                gen_hint!(vec!["out", "out.i32"], [U32, U8], OpCode::OutU32Imm),
-                gen_hint!(vec!["out", "out.r32"], [RegisterU32, U8], OpCode::OutU32Reg),
-                gen_hint!(vec!["out", "out.i8"], [U8, U8], OpCode::OutU8Imm),
-                gen_hint!(vec!["in", "in.r8"], [U8, RegisterU32], OpCode::InU8Reg),
-                gen_hint!(vec!["in", "in.r32"], [U8, RegisterU32], OpCode::InU32Reg),
-                gen_hint!(vec!["in", "in.rf32"], [U8, RegisterF32], OpCode::InF32Reg),
-                gen_hint!(vec!["in", "in.m8"], [U8, U32Pointer], OpCode::InU8Mem),
-                gen_hint!(vec!["in", "in.m32"], [U8, U32Pointer], OpCode::InU32Mem),
-                gen_hint!(vec!["in", "in.mf32"], [U8, U32Pointer], OpCode::InF32Mem),
+                gen_hint!(vec!["outf"], [F32, U8], O::OutF32Imm),
+                gen_hint!(vec!["outwd"], [U32, U8], O::OutU32Imm),
+                gen_hint!(vec!["outrw"], [RegisterU32, U8], O::OutU32Reg),
+                gen_hint!(vec!["outb"], [U8, U8], O::OutU8Imm),
+                gen_hint!(vec!["inrb"], [U8, RegisterU32], O::InU8Reg),
+                gen_hint!(vec!["inrw"], [U8, RegisterU32], O::InU32Reg),
+                gen_hint!(vec!["inrf"], [U8, RegisterF32], O::InF32Reg),
+                gen_hint!(vec!["inmb"], [U8, U32Pointer], O::InU8Mem),
+                gen_hint!(vec!["inmw"], [U8, U32Pointer], O::InU32Mem),
+                gen_hint!(vec!["inmf"], [U8, U32Pointer], O::InF32Mem),
                 /******** [Logic Instructions] ********/
-                gen_hint!(vec!["bt"], [U8, RegisterU32], OpCode::BitTestU32Reg),
-                gen_hint!(vec!["bt"], [U8, U32Pointer], OpCode::BitTestU32Mem),
-                gen_hint!(vec!["btr"], [U8, RegisterU32], OpCode::BitTestResetU32Reg),
-                gen_hint!(vec!["btr"], [U8, U32Pointer], OpCode::BitTestResetU32Mem),
-                gen_hint!(vec!["bts"], [U8, RegisterU32], OpCode::BitTestSetU32Reg),
-                gen_hint!(vec!["bts"], [U8, U32Pointer], OpCode::BitTestSetU32Mem),
+                gen_hint!(vec!["bt"], [U8, RegisterU32], O::BitTestU32Reg),
+                gen_hint!(vec!["bt"], [U8, U32Pointer], O::BitTestU32Mem),
+                gen_hint!(vec!["btr"], [U8, RegisterU32], O::BitTestResetU32Reg),
+                gen_hint!(vec!["btr"], [U8, U32Pointer], O::BitTestResetU32Mem),
+                gen_hint!(vec!["bts"], [U8, RegisterU32], O::BitTestSetU32Reg),
+                gen_hint!(vec!["bts"], [U8, U32Pointer], O::BitTestSetU32Mem),
                 gen_hint!(
                     vec!["bsr"],
                     [RegisterU32, RegisterU32],
-                    OpCode::BitScanReverseU32RegU32Reg
+                    O::BitScanReverseU32RegU32Reg
                 ),
                 gen_hint!(
                     vec!["bsr"],
                     [U32Pointer, RegisterU32],
-                    OpCode::BitScanReverseU32MemU32Reg
+                    O::BitScanReverseU32MemU32Reg
                 ),
                 gen_hint!(
                     vec!["bsr"],
                     [RegisterU32, U32Pointer],
-                    OpCode::BitScanReverseU32RegMemU32
+                    O::BitScanReverseU32RegMemU32
                 ),
                 gen_hint!(
                     vec!["bsr"],
                     [U32Pointer, U32Pointer],
-                    OpCode::BitScanReverseU32MemU32Mem
+                    O::BitScanReverseU32MemU32Mem
                 ),
                 gen_hint!(
                     vec!["bsf"],
                     [RegisterU32, RegisterU32],
-                    OpCode::BitScanForwardU32RegU32Reg
+                    O::BitScanForwardU32RegU32Reg
                 ),
                 gen_hint!(
                     vec!["bsf"],
                     [U32Pointer, RegisterU32],
-                    OpCode::BitScanForwardU32MemU32Reg
+                    O::BitScanForwardU32MemU32Reg
                 ),
                 gen_hint!(
                     vec!["bsf"],
                     [RegisterU32, U32Pointer],
-                    OpCode::BitScanForwardU32RegMemU32
+                    O::BitScanForwardU32RegMemU32
                 ),
                 gen_hint!(
                     vec!["bsf"],
                     [U32Pointer, U32Pointer],
-                    OpCode::BitScanForwardU32MemU32Mem
+                    O::BitScanForwardU32MemU32Mem
                 ),
                 /******** [Special Instructions] ********/
-                gen_hint!(vec!["mint"], [U8], OpCode::MaskInterrupt),
-                gen_hint!(vec!["umint"], [U8], OpCode::UnmaskInterrupt),
-                gen_hint!(vec!["livt"], [U32Pointer], OpCode::LoadIVTAddrU32Imm),
-                gen_hint!(vec!["mret"], [], OpCode::MachineReturn),
-                gen_hint!(vec!["hlt"], [], OpCode::Halt),
+                gen_hint!(vec!["mint"], [U8], O::MaskInterrupt),
+                gen_hint!(vec!["umint"], [U8], O::UnmaskInterrupt),
+                gen_hint!(vec!["livt"], [U32Pointer], O::LoadIVTAddrU32Imm),
+                gen_hint!(vec!["mret"], [], O::MachineReturn),
+                gen_hint!(vec!["hlt"], [], O::Halt),
             ],
         }
     }

@@ -476,292 +476,288 @@ impl<'a> AsmParser<'a> {
     /// * `opcode` - The [`OpCode`] for the instruction.
     /// * `args` - The arguments to be used to build the instruction.
     fn try_build_instruction(opcode: OpCode, args: &[Argument]) -> Instruction {
-        use {Argument::*, OpCode::*};
+        use Argument::*;
+        use Instruction as I;
+        use OpCode as O;
 
         // This will only ever be called internally and since we have confirmed that the arguments
         // match those that would be needed for the instruction associated with the opcode, it's safe
         // to make some assumptions regarding the sanity of the data.
         match opcode {
-            Nop => Instruction::Nop,
+            O::Nop => I::Nop,
 
             /******** [Arithmetic Instructions] ********/
-            AddU32ImmU32Reg => Instruction::AddU32ImmU32Reg(
+            O::AddU32ImmU32Reg => I::AddU32ImmU32Reg(
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
-            AddU32RegU32Reg => Instruction::AddU32RegU32Reg(
+            O::AddU32RegU32Reg => I::AddU32RegU32Reg(
                 get_inner_arg!(args[0], RegisterU32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
-            SubU32ImmU32Reg => Instruction::SubU32ImmU32Reg(
+            O::SubU32ImmU32Reg => I::SubU32ImmU32Reg(
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
-            SubU32RegU32Imm => Instruction::SubU32RegU32Imm(
+            O::SubU32RegU32Imm => I::SubU32RegU32Imm(
                 get_inner_arg!(args[0], RegisterU32),
                 get_inner_arg_and_cast!(args[1], UnsignedInt, u32),
             ),
-            SubU32RegU32Reg => Instruction::SubU32RegU32Reg(
+            O::SubU32RegU32Reg => I::SubU32RegU32Reg(
                 get_inner_arg!(args[0], RegisterU32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
-            MulU32Imm => Instruction::MulU32Imm(get_inner_arg_and_cast!(args[0], UnsignedInt, u32)),
-            MulU32Reg => Instruction::MulU32Reg(get_inner_arg!(args[0], RegisterU32)),
-            DivU32Imm => Instruction::DivU32Imm(get_inner_arg_and_cast!(args[0], UnsignedInt, u32)),
-            DivU32Reg => Instruction::DivU32Reg(get_inner_arg!(args[0], RegisterU32)),
-            ModU32ImmU32Reg => Instruction::ModU32ImmU32Reg(
+            O::MulU32Imm => I::MulU32Imm(get_inner_arg_and_cast!(args[0], UnsignedInt, u32)),
+            O::MulU32Reg => I::MulU32Reg(get_inner_arg!(args[0], RegisterU32)),
+            O::DivU32Imm => I::DivU32Imm(get_inner_arg_and_cast!(args[0], UnsignedInt, u32)),
+            O::DivU32Reg => I::DivU32Reg(get_inner_arg!(args[0], RegisterU32)),
+            O::ModU32ImmU32Reg => I::ModU32ImmU32Reg(
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
-            ModU32RegU32Imm => Instruction::ModU32RegU32Imm(
+            O::ModU32RegU32Imm => I::ModU32RegU32Imm(
                 get_inner_arg!(args[0], RegisterU32),
                 get_inner_arg_and_cast!(args[1], UnsignedInt, u32),
             ),
-            ModU32RegU32Reg => Instruction::ModU32RegU32Reg(
+            O::ModU32RegU32Reg => I::ModU32RegU32Reg(
                 get_inner_arg!(args[0], RegisterU32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
-            IncU32Reg => Instruction::IncU32Reg(get_inner_arg!(args[0], RegisterU32)),
-            DecU32Reg => Instruction::DecU32Reg(get_inner_arg!(args[0], RegisterU32)),
-            AndU32ImmU32Reg => Instruction::AndU32ImmU32Reg(
+            O::IncU32Reg => I::IncU32Reg(get_inner_arg!(args[0], RegisterU32)),
+            O::DecU32Reg => I::DecU32Reg(get_inner_arg!(args[0], RegisterU32)),
+            O::AndU32ImmU32Reg => I::AndU32ImmU32Reg(
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
 
             /******** [Bit Operation Instructions] ********/
-            LeftShiftU8ImmU32Reg => Instruction::LeftShiftU8ImmU32Reg(
+            O::LeftShiftU8ImmU32Reg => I::LeftShiftU8ImmU32Reg(
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
                 get_inner_arg!(args[1], RegisterU32),
             ),
-            LeftShiftU32RegU32Reg => Instruction::LeftShiftU32RegU32Reg(
+            O::LeftShiftU32RegU32Reg => I::LeftShiftU32RegU32Reg(
                 get_inner_arg!(args[0], RegisterU32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
-            ArithLeftShiftU8ImmU32Reg => Instruction::ArithLeftShiftU8ImmU32Reg(
+            O::ArithLeftShiftU8ImmU32Reg => I::ArithLeftShiftU8ImmU32Reg(
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
                 get_inner_arg!(args[1], RegisterU32),
             ),
-            ArithLeftShiftU32RegU32Reg => Instruction::ArithLeftShiftU32RegU32Reg(
+            O::ArithLeftShiftU32RegU32Reg => I::ArithLeftShiftU32RegU32Reg(
                 get_inner_arg!(args[0], RegisterU32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
-            RightShiftU8ImmU32Reg => Instruction::RightShiftU8ImmU32Reg(
+            O::RightShiftU8ImmU32Reg => I::RightShiftU8ImmU32Reg(
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
                 get_inner_arg!(args[1], RegisterU32),
             ),
-            RightShiftU32RegU32Reg => Instruction::RightShiftU32RegU32Reg(
+            O::RightShiftU32RegU32Reg => I::RightShiftU32RegU32Reg(
                 get_inner_arg!(args[0], RegisterU32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
-            ArithRightShiftU8ImmU32Reg => Instruction::ArithRightShiftU8ImmU32Reg(
+            O::ArithRightShiftU8ImmU32Reg => I::ArithRightShiftU8ImmU32Reg(
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
                 get_inner_arg!(args[1], RegisterU32),
             ),
-            ArithRightShiftU32RegU32Reg => Instruction::ArithRightShiftU32RegU32Reg(
+            O::ArithRightShiftU32RegU32Reg => I::ArithRightShiftU32RegU32Reg(
                 get_inner_arg!(args[0], RegisterU32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
 
             /******** [Branching Instructions] ********/
-            CallU32Imm => {
-                Instruction::CallU32Imm(get_inner_arg_and_cast!(args[0], UnsignedInt, u32))
+            O::CallU32Imm => I::CallU32Imm(get_inner_arg_and_cast!(args[0], UnsignedInt, u32)),
+            O::CallU32Reg => I::CallU32Reg(get_inner_arg!(args[0], RegisterU32)),
+            O::RetArgsU32 => I::RetArgsU32,
+            O::Int => I::Int(get_inner_arg_and_cast!(args[0], UnsignedInt, u8)),
+            O::IntRet => I::IntRet,
+            O::JumpAbsU32Imm => {
+                I::JumpAbsU32Imm(get_inner_arg_and_cast!(args[0], UnsignedInt, u32))
             }
-            CallU32Reg => Instruction::CallU32Reg(get_inner_arg!(args[0], RegisterU32)),
-            RetArgsU32 => Instruction::RetArgsU32,
-            Int => Instruction::Int(get_inner_arg_and_cast!(args[0], UnsignedInt, u8)),
-            IntRet => Instruction::IntRet,
-            JumpAbsU32Imm => {
-                Instruction::JumpAbsU32Imm(get_inner_arg_and_cast!(args[0], UnsignedInt, u32))
-            }
-            JumpAbsU32Reg => Instruction::JumpAbsU32Reg(get_inner_arg!(args[0], RegisterU32)),
+            O::JumpAbsU32Reg => I::JumpAbsU32Reg(get_inner_arg!(args[0], RegisterU32)),
 
             /******** [Data Instructions] ********/
-            SwapU32RegU32Reg => Instruction::SwapU32RegU32Reg(
+            O::SwapU32RegU32Reg => I::SwapU32RegU32Reg(
                 get_inner_arg!(args[0], RegisterU32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
-            MovU32ImmU32Reg => Instruction::MovU32ImmU32Reg(
+            O::MovU32ImmU32Reg => I::MovU32ImmU32Reg(
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
-            MovU32RegU32Reg => Instruction::MovU32RegU32Reg(
+            O::MovU32RegU32Reg => I::MovU32RegU32Reg(
                 get_inner_arg!(args[0], RegisterU32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
-            MovU32ImmMemSimple => Instruction::MovU32ImmMemSimple(
+            O::MovU32ImmMemSimple => I::MovU32ImmMemSimple(
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
                 get_inner_arg_and_cast!(args[1], UnsignedInt, u32),
             ),
-            MovU32RegMemSimple => Instruction::MovU32RegMemSimple(
+            O::MovU32RegMemSimple => I::MovU32RegMemSimple(
                 get_inner_arg!(args[0], RegisterU32),
                 get_inner_arg_and_cast!(args[1], UnsignedInt, u32),
             ),
-            MovMemU32RegSimple => Instruction::MovMemU32RegSimple(
+            O::MovMemU32RegSimple => I::MovMemU32RegSimple(
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
-            MovU32RegPtrU32RegSimple => Instruction::MovU32RegPtrU32RegSimple(
+            O::MovU32RegPtrU32RegSimple => I::MovU32RegPtrU32RegSimple(
                 get_inner_arg!(args[0], RegisterU32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
-            MovU32ImmMemExpr => Instruction::MovU32ImmMemExpr(
+            O::MovU32ImmMemExpr => I::MovU32ImmMemExpr(
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
                 get_inner_expr_arg!(args[1]),
             ),
-            MovMemExprU32Reg => Instruction::MovMemExprU32Reg(
+            O::MovMemExprU32Reg => I::MovMemExprU32Reg(
                 get_inner_expr_arg!(args[0]),
                 get_inner_arg!(args[1], RegisterU32),
             ),
-            MovU32RegMemExpr => Instruction::MovU32RegMemExpr(
+            O::MovU32RegMemExpr => I::MovU32RegMemExpr(
                 get_inner_arg!(args[0], RegisterU32),
                 get_inner_expr_arg!(args[1]),
             ),
-            ByteSwapU32 => Instruction::ByteSwapU32(get_inner_arg!(args[0], RegisterU32)),
-            ZeroHighBitsByIndexU32Reg => Instruction::ZeroHighBitsByIndexU32Reg(
+            O::ByteSwapU32 => I::ByteSwapU32(get_inner_arg!(args[0], RegisterU32)),
+            O::ZeroHighBitsByIndexU32Reg => I::ZeroHighBitsByIndexU32Reg(
                 get_inner_arg!(args[0], RegisterU32),
                 get_inner_arg!(args[1], RegisterU32),
                 get_inner_arg!(args[2], RegisterU32),
             ),
-            ZeroHighBitsByIndexU32RegU32Imm => Instruction::ZeroHighBitsByIndexU32RegU32Imm(
+            O::ZeroHighBitsByIndexU32RegU32Imm => I::ZeroHighBitsByIndexU32RegU32Imm(
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
                 get_inner_arg!(args[1], RegisterU32),
                 get_inner_arg!(args[2], RegisterU32),
             ),
-            PushF32Imm => Instruction::PushF32Imm(get_inner_arg_and_cast!(args[0], Float, f32)),
-            PushU32Imm => {
-                Instruction::PushU32Imm(get_inner_arg_and_cast!(args[0], UnsignedInt, u32))
-            }
-            PushU32Reg => Instruction::PushU32Reg(get_inner_arg!(args[0], RegisterU32)),
-            PopF32ToF32Reg => Instruction::PopF32ToF32Reg(get_inner_arg!(args[0], RegisterF32)),
-            PopU32ToU32Reg => Instruction::PopU32ToU32Reg(get_inner_arg!(args[0], RegisterU32)),
+            O::PushF32Imm => I::PushF32Imm(get_inner_arg_and_cast!(args[0], Float, f32)),
+            O::PushU32Imm => I::PushU32Imm(get_inner_arg_and_cast!(args[0], UnsignedInt, u32)),
+            O::PushU32Reg => I::PushU32Reg(get_inner_arg!(args[0], RegisterU32)),
+            O::PopF32ToF32Reg => I::PopF32ToF32Reg(get_inner_arg!(args[0], RegisterF32)),
+            O::PopU32ToU32Reg => I::PopU32ToU32Reg(get_inner_arg!(args[0], RegisterU32)),
 
             /******** [IO Instructions] ********/
-            OutF32Imm => Instruction::OutF32Imm(
+            O::OutF32Imm => I::OutF32Imm(
                 get_inner_arg_and_cast!(args[0], Float, f32),
                 get_inner_arg_and_cast!(args[1], UnsignedInt, u8),
             ),
-            OutU32Imm => Instruction::OutU32Imm(
+            O::OutU32Imm => I::OutU32Imm(
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
                 get_inner_arg_and_cast!(args[1], UnsignedInt, u8),
             ),
-            OutU32Reg => Instruction::OutU32Reg(
+            O::OutU32Reg => I::OutU32Reg(
                 get_inner_arg!(args[0], RegisterU32),
                 get_inner_arg_and_cast!(args[1], UnsignedInt, u8),
             ),
-            OutU8Imm => Instruction::OutU8Imm(
+            O::OutU8Imm => I::OutU8Imm(
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
                 get_inner_arg_and_cast!(args[1], UnsignedInt, u8),
             ),
-            InU8Reg => Instruction::InU8Reg(
+            O::InU8Reg => I::InU8Reg(
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
                 get_inner_arg!(args[1], RegisterU32),
             ),
-            InU8Mem => Instruction::InU8Mem(
+            O::InU8Mem => I::InU8Mem(
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
                 get_inner_arg_and_cast!(args[1], UnsignedInt, u32),
             ),
-            InU32Reg => Instruction::InU32Reg(
+            O::InU32Reg => I::InU32Reg(
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
                 get_inner_arg!(args[1], RegisterU32),
             ),
-            InU32Mem => Instruction::InU32Mem(
+            O::InU32Mem => I::InU32Mem(
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
                 get_inner_arg_and_cast!(args[1], UnsignedInt, u32),
             ),
-            InF32Reg => Instruction::InF32Reg(
+            O::InF32Reg => I::InF32Reg(
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
                 get_inner_arg!(args[1], RegisterF32),
             ),
-            InF32Mem => Instruction::InF32Mem(
+            O::InF32Mem => I::InF32Mem(
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
                 get_inner_arg_and_cast!(args[1], UnsignedInt, u32),
             ),
 
             /******** [Logic Instructions] ********/
-            BitTestU32Reg => Instruction::BitTestU32Reg(
+            O::BitTestU32Reg => I::BitTestU32Reg(
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
                 get_inner_arg!(args[1], RegisterU32),
             ),
-            BitTestU32Mem => Instruction::BitTestU32Mem(
+            O::BitTestU32Mem => I::BitTestU32Mem(
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
                 get_inner_arg_and_cast!(args[1], UnsignedInt, u32),
             ),
-            BitTestResetU32Reg => Instruction::BitTestResetU32Reg(
+            O::BitTestResetU32Reg => I::BitTestResetU32Reg(
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
                 get_inner_arg!(args[1], RegisterU32),
             ),
-            BitTestResetU32Mem => Instruction::BitTestResetU32Mem(
+            O::BitTestResetU32Mem => I::BitTestResetU32Mem(
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
                 get_inner_arg_and_cast!(args[1], UnsignedInt, u32),
             ),
-            BitTestSetU32Reg => Instruction::BitTestSetU32Reg(
+            O::BitTestSetU32Reg => I::BitTestSetU32Reg(
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
                 get_inner_arg!(args[1], RegisterU32),
             ),
-            BitTestSetU32Mem => Instruction::BitTestSetU32Mem(
+            O::BitTestSetU32Mem => I::BitTestSetU32Mem(
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u8),
                 get_inner_arg_and_cast!(args[1], UnsignedInt, u32),
             ),
-            BitScanReverseU32RegU32Reg => Instruction::BitScanReverseU32RegU32Reg(
+            O::BitScanReverseU32RegU32Reg => I::BitScanReverseU32RegU32Reg(
                 get_inner_arg!(args[0], RegisterU32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
-            BitScanReverseU32MemU32Reg => Instruction::BitScanReverseU32MemU32Reg(
+            O::BitScanReverseU32MemU32Reg => I::BitScanReverseU32MemU32Reg(
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
-            BitScanReverseU32RegMemU32 => Instruction::BitScanReverseU32RegMemU32(
+            O::BitScanReverseU32RegMemU32 => I::BitScanReverseU32RegMemU32(
                 get_inner_arg!(args[0], RegisterU32),
                 get_inner_arg_and_cast!(args[1], UnsignedInt, u32),
             ),
-            BitScanReverseU32MemU32Mem => Instruction::BitScanReverseU32MemU32Mem(
+            O::BitScanReverseU32MemU32Mem => I::BitScanReverseU32MemU32Mem(
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
                 get_inner_arg_and_cast!(args[1], UnsignedInt, u32),
             ),
-            BitScanForwardU32RegU32Reg => Instruction::BitScanForwardU32RegU32Reg(
+            O::BitScanForwardU32RegU32Reg => I::BitScanForwardU32RegU32Reg(
                 get_inner_arg!(args[0], RegisterU32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
-            BitScanForwardU32MemU32Reg => Instruction::BitScanForwardU32MemU32Reg(
+            O::BitScanForwardU32MemU32Reg => I::BitScanForwardU32MemU32Reg(
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
-            BitScanForwardU32RegMemU32 => Instruction::BitScanForwardU32RegMemU32(
+            O::BitScanForwardU32RegMemU32 => I::BitScanForwardU32RegMemU32(
                 get_inner_arg!(args[0], RegisterU32),
                 get_inner_arg_and_cast!(args[1], UnsignedInt, u32),
             ),
-            BitScanForwardU32MemU32Mem => Instruction::BitScanForwardU32MemU32Mem(
+            O::BitScanForwardU32MemU32Mem => I::BitScanForwardU32MemU32Mem(
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
                 get_inner_arg_and_cast!(args[1], UnsignedInt, u32),
             ),
 
             /******** [Special Instructions] ********/
-            MaskInterrupt => {
-                Instruction::MaskInterrupt(get_inner_arg_and_cast!(args[0], UnsignedInt, u8))
+            O::MaskInterrupt => I::MaskInterrupt(get_inner_arg_and_cast!(args[0], UnsignedInt, u8)),
+            O::UnmaskInterrupt => {
+                I::UnmaskInterrupt(get_inner_arg_and_cast!(args[0], UnsignedInt, u8))
             }
-            UnmaskInterrupt => {
-                Instruction::UnmaskInterrupt(get_inner_arg_and_cast!(args[0], UnsignedInt, u8))
+            O::LoadIVTAddrU32Imm => {
+                I::LoadIVTAddrU32Imm(get_inner_arg_and_cast!(args[0], UnsignedInt, u32))
             }
-            LoadIVTAddrU32Imm => {
-                Instruction::LoadIVTAddrU32Imm(get_inner_arg_and_cast!(args[0], UnsignedInt, u32))
-            }
-            MachineReturn => Instruction::MachineReturn,
-            Halt => Instruction::Halt,
+            O::MachineReturn => I::MachineReturn,
+            O::Halt => I::Halt,
 
             /******** [Reserved Instructions] ********/
-            Reserved1 => unreachable!(),
-            Reserved2 => unreachable!(),
-            Reserved3 => unreachable!(),
-            Reserved4 => unreachable!(),
-            Reserved5 => unreachable!(),
-            Reserved6 => unreachable!(),
-            Reserved7 => unreachable!(),
-            Reserved8 => unreachable!(),
-            Reserved9 => unreachable!(),
+            O::Reserved1 => unreachable!(),
+            O::Reserved2 => unreachable!(),
+            O::Reserved3 => unreachable!(),
+            O::Reserved4 => unreachable!(),
+            O::Reserved5 => unreachable!(),
+            O::Reserved6 => unreachable!(),
+            O::Reserved7 => unreachable!(),
+            O::Reserved8 => unreachable!(),
+            O::Reserved9 => unreachable!(),
 
             /******** [Pseudo Instructions] ********/
-            Label => unreachable!(),
-            Unknown => unreachable!(),
+            O::Label => unreachable!(),
+            O::Unknown => unreachable!(),
         }
     }
 
