@@ -56,7 +56,6 @@ impl Compiler {
             | I::BitScanReverseU32MemU32Reg(imm, reg)
             | I::BitScanForwardU32MemU32Reg(imm, reg)
             | I::SubU32ImmU32Reg(imm, reg)
-            | I::ModU32ImmU32Reg(imm, reg)
             | I::AndU32ImmU32Reg(imm, reg) => {
                 self.write_u32(imm);
                 self.write_register_id(&reg);
@@ -73,8 +72,7 @@ impl Compiler {
             | I::MovU32RegPtrU32RegSimple(reg_1, reg_2)
             | I::BitScanReverseU32RegU32Reg(reg_1, reg_2)
             | I::BitScanForwardU32RegU32Reg(reg_1, reg_2)
-            | I::SubU32RegU32Reg(reg_1, reg_2)
-            | I::ModU32RegU32Reg(reg_1, reg_2) => {
+            | I::SubU32RegU32Reg(reg_1, reg_2) => {
                 self.write_register_id(&reg_1);
                 self.write_register_id(&reg_2);
             }
@@ -93,8 +91,7 @@ impl Compiler {
             | I::MovU32RegMemExpr(reg, imm)
             | I::BitScanReverseU32RegMemU32(reg, imm)
             | I::BitScanForwardU32RegMemU32(reg, imm)
-            | I::SubU32RegU32Imm(reg, imm)
-            | I::ModU32RegU32Imm(reg, imm) => {
+            | I::SubU32RegU32Imm(reg, imm) => {
                 self.write_register_id(&reg);
                 self.write_u32(imm);
             }
@@ -317,9 +314,6 @@ mod tests_compiler {
                 O::MulU32Reg => I::MulU32Reg(ER2),
                 O::DivU32Imm => I::DivU32Imm(0x123),
                 O::DivU32Reg => I::DivU32Reg(ER2),
-                O::ModU32ImmU32Reg => I::ModU32ImmU32Reg(0x123, ER2),
-                O::ModU32RegU32Imm => I::ModU32RegU32Imm(ER2, 0x123),
-                O::ModU32RegU32Reg => I::ModU32RegU32Reg(ER2, ER3),
                 O::IncU32Reg => I::IncU32Reg(ER2),
                 O::DecU32Reg => I::DecU32Reg(ER2),
                 O::AndU32ImmU32Reg => I::AndU32ImmU32Reg(0x123, ER2),

@@ -29,15 +29,9 @@ pub enum OpCode {
     MulU32Reg,
     /// Unsigned division of a u32 register by a u32 immediate. The result is stored in the accumulator register.
     DivU32Imm,
-    /// Unsigned division of a u32 register (B) by a u32 register (A). The result is stored in the accumulator register.
+    /// Unsigned division of the register ER1 by a u32 immediate. The quotient is stored in the register ER1 and the modulo is stored in ER4.
     DivU32Reg,
-    /// Calculate the modulo of a u32 register by a u32 immediate. The result is stored in the accumulator register.
-    ModU32ImmU32Reg,
-    /// Calculate the modulo of a u32 immediate by a u32 register. The result is stored in the accumulator register.
-    ModU32RegU32Imm,
-    /// Calculate the modulo of a u32 register (B) by a u32 register (A). The result is stored in the accumulator register.
-    ModU32RegU32Reg,
-    /// Increment a u32 register.
+    /// Unsigned division of the register ER1 by a u32 register. The quotient is stored in the register ER1 and the modulo is stored in ER4.
     IncU32Reg,
     /// Decrement a u32 register.
     DecU32Reg,
@@ -224,9 +218,6 @@ impl From<&Instruction> for OpCode {
             I::MulU32Reg(_) => O::MulU32Reg,
             I::DivU32Imm(_) => O::DivU32Imm,
             I::DivU32Reg(_) => O::DivU32Reg,
-            I::ModU32ImmU32Reg(_, _) => O::ModU32ImmU32Reg,
-            I::ModU32RegU32Imm(_, _) => O::ModU32RegU32Imm,
-            I::ModU32RegU32Reg(_, _) => O::ModU32RegU32Reg,
             I::IncU32Reg(_) => O::IncU32Reg,
             I::DecU32Reg(_) => O::DecU32Reg,
             I::AndU32ImmU32Reg(_, _) => O::AndU32ImmU32Reg,

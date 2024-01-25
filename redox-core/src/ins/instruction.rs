@@ -41,16 +41,10 @@ pub enum Instruction {
     MulU32Imm(u32),
     /// Unsigned multiplication of the register ER1 by a u32 register. The result is stored in the register ER1.
     MulU32Reg(RegisterId),
-    /// Unsigned division of the register ER1 by a u32 immediate. The result is stored in the register ER1.
+    /// Unsigned division of the register ER1 by a u32 immediate. The quotient is stored in the register ER1 and the modulo is stored in ER4.
     DivU32Imm(u32),
-    /// Unsigned division of the register ER1 by a u32 register. The result is stored in the register ER1.
+    /// Unsigned division of the register ER1 by a u32 register. The quotient is stored in the register ER1 and the modulo is stored in ER4.
     DivU32Reg(RegisterId),
-    /// Calculate the modulo of a u32 register by a u32 immediate. The result is stored in the accumulator register.
-    ModU32ImmU32Reg(u32, RegisterId),
-    /// Calculate the modulo of a u32 immediate by a u32 register. The result is stored in the accumulator register.
-    ModU32RegU32Imm(RegisterId, u32),
-    /// Calculate the modulo of a u32 register (B) by a u32 register (A). The result is stored in the accumulator register.
-    ModU32RegU32Reg(RegisterId, RegisterId),
     /// Increment a u32 register.
     IncU32Reg(RegisterId),
     /// Decrement a u32 register.
@@ -260,15 +254,6 @@ impl Display for Instruction {
             }
             I::DivU32Reg(reg) => {
                 format!("div {reg}")
-            }
-            I::ModU32ImmU32Reg(imm, reg) => {
-                format!("mod 0x{imm:08x}, {reg}")
-            }
-            I::ModU32RegU32Imm(reg, imm) => {
-                format!("mod {reg}, 0x{imm:08x}")
-            }
-            I::ModU32RegU32Reg(reg_1, reg_2) => {
-                format!("mod {reg_1}, {reg_2}")
             }
             I::IncU32Reg(reg) => {
                 format!("inc {reg}")
@@ -539,9 +524,6 @@ impl Instruction {
             O::MulU32Reg => ARG_REG_ID_SIZE,
             O::DivU32Imm => ARG_U32_IMM_SIZE,
             O::DivU32Reg => ARG_REG_ID_SIZE,
-            O::ModU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
-            O::ModU32RegU32Imm => ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE,
-            O::ModU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
             O::IncU32Reg => ARG_REG_ID_SIZE,
             O::DecU32Reg => ARG_REG_ID_SIZE,
             O::AndU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
