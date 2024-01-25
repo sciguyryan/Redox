@@ -62,28 +62,6 @@ use std::time::Instant;
     );
 }*/
 
-use core::arch::asm;
-
-#[inline(never)]
-pub fn idiv(dividend: i32, divisor: i32) -> (i32, i32) {
-    assert!(divisor != 0);
-
-    let quotient: i32;
-    let remainder: i32;
-
-    unsafe {
-        asm!(
-            "xor edx, edx", // Clear the EDX register before attempting to load a new value into it.
-            "idiv ecx",
-            inout("eax") dividend => quotient, // The quotient is always stored in EAX.
-            in("ecx") divisor,
-            lateout("edx") remainder // The remainder (modulo) is always stored in EAX.
-        );
-    }
-
-    (quotient, remainder)
-}
-
 fn main() {
     if cfg!(target_endian = "big") {
         panic!("currently unsupported");

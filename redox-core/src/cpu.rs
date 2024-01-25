@@ -353,25 +353,6 @@ impl Cpu {
         final_value
     }
 
-    /// Perform a checked integer division of two u32 values.
-    ///
-    /// # Arguments
-    ///
-    /// * `value` - The first u32 value.
-    /// * `divisor` - The second u32 value.
-    ///
-    /// # Returns
-    ///
-    /// The result of the operation, truncated in the case of an overflow.
-    ///
-    /// # Note
-    ///
-    /// This method affects the following flags: none. All flags are undefined.
-    #[inline(always)]
-    fn perform_checked_div_u32(&mut self, value: u32, divisor: u32) -> u32 {
-        value.wrapping_div(divisor)
-    }
-
     /// Perform an integer modulo of two u32 values.
     ///
     /// # Arguments
@@ -454,6 +435,41 @@ impl Cpu {
         self.set_flag_state(CpuFlag::PF, Cpu::calculate_lowest_byte_parity(final_value));
 
         final_value
+    }
+
+    /// Perform an unsigned u32 division and modulo between the two arguments.
+    /// ER1 will be set to the quotient and ER4 will be set to modulo.
+    ///
+    /// # Arguments
+    ///
+    /// * `dividend` - The dividend (the number to be divided).
+    /// * `divisor` - The divisor (the number to be divided by).
+    ///
+    /// # Note
+    ///
+    /// This method affects the following flags: none. All flags are undefined.
+    pub fn perform_u32_division(&mut self, dividend: u32, divisor: u32) {
+        assert!(divisor != 0);
+
+        let quotient: u32;
+        let modulo: u32;
+
+        unsafe {
+            asm!(
+                "xor edx, edx", // Clear the EDX register before attempting to load a new value into it.
+                "div ecx",
+                inout("eax") dividend => quotient, // The quotient is always stored in EAX.
+                in("ecx") divisor,
+                lateout("edx") modulo // The remainder (modulo) is always stored in EDX.
+            );
+        }
+
+        self.registers
+            .get_register_u32_mut(RegisterId::ER1)
+            .write_unchecked(quotient);
+        self.registers
+            .get_register_u32_mut(RegisterId::ER4)
+            .write_unchecked(modulo);
     }
 
     /// Perform an arithmetic left-shift of two u32 values.
@@ -885,9 +901,8 @@ impl Cpu {
                 }
 
                 let old_value = self.registers.read_reg_u32(&RegisterId::ER1, privilege);
-                let new_value = self.perform_checked_div_u32(old_value, *divisor_imm);
 
-                self.write_reg_u32(&RegisterId::ER1, new_value, privilege);
+                self.perform_u32_division(old_value, *divisor_imm);
             }
             I::DivU32Reg(divisor_reg) => {
                 let divisor = self.registers.read_reg_u32(divisor_reg, privilege);
@@ -897,9 +912,8 @@ impl Cpu {
                 }
 
                 let old_value = self.registers.read_reg_u32(&RegisterId::ER1, privilege);
-                let new_value = self.perform_checked_div_u32(old_value, divisor);
 
-                self.write_reg_u32(&RegisterId::ER1, new_value, privilege);
+                self.perform_u32_division(old_value, divisor);
             }
             I::ModU32ImmU32Reg(imm, reg) => {
                 let divisor = self.registers.read_reg_u32(reg, privilege);
@@ -3221,15 +3235,15 @@ mod tests_cpu {
     fn test_div_u32_imm() {
         let tests = [
             TestU32::new(
-                &[MovU32ImmU32Reg(0x2, RegisterId::ER1), DivU32Imm(0x1)],
-                &[(RegisterId::ER1, 0x2)],
+                &[MovU32ImmU32Reg(0x3, RegisterId::ER1), DivU32Imm(0x2)],
+                &[(RegisterId::ER1, 0x1), (RegisterId::ER4, 0x1)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "DIV - incorrect result value produced",
             ),
             TestU32::new(
                 &[MovU32ImmU32Reg(u32::MAX, RegisterId::ER1), DivU32Imm(0x2)],
-                &[(RegisterId::ER1, 2147483647)],
+                &[(RegisterId::ER1, 2147483647), (RegisterId::ER4, 0x1)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "DIV - CPU flags not correctly set",
@@ -3271,11 +3285,15 @@ mod tests_cpu {
         let tests = [
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0x2, RegisterId::ER1),
-                    MovU32ImmU32Reg(0x1, RegisterId::ER2),
+                    MovU32ImmU32Reg(0x3, RegisterId::ER1),
+                    MovU32ImmU32Reg(0x2, RegisterId::ER2),
                     DivU32Reg(RegisterId::ER2),
                 ],
-                &[(RegisterId::ER1, 0x2), (RegisterId::ER2, 0x1)],
+                &[
+                    (RegisterId::ER1, 0x1),
+                    (RegisterId::ER2, 0x2),
+                    (RegisterId::ER4, 0x1),
+                ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "DIV - incorrect result value produced",
@@ -3286,7 +3304,11 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0x2, RegisterId::ER2),
                     DivU32Reg(RegisterId::ER2),
                 ],
-                &[(RegisterId::ER1, 2147483647), (RegisterId::ER2, 0x2)],
+                &[
+                    (RegisterId::ER1, 2147483647),
+                    (RegisterId::ER2, 0x2),
+                    (RegisterId::ER4, 0x1),
+                ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "DIV - CPU flags not correctly set",
