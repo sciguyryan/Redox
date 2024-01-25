@@ -30,7 +30,7 @@ const U32_REGISTERS: [RegisterId; 18] = [
     RegisterId::ER8,
     RegisterId::EAC,
     RegisterId::EIP,
-    RegisterId::EBP,
+    RegisterId::EFP,
     RegisterId::ESP,
     RegisterId::EFL,
     RegisterId::EIM,

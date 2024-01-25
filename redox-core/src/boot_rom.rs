@@ -33,7 +33,7 @@ impl BootRom {
             // Completely disable maskable interrupts.
             Instruction::MovU32ImmU32Reg(0x0, RegisterId::EIM),
             // Setup the stack.
-            Instruction::MovU32ImmU32Reg(mem.stack_segment_end as u32, RegisterId::EBP),
+            Instruction::MovU32ImmU32Reg(mem.stack_segment_end as u32, RegisterId::EFP),
             Instruction::MovU32ImmU32Reg(mem.stack_segment_end as u32, RegisterId::ESP),
             // Setup the segment registers.
             Instruction::MovU32ImmU32Reg(mem.stack_segment_start as u32, RegisterId::ESS),
