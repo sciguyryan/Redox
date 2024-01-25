@@ -709,7 +709,7 @@ impl Cpu {
         // NOTE - remember that the states need to be popped in the reverse order!
 
         // First, get the current frame pointer.
-        let frame_pointer = self.registers.read_reg_u32_unchecked(&RegisterId::EFP);
+        let frame_pointer = self.registers.read_reg_u32_unchecked(&RegisterId::EBP);
 
         // Next, reset the stack pointer to the address of the frame pointer.
         // Any stack entries higher in the stack can be disregarded as they are out of scope
@@ -742,7 +742,7 @@ impl Cpu {
 
         // Finally, adjust our frame pointer position to the original frame pointer
         // address plus the stack frame size.
-        self.write_reg_u32_unchecked(&RegisterId::EFP, frame_pointer + stack_frame_size);
+        self.write_reg_u32_unchecked(&RegisterId::EBP, frame_pointer + stack_frame_size);
     }
 
     /// Push the relevant processor register states to the stack.
@@ -766,7 +766,7 @@ impl Cpu {
         mem.push_u32(mem.stack_frame_size);
 
         // Next, update the stack frame pointer to be the current stack pointer location.
-        self.write_reg_u32_unchecked(&RegisterId::EFP, self.get_stack_pointer());
+        self.write_reg_u32_unchecked(&RegisterId::EBP, self.get_stack_pointer());
 
         // Finally, reset the stack frame size so we can track the new frame.
         mem.stack_frame_size = 0;

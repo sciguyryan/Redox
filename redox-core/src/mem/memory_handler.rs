@@ -314,7 +314,9 @@ impl MemoryHandler {
     ///
     /// An [`Instruction`] instance, if the memory address contains a valid instruction.
     pub fn get_instruction(&self, pos: usize) -> Instruction {
-        use {self::*, OpCode::*};
+        use self::*;
+        use Instruction as I;
+        use OpCode as O;
 
         // Read the OpCode ID.
         let opcode_id = self.get_u32(pos);
@@ -335,441 +337,441 @@ impl MemoryHandler {
 
         // Create our instruction instance.
         match opcode {
-            Nop => Instruction::Nop,
+            O::Nop => Instruction::Nop,
 
             /******** [Arithmetic Instructions] ********/
-            AddU32ImmU32Reg => {
+            O::AddU32ImmU32Reg => {
                 let imm = Self::read_u32(arg_bytes, &mut cursor);
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::AddU32ImmU32Reg(imm, reg)
+                I::AddU32ImmU32Reg(imm, reg)
             }
-            AddU32RegU32Reg => {
+            O::AddU32RegU32Reg => {
                 let reg_1 = Self::read_register_id(arg_bytes, &mut cursor);
                 let reg_2 = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::AddU32RegU32Reg(reg_1, reg_2)
+                I::AddU32RegU32Reg(reg_1, reg_2)
             }
-            SubU32ImmU32Reg => {
+            O::SubU32ImmU32Reg => {
                 let imm = Self::read_u32(arg_bytes, &mut cursor);
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::SubU32ImmU32Reg(imm, reg)
+                I::SubU32ImmU32Reg(imm, reg)
             }
-            SubU32RegU32Imm => {
+            O::SubU32RegU32Imm => {
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
                 let imm = Self::read_u32(arg_bytes, &mut cursor);
 
-                Instruction::SubU32RegU32Imm(reg, imm)
+                I::SubU32RegU32Imm(reg, imm)
             }
-            SubU32RegU32Reg => {
+            O::SubU32RegU32Reg => {
                 let reg_1 = Self::read_register_id(arg_bytes, &mut cursor);
                 let reg_2 = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::SubU32RegU32Reg(reg_1, reg_2)
+                I::SubU32RegU32Reg(reg_1, reg_2)
             }
-            MulU32Imm => {
+            O::MulU32Imm => {
                 let imm = Self::read_u32(arg_bytes, &mut cursor);
 
-                Instruction::MulU32Imm(imm)
+                I::MulU32Imm(imm)
             }
-            MulU32Reg => {
+            O::MulU32Reg => {
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::MulU32Reg(reg)
+                I::MulU32Reg(reg)
             }
-            DivU32Imm => {
+            O::DivU32Imm => {
                 let imm = Self::read_u32(arg_bytes, &mut cursor);
 
-                Instruction::DivU32Imm(imm)
+                I::DivU32Imm(imm)
             }
-            DivU32Reg => {
+            O::DivU32Reg => {
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::DivU32Reg(reg)
+                I::DivU32Reg(reg)
             }
-            IncU32Reg => {
+            O::IncU32Reg => {
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::IncU32Reg(reg)
+                I::IncU32Reg(reg)
             }
-            DecU32Reg => {
+            O::DecU32Reg => {
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::DecU32Reg(reg)
+                I::DecU32Reg(reg)
             }
-            AndU32ImmU32Reg => {
+            O::AndU32ImmU32Reg => {
                 let imm = Self::read_u32(arg_bytes, &mut cursor);
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::AndU32ImmU32Reg(imm, reg)
+                I::AndU32ImmU32Reg(imm, reg)
             }
 
             /******** [Bit Operation Instructions] ********/
-            LeftShiftU8ImmU32Reg => {
+            O::LeftShiftU8ImmU32Reg => {
                 let imm = Self::read_u8(arg_bytes, &mut cursor);
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::LeftShiftU8ImmU32Reg(imm, reg)
+                I::LeftShiftU8ImmU32Reg(imm, reg)
             }
-            LeftShiftU32RegU32Reg => {
+            O::LeftShiftU32RegU32Reg => {
                 let shift_reg = Self::read_register_id(arg_bytes, &mut cursor);
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::LeftShiftU32RegU32Reg(shift_reg, reg)
+                I::LeftShiftU32RegU32Reg(shift_reg, reg)
             }
-            ArithLeftShiftU8ImmU32Reg => {
+            O::ArithLeftShiftU8ImmU32Reg => {
                 let imm = Self::read_u8(arg_bytes, &mut cursor);
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::ArithLeftShiftU8ImmU32Reg(imm, reg)
+                I::ArithLeftShiftU8ImmU32Reg(imm, reg)
             }
-            ArithLeftShiftU32RegU32Reg => {
+            O::ArithLeftShiftU32RegU32Reg => {
                 let shift_reg = Self::read_register_id(arg_bytes, &mut cursor);
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::ArithLeftShiftU32RegU32Reg(shift_reg, reg)
+                I::ArithLeftShiftU32RegU32Reg(shift_reg, reg)
             }
-            RightShiftU8ImmU32Reg => {
+            O::RightShiftU8ImmU32Reg => {
                 let imm = Self::read_u8(arg_bytes, &mut cursor);
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::RightShiftU8ImmU32Reg(imm, reg)
+                I::RightShiftU8ImmU32Reg(imm, reg)
             }
-            RightShiftU32RegU32Reg => {
+            O::RightShiftU32RegU32Reg => {
                 let shift_reg = Self::read_register_id(arg_bytes, &mut cursor);
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::RightShiftU32RegU32Reg(shift_reg, reg)
+                I::RightShiftU32RegU32Reg(shift_reg, reg)
             }
-            ArithRightShiftU8ImmU32Reg => {
+            O::ArithRightShiftU8ImmU32Reg => {
                 let imm = Self::read_u8(arg_bytes, &mut cursor);
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::ArithRightShiftU8ImmU32Reg(imm, reg)
+                I::ArithRightShiftU8ImmU32Reg(imm, reg)
             }
-            ArithRightShiftU32RegU32Reg => {
+            O::ArithRightShiftU32RegU32Reg => {
                 let shift_reg = Self::read_register_id(arg_bytes, &mut cursor);
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::ArithRightShiftU32RegU32Reg(shift_reg, reg)
+                I::ArithRightShiftU32RegU32Reg(shift_reg, reg)
             }
 
             /******** [Branching Instructions] ********/
-            CallU32Imm => {
+            O::CallU32Imm => {
                 let addr = Self::read_u32(arg_bytes, &mut cursor);
 
-                Instruction::CallU32Imm(addr)
+                I::CallU32Imm(addr)
             }
-            CallU32Reg => {
+            O::CallU32Reg => {
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::CallU32Reg(reg)
+                I::CallU32Reg(reg)
             }
-            RetArgsU32 => Instruction::RetArgsU32,
-            Int => {
+            O::RetArgsU32 => I::RetArgsU32,
+            O::Int => {
                 let int_index = Self::read_u8(arg_bytes, &mut cursor);
 
-                Instruction::Int(int_index)
+                I::Int(int_index)
             }
-            IntRet => Instruction::IntRet,
-            JumpAbsU32Imm => {
+            O::IntRet => I::IntRet,
+            O::JumpAbsU32Imm => {
                 let addr = Self::read_u32(arg_bytes, &mut cursor);
 
-                Instruction::JumpAbsU32Imm(addr)
+                I::JumpAbsU32Imm(addr)
             }
-            JumpAbsU32Reg => {
+            O::JumpAbsU32Reg => {
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::JumpAbsU32Reg(reg)
+                I::JumpAbsU32Reg(reg)
             }
 
             /******** [Data Instructions] ********/
-            SwapU32RegU32Reg => {
+            O::SwapU32RegU32Reg => {
                 let reg1 = Self::read_register_id(arg_bytes, &mut cursor);
                 let reg2 = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::SwapU32RegU32Reg(reg1, reg2)
+                I::SwapU32RegU32Reg(reg1, reg2)
             }
-            MovU32ImmU32Reg => {
+            O::MovU32ImmU32Reg => {
                 let imm = Self::read_u32(arg_bytes, &mut cursor);
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::MovU32ImmU32Reg(imm, reg)
+                I::MovU32ImmU32Reg(imm, reg)
             }
-            MovU32RegU32Reg => {
+            O::MovU32RegU32Reg => {
                 let in_reg = Self::read_register_id(arg_bytes, &mut cursor);
                 let out_reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::MovU32RegU32Reg(in_reg, out_reg)
+                I::MovU32RegU32Reg(in_reg, out_reg)
             }
-            MovU32ImmMemSimple => {
+            O::MovU32ImmMemSimple => {
                 let imm = Self::read_u32(arg_bytes, &mut cursor);
                 let addr = Self::read_u32(arg_bytes, &mut cursor);
 
-                Instruction::MovU32ImmMemSimple(imm, addr)
+                I::MovU32ImmMemSimple(imm, addr)
             }
-            MovU32RegMemSimple => {
+            O::MovU32RegMemSimple => {
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
                 let addr = Self::read_u32(arg_bytes, &mut cursor);
 
-                Instruction::MovU32RegMemSimple(reg, addr)
+                I::MovU32RegMemSimple(reg, addr)
             }
-            MovMemU32RegSimple => {
+            O::MovMemU32RegSimple => {
                 let addr = Self::read_u32(arg_bytes, &mut cursor);
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::MovMemU32RegSimple(addr, reg)
+                I::MovMemU32RegSimple(addr, reg)
             }
-            MovU32RegPtrU32RegSimple => {
+            O::MovU32RegPtrU32RegSimple => {
                 let in_reg = Self::read_register_id(arg_bytes, &mut cursor);
                 let out_reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::MovU32RegPtrU32RegSimple(in_reg, out_reg)
+                I::MovU32RegPtrU32RegSimple(in_reg, out_reg)
             }
-            MovU32ImmMemExpr => {
+            O::MovU32ImmMemExpr => {
                 let imm = Self::read_u32(arg_bytes, &mut cursor);
                 let expr = Self::read_u32(arg_bytes, &mut cursor);
 
-                Instruction::MovU32ImmMemExpr(imm, expr)
+                I::MovU32ImmMemExpr(imm, expr)
             }
-            MovMemExprU32Reg => {
+            O::MovMemExprU32Reg => {
                 let expr = Self::read_u32(arg_bytes, &mut cursor);
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::MovMemExprU32Reg(expr, reg)
+                I::MovMemExprU32Reg(expr, reg)
             }
-            MovU32RegMemExpr => {
+            O::MovU32RegMemExpr => {
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
                 let expr = Self::read_u32(arg_bytes, &mut cursor);
 
-                Instruction::MovU32RegMemExpr(reg, expr)
+                I::MovU32RegMemExpr(reg, expr)
             }
-            ByteSwapU32 => {
+            O::ByteSwapU32 => {
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::ByteSwapU32(reg)
+                I::ByteSwapU32(reg)
             }
-            ZeroHighBitsByIndexU32Reg => {
+            O::ZeroHighBitsByIndexU32Reg => {
                 let index_reg = Self::read_register_id(arg_bytes, &mut cursor);
                 let in_reg = Self::read_register_id(arg_bytes, &mut cursor);
                 let out_reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::ZeroHighBitsByIndexU32Reg(index_reg, in_reg, out_reg)
+                I::ZeroHighBitsByIndexU32Reg(index_reg, in_reg, out_reg)
             }
-            ZeroHighBitsByIndexU32RegU32Imm => {
+            O::ZeroHighBitsByIndexU32RegU32Imm => {
                 let index = Self::read_u32(arg_bytes, &mut cursor);
                 let in_reg = Self::read_register_id(arg_bytes, &mut cursor);
                 let out_reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::ZeroHighBitsByIndexU32RegU32Imm(index, in_reg, out_reg)
+                I::ZeroHighBitsByIndexU32RegU32Imm(index, in_reg, out_reg)
             }
-            PushU32Imm => {
+            O::PushU32Imm => {
                 let imm = Self::read_u32(arg_bytes, &mut cursor);
 
-                Instruction::PushU32Imm(imm)
+                I::PushU32Imm(imm)
             }
-            PushF32Imm => {
+            O::PushF32Imm => {
                 let imm = Self::read_f32(arg_bytes, &mut cursor);
 
-                Instruction::PushF32Imm(imm)
+                I::PushF32Imm(imm)
             }
-            PushU32Reg => {
+            O::PushU32Reg => {
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::PushU32Reg(reg)
+                I::PushU32Reg(reg)
             }
-            PopF32ToF32Reg => {
+            O::PopF32ToF32Reg => {
                 let out_reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::PopF32ToF32Reg(out_reg)
+                I::PopF32ToF32Reg(out_reg)
             }
-            PopU32ToU32Reg => {
+            O::PopU32ToU32Reg => {
                 let out_reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::PopU32ToU32Reg(out_reg)
+                I::PopU32ToU32Reg(out_reg)
             }
 
             /******** [IO Instructions] ********/
-            OutF32Imm => {
+            O::OutF32Imm => {
                 let value = Self::read_f32(arg_bytes, &mut cursor);
                 let port = Self::read_u8(arg_bytes, &mut cursor);
 
-                Instruction::OutF32Imm(value, port)
+                I::OutF32Imm(value, port)
             }
-            OutU32Imm => {
+            O::OutU32Imm => {
                 let value = Self::read_u32(arg_bytes, &mut cursor);
                 let port = Self::read_u8(arg_bytes, &mut cursor);
 
-                Instruction::OutU32Imm(value, port)
+                I::OutU32Imm(value, port)
             }
-            OutU32Reg => {
+            O::OutU32Reg => {
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
                 let port = Self::read_u8(arg_bytes, &mut cursor);
 
-                Instruction::OutU32Reg(reg, port)
+                I::OutU32Reg(reg, port)
             }
-            OutU8Imm => {
+            O::OutU8Imm => {
                 let value = Self::read_u8(arg_bytes, &mut cursor);
                 let port = Self::read_u8(arg_bytes, &mut cursor);
 
-                Instruction::OutU8Imm(value, port)
+                I::OutU8Imm(value, port)
             }
-            InU8Reg => {
+            O::InU8Reg => {
                 let port = Self::read_u8(arg_bytes, &mut cursor);
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::InU8Reg(port, reg)
+                I::InU8Reg(port, reg)
             }
-            InU8Mem => {
+            O::InU8Mem => {
                 let port = Self::read_u8(arg_bytes, &mut cursor);
                 let addr = Self::read_u32(arg_bytes, &mut cursor);
 
-                Instruction::InU8Mem(port, addr)
+                I::InU8Mem(port, addr)
             }
-            InU32Reg => {
+            O::InU32Reg => {
                 let port = Self::read_u8(arg_bytes, &mut cursor);
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::InU32Reg(port, reg)
+                I::InU32Reg(port, reg)
             }
-            InU32Mem => {
+            O::InU32Mem => {
                 let port = Self::read_u8(arg_bytes, &mut cursor);
                 let addr = Self::read_u32(arg_bytes, &mut cursor);
 
-                Instruction::InU32Mem(port, addr)
+                I::InU32Mem(port, addr)
             }
-            InF32Reg => {
+            O::InF32Reg => {
                 let port = Self::read_u8(arg_bytes, &mut cursor);
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::InF32Reg(port, reg)
+                I::InF32Reg(port, reg)
             }
-            InF32Mem => {
+            O::InF32Mem => {
                 let port = Self::read_u8(arg_bytes, &mut cursor);
                 let addr = Self::read_u32(arg_bytes, &mut cursor);
 
-                Instruction::InF32Mem(port, addr)
+                I::InF32Mem(port, addr)
             }
 
             /******** [Logic Instructions] ********/
-            BitTestU32Reg => {
+            O::BitTestU32Reg => {
                 let bit = Self::read_u8(arg_bytes, &mut cursor);
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::BitTestU32Reg(bit, reg)
+                I::BitTestU32Reg(bit, reg)
             }
-            BitTestU32Mem => {
+            O::BitTestU32Mem => {
                 let bit = Self::read_u8(arg_bytes, &mut cursor);
                 let addr = Self::read_u32(arg_bytes, &mut cursor);
 
-                Instruction::BitTestU32Mem(bit, addr)
+                I::BitTestU32Mem(bit, addr)
             }
-            BitTestResetU32Reg => {
+            O::BitTestResetU32Reg => {
                 let bit = Self::read_u8(arg_bytes, &mut cursor);
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::BitTestResetU32Reg(bit, reg)
+                I::BitTestResetU32Reg(bit, reg)
             }
-            BitTestResetU32Mem => {
+            O::BitTestResetU32Mem => {
                 let bit = Self::read_u8(arg_bytes, &mut cursor);
                 let addr = Self::read_u32(arg_bytes, &mut cursor);
 
-                Instruction::BitTestResetU32Mem(bit, addr)
+                I::BitTestResetU32Mem(bit, addr)
             }
-            BitTestSetU32Reg => {
+            O::BitTestSetU32Reg => {
                 let bit = Self::read_u8(arg_bytes, &mut cursor);
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::BitTestSetU32Reg(bit, reg)
+                I::BitTestSetU32Reg(bit, reg)
             }
-            BitTestSetU32Mem => {
+            O::BitTestSetU32Mem => {
                 let bit = Self::read_u8(arg_bytes, &mut cursor);
                 let addr = Self::read_u32(arg_bytes, &mut cursor);
 
-                Instruction::BitTestSetU32Mem(bit, addr)
+                I::BitTestSetU32Mem(bit, addr)
             }
-            BitScanReverseU32RegU32Reg => {
+            O::BitScanReverseU32RegU32Reg => {
                 let in_reg = Self::read_register_id(arg_bytes, &mut cursor);
                 let out_reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::BitScanReverseU32RegU32Reg(in_reg, out_reg)
+                I::BitScanReverseU32RegU32Reg(in_reg, out_reg)
             }
-            BitScanReverseU32MemU32Reg => {
+            O::BitScanReverseU32MemU32Reg => {
                 let addr = Self::read_u32(arg_bytes, &mut cursor);
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::BitScanReverseU32MemU32Reg(addr, reg)
+                I::BitScanReverseU32MemU32Reg(addr, reg)
             }
-            BitScanReverseU32RegMemU32 => {
+            O::BitScanReverseU32RegMemU32 => {
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
                 let out_addr = Self::read_u32(arg_bytes, &mut cursor);
 
-                Instruction::BitScanReverseU32RegMemU32(reg, out_addr)
+                I::BitScanReverseU32RegMemU32(reg, out_addr)
             }
-            BitScanReverseU32MemU32Mem => {
+            O::BitScanReverseU32MemU32Mem => {
                 let in_addr = Self::read_u32(arg_bytes, &mut cursor);
                 let out_addr = Self::read_u32(arg_bytes, &mut cursor);
 
-                Instruction::BitScanReverseU32MemU32Mem(in_addr, out_addr)
+                I::BitScanReverseU32MemU32Mem(in_addr, out_addr)
             }
-            BitScanForwardU32RegU32Reg => {
+            O::BitScanForwardU32RegU32Reg => {
                 let in_reg = Self::read_register_id(arg_bytes, &mut cursor);
                 let out_reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::BitScanForwardU32RegU32Reg(in_reg, out_reg)
+                I::BitScanForwardU32RegU32Reg(in_reg, out_reg)
             }
-            BitScanForwardU32MemU32Reg => {
+            O::BitScanForwardU32MemU32Reg => {
                 let addr = Self::read_u32(arg_bytes, &mut cursor);
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                Instruction::BitScanForwardU32MemU32Reg(addr, reg)
+                I::BitScanForwardU32MemU32Reg(addr, reg)
             }
-            BitScanForwardU32RegMemU32 => {
+            O::BitScanForwardU32RegMemU32 => {
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
                 let out_addr = Self::read_u32(arg_bytes, &mut cursor);
 
-                Instruction::BitScanForwardU32RegMemU32(reg, out_addr)
+                I::BitScanForwardU32RegMemU32(reg, out_addr)
             }
-            BitScanForwardU32MemU32Mem => {
+            O::BitScanForwardU32MemU32Mem => {
                 let in_addr = Self::read_u32(arg_bytes, &mut cursor);
                 let out_addr = Self::read_u32(arg_bytes, &mut cursor);
 
-                Instruction::BitScanForwardU32MemU32Mem(in_addr, out_addr)
+                I::BitScanForwardU32MemU32Mem(in_addr, out_addr)
             }
 
             /******** [Special Instructions] ********/
-            MaskInterrupt => {
+            O::MaskInterrupt => {
                 let int_code = Self::read_u8(arg_bytes, &mut cursor);
 
-                Instruction::MaskInterrupt(int_code)
+                I::MaskInterrupt(int_code)
             }
-            UnmaskInterrupt => {
+            O::UnmaskInterrupt => {
                 let int_code = Self::read_u8(arg_bytes, &mut cursor);
 
-                Instruction::UnmaskInterrupt(int_code)
+                I::UnmaskInterrupt(int_code)
             }
-            LoadIVTAddrU32Imm => {
+            O::LoadIVTAddrU32Imm => {
                 let addr = Self::read_u32(arg_bytes, &mut cursor);
 
-                Instruction::LoadIVTAddrU32Imm(addr)
+                I::LoadIVTAddrU32Imm(addr)
             }
-            MachineReturn => Instruction::MachineReturn,
-            Halt => Instruction::Halt,
+            O::MachineReturn => I::MachineReturn,
+            O::Halt => I::Halt,
 
             /******** [Reserved Instructions] ********/
-            Reserved1 => Instruction::Reserved1,
-            Reserved2 => Instruction::Reserved2,
-            Reserved3 => Instruction::Reserved3,
-            Reserved4 => Instruction::Reserved4,
-            Reserved5 => Instruction::Reserved5,
-            Reserved6 => Instruction::Reserved6,
-            Reserved7 => Instruction::Reserved7,
-            Reserved8 => Instruction::Reserved8,
-            Reserved9 => Instruction::Reserved9,
+            O::Reserved1 => I::Reserved1,
+            O::Reserved2 => I::Reserved2,
+            O::Reserved3 => I::Reserved3,
+            O::Reserved4 => I::Reserved4,
+            O::Reserved5 => I::Reserved5,
+            O::Reserved6 => I::Reserved6,
+            O::Reserved7 => I::Reserved7,
+            O::Reserved8 => I::Reserved8,
+            O::Reserved9 => I::Reserved9,
 
             /******** [Pseudo Instructions] ********/
-            Label | Unknown => Instruction::Unknown(opcode_id),
+            O::Label | O::Unknown => I::Unknown(opcode_id),
         }
     }
 
