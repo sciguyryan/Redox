@@ -27,11 +27,11 @@ pub enum OpCode {
     MulU32Imm,
     /// Unsigned multiplication of the register ER1 by a u32 register. The result is stored in the register ER1.
     MulU32Reg,
-    /// Unsigned division of a u32 register by a u32 immediate. The result is stored in the accumulator register.
-    DivU32Imm,
     /// Unsigned division of the register ER1 by a u32 immediate. The quotient is stored in the register ER1 and the modulo is stored in ER4.
-    DivU32Reg,
+    DivU32Imm,
     /// Unsigned division of the register ER1 by a u32 register. The quotient is stored in the register ER1 and the modulo is stored in ER4.
+    DivU32Reg,
+    /// Increment a u32 register.
     IncU32Reg,
     /// Decrement a u32 register.
     DecU32Reg,
