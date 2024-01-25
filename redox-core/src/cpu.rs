@@ -294,7 +294,7 @@ impl Cpu {
     /// # Note
     ///
     /// This method affects the following flags: Sign (SF), Overflow (OF), Zero (ZF) and Parity (PF). Any other flags are undefined.
-    #[inline(always)]
+    #[inline]
     fn perform_checked_add_u32(&mut self, value_1: u32, value_2: u32) -> u32 {
         let (final_value, overflow) = value_1.overflowing_add(value_2);
 
@@ -317,7 +317,7 @@ impl Cpu {
     /// # Note
     ///
     /// This method affects the following flags: Sign (SF), Overflow (OF), Zero (ZF) and Parity (PF). Any other flags are undefined.
-    #[inline(always)]
+    #[inline]
     fn perform_checked_subtract_u32(&mut self, value_1: u32, value_2: u32) -> u32 {
         let (final_value, overflow) = value_1.overflowing_sub(value_2);
 
@@ -340,7 +340,7 @@ impl Cpu {
     /// # Note
     ///
     /// This method affects the following flags: Overflow (OF) and Carry (CF). Any other flags are undefined.
-    #[inline(always)]
+    #[inline]
     fn perform_checked_mul_u32(&mut self, value_1: u32, value_2: u32) -> u32 {
         let final_value = value_1.wrapping_mul(value_2);
 
@@ -369,7 +369,7 @@ impl Cpu {
     /// This method affects the following flags: Sign (SF), Zero (ZF) and Parity (PF).
     ///
     /// The Overflow (OF) and Carry (CF) flags will always be cleared. Any other flags are undefined.
-    #[inline(always)]
+    #[inline]
     fn perform_bitwise_and_u32(&mut self, value_1: u32, value_2: u32) -> u32 {
         let new_value = value_1 & value_2;
 
@@ -398,7 +398,7 @@ impl Cpu {
     /// This method affects the following flags: Sign (SF), Overflow (OF), Zero (ZF), Carry (CF) and Parity (PF).
     ///
     /// The Overflow (OF) flag will only be affected by 1-bit shifts. Any other flags are undefined.
-    #[inline(always)]
+    #[inline]
     fn perform_checked_left_shift_u32(&mut self, value: u32, shift_by: u8) -> u32 {
         if shift_by == 0 {
             return value;
@@ -429,7 +429,8 @@ impl Cpu {
     /// # Note
     ///
     /// This method affects the following flags: none. All flags are undefined.
-    pub fn perform_u32_division(&mut self, dividend: u32, divisor: u32) {
+    #[inline]
+    pub fn perform_division_u32(&mut self, dividend: u32, divisor: u32) {
         assert!(divisor != 0);
 
         let quotient: u32;
@@ -469,7 +470,7 @@ impl Cpu {
     /// This method affects the following flags: Sign (SF), Zero (ZF) and Parity (PF).
     ///
     /// The Overflow (OF) and Carry (CF) flags will always be cleared. Any other flags are undefined.
-    #[inline(always)]
+    #[inline]
     fn perform_arithmetic_left_shift_u32(&mut self, value: u32, shift_by: u32) -> u32 {
         let final_value = value.rotate_left(shift_by);
         self.set_flag_state(CpuFlag::SF, utils::is_bit_set(final_value, 31));
@@ -487,7 +488,7 @@ impl Cpu {
     ///
     /// * `mem` - A mutable reference to the [`MemoryHandler`] connected to this CPU instance.
     /// * `addr` - The call jump address.
-    #[inline(always)]
+    #[inline]
     fn perform_call_jump(&mut self, mem: &mut MemoryHandler, addr: u32) {
         // Store the current stack frame state.
         self.push_state(mem);
@@ -513,7 +514,7 @@ impl Cpu {
     /// This method affects the following flags: Sign (SF), Zero (ZF), Carry (CF) and Parity (PF).
     ///
     /// The Overflow (OF) flag will always be cleared. Any other flags are undefined.
-    #[inline(always)]
+    #[inline]
     fn perform_right_shift_u32(&mut self, value: u32, shift_by: u8) -> u32 {
         if shift_by == 0 {
             return value;
@@ -550,7 +551,7 @@ impl Cpu {
     /// This method affects the following flags: Sign (SF), Zero (ZF) and Parity (PF).
     ///
     /// The Overflow (OF) and Carry (CF) flags will always be cleared. Any other flags are undefined.
-    #[inline(always)]
+    #[inline]
     fn perform_arithmetic_right_shift_u32(&mut self, value: u32, shift_by: u32) -> u32 {
         let final_value = value.rotate_right(shift_by);
         self.set_flag_state(CpuFlag::SF, utils::is_bit_set(final_value, 31));
@@ -572,7 +573,7 @@ impl Cpu {
     /// # Note
     ///
     /// This method affects the following flags: Carry (CF). Any other flags are undefined.
-    #[inline(always)]
+    #[inline]
     fn perform_bit_test_with_carry_flag(&mut self, value: u32, bit: u8) {
         // Set the carry flag to the current state of the bit.
         self.set_flag_state(CpuFlag::CF, utils::is_bit_set(value, bit));
@@ -591,7 +592,7 @@ impl Cpu {
     /// This method affects the following flags: Carry (CF). Any other flags are undefined.
     ///
     /// This method will panic if the bit index is larger than the number of bytes in the value.
-    #[inline(always)]
+    #[inline]
     fn perform_bit_test_with_carry_flag_with_set(
         &mut self,
         value: &mut u32,
@@ -615,7 +616,7 @@ impl Cpu {
     /// This method affects the following flags: ZF (CF). Any other flags are undefined.
     ///
     /// The Zero flag (ZF) will be set if the value is zero, otherwise the flag will be cleared.
-    #[inline(always)]
+    #[inline]
     fn perform_forward_bit_search(&mut self, value: u32) -> u32 {
         self.set_flag_state(CpuFlag::ZF, value == 0);
 
@@ -633,7 +634,7 @@ impl Cpu {
     /// This method affects the following flags: ZF (CF). Any other flags are undefined.
     ///
     /// The Zero flag (ZF) will be set if the value is zero, otherwise the flag will be cleared.
-    #[inline(always)]
+    #[inline]
     fn perform_reverse_bit_search(&mut self, value: u32) -> u32 {
         self.set_flag_state(CpuFlag::ZF, value == 0);
 
@@ -653,7 +654,7 @@ impl Cpu {
     /// This method affects the following flags: Sign (SF), Zero (ZF), Carry (CF) and Parity (PF).
     ///
     /// The Overflow (OF) flag will always be cleared. Any other flags are undefined.
-    #[inline(always)]
+    #[inline]
     fn perform_zero_high_bit_u32_reg(
         &mut self,
         source_reg: &RegisterId,
@@ -709,16 +710,16 @@ impl Cpu {
         // NOTE - remember that the states need to be popped in the reverse order!
 
         // First, get the current frame pointer.
-        let frame_pointer = self.registers.read_reg_u32_unchecked(&RegisterId::EBP);
+        let base_pointer = self.registers.read_reg_u32_unchecked(&RegisterId::EBP);
 
-        // Next, reset the stack pointer to the address of the frame pointer.
+        // Next, set the stack pointer to the current base pointer location.
         // Any stack entries higher in the stack can be disregarded as they are out of scope
         // from this point forward.
-        self.write_reg_u32_unchecked(&RegisterId::ESP, frame_pointer);
+        self.write_reg_u32_unchecked(&RegisterId::ESP, base_pointer);
 
         // Next, pop the old stack frame size.
-        let old_stack_frame_pointer = mem.pop_u32();
-        mem.stack_base_pointer = old_stack_frame_pointer as usize;
+        let old_base_pointer = mem.pop_u32();
+        mem.stack_base_pointer = old_base_pointer as usize;
 
         // Next, pop the f32 data registers from the stack.
         for reg in PRESERVE_REGISTERS_F32_REV {
@@ -737,9 +738,8 @@ impl Cpu {
             StackArgType::U32 => mem.pop_top_u32(arg_count),
         }
 
-        // Finally, adjust our frame pointer position to the original frame pointer
-        // address plus the stack frame size.
-        self.write_reg_u32_unchecked(&RegisterId::EBP, old_stack_frame_pointer);
+        // Finally, reset the stack base pointer position to the original state.
+        self.write_reg_u32_unchecked(&RegisterId::EBP, old_base_pointer);
     }
 
     /// Push the relevant processor register states to the stack.
@@ -759,10 +759,10 @@ impl Cpu {
             mem.push_f32(self.registers.read_reg_f32_unchecked(&reg));
         }
 
-        // Next, push the current stack frame size to the stack.
+        // Next, push the current stack frame base pointer to the stack.
         mem.push_u32(mem.stack_base_pointer as u32);
 
-        // Next, update the stack frame pointer to be the current stack pointer location.
+        // Finally, update the stack base pointer to be the current stack pointer.
         self.write_reg_u32_unchecked(&RegisterId::EBP, self.get_stack_pointer());
     }
 
@@ -875,9 +875,9 @@ impl Cpu {
                     return;
                 }
 
-                let old_value = self.registers.read_reg_u32(&RegisterId::ER1, privilege);
+                let dividend = self.registers.read_reg_u32(&RegisterId::ER1, privilege);
 
-                self.perform_u32_division(old_value, *divisor_imm);
+                self.perform_division_u32(dividend, *divisor_imm);
             }
             I::DivU32Reg(divisor_reg) => {
                 let divisor = self.registers.read_reg_u32(divisor_reg, privilege);
@@ -886,9 +886,9 @@ impl Cpu {
                     return;
                 }
 
-                let old_value = self.registers.read_reg_u32(&RegisterId::ER1, privilege);
+                let dividend = self.registers.read_reg_u32(&RegisterId::ER1, privilege);
 
-                self.perform_u32_division(old_value, divisor);
+                self.perform_division_u32(dividend, divisor);
             }
             I::IncU32Reg(reg) => {
                 let value = self.registers.read_reg_u32(reg, privilege);

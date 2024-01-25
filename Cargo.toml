@@ -16,6 +16,7 @@ rand = "0.8.5"
 rand_xoshiro = "0.6.0"
 strum = "0.25.0"
 strum_macros = "0.25.3"
+thiserror = "1.0.56"
 winres = "0.1.12"
 
 [profile.dev]
