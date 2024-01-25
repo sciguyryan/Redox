@@ -25,7 +25,13 @@ strum_macros.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
+criterion.workspace = true
 
 [features]
 default = ["stack-type-hints"]
 stack-type-hints = []
+
+[[bench]]
+name = "benchmarks"
+path = "benches/benchmarks.rs"
+harness = false
