@@ -69,12 +69,12 @@ fn main() {
 
     let code = "call :LABEL_1";
 
-    /*let mut parser = AsmParser::new();
+    let mut parser = AsmParser::new();
     parser.parse_code(code);
 
     println!("parsed = {:?}", parser.parsed_instructions);
     println!("labels = {:?}", parser.labeled_instructions);
-    return;*/
+    return;
 
     let instructions = &[
         // Indicate that we want to make a seeded random number generator.

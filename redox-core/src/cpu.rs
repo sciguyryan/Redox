@@ -1,6 +1,8 @@
 use core::fmt;
 use std::{arch::asm, panic, slice::Iter};
 
+use hashbrown::HashMap;
+
 use crate::{
     com_bus::communication_bus::CommunicationBus,
     ins::{
@@ -89,6 +91,8 @@ pub struct Cpu {
     pub is_in_interrupt_handler: bool,
     /// The last interrupt handler that was "active" (i.e. was not terminated with intret).
     pub last_interrupt_code: Option<u8>,
+    /// The decoded expressions cache.
+    decode_expression_cache: HashMap<u32, Expression>,
 }
 
 impl Cpu {
@@ -99,6 +103,7 @@ impl Cpu {
             is_machine_mode: true,
             is_in_interrupt_handler: false,
             last_interrupt_code: None,
+            decode_expression_cache: HashMap::new(),
         }
     }
 
@@ -127,13 +132,17 @@ impl Cpu {
     ///
     /// A u32 that is the calculated result of the expression.
     #[inline]
-    fn decode_evaluate_u32_move_expression(
-        &mut self,
-        expr: &u32,
-        privilege: &PrivilegeLevel,
-    ) -> u32 {
-        let mut decoder = Expression::new();
-        decoder.unpack(*expr);
+    fn decode_evaluate_u32_expression(&mut self, expr: &u32, privilege: &PrivilegeLevel) -> u32 {
+        // Cache the decoded expression so we don't need to do this multiple times
+        // for the same expression.
+        let decoder = self
+            .decode_expression_cache
+            .entry(*expr)
+            .or_insert_with(|| {
+                let mut expression = Expression::new();
+                expression.unpack(*expr);
+                expression
+            });
 
         // Determine the first and second operands.
         let value_1 = match decoder.operand_1 {
@@ -911,54 +920,54 @@ impl Cpu {
 
             /******** [Bit Operation Instructions] ********/
             I::LeftShiftU8ImmU32Reg(imm, reg) => {
-                let old_value = self.registers.read_reg_u32(reg, privilege);
-                let shifted = self.perform_checked_left_shift_u32(old_value, *imm);
+                let value = self.registers.read_reg_u32(reg, privilege);
+                let shifted = self.perform_checked_left_shift_u32(value, *imm);
 
                 self.write_reg_u32(reg, shifted, privilege);
             }
             I::LeftShiftU32RegU32Reg(shift_reg, reg) => {
                 let shift_by = self.registers.read_reg_u32(shift_reg, privilege);
-                let old_value = self.registers.read_reg_u32(reg, privilege);
-                let shifted = self.perform_checked_left_shift_u32(old_value, shift_by as u8);
+                let value = self.registers.read_reg_u32(reg, privilege);
+                let shifted = self.perform_checked_left_shift_u32(value, shift_by as u8);
 
                 self.write_reg_u32(reg, shifted, privilege);
             }
             I::ArithLeftShiftU8ImmU32Reg(imm, reg) => {
-                let old_value = self.registers.read_reg_u32(reg, privilege);
-                let shifted = self.perform_arithmetic_left_shift_u32(old_value, *imm as u32);
+                let value = self.registers.read_reg_u32(reg, privilege);
+                let shifted = self.perform_arithmetic_left_shift_u32(value, *imm as u32);
 
                 self.write_reg_u32(reg, shifted, privilege);
             }
             I::ArithLeftShiftU32RegU32Reg(shift_reg, reg) => {
                 let shift_by = self.registers.read_reg_u32(shift_reg, privilege);
-                let old_value = self.registers.read_reg_u32(reg, privilege);
-                let shifted = self.perform_arithmetic_left_shift_u32(old_value, shift_by);
+                let value = self.registers.read_reg_u32(reg, privilege);
+                let shifted = self.perform_arithmetic_left_shift_u32(value, shift_by);
 
                 self.write_reg_u32(reg, shifted, privilege);
             }
             I::RightShiftU8ImmU32Reg(imm, reg) => {
-                let old_value = self.registers.read_reg_u32(reg, privilege);
-                let shifted = self.perform_right_shift_u32(old_value, *imm);
+                let value = self.registers.read_reg_u32(reg, privilege);
+                let shifted = self.perform_right_shift_u32(value, *imm);
 
                 self.write_reg_u32(reg, shifted, privilege);
             }
             I::RightShiftU32RegU32Reg(shift_reg, reg) => {
                 let shift_by = self.registers.read_reg_u32(shift_reg, privilege);
-                let old_value = self.registers.read_reg_u32(reg, privilege);
-                let shifted = self.perform_right_shift_u32(old_value, shift_by as u8);
+                let value = self.registers.read_reg_u32(reg, privilege);
+                let shifted = self.perform_right_shift_u32(value, shift_by as u8);
 
                 self.write_reg_u32(reg, shifted, privilege);
             }
             I::ArithRightShiftU8ImmU32Reg(imm, reg) => {
-                let old_value = self.registers.read_reg_u32(reg, privilege);
-                let shifted = self.perform_arithmetic_right_shift_u32(old_value, *imm as u32);
+                let value = self.registers.read_reg_u32(reg, privilege);
+                let shifted = self.perform_arithmetic_right_shift_u32(value, *imm as u32);
 
                 self.write_reg_u32(reg, shifted, privilege);
             }
             I::ArithRightShiftU32RegU32Reg(shift_reg, reg) => {
                 let shift_by = self.registers.read_reg_u32(shift_reg, privilege);
-                let old_value = self.registers.read_reg_u32(reg, privilege);
-                let shifted = self.perform_arithmetic_right_shift_u32(old_value, shift_by);
+                let value = self.registers.read_reg_u32(reg, privilege);
+                let shifted = self.perform_arithmetic_right_shift_u32(value, shift_by);
 
                 self.write_reg_u32(reg, shifted, privilege);
             }
@@ -1041,20 +1050,20 @@ impl Cpu {
             }
             I::MovU32ImmMemExpr(imm, expr) => {
                 // mov imm, &[addr] - move immediate to address.
-                let addr = self.decode_evaluate_u32_move_expression(expr, privilege);
+                let addr = self.decode_evaluate_u32_expression(expr, privilege);
 
                 com_bus.mem.set_u32(addr as usize, *imm);
             }
             I::MovMemExprU32Reg(expr, reg) => {
                 // mov &[addr], register - move value at address to register.
-                let addr = self.decode_evaluate_u32_move_expression(expr, privilege);
+                let addr = self.decode_evaluate_u32_expression(expr, privilege);
                 let value = com_bus.mem.get_u32(addr as usize);
 
                 self.write_reg_u32(reg, value, privilege);
             }
             I::MovU32RegMemExpr(reg, expr) => {
                 // mov &reg, &[addr] - move value of a register to an address.
-                let addr = self.decode_evaluate_u32_move_expression(expr, privilege);
+                let addr = self.decode_evaluate_u32_expression(expr, privilege);
                 let value = self.registers.read_reg_u32(reg, privilege);
 
                 com_bus.mem.set_u32(addr as usize, value);
