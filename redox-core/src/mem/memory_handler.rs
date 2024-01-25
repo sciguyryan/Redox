@@ -78,8 +78,8 @@ pub struct MemoryHandler {
 
     /// The current stack pointer.
     stack_pointer: usize,
-    /// The size of the current stack frame.
-    pub stack_frame_size: u32,
+    /// The base (frame) stack pointer.
+    pub stack_base_pointer: usize,
 }
 
 impl MemoryHandler {
@@ -138,7 +138,7 @@ impl MemoryHandler {
             stack_segment_start,
             stack_segment_end,
             stack_pointer: stack_segment_end,
-            stack_frame_size: 0,
+            stack_base_pointer: stack_segment_end,
         };
 
         // Insert the physical RAM memory-mapped segments that
@@ -887,6 +887,11 @@ impl MemoryHandler {
             .expect("failed to get physical RAM memory segment")
     }
 
+    /// Get the size of the current stack frame.
+    pub fn get_stack_frame_size(&self) -> usize {
+        self.stack_base_pointer - self.stack_pointer
+    }
+
     /// Attempt to read a f32 value from memory.
     ///
     /// # Arguments
@@ -1064,18 +1069,6 @@ impl MemoryHandler {
         // Update the stack pointer.
         self.stack_pointer = value_start_pos + SIZE_OF_F32;
 
-        // Update the frame size indicator.
-        // A little hackery to ensure we don't assert in debug builds in
-        // instances where the stack size is zero, something that can occur during a subroutine call.
-        #[cfg(debug_assertions)]
-        {
-            self.stack_frame_size = self.stack_frame_size.wrapping_sub(SIZE_OF_F32 as u32);
-        }
-        #[cfg(not(debug_assertions))]
-        {
-            self.stack_frame_size -= SIZE_OF_F32 as u32;
-        }
-
         result
     }
 
@@ -1132,18 +1125,6 @@ impl MemoryHandler {
         // Update the stack pointer.
         self.stack_pointer = value_start_pos + SIZE_OF_U32;
 
-        // Update the frame size indicator.
-        // A little hackery to ensure we don't assert in debug builds in
-        // instances where the stack size is zero, something that can occur during a subroutine call.
-        #[cfg(debug_assertions)]
-        {
-            self.stack_frame_size = self.stack_frame_size.wrapping_sub(SIZE_OF_U32 as u32);
-        }
-        #[cfg(not(debug_assertions))]
-        {
-            self.stack_frame_size -= SIZE_OF_U32 as u32;
-        }
-
         result
     }
 
@@ -1173,9 +1154,6 @@ impl MemoryHandler {
 
         // Update the stack pointer.
         self.stack_pointer = value_start_pos;
-
-        // Update the frame size indicator.
-        self.stack_frame_size += SIZE_OF_F32 as u32;
     }
 
     /// Attempt to push a [`StackTypeHint`] onto the stack hint list.
@@ -1221,9 +1199,6 @@ impl MemoryHandler {
 
         // Update the stack pointer.
         self.stack_pointer = value_start_pos;
-
-        // Update the frame size indicator.
-        self.stack_frame_size += SIZE_OF_U32 as u32;
     }
 
     /// Attempt to read a [`RegisterId`] from a memory slice.
@@ -1359,8 +1334,8 @@ impl MemoryHandler {
     #[inline]
     pub fn reset_stack_configuration(&mut self) {
         self.clear_stack_type_hints();
-        self.stack_frame_size = 0;
         self.stack_pointer = self.stack_segment_end;
+        self.stack_base_pointer = self.stack_pointer;
     }
 
     /// Write a u32 value into memory.

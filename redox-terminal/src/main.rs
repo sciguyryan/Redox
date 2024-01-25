@@ -69,12 +69,12 @@ fn main() {
 
     let code = "call :LABEL_1";
 
-    let mut parser = AsmParser::new();
+    /*let mut parser = AsmParser::new();
     parser.parse_code(code);
 
     println!("parsed = {:?}", parser.parsed_instructions);
     println!("labels = {:?}", parser.labeled_instructions);
-    return;
+    return;*/
 
     let instructions = &[
         // Indicate that we want to make a seeded random number generator.
@@ -83,6 +83,7 @@ fn main() {
         Instruction::OutU32Imm(0xdeadbeef, 0x0),
         // Read a PRNG from the device.
         Instruction::InU32Reg(0x0, RegisterId::ER1),
+        Instruction::PushU32Imm(0xdeadbeef),
         /*// Write the handler addresses into the IVT.
         // Handler for 0x00. This is a non-maskable interrupt.
         // We are essentially replacing the default handler for the division by zero interrupt.
@@ -130,7 +131,10 @@ fn main() {
     println!("Code successfully executed in {elapsed} ns!");
     println!();
     println!("Machine Mode? {}", vm.cpu.is_machine_mode);
-    println!("Stack Frame Size: {}", vm.com_bus.mem.stack_frame_size);
+    println!(
+        "Stack Frame Size: {}",
+        vm.com_bus.mem.get_stack_frame_size()
+    );
     println!();
 
     println!("----------[Registers]----------");

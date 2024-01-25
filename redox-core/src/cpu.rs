@@ -709,7 +709,7 @@ impl Cpu {
         // NOTE - remember that the states need to be popped in the reverse order!
 
         // First, get the current frame pointer.
-        let frame_pointer = self.registers.read_reg_u32_unchecked(&RegisterId::EFP);
+        let frame_pointer = self.registers.read_reg_u32_unchecked(&RegisterId::EBP);
 
         // Next, reset the stack pointer to the address of the frame pointer.
         // Any stack entries higher in the stack can be disregarded as they are out of scope
@@ -717,11 +717,8 @@ impl Cpu {
         self.write_reg_u32_unchecked(&RegisterId::ESP, frame_pointer);
 
         // Next, pop the old stack frame size.
-        let old_stack_frame_size = mem.pop_u32();
-        mem.stack_frame_size = old_stack_frame_size;
-
-        // We will need to keep this for resetting the frame pointer position below.
-        let stack_frame_size = old_stack_frame_size;
+        let old_stack_frame_pointer = mem.pop_u32();
+        mem.stack_base_pointer = old_stack_frame_pointer as usize;
 
         // Next, pop the f32 data registers from the stack.
         for reg in PRESERVE_REGISTERS_F32_REV {
@@ -742,7 +739,7 @@ impl Cpu {
 
         // Finally, adjust our frame pointer position to the original frame pointer
         // address plus the stack frame size.
-        self.write_reg_u32_unchecked(&RegisterId::EFP, frame_pointer + stack_frame_size);
+        self.write_reg_u32_unchecked(&RegisterId::EBP, old_stack_frame_pointer);
     }
 
     /// Push the relevant processor register states to the stack.
@@ -763,13 +760,10 @@ impl Cpu {
         }
 
         // Next, push the current stack frame size to the stack.
-        mem.push_u32(mem.stack_frame_size);
+        mem.push_u32(mem.stack_base_pointer as u32);
 
         // Next, update the stack frame pointer to be the current stack pointer location.
-        self.write_reg_u32_unchecked(&RegisterId::EFP, self.get_stack_pointer());
-
-        // Finally, reset the stack frame size so we can track the new frame.
-        mem.stack_frame_size = 0;
+        self.write_reg_u32_unchecked(&RegisterId::EBP, self.get_stack_pointer());
     }
 
     /// Perform a hard reset on the CPU.
@@ -2284,7 +2278,7 @@ mod tests_cpu {
                 assert_eq!(v.com_bus.mem.pop_u32(), 3);
 
                 // The stack should now be empty.
-                assert_eq!(v.com_bus.mem.stack_frame_size, 0);
+                assert_eq!(v.com_bus.mem.get_stack_frame_size(), 0);
             } else {
                 panic!("failed to correctly execute test id {id}");
             }
@@ -2402,7 +2396,7 @@ mod tests_cpu {
                 assert_eq!(v.com_bus.mem.pop_u32(), 3);
 
                 // The stack should now be empty.
-                assert_eq!(v.com_bus.mem.stack_frame_size, 0);
+                assert_eq!(v.com_bus.mem.get_stack_frame_size(), 0);
             } else {
                 panic!("failed to correctly execute test id {id}");
             }
