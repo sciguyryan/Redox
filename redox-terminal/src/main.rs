@@ -70,7 +70,7 @@ fn main() {
     let code = "call :LABEL_1";
 
     let mut parser = AsmParser::new();
-    parser.parse_code(code);
+    parser.parse(code);
 
     println!("parsed = {:?}", parser.parsed_instructions);
     println!("labels = {:?}", parser.labeled_instructions);
