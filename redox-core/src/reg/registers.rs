@@ -421,7 +421,7 @@ impl Registers {
         f32_registers.sort();
 
         for reg in &u32_registers {
-            let reg_value = *reg.read_unchecked();
+            let reg_value = reg.read_unchecked();
             let formatted_value = format!("{reg_value:0>8X}");
             let mut notes = String::new();
 
@@ -452,7 +452,7 @@ impl Registers {
     #[inline(always)]
     #[allow(dead_code)]
     pub fn read_reg_f32(&self, reg: &RegisterId, privilege: &PrivilegeLevel) -> f32 {
-        *self.get_register_f32(*reg).read(privilege)
+        self.get_register_f32(*reg).read(privilege)
     }
 
     /// Get the value of a specific f32 register, without privilege checking.
@@ -466,7 +466,7 @@ impl Registers {
     /// The f32 value of the register.
     #[inline(always)]
     pub fn read_reg_f32_unchecked(&self, reg: &RegisterId) -> f32 {
-        *self.get_register_f32(*reg).read_unchecked()
+        self.get_register_f32(*reg).read_unchecked()
     }
 
     /// Get the value of a specific u32 register.
@@ -481,7 +481,7 @@ impl Registers {
     /// The u32 value of the register.
     #[inline(always)]
     pub fn read_reg_u32(&self, reg: &RegisterId, privilege: &PrivilegeLevel) -> u32 {
-        *self.get_register_u32(*reg).read(privilege)
+        self.get_register_u32(*reg).read(privilege)
     }
 
     /// Get the value of a specific u32 register, without privilege checking.
@@ -495,7 +495,7 @@ impl Registers {
     /// The u32 value of the register.
     #[inline(always)]
     pub fn read_reg_u32_unchecked(&self, reg: &RegisterId) -> u32 {
-        *self.get_register_u32(*reg).read_unchecked()
+        self.get_register_u32(*reg).read_unchecked()
     }
 }
 

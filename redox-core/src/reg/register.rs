@@ -132,11 +132,11 @@ impl RegisterU32 {
     ///
     /// A reference to the u32 value of this register.
     #[inline(always)]
-    pub fn read(&self, privilege: &PrivilegeLevel) -> &u32 {
+    pub fn read(&self, privilege: &PrivilegeLevel) -> u32 {
         // Check whether the register has read permissions.
         self.validate_access(&DataAccessType::Read, privilege);
 
-        &self.value
+        self.value
     }
 
     /// Read the value of this register without performing a permission check.
@@ -145,8 +145,8 @@ impl RegisterU32 {
     ///
     /// A reference to the u32 value of this register.
     #[inline(always)]
-    pub fn read_unchecked(&self) -> &u32 {
-        &self.value
+    pub fn read_unchecked(&self) -> u32 {
+        self.value
     }
 
     /// Subtract a specific value from this register.
@@ -261,11 +261,11 @@ impl RegisterF32 {
     /// # Returns
     ///
     /// A reference to the f32 value of this register.
-    pub fn read(&self, privilege: &PrivilegeLevel) -> &f32 {
+    pub fn read(&self, privilege: &PrivilegeLevel) -> f32 {
         // Check whether the register has read permissions.
         self.validate_access(&DataAccessType::Read, privilege);
 
-        &self.value
+        self.value
     }
 
     /// Read the value of this register without performing a permission check.
@@ -273,8 +273,8 @@ impl RegisterF32 {
     /// # Returns
     ///
     /// A reference to the f32 value of this register.
-    pub fn read_unchecked(&self) -> &f32 {
-        &self.value
+    pub fn read_unchecked(&self) -> f32 {
+        self.value
     }
 
     /// Write a value to this register without performing a permission check.
@@ -524,7 +524,7 @@ mod tests_registers {
                     register.write(test.write_value.unwrap(), &test.privilege);
                 }
 
-                let value = *register.read(&test.privilege);
+                let value = register.read(&test.privilege);
 
                 // Check that the read value is correct.
                 assert_eq!(
@@ -644,7 +644,7 @@ mod tests_registers {
                     register.write(test.write_value.unwrap(), &test.privilege);
                 }
 
-                let value = *register.read(&test.privilege);
+                let value = register.read(&test.privilege);
 
                 // Check that the read value is correct.
                 assert_eq!(

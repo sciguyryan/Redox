@@ -1384,7 +1384,7 @@ impl Cpu {
     #[inline(always)]
     pub fn set_flag_state(&mut self, flag: CpuFlag, state: bool) {
         let register = self.registers.get_register_u32_mut(RegisterId::EFL);
-        let flags = utils::set_bit_state(*register.read_unchecked(), flag.into(), state);
+        let flags = utils::set_bit_state(register.read_unchecked(), flag.into(), state);
         register.write_unchecked(flags);
     }
 
@@ -2108,7 +2108,7 @@ mod tests_cpu {
                 // to the value of the register ER1 (which is zero). Therefore, 5 should be moved to
                 // accumulator register.
                 assert_eq!(
-                    *v.cpu
+                    v.cpu
                         .registers
                         .get_register_u32(RegisterId::EAC)
                         .read_unchecked(),
@@ -2161,7 +2161,7 @@ mod tests_cpu {
                 // to the value of the register ER1 (which is zero). Therefore, 5 should be moved to
                 // accumulator register.
                 assert_eq!(
-                    *v.cpu
+                    v.cpu
                         .registers
                         .get_register_u32(RegisterId::EAC)
                         .read_unchecked(),
@@ -2210,7 +2210,7 @@ mod tests_cpu {
                 // The interrupt handler should set the value of the ER1 register to 0x64.
                 // After returning, 0x5 should be added to the value of ER1, the result moved to the accumulator.
                 assert_eq!(
-                    *v.cpu
+                    v.cpu
                         .registers
                         .get_register_u32(RegisterId::EAC)
                         .read_unchecked(),
@@ -2261,7 +2261,7 @@ mod tests_cpu {
                 // The subroutine should set the value of the ER1 register to 5.
                 // After returning, 100 should be added to the value of ER1, the result moved to the accumulator.
                 assert_eq!(
-                    *v.cpu
+                    v.cpu
                         .registers
                         .get_register_u32(RegisterId::EAC)
                         .read_unchecked(),
@@ -2379,7 +2379,7 @@ mod tests_cpu {
                 // The second subroutine should add 5 to the value of EAC and set the accumulator
                 // to the resulting value.
                 assert_eq!(
-                    *v.cpu
+                    v.cpu
                         .registers
                         .get_register_u32(RegisterId::EAC)
                         .read_unchecked(),
