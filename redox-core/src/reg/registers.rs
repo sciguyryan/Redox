@@ -18,30 +18,30 @@ pub enum RegisterId {
     //               [  R1L ][  R1H ]
 
     // [ User Registers ] //
-    /// Data register 1.
+    /// Accumulator register.
     #[default]
-    ER1 = 0,
+    EAX = 0,
     /// Data register 1, two highest order bytes.
-    //R1X = 1,
+    //AX = 1,
     /// Data register 1, highest order byte.
-    //R1H = 2,
+    //AH = 2,
     /// Data register 1, lowest order byte.
-    //R1L = 3,
+    //AL = 3,
 
-    /// Data register 2.
-    ER2 = 4,
-    /// Data register 3.
-    ER3 = 8,
-    /// Data register 4.
-    ER4 = 12,
+    /// Base register.
+    EBX = 4,
+    /// Counter register.
+    ECX = 8,
+    /// Data register.
+    EDX = 12,
     /// Data register 5.
-    ER5 = 16,
+    E5X = 16,
     /// Data register 6.
-    ER6 = 20,
+    E6X = 20,
     /// Data register 7.
-    ER7 = 24,
+    E7X = 24,
     /// Data register 8.
-    ER8 = 28,
+    E8X = 28,
 
     /// Float data register 1.
     FR1 = 29,
@@ -76,14 +76,14 @@ impl FromStr for RegisterId {
 
     fn from_str(input: &str) -> Result<RegisterId, Self::Err> {
         match input.to_uppercase().as_str() {
-            "ER1" => Ok(RegisterId::ER1),
-            "ER2" => Ok(RegisterId::ER2),
-            "ER3" => Ok(RegisterId::ER3),
-            "ER4" => Ok(RegisterId::ER4),
-            "ER5" => Ok(RegisterId::ER5),
-            "ER6" => Ok(RegisterId::ER6),
-            "ER7" => Ok(RegisterId::ER7),
-            "ER8" => Ok(RegisterId::ER8),
+            "EAX" => Ok(RegisterId::EAX),
+            "EBX" => Ok(RegisterId::EBX),
+            "ECX" => Ok(RegisterId::ECX),
+            "EDX" => Ok(RegisterId::EDX),
+            "E5X" => Ok(RegisterId::E5X),
+            "E6X" => Ok(RegisterId::E6X),
+            "E7X" => Ok(RegisterId::E7X),
+            "E8X" => Ok(RegisterId::E8X),
             "FR1" => Ok(RegisterId::FR1),
             "FR2" => Ok(RegisterId::FR2),
             "EIP" => Ok(RegisterId::EIP),
@@ -104,14 +104,14 @@ impl FromStr for RegisterId {
 impl From<u8> for RegisterId {
     fn from(value: u8) -> Self {
         match value {
-            0 => RegisterId::ER1,
-            4 => RegisterId::ER2,
-            8 => RegisterId::ER3,
-            12 => RegisterId::ER4,
-            16 => RegisterId::ER5,
-            20 => RegisterId::ER6,
-            24 => RegisterId::ER7,
-            28 => RegisterId::ER8,
+            0 => RegisterId::EAX,
+            4 => RegisterId::EBX,
+            8 => RegisterId::ECX,
+            12 => RegisterId::EDX,
+            16 => RegisterId::E5X,
+            20 => RegisterId::E6X,
+            24 => RegisterId::E7X,
+            28 => RegisterId::E8X,
             29 => RegisterId::FR1,
             30 => RegisterId::FR2,
             100 => RegisterId::EIP,
@@ -131,14 +131,14 @@ impl From<u8> for RegisterId {
 impl Display for RegisterId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let printable = match *self {
-            RegisterId::ER1 => "ER1",
-            RegisterId::ER2 => "ER2",
-            RegisterId::ER3 => "ER3",
-            RegisterId::ER4 => "ER4",
-            RegisterId::ER5 => "ER5",
-            RegisterId::ER6 => "ER6",
-            RegisterId::ER7 => "ER7",
-            RegisterId::ER8 => "ER8",
+            RegisterId::EAX => "EAX",
+            RegisterId::EBX => "EBX",
+            RegisterId::ECX => "ECX",
+            RegisterId::EDX => "EDX",
+            RegisterId::E5X => "E5X",
+            RegisterId::E6X => "E6X",
+            RegisterId::E7X => "E7X",
+            RegisterId::E8X => "E8X",
             RegisterId::FR1 => "FR1",
             RegisterId::FR2 => "FR2",
             RegisterId::EIP => "EIP",
@@ -200,14 +200,14 @@ impl Registers {
         Self {
             /****** [u32 Registers] ******/
             // [ User Registers ] //
-            er1: RegisterU32::new(RegisterId::ER1, rw, 0),
-            er2: RegisterU32::new(RegisterId::ER2, rw, 0),
-            er3: RegisterU32::new(RegisterId::ER3, rw, 0),
-            er4: RegisterU32::new(RegisterId::ER4, rw, 0),
-            er5: RegisterU32::new(RegisterId::ER5, rw, 0),
-            er6: RegisterU32::new(RegisterId::ER6, rw, 0),
-            er7: RegisterU32::new(RegisterId::ER7, rw, 0),
-            er8: RegisterU32::new(RegisterId::ER8, rw, 0),
+            er1: RegisterU32::new(RegisterId::EAX, rw, 0),
+            er2: RegisterU32::new(RegisterId::EBX, rw, 0),
+            er3: RegisterU32::new(RegisterId::ECX, rw, 0),
+            er4: RegisterU32::new(RegisterId::EDX, rw, 0),
+            er5: RegisterU32::new(RegisterId::E5X, rw, 0),
+            er6: RegisterU32::new(RegisterId::E6X, rw, 0),
+            er7: RegisterU32::new(RegisterId::E7X, rw, 0),
+            er8: RegisterU32::new(RegisterId::E8X, rw, 0),
 
             // [ System Registers ] //
             eip: RegisterU32::new(RegisterId::EIP, rw, BOOT_MEMORY_START as u32),
@@ -240,14 +240,14 @@ impl Registers {
 
         for id in RegisterId::iter() {
             match id {
-                RegisterId::ER1 => u32_vec.push(&self.er1),
-                RegisterId::ER2 => u32_vec.push(&self.er2),
-                RegisterId::ER3 => u32_vec.push(&self.er3),
-                RegisterId::ER4 => u32_vec.push(&self.er4),
-                RegisterId::ER5 => u32_vec.push(&self.er5),
-                RegisterId::ER6 => u32_vec.push(&self.er6),
-                RegisterId::ER7 => u32_vec.push(&self.er7),
-                RegisterId::ER8 => u32_vec.push(&self.er8),
+                RegisterId::EAX => u32_vec.push(&self.er1),
+                RegisterId::EBX => u32_vec.push(&self.er2),
+                RegisterId::ECX => u32_vec.push(&self.er3),
+                RegisterId::EDX => u32_vec.push(&self.er4),
+                RegisterId::E5X => u32_vec.push(&self.er5),
+                RegisterId::E6X => u32_vec.push(&self.er6),
+                RegisterId::E7X => u32_vec.push(&self.er7),
+                RegisterId::E8X => u32_vec.push(&self.er8),
                 RegisterId::EIP => u32_vec.push(&self.eip),
                 RegisterId::EBP => u32_vec.push(&self.ebp),
                 RegisterId::ESP => u32_vec.push(&self.esp),
@@ -279,14 +279,14 @@ impl Registers {
         match id {
             RegisterId::FR1 => &self.fr1,
             RegisterId::FR2 => &self.fr2,
-            RegisterId::ER1
-            | RegisterId::ER2
-            | RegisterId::ER3
-            | RegisterId::ER4
-            | RegisterId::ER5
-            | RegisterId::ER6
-            | RegisterId::ER7
-            | RegisterId::ER8
+            RegisterId::EAX
+            | RegisterId::EBX
+            | RegisterId::ECX
+            | RegisterId::EDX
+            | RegisterId::E5X
+            | RegisterId::E6X
+            | RegisterId::E7X
+            | RegisterId::E8X
             | RegisterId::EIP
             | RegisterId::EBP
             | RegisterId::ESP
@@ -311,14 +311,14 @@ impl Registers {
     #[inline(always)]
     pub fn get_register_u32(&self, id: RegisterId) -> &RegisterU32 {
         match id {
-            RegisterId::ER1 => &self.er1,
-            RegisterId::ER2 => &self.er2,
-            RegisterId::ER3 => &self.er3,
-            RegisterId::ER4 => &self.er4,
-            RegisterId::ER5 => &self.er5,
-            RegisterId::ER6 => &self.er6,
-            RegisterId::ER7 => &self.er7,
-            RegisterId::ER8 => &self.er8,
+            RegisterId::EAX => &self.er1,
+            RegisterId::EBX => &self.er2,
+            RegisterId::ECX => &self.er3,
+            RegisterId::EDX => &self.er4,
+            RegisterId::E5X => &self.er5,
+            RegisterId::E6X => &self.er6,
+            RegisterId::E7X => &self.er7,
+            RegisterId::E8X => &self.er8,
             RegisterId::EIP => &self.eip,
             RegisterId::EBP => &self.ebp,
             RegisterId::ESP => &self.esp,
@@ -346,14 +346,14 @@ impl Registers {
         match id {
             RegisterId::FR1 => &mut self.fr1,
             RegisterId::FR2 => &mut self.fr2,
-            RegisterId::ER1
-            | RegisterId::ER2
-            | RegisterId::ER3
-            | RegisterId::ER4
-            | RegisterId::ER5
-            | RegisterId::ER6
-            | RegisterId::ER7
-            | RegisterId::ER8
+            RegisterId::EAX
+            | RegisterId::EBX
+            | RegisterId::ECX
+            | RegisterId::EDX
+            | RegisterId::E5X
+            | RegisterId::E6X
+            | RegisterId::E7X
+            | RegisterId::E8X
             | RegisterId::EIP
             | RegisterId::EBP
             | RegisterId::ESP
@@ -378,14 +378,14 @@ impl Registers {
     #[inline(always)]
     pub fn get_register_u32_mut(&mut self, id: RegisterId) -> &mut RegisterU32 {
         match id {
-            RegisterId::ER1 => &mut self.er1,
-            RegisterId::ER2 => &mut self.er2,
-            RegisterId::ER3 => &mut self.er3,
-            RegisterId::ER4 => &mut self.er4,
-            RegisterId::ER5 => &mut self.er5,
-            RegisterId::ER6 => &mut self.er6,
-            RegisterId::ER7 => &mut self.er7,
-            RegisterId::ER8 => &mut self.er8,
+            RegisterId::EAX => &mut self.er1,
+            RegisterId::EBX => &mut self.er2,
+            RegisterId::ECX => &mut self.er3,
+            RegisterId::EDX => &mut self.er4,
+            RegisterId::E5X => &mut self.er5,
+            RegisterId::E6X => &mut self.er6,
+            RegisterId::E7X => &mut self.er7,
+            RegisterId::E8X => &mut self.er8,
             RegisterId::EIP => &mut self.eip,
             RegisterId::EBP => &mut self.ebp,
             RegisterId::ESP => &mut self.esp,

@@ -82,7 +82,7 @@ fn main() {
         // Specify our seed.
         Instruction::OutU32Imm(0xdeadbeef, 0x0),
         // Read a PRNG from the device.
-        Instruction::InU32Reg(0x0, RegisterId::ER1),
+        Instruction::InU32Reg(0x0, RegisterId::EAX),
         Instruction::PushU32Imm(0xdeadbeef),
         /*// Write the handler addresses into the IVT.
         // Handler for 0x00. This is a non-maskable interrupt.

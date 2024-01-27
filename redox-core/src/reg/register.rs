@@ -518,7 +518,7 @@ mod tests_registers {
         for (i, test) in tests.iter().enumerate() {
             let result = panic::catch_unwind(|| {
                 let mut register =
-                    RegisterU32::new(RegisterId::ER1, test.permissions, test.initial_value);
+                    RegisterU32::new(RegisterId::EAX, test.permissions, test.initial_value);
 
                 if matches!(test.test_type, TestType::Write) {
                     register.write(test.write_value.unwrap(), &test.privilege);
@@ -638,7 +638,7 @@ mod tests_registers {
         for (i, test) in tests.iter().enumerate() {
             let result = panic::catch_unwind(|| {
                 let mut register =
-                    RegisterF32::new(RegisterId::ER1, test.permissions, test.initial_value);
+                    RegisterF32::new(RegisterId::EAX, test.permissions, test.initial_value);
 
                 if matches!(test.test_type, TestType::Write) {
                     register.write(test.write_value.unwrap(), &test.privilege);
