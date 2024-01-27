@@ -2415,8 +2415,8 @@ mod tests_cpu {
             // The halt instruction should prevent any following instructions from executing, which
             // means that the register value will never change.
             TestU32::new(
-                &[Halt, MovU32ImmU32Reg(0xf, RegisterId::EAX)],
-                &[(RegisterId::EAX, 0)],
+                &[Halt, MovU32ImmU32Reg(0xf, RegisterId::E5X)],
+                &[(RegisterId::E5X, 0)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "HLT - failed to correctly stop execution after a HLT instruction",
@@ -2576,10 +2576,10 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0xf, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x1, RegisterId::EBX),
-                    AddU32RegU32Reg(RegisterId::EAX, RegisterId::EBX),
+                    MovU32ImmU32Reg(0x1, RegisterId::E8X),
+                    AddU32RegU32Reg(RegisterId::EAX, RegisterId::E8X),
                 ],
-                &[(RegisterId::EAX, 0xf), (RegisterId::EBX, 0x10)],
+                &[(RegisterId::EAX, 0xf), (RegisterId::E8X, 0x10)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ADD - incorrect result value produced",
@@ -2587,12 +2587,12 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(u32::MAX, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x2, RegisterId::EBX),
-                    AddU32RegU32Reg(RegisterId::EAX, RegisterId::EBX),
+                    MovU32ImmU32Reg(0x2, RegisterId::E8X),
+                    AddU32RegU32Reg(RegisterId::EAX, RegisterId::E8X),
                 ],
                 &[
                     (RegisterId::EAX, u32::MAX),
-                    (RegisterId::EBX, 0x1),
+                    (RegisterId::E8X, 0x1),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::OF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -2600,7 +2600,7 @@ mod tests_cpu {
                 "ADD - CPU flags not correctly set",
             ),
             TestU32::new(
-                &[AddU32RegU32Reg(RegisterId::EAX, RegisterId::EBX)],
+                &[AddU32RegU32Reg(RegisterId::EAX, RegisterId::E8X)],
                 &[(
                     RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
@@ -2615,12 +2615,12 @@ mod tests_cpu {
                     // Clear every flag.
                     MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0x2, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x1, RegisterId::EBX),
-                    AddU32RegU32Reg(RegisterId::EAX, RegisterId::EBX),
+                    MovU32ImmU32Reg(0x1, RegisterId::E8X),
+                    AddU32RegU32Reg(RegisterId::EAX, RegisterId::E8X),
                 ],
                 &[
                     (RegisterId::EAX, 0x2),
-                    (RegisterId::EBX, 0x3),
+                    (RegisterId::E8X, 0x3),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -2646,13 +2646,12 @@ mod tests_cpu {
                     // Clear every flag.
                     MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x1, RegisterId::EBX),
-                    AddU32RegU32Reg(RegisterId::EAX, RegisterId::EBX),
+                    MovU32ImmU32Reg(0x1, RegisterId::E8X),
+                    AddU32RegU32Reg(RegisterId::EAX, RegisterId::E8X),
                 ],
                 &[
                     (RegisterId::EAX, 0b0111_1111_1111_1111_1111_1111_1111_1111),
-                    //(RegisterId::ER2, 0x1),
-                    (RegisterId::EBX, 0b1000_0000_0000_0000_0000_0000_0000_0000),
+                    (RegisterId::E8X, 0b1000_0000_0000_0000_0000_0000_0000_0000),
                     (
                         RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
@@ -2668,13 +2667,12 @@ mod tests_cpu {
                     // Manually set the signed flag.
                     MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x1, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x1, RegisterId::EBX),
-                    AddU32RegU32Reg(RegisterId::EAX, RegisterId::EBX),
+                    MovU32ImmU32Reg(0x1, RegisterId::E8X),
+                    AddU32RegU32Reg(RegisterId::EAX, RegisterId::E8X),
                 ],
                 &[
                     (RegisterId::EAX, 0x1),
-                    //(RegisterId::ER2, 0x1),
-                    (RegisterId::EBX, 0x2),
+                    (RegisterId::E8X, 0x2),
                     (RegisterId::EFL, 0x0),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -2796,10 +2794,10 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0x1, RegisterId::EAX),
-                    MovU32ImmU32Reg(0xf, RegisterId::EBX),
-                    SubU32RegU32Reg(RegisterId::EAX, RegisterId::EBX),
+                    MovU32ImmU32Reg(0xf, RegisterId::E8X),
+                    SubU32RegU32Reg(RegisterId::EAX, RegisterId::E8X),
                 ],
-                &[(RegisterId::EAX, 0x1), (RegisterId::EBX, 0xe)],
+                &[(RegisterId::EAX, 0x1), (RegisterId::E8X, 0xe)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SUB - incorrect result value produced",
@@ -2807,12 +2805,12 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(u32::MAX, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x2, RegisterId::EBX),
-                    SubU32RegU32Reg(RegisterId::EAX, RegisterId::EBX),
+                    MovU32ImmU32Reg(0x2, RegisterId::E8X),
+                    SubU32RegU32Reg(RegisterId::EAX, RegisterId::E8X),
                 ],
                 &[
                     (RegisterId::EAX, u32::MAX),
-                    (RegisterId::EBX, 0x3),
+                    (RegisterId::E8X, 0x3),
                     (
                         RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::PF]),
@@ -2823,7 +2821,7 @@ mod tests_cpu {
                 "SUB - CPU flags not correctly set",
             ),
             TestU32::new(
-                &[SubU32RegU32Reg(RegisterId::EAX, RegisterId::EBX)],
+                &[SubU32RegU32Reg(RegisterId::EAX, RegisterId::E8X)],
                 &[(
                     RegisterId::EFL,
                     CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
@@ -2838,12 +2836,12 @@ mod tests_cpu {
                     // Clear every flag.
                     MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0x1, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x4, RegisterId::EBX),
-                    SubU32RegU32Reg(RegisterId::EAX, RegisterId::EBX),
+                    MovU32ImmU32Reg(0x4, RegisterId::E8X),
+                    SubU32RegU32Reg(RegisterId::EAX, RegisterId::E8X),
                 ],
                 &[
                     (RegisterId::EAX, 0x1),
-                    (RegisterId::EBX, 0x3),
+                    (RegisterId::E8X, 0x3),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -2856,12 +2854,12 @@ mod tests_cpu {
                     // Manually set the parity flag.
                     MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::PF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x1, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x2, RegisterId::EBX),
-                    SubU32RegU32Reg(RegisterId::EAX, RegisterId::EBX),
+                    MovU32ImmU32Reg(0x2, RegisterId::E8X),
+                    SubU32RegU32Reg(RegisterId::EAX, RegisterId::E8X),
                 ],
                 &[
                     (RegisterId::EAX, 0x1),
-                    (RegisterId::EBX, 0x1),
+                    (RegisterId::E8X, 0x1),
                     (RegisterId::EFL, 0x0),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -2874,12 +2872,12 @@ mod tests_cpu {
                     // Clear every flag.
                     MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0x1, RegisterId::EAX),
-                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::EBX),
-                    SubU32RegU32Reg(RegisterId::EAX, RegisterId::EBX),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::E8X),
+                    SubU32RegU32Reg(RegisterId::EAX, RegisterId::E8X),
                 ],
                 &[
                     (RegisterId::EAX, 0x1),
-                    (RegisterId::EBX, 0b1111_1111_1111_1111_1111_1111_1111_1110),
+                    (RegisterId::E8X, 0b1111_1111_1111_1111_1111_1111_1111_1110),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::SF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -2892,12 +2890,12 @@ mod tests_cpu {
                     // Manually set the signed flag.
                     MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x1, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x2, RegisterId::EBX),
-                    SubU32RegU32Reg(RegisterId::EAX, RegisterId::EBX),
+                    MovU32ImmU32Reg(0x2, RegisterId::E8X),
+                    SubU32RegU32Reg(RegisterId::EAX, RegisterId::E8X),
                 ],
                 &[
                     (RegisterId::EAX, 0x1),
-                    (RegisterId::EBX, 0x1),
+                    (RegisterId::E8X, 0x1),
                     (RegisterId::EFL, 0x0),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -2945,10 +2943,10 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0x1, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x2, RegisterId::EBX),
-                    MulU32Reg(RegisterId::EBX),
+                    MovU32ImmU32Reg(0x2, RegisterId::E8X),
+                    MulU32Reg(RegisterId::E8X),
                 ],
-                &[(RegisterId::EAX, 0x2), (RegisterId::EBX, 0x2)],
+                &[(RegisterId::EAX, 0x2), (RegisterId::E8X, 0x2)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MUL - incorrect result value produced",
@@ -2956,12 +2954,12 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(u32::MAX, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x2, RegisterId::EBX),
-                    MulU32Reg(RegisterId::EBX),
+                    MovU32ImmU32Reg(0x2, RegisterId::E8X),
+                    MulU32Reg(RegisterId::E8X),
                 ],
                 &[
                     (RegisterId::EAX, 4294967294),
-                    (RegisterId::EBX, 0x2),
+                    (RegisterId::E8X, 0x2),
                     (
                         RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::CF]),
@@ -3032,12 +3030,12 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0x3, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x2, RegisterId::EBX),
-                    DivU32Reg(RegisterId::EBX),
+                    MovU32ImmU32Reg(0x2, RegisterId::E8X),
+                    DivU32Reg(RegisterId::E8X),
                 ],
                 &[
                     (RegisterId::EAX, 0x1),
-                    (RegisterId::EBX, 0x2),
+                    (RegisterId::E8X, 0x2),
                     (RegisterId::EDX, 0x1),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -3047,12 +3045,12 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(u32::MAX, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x2, RegisterId::EBX),
-                    DivU32Reg(RegisterId::EBX),
+                    MovU32ImmU32Reg(0x2, RegisterId::E8X),
+                    DivU32Reg(RegisterId::E8X),
                 ],
                 &[
                     (RegisterId::EAX, 2147483647),
-                    (RegisterId::EBX, 0x2),
+                    (RegisterId::E8X, 0x2),
                     (RegisterId::EDX, 0x1),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -3065,7 +3063,7 @@ mod tests_cpu {
 
         // Additional division by zero exception tests.
         let div_zero_tests = [TestU32::new(
-            &[DivU32Reg(RegisterId::EBX)],
+            &[DivU32Reg(RegisterId::E8X)],
             &[],
             DEFAULT_U32_STACK_CAPACITY,
             false,
@@ -3553,10 +3551,10 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0x1, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x1, RegisterId::EBX),
-                    LeftShiftU32RegU32Reg(RegisterId::EBX, RegisterId::EAX),
+                    MovU32ImmU32Reg(0x1, RegisterId::E8X),
+                    LeftShiftU32RegU32Reg(RegisterId::E8X, RegisterId::EAX),
                 ],
-                &[(RegisterId::EAX, 0x2), (RegisterId::EBX, 0x1)],
+                &[(RegisterId::EAX, 0x2), (RegisterId::E8X, 0x1)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SHL - incorrect result value produced",
@@ -3566,12 +3564,12 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0b1011_1111_1111_1111_1111_1111_1111_1111, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x3, RegisterId::EBX),
-                    LeftShiftU32RegU32Reg(RegisterId::EBX, RegisterId::EAX),
+                    MovU32ImmU32Reg(0x3, RegisterId::E8X),
+                    LeftShiftU32RegU32Reg(RegisterId::E8X, RegisterId::EAX),
                 ],
                 &[
                     (RegisterId::EAX, 0b1111_1111_1111_1111_1111_1111_1111_1000),
-                    (RegisterId::EBX, 0x3),
+                    (RegisterId::E8X, 0x3),
                     (
                         RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::CF]),
@@ -3586,12 +3584,12 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x1, RegisterId::EBX),
-                    LeftShiftU32RegU32Reg(RegisterId::EBX, RegisterId::EAX),
+                    MovU32ImmU32Reg(0x1, RegisterId::E8X),
+                    LeftShiftU32RegU32Reg(RegisterId::E8X, RegisterId::EAX),
                 ],
                 &[
                     (RegisterId::EAX, 0b1111_1111_1111_1111_1111_1111_1111_1110),
-                    (RegisterId::EBX, 0x1),
+                    (RegisterId::E8X, 0x1),
                     (
                         RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::OF, CpuFlag::CF]),
@@ -3605,12 +3603,12 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(u32::MAX, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x1, RegisterId::EBX),
-                    LeftShiftU32RegU32Reg(RegisterId::EBX, RegisterId::EAX),
+                    MovU32ImmU32Reg(0x1, RegisterId::E8X),
+                    LeftShiftU32RegU32Reg(RegisterId::E8X, RegisterId::EAX),
                 ],
                 &[
                     (RegisterId::EAX, 0b1111_1111_1111_1111_1111_1111_1111_1110),
-                    (RegisterId::EBX, 0x1),
+                    (RegisterId::E8X, 0x1),
                     (
                         RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::OF, CpuFlag::CF]),
@@ -3624,11 +3622,11 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0x0, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x1, RegisterId::EBX),
-                    LeftShiftU32RegU32Reg(RegisterId::EBX, RegisterId::EAX),
+                    MovU32ImmU32Reg(0x1, RegisterId::E8X),
+                    LeftShiftU32RegU32Reg(RegisterId::E8X, RegisterId::EAX),
                 ],
                 &[
-                    (RegisterId::EBX, 0x1),
+                    (RegisterId::E8X, 0x1),
                     (
                         RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
@@ -3645,11 +3643,11 @@ mod tests_cpu {
                     MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::OF]), RegisterId::EFL),
                     // This will unset the overflow flag and set the zero flag instead.
                     MovU32ImmU32Reg(0x0, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x1, RegisterId::EBX),
-                    LeftShiftU32RegU32Reg(RegisterId::EBX, RegisterId::EAX),
+                    MovU32ImmU32Reg(0x1, RegisterId::E8X),
+                    LeftShiftU32RegU32Reg(RegisterId::E8X, RegisterId::EAX),
                 ],
                 &[
-                    (RegisterId::EBX, 0x1),
+                    (RegisterId::E8X, 0x1),
                     (
                         RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
@@ -3662,8 +3660,8 @@ mod tests_cpu {
             // This should assert as a shift of value higher than 31 is unsupported.
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0x20, RegisterId::EBX),
-                    LeftShiftU32RegU32Reg(RegisterId::EBX, RegisterId::EAX),
+                    MovU32ImmU32Reg(0x20, RegisterId::E8X),
+                    LeftShiftU32RegU32Reg(RegisterId::E8X, RegisterId::EAX),
                 ],
                 &[],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -3674,7 +3672,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0x1, RegisterId::EAX),
-                    LeftShiftU32RegU32Reg(RegisterId::EBX, RegisterId::EAX),
+                    LeftShiftU32RegU32Reg(RegisterId::E8X, RegisterId::EAX),
                 ],
                 &[(RegisterId::EAX, 0x1)],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -3687,12 +3685,12 @@ mod tests_cpu {
                     // Clear any set flags.
                     MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0b0100_0000_0000_0000_0000_0000_0000_0000, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x1, RegisterId::EBX),
-                    LeftShiftU32RegU32Reg(RegisterId::EBX, RegisterId::EAX),
+                    MovU32ImmU32Reg(0x1, RegisterId::E8X),
+                    LeftShiftU32RegU32Reg(RegisterId::E8X, RegisterId::EAX),
                 ],
                 &[
                     (RegisterId::EAX, 0b1000_0000_0000_0000_0000_0000_0000_0000),
-                    (RegisterId::EBX, 0x1),
+                    (RegisterId::E8X, 0x1),
                     (
                         RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
@@ -3708,12 +3706,12 @@ mod tests_cpu {
                     // Manually set the signed flag.
                     MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x1, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x1, RegisterId::EBX),
-                    LeftShiftU32RegU32Reg(RegisterId::EBX, RegisterId::EAX),
+                    MovU32ImmU32Reg(0x1, RegisterId::E8X),
+                    LeftShiftU32RegU32Reg(RegisterId::E8X, RegisterId::EAX),
                 ],
                 &[
                     (RegisterId::EAX, 0x2),
-                    (RegisterId::EBX, 0x1),
+                    (RegisterId::E8X, 0x1),
                     (RegisterId::EFL, 0x0),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -3821,10 +3819,10 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0x1, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x1, RegisterId::EBX),
-                    ArithLeftShiftU32RegU32Reg(RegisterId::EBX, RegisterId::EAX),
+                    MovU32ImmU32Reg(0x1, RegisterId::E8X),
+                    ArithLeftShiftU32RegU32Reg(RegisterId::E8X, RegisterId::EAX),
                 ],
-                &[(RegisterId::EAX, 0x2), (RegisterId::EBX, 0x1)],
+                &[(RegisterId::EAX, 0x2), (RegisterId::E8X, 0x1)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SAL - incorrect result value produced",
@@ -3832,12 +3830,12 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1110, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x1, RegisterId::EBX),
-                    ArithLeftShiftU32RegU32Reg(RegisterId::EBX, RegisterId::EAX),
+                    MovU32ImmU32Reg(0x1, RegisterId::E8X),
+                    ArithLeftShiftU32RegU32Reg(RegisterId::E8X, RegisterId::EAX),
                 ],
                 &[
                     (RegisterId::EAX, 0b1111_1111_1111_1111_1111_1111_1111_1101),
-                    (RegisterId::EBX, 0x1),
+                    (RegisterId::E8X, 0x1),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::SF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -3848,11 +3846,11 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0x0, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x1, RegisterId::EBX),
-                    ArithLeftShiftU32RegU32Reg(RegisterId::EBX, RegisterId::EAX),
+                    MovU32ImmU32Reg(0x1, RegisterId::E8X),
+                    ArithLeftShiftU32RegU32Reg(RegisterId::E8X, RegisterId::EAX),
                 ],
                 &[
-                    (RegisterId::EBX, 0x1),
+                    (RegisterId::E8X, 0x1),
                     (
                         RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
@@ -3866,7 +3864,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0x1, RegisterId::EAX),
-                    ArithLeftShiftU32RegU32Reg(RegisterId::EBX, RegisterId::EAX),
+                    ArithLeftShiftU32RegU32Reg(RegisterId::E8X, RegisterId::EAX),
                 ],
                 &[(RegisterId::EAX, 0x1)],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -3879,12 +3877,12 @@ mod tests_cpu {
                     // Clear any set flags.
                     MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0b0100_0000_0000_0000_0000_0000_0000_0000, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x1, RegisterId::EBX),
-                    ArithLeftShiftU32RegU32Reg(RegisterId::EBX, RegisterId::EAX),
+                    MovU32ImmU32Reg(0x1, RegisterId::E8X),
+                    ArithLeftShiftU32RegU32Reg(RegisterId::E8X, RegisterId::EAX),
                 ],
                 &[
                     (RegisterId::EAX, 0b1000_0000_0000_0000_0000_0000_0000_0000),
-                    (RegisterId::EBX, 0x1),
+                    (RegisterId::E8X, 0x1),
                     (
                         RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
@@ -3900,12 +3898,12 @@ mod tests_cpu {
                     // Manually set the signed flag.
                     MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x1, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x1, RegisterId::EBX),
-                    ArithLeftShiftU32RegU32Reg(RegisterId::EBX, RegisterId::EAX),
+                    MovU32ImmU32Reg(0x1, RegisterId::E8X),
+                    ArithLeftShiftU32RegU32Reg(RegisterId::E8X, RegisterId::EAX),
                 ],
                 &[
                     (RegisterId::EAX, 0x2),
-                    (RegisterId::EBX, 0x1),
+                    (RegisterId::E8X, 0x1),
                     (RegisterId::EFL, 0x0),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -4034,10 +4032,10 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0x2, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x1, RegisterId::EBX),
-                    RightShiftU32RegU32Reg(RegisterId::EBX, RegisterId::EAX),
+                    MovU32ImmU32Reg(0x1, RegisterId::E8X),
+                    RightShiftU32RegU32Reg(RegisterId::E8X, RegisterId::EAX),
                 ],
-                &[(RegisterId::EAX, 0x1), (RegisterId::EBX, 0x1)],
+                &[(RegisterId::EAX, 0x1), (RegisterId::E8X, 0x1)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SHR - incorrect result value produced",
@@ -4048,14 +4046,14 @@ mod tests_cpu {
                 &[
                     // Manually set the overflow flag.
                     MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::OF]), RegisterId::EFL),
-                    MovU32ImmU32Reg(0x1, RegisterId::EBX),
+                    MovU32ImmU32Reg(0x1, RegisterId::E8X),
                     // Execute the test instruction.
                     MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::EAX),
-                    RightShiftU32RegU32Reg(RegisterId::EBX, RegisterId::EAX),
+                    RightShiftU32RegU32Reg(RegisterId::E8X, RegisterId::EAX),
                 ],
                 &[
                     (RegisterId::EAX, 0b0011_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::EBX, 0x1),
+                    (RegisterId::E8X, 0x1),
                     (
                         RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::CF, CpuFlag::PF]),
@@ -4071,14 +4069,14 @@ mod tests_cpu {
                 &[
                     // Manually set the overflow flag.
                     MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::OF]), RegisterId::EFL),
-                    MovU32ImmU32Reg(0x1, RegisterId::EBX),
+                    MovU32ImmU32Reg(0x1, RegisterId::E8X),
                     // Execute the test instruction.
                     MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1110, RegisterId::EAX),
-                    RightShiftU32RegU32Reg(RegisterId::EBX, RegisterId::EAX),
+                    RightShiftU32RegU32Reg(RegisterId::E8X, RegisterId::EAX),
                 ],
                 &[
                     (RegisterId::EAX, 0b0011_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::EBX, 0x1),
+                    (RegisterId::E8X, 0x1),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -4089,11 +4087,11 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0x0, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x1, RegisterId::EBX),
-                    RightShiftU32RegU32Reg(RegisterId::EBX, RegisterId::EAX),
+                    MovU32ImmU32Reg(0x1, RegisterId::E8X),
+                    RightShiftU32RegU32Reg(RegisterId::E8X, RegisterId::EAX),
                 ],
                 &[
-                    (RegisterId::EBX, 0x1),
+                    (RegisterId::E8X, 0x1),
                     (
                         RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
@@ -4106,8 +4104,8 @@ mod tests_cpu {
             // This should assert as a shift of value higher than 31 is unsupported.
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0x20, RegisterId::EBX),
-                    RightShiftU32RegU32Reg(RegisterId::EBX, RegisterId::EAX),
+                    MovU32ImmU32Reg(0x20, RegisterId::E8X),
+                    RightShiftU32RegU32Reg(RegisterId::E8X, RegisterId::EAX),
                 ],
                 &[],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -4118,7 +4116,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0x1, RegisterId::EAX),
-                    RightShiftU32RegU32Reg(RegisterId::EBX, RegisterId::EAX),
+                    RightShiftU32RegU32Reg(RegisterId::E8X, RegisterId::EAX),
                 ],
                 &[(RegisterId::EAX, 0x1)],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -4229,10 +4227,10 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0x2, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x1, RegisterId::EBX),
-                    ArithRightShiftU32RegU32Reg(RegisterId::EBX, RegisterId::EAX),
+                    MovU32ImmU32Reg(0x1, RegisterId::E8X),
+                    ArithRightShiftU32RegU32Reg(RegisterId::E8X, RegisterId::EAX),
                 ],
-                &[(RegisterId::EAX, 0x1), (RegisterId::EBX, 0x1)],
+                &[(RegisterId::EAX, 0x1), (RegisterId::E8X, 0x1)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SAR - incorrect result value produced",
@@ -4240,12 +4238,12 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x1, RegisterId::EBX),
-                    ArithRightShiftU32RegU32Reg(RegisterId::EBX, RegisterId::EAX),
+                    MovU32ImmU32Reg(0x1, RegisterId::E8X),
+                    ArithRightShiftU32RegU32Reg(RegisterId::E8X, RegisterId::EAX),
                 ],
                 &[
                     (RegisterId::EAX, 0b1011_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::EBX, 0x1),
+                    (RegisterId::E8X, 0x1),
                     (
                         RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
@@ -4259,11 +4257,11 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0x0, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x1, RegisterId::EBX),
-                    ArithRightShiftU32RegU32Reg(RegisterId::EBX, RegisterId::EAX),
+                    MovU32ImmU32Reg(0x1, RegisterId::E8X),
+                    ArithRightShiftU32RegU32Reg(RegisterId::E8X, RegisterId::EAX),
                 ],
                 &[
-                    (RegisterId::EBX, 0x1),
+                    (RegisterId::E8X, 0x1),
                     (
                         RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
@@ -4277,7 +4275,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0x1, RegisterId::EAX),
-                    ArithRightShiftU32RegU32Reg(RegisterId::EBX, RegisterId::EAX),
+                    ArithRightShiftU32RegU32Reg(RegisterId::E8X, RegisterId::EAX),
                 ],
                 &[(RegisterId::EAX, 0x1)],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -4290,12 +4288,12 @@ mod tests_cpu {
                     // Clear every flag.
                     MovU32ImmU32Reg(0x0, RegisterId::EFL),
                     MovU32ImmU32Reg(0b0000_0000_0000_0000_0000_0000_0000_0001, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x1, RegisterId::EBX),
-                    ArithRightShiftU32RegU32Reg(RegisterId::EBX, RegisterId::EAX),
+                    MovU32ImmU32Reg(0x1, RegisterId::E8X),
+                    ArithRightShiftU32RegU32Reg(RegisterId::E8X, RegisterId::EAX),
                 ],
                 &[
                     (RegisterId::EAX, 0b1000_0000_0000_0000_0000_0000_0000_0000),
-                    (RegisterId::EBX, 0x1),
+                    (RegisterId::E8X, 0x1),
                     (
                         RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
@@ -4311,12 +4309,12 @@ mod tests_cpu {
                     // Manually set the signed flag.
                     MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::EFL),
                     MovU32ImmU32Reg(0x2, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x1, RegisterId::EBX),
-                    ArithRightShiftU32RegU32Reg(RegisterId::EBX, RegisterId::EAX),
+                    MovU32ImmU32Reg(0x1, RegisterId::E8X),
+                    ArithRightShiftU32RegU32Reg(RegisterId::E8X, RegisterId::EAX),
                 ],
                 &[
                     (RegisterId::EAX, 0x1),
-                    (RegisterId::EBX, 0x1),
+                    (RegisterId::E8X, 0x1),
                     (RegisterId::EFL, 0x0),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -4361,9 +4359,9 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0x1, RegisterId::EAX),
-                    MovU32RegU32Reg(RegisterId::EAX, RegisterId::EBX),
+                    MovU32RegU32Reg(RegisterId::EAX, RegisterId::E8X),
                 ],
-                &[(RegisterId::EAX, 0x1), (RegisterId::EBX, 0x1)],
+                &[(RegisterId::EAX, 0x1), (RegisterId::E8X, 0x1)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOV - immediate value not moved to register",
@@ -4371,10 +4369,10 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmU32Reg(0x1, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x2, RegisterId::EBX),
-                    MovU32RegU32Reg(RegisterId::EAX, RegisterId::EBX),
+                    MovU32ImmU32Reg(0x2, RegisterId::E8X),
+                    MovU32RegU32Reg(RegisterId::EAX, RegisterId::E8X),
                 ],
-                &[(RegisterId::EAX, 0x1), (RegisterId::EBX, 0x1)],
+                &[(RegisterId::EAX, 0x1), (RegisterId::E8X, 0x1)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOV - immediate value not moved to register",
@@ -4410,9 +4408,9 @@ mod tests_cpu {
                 MovU32ImmU32Reg(0x123, RegisterId::EAX),
                 MovU32RegMemSimple(RegisterId::EAX, 0x0),
                 // Check that the value was written by reading it back into a register.
-                MovMemU32RegSimple(0x0, RegisterId::EBX),
+                MovMemU32RegSimple(0x0, RegisterId::E8X),
             ],
-            &[(RegisterId::EAX, 0x123), (RegisterId::EBX, 0x123)],
+            &[(RegisterId::EAX, 0x123), (RegisterId::E8X, 0x123)],
             DEFAULT_U32_STACK_CAPACITY,
             false,
             "MOV - u32 register value not moved to memory",
@@ -4430,9 +4428,9 @@ mod tests_cpu {
                 MovU32ImmU32Reg(0x123, RegisterId::EAX),
                 MovU32RegMemSimple(RegisterId::EAX, 0x0),
                 // Check that the value was written by reading it back into a register.
-                MovMemU32RegSimple(0x0, RegisterId::EBX),
+                MovMemU32RegSimple(0x0, RegisterId::E8X),
             ],
-            &[(RegisterId::EAX, 0x123), (RegisterId::EBX, 0x123)],
+            &[(RegisterId::EAX, 0x123), (RegisterId::E8X, 0x123)],
             DEFAULT_U32_STACK_CAPACITY,
             false,
             "MOV - value not correctly moved from memory to register",
@@ -4447,12 +4445,9 @@ mod tests_cpu {
         let tests = [TestU32::new(
             &[
                 MovU32ImmU32Reg(0x123, RegisterId::EAX),
-                // Store value in memory.
                 MovU32RegMemSimple(RegisterId::EAX, 0x0),
-                // Set the address pointer in ER2.
-                MovU32ImmU32Reg(0x0, RegisterId::EBX),
-                // Read the value from the address of ER2 into ER1.
-                MovU32RegPtrU32RegSimple(RegisterId::EBX, RegisterId::ECX),
+                MovU32ImmU32Reg(0x0, RegisterId::E8X),
+                MovU32RegPtrU32RegSimple(RegisterId::E8X, RegisterId::ECX),
             ],
             &[(RegisterId::EAX, 0x123), (RegisterId::ECX, 0x123)],
             DEFAULT_U32_STACK_CAPACITY,
@@ -4469,10 +4464,10 @@ mod tests_cpu {
         let tests = [TestU32::new(
             &[
                 MovU32ImmU32Reg(0x1, RegisterId::EAX),
-                MovU32ImmU32Reg(0x2, RegisterId::EBX),
-                SwapU32RegU32Reg(RegisterId::EAX, RegisterId::EBX),
+                MovU32ImmU32Reg(0x2, RegisterId::E8X),
+                SwapU32RegU32Reg(RegisterId::EAX, RegisterId::E8X),
             ],
-            &[(RegisterId::EAX, 0x2), (RegisterId::EBX, 0x1)],
+            &[(RegisterId::EAX, 0x2), (RegisterId::E8X, 0x1)],
             DEFAULT_U32_STACK_CAPACITY,
             false,
             "SWAP - values of the two registers were not correctly swapped",
@@ -4501,6 +4496,9 @@ mod tests_cpu {
     /// Test the complex move value to expression-derived memory address.
     #[test]
     fn test_move_u32_imm_expr() {
+        use ExpressionArgs as EA;
+        use ExpressionOperator as EO;
+
         let tests = [
             TestU32::new(
                 &[
@@ -4508,9 +4506,9 @@ mod tests_cpu {
                         0x123,
                         Expression::try_from(
                             &[
-                                ExpressionArgs::Immediate(0x8),
-                                ExpressionArgs::Operator(ExpressionOperator::Add),
-                                ExpressionArgs::Immediate(0x8),
+                                EA::Immediate(0x8),
+                                EA::Operator(EO::Add),
+                                EA::Immediate(0x8),
                             ][..],
                         )
                         .expect("")
@@ -4526,15 +4524,15 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0x8, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x8, RegisterId::EBX),
+                    MovU32ImmU32Reg(0x8, RegisterId::E5X),
+                    MovU32ImmU32Reg(0x8, RegisterId::E6X),
                     MovU32ImmMemExpr(
                         0x123,
                         Expression::try_from(
                             &[
-                                ExpressionArgs::Register(RegisterId::EAX),
-                                ExpressionArgs::Operator(ExpressionOperator::Add),
-                                ExpressionArgs::Register(RegisterId::EBX),
+                                EA::Register(RegisterId::E5X),
+                                EA::Operator(EO::Add),
+                                EA::Register(RegisterId::E6X),
                             ][..],
                         )
                         .expect("")
@@ -4543,21 +4541,21 @@ mod tests_cpu {
                     // Check that the value was written by reading it back into a register.
                     MovMemU32RegSimple(0x8 + 0x8, RegisterId::E8X),
                 ],
-                &[(RegisterId::EAX, 0x8), (RegisterId::EBX, 0x8), (RegisterId::E8X, 0x123)],
+                &[(RegisterId::E5X, 0x8), (RegisterId::E6X, 0x8), (RegisterId::E8X, 0x123)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - two registers",
             ),
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0x8, RegisterId::EAX),
+                    MovU32ImmU32Reg(0x8, RegisterId::E5X),
                     MovU32ImmMemExpr(
                         0x123,
                         Expression::try_from(
                             &[
-                                ExpressionArgs::Register(RegisterId::EAX),
-                                ExpressionArgs::Operator(ExpressionOperator::Add),
-                                ExpressionArgs::Immediate(0x8),
+                                EA::Register(RegisterId::E5X),
+                                EA::Operator(EO::Add),
+                                EA::Immediate(0x8),
                             ][..],
                         )
                         .expect("")
@@ -4566,22 +4564,22 @@ mod tests_cpu {
                     // Check that the value was written by reading it back into a register.
                     MovMemU32RegSimple(0x8 + 0x8, RegisterId::E8X),
                 ],
-                &[(RegisterId::EAX, 0x8), (RegisterId::E8X, 0x123)],
+                &[(RegisterId::E5X, 0x8), (RegisterId::E8X, 0x123)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - one constant and one register",
             ),
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0x2, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x8, RegisterId::EBX),
+                    MovU32ImmU32Reg(0x2, RegisterId::E5X),
+                    MovU32ImmU32Reg(0x8, RegisterId::E6X),
                     MovU32ImmMemExpr(
                         0x123,
                         Expression::try_from(
                             &[
-                                ExpressionArgs::Register(RegisterId::EAX),
-                                ExpressionArgs::Operator(ExpressionOperator::Multiply),
-                                ExpressionArgs::Register(RegisterId::EBX),
+                                EA::Register(RegisterId::E5X),
+                                EA::Operator(EO::Multiply),
+                                EA::Register(RegisterId::E6X),
                             ][..],
                         )
                         .expect("")
@@ -4590,22 +4588,22 @@ mod tests_cpu {
                     // Check that the value was written by reading it back into a register.
                     MovMemU32RegSimple(0x2 * 0x8, RegisterId::E8X),
                 ],
-                &[(RegisterId::EAX, 0x2), (RegisterId::EBX, 0x8), (RegisterId::E8X, 0x123)],
+                &[(RegisterId::E5X, 0x2), (RegisterId::E6X, 0x8), (RegisterId::E8X, 0x123)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOV - value not correctly moved from memory to register - using multiplication",
             ),
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0x1a, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x4, RegisterId::EBX),
+                    MovU32ImmU32Reg(0x1a, RegisterId::E5X),
+                    MovU32ImmU32Reg(0x4, RegisterId::E6X),
                     MovU32ImmMemExpr(
                         0x123,
                         Expression::try_from(
                             &[
-                                ExpressionArgs::Register(RegisterId::EAX),
-                                ExpressionArgs::Operator(ExpressionOperator::Subtract),
-                                ExpressionArgs::Register(RegisterId::EBX),
+                                EA::Register(RegisterId::E5X),
+                                EA::Operator(EO::Subtract),
+                                EA::Register(RegisterId::E6X),
                             ][..],
                         )
                         .expect("")
@@ -4614,7 +4612,7 @@ mod tests_cpu {
                     // Check that the value was written by reading it back into a register.
                     MovMemU32RegSimple(0x1a - 0x4, RegisterId::E8X),
                 ],
-                &[(RegisterId::EAX, 0x1a), (RegisterId::EBX, 0x4), (RegisterId::E8X, 0x123)],
+                &[(RegisterId::E5X, 0x1a), (RegisterId::E6X, 0x4), (RegisterId::E8X, 0x123)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOV - value not correctly moved from memory to register - using subtraction",
@@ -4625,11 +4623,11 @@ mod tests_cpu {
                         0x123,
                         Expression::try_from(
                             &[
-                                ExpressionArgs::Immediate(0x8),
-                                ExpressionArgs::Operator(ExpressionOperator::Add),
-                                ExpressionArgs::Immediate(0x4),
-                                ExpressionArgs::Operator(ExpressionOperator::Multiply),
-                                ExpressionArgs::Immediate(0x2),
+                                EA::Immediate(0x8),
+                                EA::Operator(EO::Add),
+                                EA::Immediate(0x4),
+                                EA::Operator(EO::Multiply),
+                                EA::Immediate(0x2),
                             ][..],
                         )
                         .expect("")
@@ -4651,6 +4649,9 @@ mod tests_cpu {
     /// Test the complex move from an expression-derived memory address to a register.
     #[test]
     fn test_move_mem_expr_u32_reg() {
+        use ExpressionArgs as EA;
+        use ExpressionOperator as EO;
+
         let tests = [
             TestU32::new(
                 &[
@@ -4658,9 +4659,9 @@ mod tests_cpu {
                     MovMemExprU32Reg(
                         Expression::try_from(
                             &[
-                                ExpressionArgs::Immediate(0x8),
-                                ExpressionArgs::Operator(ExpressionOperator::Add),
-                                ExpressionArgs::Immediate(0x8),
+                                EA::Immediate(0x8),
+                                EA::Operator(EO::Add),
+                                EA::Immediate(0x8),
                             ][..],
                         )
                         .expect("")
@@ -4676,14 +4677,14 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmMemSimple(0x123, 0x10),
-                    MovU32ImmU32Reg(0x8, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x8, RegisterId::EBX),
+                    MovU32ImmU32Reg(0x8, RegisterId::E5X),
+                    MovU32ImmU32Reg(0x8, RegisterId::E6X),
                     MovMemExprU32Reg(
                         Expression::try_from(
                             &[
-                                ExpressionArgs::Register(RegisterId::EAX),
-                                ExpressionArgs::Operator(ExpressionOperator::Add),
-                                ExpressionArgs::Register(RegisterId::EBX),
+                                EA::Register(RegisterId::E5X),
+                                EA::Operator(EO::Add),
+                                EA::Register(RegisterId::E6X),
                             ][..],
                         )
                         .expect("")
@@ -4692,8 +4693,8 @@ mod tests_cpu {
                     ),
                 ],
                 &[
-                    (RegisterId::EAX, 0x8),
-                    (RegisterId::EBX, 0x8),
+                    (RegisterId::E5X, 0x8),
+                    (RegisterId::E6X, 0x8),
                     (RegisterId::E8X, 0x123),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -4703,13 +4704,13 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmMemSimple(0x123, 0x10),
-                    MovU32ImmU32Reg(0x8, RegisterId::EAX),
+                    MovU32ImmU32Reg(0x8, RegisterId::E5X),
                     MovMemExprU32Reg(
                         Expression::try_from(
                             &[
-                                ExpressionArgs::Register(RegisterId::EAX),
-                                ExpressionArgs::Operator(ExpressionOperator::Add),
-                                ExpressionArgs::Immediate(0x8),
+                                EA::Register(RegisterId::E5X),
+                                EA::Operator(EO::Add),
+                                EA::Immediate(0x8),
                             ][..],
                         )
                         .expect("")
@@ -4717,7 +4718,7 @@ mod tests_cpu {
                         RegisterId::E8X,
                     ),
                 ],
-                &[(RegisterId::EAX, 0x8), (RegisterId::E8X, 0x123)],
+                &[(RegisterId::E5X, 0x8), (RegisterId::E8X, 0x123)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - one constant and one register",
@@ -4725,14 +4726,14 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmMemSimple(0x123, 0x10),
-                    MovU32ImmU32Reg(0x2, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x8, RegisterId::EBX),
+                    MovU32ImmU32Reg(0x2, RegisterId::E5X),
+                    MovU32ImmU32Reg(0x8, RegisterId::E6X),
                     MovMemExprU32Reg(
                         Expression::try_from(
                             &[
-                                ExpressionArgs::Register(RegisterId::EAX),
-                                ExpressionArgs::Operator(ExpressionOperator::Multiply),
-                                ExpressionArgs::Register(RegisterId::EBX),
+                                EA::Register(RegisterId::E5X),
+                                EA::Operator(EO::Multiply),
+                                EA::Register(RegisterId::E6X),
                             ][..],
                         )
                         .expect("")
@@ -4741,8 +4742,8 @@ mod tests_cpu {
                     ),
                 ],
                 &[
-                    (RegisterId::EAX, 0x2),
-                    (RegisterId::EBX, 0x8),
+                    (RegisterId::E5X, 0x2),
+                    (RegisterId::E6X, 0x8),
                     (RegisterId::E8X, 0x123),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -4752,14 +4753,14 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmMemSimple(0x123, 0x16),
-                    MovU32ImmU32Reg(0x1A, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x4, RegisterId::EBX),
+                    MovU32ImmU32Reg(0x1A, RegisterId::E5X),
+                    MovU32ImmU32Reg(0x4, RegisterId::E6X),
                     MovMemExprU32Reg(
                         Expression::try_from(
                             &[
-                                ExpressionArgs::Register(RegisterId::EAX),
-                                ExpressionArgs::Operator(ExpressionOperator::Subtract),
-                                ExpressionArgs::Register(RegisterId::EBX),
+                                EA::Register(RegisterId::E5X),
+                                EA::Operator(EO::Subtract),
+                                EA::Register(RegisterId::E6X),
                             ][..],
                         )
                         .expect("")
@@ -4768,8 +4769,8 @@ mod tests_cpu {
                     ),
                 ],
                 &[
-                    (RegisterId::EAX, 0x1a),
-                    (RegisterId::EBX, 0x4),
+                    (RegisterId::E5X, 0x1a),
+                    (RegisterId::E6X, 0x4),
                     (RegisterId::E8X, 0x123),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -4782,11 +4783,11 @@ mod tests_cpu {
                     MovMemExprU32Reg(
                         Expression::try_from(
                             &[
-                                ExpressionArgs::Immediate(0x8),
-                                ExpressionArgs::Operator(ExpressionOperator::Add),
-                                ExpressionArgs::Immediate(0x4),
-                                ExpressionArgs::Operator(ExpressionOperator::Multiply),
-                                ExpressionArgs::Immediate(0x2),
+                                EA::Immediate(0x8),
+                                EA::Operator(EO::Add),
+                                EA::Immediate(0x4),
+                                EA::Operator(EO::Multiply),
+                                EA::Immediate(0x2),
                             ][..],
                         )
                         .expect("")
@@ -4807,6 +4808,9 @@ mod tests_cpu {
     /// Test the complex move from a register to an expression-derived memory address.
     #[test]
     fn test_move_u32_reg_mem_expr() {
+        use ExpressionArgs as EA;
+        use ExpressionOperator as EO;
+
         let tests = [
             TestU32::new(
                 &[
@@ -4815,9 +4819,9 @@ mod tests_cpu {
                         RegisterId::E8X,
                         Expression::try_from(
                             &[
-                                ExpressionArgs::Immediate(0x8),
-                                ExpressionArgs::Operator(ExpressionOperator::Add),
-                                ExpressionArgs::Immediate(0x8),
+                                EA::Immediate(0x8),
+                                EA::Operator(EO::Add),
+                                EA::Immediate(0x8),
                             ][..],
                         )
                         .expect("")
@@ -4832,16 +4836,16 @@ mod tests_cpu {
             // Test with two register values.
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0x8, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x8, RegisterId::EBX),
+                    MovU32ImmU32Reg(0x8, RegisterId::E5X),
+                    MovU32ImmU32Reg(0x8, RegisterId::E6X),
                     MovU32ImmU32Reg(0x123, RegisterId::E8X),
                     MovU32RegMemExpr(
                         RegisterId::E8X,
                         Expression::try_from(
                             &[
-                                ExpressionArgs::Register(RegisterId::EAX),
-                                ExpressionArgs::Operator(ExpressionOperator::Add),
-                                ExpressionArgs::Register(RegisterId::EBX),
+                                EA::Register(RegisterId::E5X),
+                                EA::Operator(EO::Add),
+                                EA::Register(RegisterId::E6X),
                             ][..],
                         )
                         .expect("")
@@ -4849,8 +4853,8 @@ mod tests_cpu {
                     ),
                 ],
                 &[
-                    (RegisterId::EAX, 0x8),
-                    (RegisterId::EBX, 0x8),
+                    (RegisterId::E5X, 0x8),
+                    (RegisterId::E6X, 0x8),
                     (RegisterId::E8X, 0x123),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -4860,22 +4864,22 @@ mod tests_cpu {
             // Test with a constant and a register.
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0x8, RegisterId::EAX),
+                    MovU32ImmU32Reg(0x8, RegisterId::E5X),
                     MovU32ImmU32Reg(0x123, RegisterId::E8X),
                     MovU32RegMemExpr(
                         RegisterId::E8X,
                         Expression::try_from(
                             &[
-                                ExpressionArgs::Register(RegisterId::EAX),
-                                ExpressionArgs::Operator(ExpressionOperator::Add),
-                                ExpressionArgs::Immediate(0x8),
+                                EA::Register(RegisterId::E5X),
+                                EA::Operator(EO::Add),
+                                EA::Immediate(0x8),
                             ][..],
                         )
                         .expect("")
                         .pack(),
                     ),
                 ],
-                &[(RegisterId::EAX, 0x8), (RegisterId::E8X, 0x123)],
+                &[(RegisterId::E5X, 0x8), (RegisterId::E8X, 0x123)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - one constant and one register",
@@ -4883,16 +4887,16 @@ mod tests_cpu {
             // Test with multiplication.
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0x2, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x8, RegisterId::EBX),
+                    MovU32ImmU32Reg(0x2, RegisterId::E5X),
+                    MovU32ImmU32Reg(0x8, RegisterId::E6X),
                     MovU32ImmU32Reg(0x123, RegisterId::E8X),
                     MovU32RegMemExpr(
                         RegisterId::E8X,
                         Expression::try_from(
                             &[
-                                ExpressionArgs::Register(RegisterId::EAX),
-                                ExpressionArgs::Operator(ExpressionOperator::Multiply),
-                                ExpressionArgs::Register(RegisterId::EBX),
+                                EA::Register(RegisterId::E5X),
+                                EA::Operator(EO::Multiply),
+                                EA::Register(RegisterId::E6X),
                             ][..],
                         )
                         .expect("")
@@ -4900,8 +4904,8 @@ mod tests_cpu {
                     ),
                 ],
                 &[
-                    (RegisterId::EAX, 0x2),
-                    (RegisterId::EBX, 0x8),
+                    (RegisterId::E5X, 0x2),
+                    (RegisterId::E6X, 0x8),
                     (RegisterId::E8X, 0x123),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -4911,16 +4915,16 @@ mod tests_cpu {
             // Test with subtraction.
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0x1A, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x4, RegisterId::EBX),
+                    MovU32ImmU32Reg(0x1A, RegisterId::E5X),
+                    MovU32ImmU32Reg(0x4, RegisterId::E6X),
                     MovU32ImmU32Reg(0x123, RegisterId::E8X),
                     MovU32RegMemExpr(
                         RegisterId::E8X,
                         Expression::try_from(
                             &[
-                                ExpressionArgs::Register(RegisterId::EAX),
-                                ExpressionArgs::Operator(ExpressionOperator::Subtract),
-                                ExpressionArgs::Register(RegisterId::EBX),
+                                EA::Register(RegisterId::E5X),
+                                EA::Operator(EO::Subtract),
+                                EA::Register(RegisterId::E6X),
                             ][..],
                         )
                         .expect("")
@@ -4928,8 +4932,8 @@ mod tests_cpu {
                     ),
                 ],
                 &[
-                    (RegisterId::EAX, 0x1a),
-                    (RegisterId::EBX, 0x4),
+                    (RegisterId::E5X, 0x1a),
+                    (RegisterId::E6X, 0x4),
                     (RegisterId::E8X, 0x123),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -4943,11 +4947,11 @@ mod tests_cpu {
                         RegisterId::E8X,
                         Expression::try_from(
                             &[
-                                ExpressionArgs::Immediate(0x8),
-                                ExpressionArgs::Operator(ExpressionOperator::Add),
-                                ExpressionArgs::Immediate(0x4),
-                                ExpressionArgs::Operator(ExpressionOperator::Multiply),
-                                ExpressionArgs::Immediate(0x2),
+                                EA::Immediate(0x8),
+                                EA::Operator(EO::Add),
+                                EA::Immediate(0x4),
+                                EA::Operator(EO::Multiply),
+                                EA::Immediate(0x2),
                             ][..],
                         )
                         .expect("")
@@ -4970,29 +4974,14 @@ mod tests_cpu {
         let tests = [
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::EAX),
-                    MovU32ImmU32Reg(4, RegisterId::EBX),
-                    ZeroHighBitsByIndexU32Reg(RegisterId::EBX, RegisterId::EAX, RegisterId::ECX),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::E5X),
+                    MovU32ImmU32Reg(4, RegisterId::E6X),
+                    ZeroHighBitsByIndexU32Reg(RegisterId::E6X, RegisterId::E5X, RegisterId::E7X),
                 ],
                 &[
-                    (RegisterId::EAX, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::EBX, 4),
-                    (RegisterId::ECX, 0b0000_0000_0000_0000_0000_0000_0000_1111),
-                ],
-                DEFAULT_U32_STACK_CAPACITY,
-                false,
-                "ZHBI - incorrect result value produced",
-            ),
-            TestU32::new(
-                &[
-                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::EAX),
-                    MovU32ImmU32Reg(24, RegisterId::EBX),
-                    ZeroHighBitsByIndexU32Reg(RegisterId::EBX, RegisterId::EAX, RegisterId::ECX),
-                ],
-                &[
-                    (RegisterId::EAX, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::EBX, 24),
-                    (RegisterId::ECX, 0b0000_0000_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::E5X, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::E6X, 4),
+                    (RegisterId::E7X, 0b0000_0000_0000_0000_0000_0000_0000_1111),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -5000,14 +4989,29 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::EAX),
-                    MovU32ImmU32Reg(25, RegisterId::EBX),
-                    ZeroHighBitsByIndexU32Reg(RegisterId::EBX, RegisterId::EAX, RegisterId::ECX),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::E5X),
+                    MovU32ImmU32Reg(24, RegisterId::E6X),
+                    ZeroHighBitsByIndexU32Reg(RegisterId::E6X, RegisterId::E5X, RegisterId::E7X),
                 ],
                 &[
-                    (RegisterId::EAX, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::EBX, 25),
-                    (RegisterId::ECX, 0b0000_0001_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::E5X, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::E6X, 24),
+                    (RegisterId::E7X, 0b0000_0000_1111_1111_1111_1111_1111_1111),
+                ],
+                DEFAULT_U32_STACK_CAPACITY,
+                false,
+                "ZHBI - incorrect result value produced",
+            ),
+            TestU32::new(
+                &[
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::E5X),
+                    MovU32ImmU32Reg(25, RegisterId::E6X),
+                    ZeroHighBitsByIndexU32Reg(RegisterId::E6X, RegisterId::E5X, RegisterId::E7X),
+                ],
+                &[
+                    (RegisterId::E5X, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::E6X, 25),
+                    (RegisterId::E7X, 0b0000_0001_1111_1111_1111_1111_1111_1111),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -5016,14 +5020,14 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::EAX),
-                    MovU32ImmU32Reg(27, RegisterId::EBX),
-                    ZeroHighBitsByIndexU32Reg(RegisterId::EBX, RegisterId::EAX, RegisterId::ECX),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::E5X),
+                    MovU32ImmU32Reg(27, RegisterId::E6X),
+                    ZeroHighBitsByIndexU32Reg(RegisterId::E6X, RegisterId::E5X, RegisterId::E7X),
                 ],
                 &[
-                    (RegisterId::EAX, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::EBX, 27),
-                    (RegisterId::ECX, 0b0000_0111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::E5X, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::E6X, 27),
+                    (RegisterId::E7X, 0b0000_0111_1111_1111_1111_1111_1111_1111),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -5031,9 +5035,9 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0, RegisterId::EAX),
-                    MovU32ImmU32Reg(0, RegisterId::EBX),
-                    ZeroHighBitsByIndexU32Reg(RegisterId::EBX, RegisterId::EAX, RegisterId::ECX),
+                    MovU32ImmU32Reg(0, RegisterId::E5X),
+                    MovU32ImmU32Reg(0, RegisterId::E6X),
+                    ZeroHighBitsByIndexU32Reg(RegisterId::E6X, RegisterId::E5X, RegisterId::E7X),
                 ],
                 &[(RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::ZF]))],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -5045,9 +5049,9 @@ mod tests_cpu {
                     // Manually set the overflow flag state.
                     MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::OF]), RegisterId::EFL),
                     ZeroHighBitsByIndexU32Reg(
-                        RegisterId::EAX, // Already has the value of 0.
-                        RegisterId::EBX, // Already has the value of 0.
-                        RegisterId::ECX,
+                        RegisterId::E6X, // Already has the value of 0.
+                        RegisterId::E5X, // Already has the value of 0.
+                        RegisterId::E7X,
                     ),
                 ],
                 &[(RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::ZF]))],
@@ -5057,11 +5061,11 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(32, RegisterId::EBX),
+                    MovU32ImmU32Reg(32, RegisterId::E6X),
                     ZeroHighBitsByIndexU32Reg(
-                        RegisterId::EBX,
-                        RegisterId::EAX, // Already has the value of 0.
-                        RegisterId::ECX,
+                        RegisterId::E6X,
+                        RegisterId::E5X, // Already has the value of 0.
+                        RegisterId::E7X,
                     ),
                 ],
                 &[],
@@ -5074,16 +5078,16 @@ mod tests_cpu {
                 &[
                     // Manually set the signed flag.
                     MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::EFL),
-                    MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::EAX),
+                    MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::E5X),
                     ZeroHighBitsByIndexU32Reg(
-                        RegisterId::EBX, // Already has the value of 0.
-                        RegisterId::EAX,
-                        RegisterId::ECX,
+                        RegisterId::E6X, // Already has the value of 0.
+                        RegisterId::E5X,
+                        RegisterId::E7X,
                     ),
                 ],
                 &[
-                    (RegisterId::EAX, 0b0111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::ECX, 0),
+                    (RegisterId::E5X, 0b0111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::E7X, 0),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::ZF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -5101,12 +5105,12 @@ mod tests_cpu {
         let tests = [
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::EAX),
-                    ZeroHighBitsByIndexU32RegU32Imm(0x4, RegisterId::EAX, RegisterId::EBX),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::E5X),
+                    ZeroHighBitsByIndexU32RegU32Imm(0x4, RegisterId::E5X, RegisterId::E6X),
                 ],
                 &[
-                    (RegisterId::EAX, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::EBX, 0b0000_0000_0000_0000_0000_0000_0000_1111),
+                    (RegisterId::E5X, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::E6X, 0b0000_0000_0000_0000_0000_0000_0000_1111),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -5114,12 +5118,12 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::EAX),
-                    ZeroHighBitsByIndexU32RegU32Imm(0x18, RegisterId::EAX, RegisterId::EBX),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::E5X),
+                    ZeroHighBitsByIndexU32RegU32Imm(0x18, RegisterId::E5X, RegisterId::E6X),
                 ],
                 &[
-                    (RegisterId::EAX, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::EBX, 0b0000_0000_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::E5X, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::E6X, 0b0000_0000_1111_1111_1111_1111_1111_1111),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -5128,12 +5132,12 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::EAX),
-                    ZeroHighBitsByIndexU32RegU32Imm(0x19, RegisterId::EAX, RegisterId::EBX),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::E5X),
+                    ZeroHighBitsByIndexU32RegU32Imm(0x19, RegisterId::E5X, RegisterId::E6X),
                 ],
                 &[
-                    (RegisterId::EAX, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::EBX, 0b0000_0001_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::E5X, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::E6X, 0b0000_0001_1111_1111_1111_1111_1111_1111),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -5142,12 +5146,12 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::EAX),
-                    ZeroHighBitsByIndexU32RegU32Imm(0x1b, RegisterId::EAX, RegisterId::EBX),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::E5X),
+                    ZeroHighBitsByIndexU32RegU32Imm(0x1b, RegisterId::E5X, RegisterId::E6X),
                 ],
                 &[
-                    (RegisterId::EAX, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::EBX, 0b0000_0111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::E5X, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::E6X, 0b0000_0111_1111_1111_1111_1111_1111_1111),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -5156,8 +5160,8 @@ mod tests_cpu {
             TestU32::new(
                 &[ZeroHighBitsByIndexU32RegU32Imm(
                     0,
-                    RegisterId::EAX, // Already has the value of 0.
-                    RegisterId::EBX,
+                    RegisterId::E5X, // Already has the value of 0.
+                    RegisterId::E6X,
                 )],
                 &[(RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::ZF]))],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -5170,8 +5174,8 @@ mod tests_cpu {
                     MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::OF]), RegisterId::EFL),
                     ZeroHighBitsByIndexU32RegU32Imm(
                         0,
-                        RegisterId::EAX,
-                        RegisterId::EBX, // Already has the value of 0.
+                        RegisterId::E5X,
+                        RegisterId::E6X, // Already has the value of 0.
                     ),
                 ],
                 &[(RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::ZF]))],
@@ -5182,8 +5186,8 @@ mod tests_cpu {
             TestU32::new(
                 &[ZeroHighBitsByIndexU32RegU32Imm(
                     32,
-                    RegisterId::EAX,
-                    RegisterId::EBX,
+                    RegisterId::E5X,
+                    RegisterId::E6X,
                 )],
                 &[],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -5195,12 +5199,12 @@ mod tests_cpu {
                 &[
                     // Manually set the signed flag.
                     MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::EFL),
-                    MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::EAX),
-                    ZeroHighBitsByIndexU32RegU32Imm(0x0, RegisterId::EAX, RegisterId::EBX),
+                    MovU32ImmU32Reg(0b0111_1111_1111_1111_1111_1111_1111_1111, RegisterId::E5X),
+                    ZeroHighBitsByIndexU32RegU32Imm(0x0, RegisterId::E5X, RegisterId::E6X),
                 ],
                 &[
-                    (RegisterId::EAX, 0b0111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::EBX, 0b0),
+                    (RegisterId::E5X, 0b0111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::E6X, 0b0),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::ZF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -5218,11 +5222,11 @@ mod tests_cpu {
         let tests = [
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::EAX),
-                    BitTestU32Reg(0x0, RegisterId::EAX),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::E5X),
+                    BitTestU32Reg(0x0, RegisterId::E5X),
                 ],
                 &[
-                    (RegisterId::EAX, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::E5X, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -5231,22 +5235,22 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1110, RegisterId::EAX),
-                    BitTestU32Reg(0x0, RegisterId::EAX),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1110, RegisterId::E5X),
+                    BitTestU32Reg(0x0, RegisterId::E5X),
                 ],
-                &[(RegisterId::EAX, 0b1111_1111_1111_1111_1111_1111_1111_1110)],
+                &[(RegisterId::E5X, 0b1111_1111_1111_1111_1111_1111_1111_1110)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BT - incorrect result produced from the bit-test instruction - carry flag set",
             ),
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::EAX),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::E5X),
                     // The modulo of the bit should be taken, meaning the 0th bit should be tested.
-                    BitTestU32Reg(0x20, RegisterId::EAX),
+                    BitTestU32Reg(0x20, RegisterId::E5X),
                 ],
                 &[
-                    (RegisterId::EAX, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::E5X, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -5306,12 +5310,12 @@ mod tests_cpu {
                 &[
                     MovU32ImmU32Reg(
                         0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::EAX,
+                        RegisterId::E5X,
                     ),
-                    BitTestResetU32Reg(0x0, RegisterId::EAX),
+                    BitTestResetU32Reg(0x0, RegisterId::E5X),
                 ],
                 &[
-                    (RegisterId::EAX, 0b1111_1111_1111_1111_1111_1111_1111_1110),
+                    (RegisterId::E5X, 0b1111_1111_1111_1111_1111_1111_1111_1110),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -5322,11 +5326,11 @@ mod tests_cpu {
                 &[
                     MovU32ImmU32Reg(
                         0b1111_1111_1111_1111_1111_1111_1111_1110,
-                        RegisterId::EAX,
+                        RegisterId::E5X,
                     ),
-                    BitTestResetU32Reg(0x0, RegisterId::EAX),
+                    BitTestResetU32Reg(0x0, RegisterId::E5X),
                 ],
-                &[(RegisterId::EAX, 0b1111_1111_1111_1111_1111_1111_1111_1110)],
+                &[(RegisterId::E5X, 0b1111_1111_1111_1111_1111_1111_1111_1110)],
 
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -5336,13 +5340,13 @@ mod tests_cpu {
                 &[
                     MovU32ImmU32Reg(
                         0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::EAX,
+                        RegisterId::E5X,
                     ),
                     // The modulo of the bit should be taken, meaning the 0th bit should be tested.
-                    BitTestResetU32Reg(0x20, RegisterId::EAX),
+                    BitTestResetU32Reg(0x20, RegisterId::E5X),
                 ],
                 &[
-                    (RegisterId::EAX, 0b1111_1111_1111_1111_1111_1111_1111_1110),
+                    (RegisterId::E5X, 0b1111_1111_1111_1111_1111_1111_1111_1110),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -5526,22 +5530,22 @@ mod tests_cpu {
         let tests = [
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::EAX),
-                    BitScanReverseU32RegU32Reg(RegisterId::EAX, RegisterId::EBX),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::E5X),
+                    BitScanReverseU32RegU32Reg(RegisterId::E5X, RegisterId::E6X),
                 ],
-                &[(RegisterId::EAX, 0b1111_1111_1111_1111_1111_1111_1111_1111)],
+                &[(RegisterId::E5X, 0b1111_1111_1111_1111_1111_1111_1111_1111)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BSR - incorrect result produced from the bit search",
             ),
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0b0000_1111_1111_1111_1111_1111_1111_1111, RegisterId::EAX),
-                    BitScanReverseU32RegU32Reg(RegisterId::EAX, RegisterId::EBX),
+                    MovU32ImmU32Reg(0b0000_1111_1111_1111_1111_1111_1111_1111, RegisterId::E5X),
+                    BitScanReverseU32RegU32Reg(RegisterId::E5X, RegisterId::E6X),
                 ],
                 &[
-                    (RegisterId::EAX, 0b0000_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::EBX, 0x4),
+                    (RegisterId::E5X, 0b0000_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::E6X, 0x4),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -5549,12 +5553,12 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0x0, RegisterId::EAX),
-                    BitScanReverseU32RegU32Reg(RegisterId::EAX, RegisterId::EBX),
+                    MovU32ImmU32Reg(0x0, RegisterId::E5X),
+                    BitScanReverseU32RegU32Reg(RegisterId::E5X, RegisterId::E6X),
                 ],
                 &[
                     // The modulo of the bit should be taken, meaning the last bit should be tested.
-                    (RegisterId::EBX, 0x20),
+                    (RegisterId::E6X, 0x20),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::ZF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -5573,9 +5577,9 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmMemSimple(0b1111_1111_1111_1111_1111_1111_1111_1111, 0x1000),
-                    BitScanReverseU32MemU32Reg(0x1000, RegisterId::EAX),
+                    BitScanReverseU32MemU32Reg(0x1000, RegisterId::E5X),
                 ],
-                &[],
+                &[(RegisterId::E5X, 0x0)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BSR - incorrect result produced from the bit search",
@@ -5583,17 +5587,17 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmMemSimple(0b0000_1111_1111_1111_1111_1111_1111_1111, 0x1000),
-                    BitScanReverseU32MemU32Reg(0x1000, RegisterId::EAX),
+                    BitScanReverseU32MemU32Reg(0x1000, RegisterId::E5X),
                 ],
-                &[(RegisterId::EAX, 0x4)],
+                &[(RegisterId::E5X, 0x4)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BSR - incorrect result produced from the bit search",
             ),
             TestU32::new(
-                &[BitScanReverseU32MemU32Reg(0x1000, RegisterId::EAX)],
+                &[BitScanReverseU32MemU32Reg(0x1000, RegisterId::E5X)],
                 &[
-                    (RegisterId::EAX, 0x20),
+                    (RegisterId::E5X, 0x20),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::ZF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -5611,12 +5615,12 @@ mod tests_cpu {
         let tests = [
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::EAX),
-                    BitScanReverseU32RegMemU32(RegisterId::EAX, 0x0),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::E5X),
+                    BitScanReverseU32RegMemU32(RegisterId::E5X, 0x0),
                     MovMemU32RegSimple(0x0, RegisterId::E8X),
                 ],
                 &[
-                    (RegisterId::EAX, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::E5X, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::E8X, 0x0),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -5625,12 +5629,12 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0b0000_1111_1111_1111_1111_1111_1111_1111, RegisterId::EAX),
-                    BitScanReverseU32RegMemU32(RegisterId::EAX, 0x0),
+                    MovU32ImmU32Reg(0b0000_1111_1111_1111_1111_1111_1111_1111, RegisterId::E5X),
+                    BitScanReverseU32RegMemU32(RegisterId::E5X, 0x0),
                     MovMemU32RegSimple(0x0, RegisterId::E8X),
                 ],
                 &[
-                    (RegisterId::EAX, 0b0000_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::E5X, 0b0000_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::E8X, 0x4),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -5639,7 +5643,7 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[
-                    BitScanReverseU32RegMemU32(RegisterId::EAX, 0x0),
+                    BitScanReverseU32RegMemU32(RegisterId::E5X, 0x0),
                     MovMemU32RegSimple(0x0, RegisterId::E8X),
                 ],
                 &[
@@ -5708,22 +5712,22 @@ mod tests_cpu {
         let tests = [
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::EAX),
-                    BitScanForwardU32RegU32Reg(RegisterId::EAX, RegisterId::EBX),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::E5X),
+                    BitScanForwardU32RegU32Reg(RegisterId::E5X, RegisterId::E6X),
                 ],
-                &[(RegisterId::EAX, 0b1111_1111_1111_1111_1111_1111_1111_1111)],
+                &[(RegisterId::E5X, 0b1111_1111_1111_1111_1111_1111_1111_1111)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BSF - incorrect result produced from the bit search",
             ),
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_0000, RegisterId::EAX),
-                    BitScanForwardU32RegU32Reg(RegisterId::EAX, RegisterId::EBX),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_0000, RegisterId::E5X),
+                    BitScanForwardU32RegU32Reg(RegisterId::E5X, RegisterId::E6X),
                 ],
                 &[
-                    (RegisterId::EAX, 0b1111_1111_1111_1111_1111_1111_1111_0000),
-                    (RegisterId::EBX, 0x4),
+                    (RegisterId::E5X, 0b1111_1111_1111_1111_1111_1111_1111_0000),
+                    (RegisterId::E6X, 0x4),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -5731,11 +5735,11 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0x0, RegisterId::EAX),
-                    BitScanForwardU32RegU32Reg(RegisterId::EAX, RegisterId::EBX),
+                    MovU32ImmU32Reg(0x0, RegisterId::E5X),
+                    BitScanForwardU32RegU32Reg(RegisterId::E5X, RegisterId::E6X),
                 ],
                 &[
-                    (RegisterId::EBX, 0x20),
+                    (RegisterId::E6X, 0x20),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::ZF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -5754,7 +5758,7 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmMemSimple(0b1111_1111_1111_1111_1111_1111_1111_1111, 0x1000),
-                    BitScanForwardU32MemU32Reg(0x1000, RegisterId::EAX),
+                    BitScanForwardU32MemU32Reg(0x1000, RegisterId::E5X),
                 ],
                 &[],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -5764,17 +5768,17 @@ mod tests_cpu {
             TestU32::new(
                 &[
                     MovU32ImmMemSimple(0b1111_1111_1111_1111_1111_1111_1111_0000, 0x1000),
-                    BitScanForwardU32MemU32Reg(0x1000, RegisterId::EAX),
+                    BitScanForwardU32MemU32Reg(0x1000, RegisterId::E5X),
                 ],
-                &[(RegisterId::EAX, 0x4)],
+                &[(RegisterId::E5X, 0x4)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BSF - incorrect result produced from the bit search",
             ),
             TestU32::new(
-                &[BitScanForwardU32MemU32Reg(0x1000, RegisterId::EAX)],
+                &[BitScanForwardU32MemU32Reg(0x1000, RegisterId::E5X)],
                 &[
-                    (RegisterId::EAX, 0x20),
+                    (RegisterId::E5X, 0x20),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::ZF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -5792,12 +5796,12 @@ mod tests_cpu {
         let tests = [
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::EAX),
-                    BitScanForwardU32RegMemU32(RegisterId::EAX, 0x0),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::E5X),
+                    BitScanForwardU32RegMemU32(RegisterId::E5X, 0x0),
                     MovMemU32RegSimple(0x0, RegisterId::E8X),
                 ],
                 &[
-                    (RegisterId::EAX, 0b1111_1111_1111_1111_1111_1111_1111_1111),
+                    (RegisterId::E5X, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (RegisterId::E8X, 0x0),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -5806,12 +5810,12 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_0000, RegisterId::EAX),
-                    BitScanForwardU32RegMemU32(RegisterId::EAX, 0x0),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_0000, RegisterId::E5X),
+                    BitScanForwardU32RegMemU32(RegisterId::E5X, 0x0),
                     MovMemU32RegSimple(0x0, RegisterId::E8X),
                 ],
                 &[
-                    (RegisterId::EAX, 0b1111_1111_1111_1111_1111_1111_1111_0000),
+                    (RegisterId::E5X, 0b1111_1111_1111_1111_1111_1111_1111_0000),
                     (RegisterId::E8X, 0x4),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -5820,7 +5824,7 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[
-                    BitScanForwardU32RegMemU32(RegisterId::EAX, 0x0),
+                    BitScanForwardU32RegMemU32(RegisterId::E5X, 0x0),
                     MovMemU32RegSimple(0x0, RegisterId::E8X),
                 ],
                 &[
@@ -5900,25 +5904,25 @@ mod tests_cpu {
         let tests = [
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0x123, RegisterId::EAX),
-                    MovU32ImmU32Reg(0x321, RegisterId::EBX),
-                    PushU32Reg(RegisterId::EAX),
-                    PushU32Reg(RegisterId::EBX),
-                    PopU32ToU32Reg(RegisterId::ECX),
-                    PopU32ToU32Reg(RegisterId::EDX),
+                    MovU32ImmU32Reg(0x123, RegisterId::E5X),
+                    MovU32ImmU32Reg(0x321, RegisterId::E6X),
+                    PushU32Reg(RegisterId::E5X),
+                    PushU32Reg(RegisterId::E6X),
+                    PopU32ToU32Reg(RegisterId::E7X),
+                    PopU32ToU32Reg(RegisterId::E8X),
                 ],
-                &[(RegisterId::ECX, 0x321), (RegisterId::EDX, 0x123)],
+                &[(RegisterId::E7X, 0x321), (RegisterId::E8X, 0x123)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "POP - failed to execute POP instruction",
             ),
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(0x123, RegisterId::EAX),
-                    PushU32Reg(RegisterId::EAX),
-                    PopU32ToU32Reg(RegisterId::EBX),
+                    MovU32ImmU32Reg(0x123, RegisterId::E5X),
+                    PushU32Reg(RegisterId::E5X),
+                    PopU32ToU32Reg(RegisterId::E6X),
                 ],
-                &[(RegisterId::EBX, 0x123)],
+                &[(RegisterId::E6X, 0x123)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "PUSH - failed to execute PUSH instruction",
@@ -5936,17 +5940,17 @@ mod tests_cpu {
                 &[
                     PushU32Imm(0x123),
                     PushU32Imm(0x321),
-                    PopU32ToU32Reg(RegisterId::EAX),
-                    PopU32ToU32Reg(RegisterId::EBX),
+                    PopU32ToU32Reg(RegisterId::E5X),
+                    PopU32ToU32Reg(RegisterId::E6X),
                 ],
-                &[(RegisterId::EAX, 0x321), (RegisterId::EBX, 0x123)],
+                &[(RegisterId::E5X, 0x321), (RegisterId::E6X, 0x123)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "PUSH - failed to execute PUSH instruction",
             ),
             TestU32::new(
-                &[PushU32Imm(0x123), PopU32ToU32Reg(RegisterId::EAX)],
-                &[(RegisterId::EAX, 0x123)],
+                &[PushU32Imm(0x123), PopU32ToU32Reg(RegisterId::E5X)],
+                &[(RegisterId::E5X, 0x123)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "PUSH - failed to execute PUSH instruction",
@@ -5961,8 +5965,8 @@ mod tests_cpu {
     fn test_pop_u32_reg() {
         let tests = [
             TestU32::new(
-                &[PushU32Imm(0x123), PopU32ToU32Reg(RegisterId::EAX)],
-                &[(RegisterId::EAX, 0x123)],
+                &[PushU32Imm(0x123), PopU32ToU32Reg(RegisterId::E5X)],
+                &[(RegisterId::E5X, 0x123)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "POP - failed to execute POP instruction",
@@ -5971,23 +5975,23 @@ mod tests_cpu {
                 &[
                     PushU32Imm(0x123),
                     PushU32Imm(0x321),
-                    PopU32ToU32Reg(RegisterId::EAX),
-                    PopU32ToU32Reg(RegisterId::EBX),
+                    PopU32ToU32Reg(RegisterId::E5X),
+                    PopU32ToU32Reg(RegisterId::E6X),
                 ],
-                &[(RegisterId::EAX, 0x321), (RegisterId::EAX, 0x321)],
+                &[(RegisterId::E5X, 0x321), (RegisterId::E6X, 0x123)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "POP - failed to execute POP instruction",
             ),
             TestU32::new(
-                &[PopU32ToU32Reg(RegisterId::EAX)],
+                &[PopU32ToU32Reg(RegisterId::E5X)],
                 &[],
                 DEFAULT_U32_STACK_CAPACITY,
                 true,
                 "POP - failed to execute POP instruction",
             ),
             TestU32::new(
-                &[PopU32ToU32Reg(RegisterId::EAX)],
+                &[PopU32ToU32Reg(RegisterId::E5X)],
                 &[],
                 DEFAULT_U32_STACK_CAPACITY,
                 true,
@@ -6021,11 +6025,11 @@ mod tests_cpu {
                     // We expect that the first move instruction will be skipped entirely.
                     JumpAbsU32Imm(base_offset + 17),
                     // This instruction should be skipped, so R1 should remain at the default value of 0.
-                    MovU32ImmU32Reg(0xf, RegisterId::EAX),
+                    MovU32ImmU32Reg(0xf, RegisterId::E5X),
                     // The jump should start execution here.
-                    MovU32ImmU32Reg(0xa, RegisterId::EBX),
+                    MovU32ImmU32Reg(0xa, RegisterId::E6X),
                 ],
-                &[(RegisterId::EAX, 0x0), (RegisterId::EBX, 0xa)],
+                &[(RegisterId::E5X, 0x0), (RegisterId::E6X, 0xa)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "JMP - failed to execute JMP instruction",
@@ -6064,23 +6068,23 @@ mod tests_cpu {
                     // to the start of the second move instruction.
                     //
                     // We expect that the first move instruction will be skipped entirely.
-                    MovU32ImmU32Reg(29, RegisterId::EAX),
-                    AddU32RegU32Reg(RegisterId::ECS, RegisterId::EAX),
-                    JumpAbsU32Reg(RegisterId::EAX),
+                    MovU32ImmU32Reg(29, RegisterId::E5X),
+                    AddU32RegU32Reg(RegisterId::ECS, RegisterId::E5X),
+                    JumpAbsU32Reg(RegisterId::E5X),
                     // This instruction should be skipped, so R1 should remain at the default value of 0.
-                    MovU32ImmU32Reg(0xf, RegisterId::EBX),
+                    MovU32ImmU32Reg(0xf, RegisterId::E6X),
                     // The jump should start execution here.
-                    MovU32ImmU32Reg(0xa, RegisterId::ECX),
+                    MovU32ImmU32Reg(0xa, RegisterId::E7X),
                 ],
-                &[(RegisterId::EBX, 0x0), (RegisterId::ECX, 0xa)],
+                &[(RegisterId::E6X, 0x0), (RegisterId::E7X, 0xa)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "JMP - failed to execute JMP instruction",
             ),
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(u32::MAX, RegisterId::EAX),
-                    JumpAbsU32Reg(RegisterId::EAX),
+                    MovU32ImmU32Reg(u32::MAX, RegisterId::E5X),
+                    JumpAbsU32Reg(RegisterId::E5X),
                 ],
                 &[],
                 DEFAULT_U32_STACK_CAPACITY,
