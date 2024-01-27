@@ -1292,7 +1292,7 @@ impl Cpu {
                 im.write_unchecked(new_mask);
             }
             I::LoadIVTAddrU32Imm(addr) => {
-                // livt &[addr]
+                // livt &addr
                 if !self.is_machine_mode {
                     self.trigger_interrupt(GENERAL_PROTECTION_FAULT_INT, &mut com_bus.mem);
                     return;

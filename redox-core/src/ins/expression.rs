@@ -316,9 +316,11 @@ impl ExpressionArgs {
 mod tests_move_expressions {
     use std::panic;
 
-    use crate::{ins::expressions::Expression, reg::registers::RegisterId};
+    use crate::{ins::expression::Expression, reg::registers::RegisterId};
 
-    use super::{ExpressionArgs, ExpressionOperator};
+    use super::ExpressionArgs;
+    use super::ExpressionArgs as EA;
+    use super::ExpressionOperator as EO;
 
     struct TestEntry<'a> {
         pub arguments: &'a [ExpressionArgs],
@@ -427,9 +429,9 @@ mod tests_move_expressions {
         let tests = [
             TestEntry::new(
                 &[
-                    ExpressionArgs::Register(RegisterId::E7X),
-                    ExpressionArgs::Operator(ExpressionOperator::Multiply),
-                    ExpressionArgs::Register(RegisterId::E8X),
+                    EA::Register(RegisterId::E7X),
+                    EA::Operator(EO::Multiply),
+                    EA::Register(RegisterId::E8X),
                 ],
                 &[],
                 0,
@@ -438,9 +440,9 @@ mod tests_move_expressions {
             ),
             TestEntry::new(
                 &[
-                    ExpressionArgs::Immediate(123),
-                    ExpressionArgs::Operator(ExpressionOperator::Add),
-                    ExpressionArgs::Immediate(111),
+                    EA::Immediate(123),
+                    EA::Operator(EO::Add),
+                    EA::Immediate(111),
                 ],
                 &[],
                 0,
@@ -449,9 +451,9 @@ mod tests_move_expressions {
             ),
             TestEntry::new(
                 &[
-                    ExpressionArgs::Immediate(123),
-                    ExpressionArgs::Operator(ExpressionOperator::Subtract),
-                    ExpressionArgs::Register(RegisterId::EAX),
+                    EA::Immediate(123),
+                    EA::Operator(EO::Subtract),
+                    EA::Register(RegisterId::EAX),
                 ],
                 &[],
                 0,
@@ -460,9 +462,9 @@ mod tests_move_expressions {
             ),
             TestEntry::new(
                 &[
-                    ExpressionArgs::Register(RegisterId::EAX),
-                    ExpressionArgs::Operator(ExpressionOperator::Multiply),
-                    ExpressionArgs::Immediate(123),
+                    EA::Register(RegisterId::EAX),
+                    EA::Operator(EO::Multiply),
+                    EA::Immediate(123),
                 ],
                 &[],
                 0,
@@ -470,10 +472,7 @@ mod tests_move_expressions {
                 "failed to create register-constant roundtrip",
             ),
             TestEntry::new(
-                &[
-                    ExpressionArgs::Register(RegisterId::EAX),
-                    ExpressionArgs::Operator(ExpressionOperator::Multiply),
-                ],
+                &[EA::Register(RegisterId::EAX), EA::Operator(EO::Multiply)],
                 &[],
                 0,
                 true,
@@ -481,10 +480,10 @@ mod tests_move_expressions {
             ),
             TestEntry::new(
                 &[
-                    ExpressionArgs::Register(RegisterId::EAX),
-                    ExpressionArgs::Operator(ExpressionOperator::Multiply),
-                    ExpressionArgs::Register(RegisterId::EAX),
-                    ExpressionArgs::Register(RegisterId::EAX),
+                    EA::Register(RegisterId::EAX),
+                    EA::Operator(EO::Multiply),
+                    EA::Register(RegisterId::EAX),
+                    EA::Register(RegisterId::EAX),
                 ],
                 &[],
                 0,
@@ -493,9 +492,9 @@ mod tests_move_expressions {
             ),
             TestEntry::new(
                 &[
-                    ExpressionArgs::Register(RegisterId::EAX),
-                    ExpressionArgs::Register(RegisterId::EAX),
-                    ExpressionArgs::Register(RegisterId::EAX),
+                    EA::Register(RegisterId::EAX),
+                    EA::Register(RegisterId::EAX),
+                    EA::Register(RegisterId::EAX),
                 ],
                 &[],
                 0,
@@ -504,9 +503,9 @@ mod tests_move_expressions {
             ),
             TestEntry::new(
                 &[
-                    ExpressionArgs::Operator(ExpressionOperator::Multiply),
-                    ExpressionArgs::Register(RegisterId::EAX),
-                    ExpressionArgs::Register(RegisterId::EAX),
+                    EA::Operator(EO::Multiply),
+                    EA::Register(RegisterId::EAX),
+                    EA::Register(RegisterId::EAX),
                 ],
                 &[],
                 0,
@@ -515,9 +514,9 @@ mod tests_move_expressions {
             ),
             TestEntry::new(
                 &[
-                    ExpressionArgs::Register(RegisterId::EAX),
-                    ExpressionArgs::Register(RegisterId::EAX),
-                    ExpressionArgs::Operator(ExpressionOperator::Multiply),
+                    EA::Register(RegisterId::EAX),
+                    EA::Register(RegisterId::EAX),
+                    EA::Operator(EO::Multiply),
                 ],
                 &[],
                 0,
@@ -526,11 +525,11 @@ mod tests_move_expressions {
             ),
             TestEntry::new(
                 &[
-                    ExpressionArgs::Register(RegisterId::E7X),
-                    ExpressionArgs::Operator(ExpressionOperator::Multiply),
-                    ExpressionArgs::Register(RegisterId::E8X),
-                    ExpressionArgs::Operator(ExpressionOperator::Multiply),
-                    ExpressionArgs::Register(RegisterId::E6X),
+                    EA::Register(RegisterId::E7X),
+                    EA::Operator(EO::Multiply),
+                    EA::Register(RegisterId::E8X),
+                    EA::Operator(EO::Multiply),
+                    EA::Register(RegisterId::E6X),
                 ],
                 &[],
                 0,
@@ -539,11 +538,11 @@ mod tests_move_expressions {
             ),
             TestEntry::new(
                 &[
-                    ExpressionArgs::Immediate(123),
-                    ExpressionArgs::Operator(ExpressionOperator::Add),
-                    ExpressionArgs::Immediate(111),
-                    ExpressionArgs::Operator(ExpressionOperator::Add),
-                    ExpressionArgs::Immediate(64),
+                    EA::Immediate(123),
+                    EA::Operator(EO::Add),
+                    EA::Immediate(111),
+                    EA::Operator(EO::Add),
+                    EA::Immediate(64),
                 ],
                 &[],
                 0,
@@ -552,11 +551,11 @@ mod tests_move_expressions {
             ),
             TestEntry::new(
                 &[
-                    ExpressionArgs::Register(RegisterId::E7X),
-                    ExpressionArgs::Operator(ExpressionOperator::Multiply),
-                    ExpressionArgs::Register(RegisterId::E8X),
-                    ExpressionArgs::Register(RegisterId::E6X),
-                    ExpressionArgs::Operator(ExpressionOperator::Multiply),
+                    EA::Register(RegisterId::E7X),
+                    EA::Operator(EO::Multiply),
+                    EA::Register(RegisterId::E8X),
+                    EA::Register(RegisterId::E6X),
+                    EA::Operator(EO::Multiply),
                 ],
                 &[],
                 0,
@@ -576,9 +575,9 @@ mod tests_move_expressions {
         let tests = [
             TestEntry::new(
                 &[
-                    ExpressionArgs::Immediate(2),
-                    ExpressionArgs::Operator(ExpressionOperator::Multiply),
-                    ExpressionArgs::Immediate(100),
+                    EA::Immediate(2),
+                    EA::Operator(EO::Multiply),
+                    EA::Immediate(100),
                 ],
                 &[2, 100],
                 200,
@@ -586,11 +585,7 @@ mod tests_move_expressions {
                 "failed to correctly evaluate expression result",
             ),
             TestEntry::new(
-                &[
-                    ExpressionArgs::Immediate(2),
-                    ExpressionArgs::Operator(ExpressionOperator::Add),
-                    ExpressionArgs::Immediate(100),
-                ],
+                &[EA::Immediate(2), EA::Operator(EO::Add), EA::Immediate(100)],
                 &[2, 100],
                 102,
                 false,
@@ -598,9 +593,9 @@ mod tests_move_expressions {
             ),
             TestEntry::new(
                 &[
-                    ExpressionArgs::Immediate(100),
-                    ExpressionArgs::Operator(ExpressionOperator::Subtract),
-                    ExpressionArgs::Immediate(2),
+                    EA::Immediate(100),
+                    EA::Operator(EO::Subtract),
+                    EA::Immediate(2),
                 ],
                 &[100, 2],
                 98,
@@ -609,11 +604,11 @@ mod tests_move_expressions {
             ),
             TestEntry::new(
                 &[
-                    ExpressionArgs::Immediate(100),
-                    ExpressionArgs::Operator(ExpressionOperator::Subtract),
-                    ExpressionArgs::Immediate(2),
-                    ExpressionArgs::Operator(ExpressionOperator::Multiply),
-                    ExpressionArgs::Immediate(8),
+                    EA::Immediate(100),
+                    EA::Operator(EO::Subtract),
+                    EA::Immediate(2),
+                    EA::Operator(EO::Multiply),
+                    EA::Immediate(8),
                 ],
                 &[100, 2, 8],
                 84,
@@ -622,11 +617,11 @@ mod tests_move_expressions {
             ),
             TestEntry::new(
                 &[
-                    ExpressionArgs::Immediate(100),
-                    ExpressionArgs::Operator(ExpressionOperator::Multiply),
-                    ExpressionArgs::Immediate(2),
-                    ExpressionArgs::Operator(ExpressionOperator::Subtract),
-                    ExpressionArgs::Immediate(8),
+                    EA::Immediate(100),
+                    EA::Operator(EO::Multiply),
+                    EA::Immediate(2),
+                    EA::Operator(EO::Subtract),
+                    EA::Immediate(8),
                 ],
                 &[100, 2, 8],
                 192,

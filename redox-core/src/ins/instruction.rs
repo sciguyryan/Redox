@@ -3,7 +3,7 @@ use std::fmt::{self, Display, Formatter};
 #[cfg(test)]
 use strum_macros::EnumIter;
 
-use crate::{ins::expressions::Expression, reg::registers::RegisterId};
+use crate::{ins::expression::Expression, reg::registers::RegisterId};
 
 use super::op_codes::OpCode;
 
