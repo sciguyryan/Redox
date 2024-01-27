@@ -19,8 +19,6 @@ pub enum OpCode {
     AddU32RegU32Reg,
     /// Subtract a u32 immediate from a u32 register. The result is stored in the accumulator register.
     SubU32ImmU32Reg,
-    /// Subtract a u32 register from a u32 immediate. The result is stored in the accumulator register.
-    SubU32RegU32Imm,
     /// Subtract a u32 register (A) from a u32 register (B). The result is stored in the accumulator register.
     SubU32RegU32Reg,
     /// Unsigned multiplication of the register ER1 by a u32 immediate. The result is stored in the register ER1.
@@ -35,7 +33,7 @@ pub enum OpCode {
     IncU32Reg,
     /// Decrement a u32 register.
     DecU32Reg,
-    /// Perform a logical AND operation on a u32 immediate and a u32 register.
+    /// Perform a logical AND operation on a u32 immediate and a u32 register. The resulting value is stored in the register.
     AndU32ImmU32Reg,
 
     /******** [Bit Operation Instructions] ********/
@@ -212,7 +210,6 @@ impl From<&Instruction> for OpCode {
             I::AddU32ImmU32Reg(_, _) => O::AddU32ImmU32Reg,
             I::AddU32RegU32Reg(_, _) => O::AddU32RegU32Reg,
             I::SubU32ImmU32Reg(_, _) => O::SubU32ImmU32Reg,
-            I::SubU32RegU32Imm(_, _) => O::SubU32RegU32Imm,
             I::SubU32RegU32Reg(_, _) => O::SubU32RegU32Reg,
             I::MulU32Imm(_) => O::MulU32Imm,
             I::MulU32Reg(_) => O::MulU32Reg,

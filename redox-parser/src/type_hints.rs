@@ -105,7 +105,6 @@ impl<'a> InstructionHints<'a> {
                 gen_hint!(vec!["add"], [U32, RegisterU32], O::AddU32ImmU32Reg),
                 gen_hint!(vec!["add"], [RegisterU32, RegisterU32], O::AddU32RegU32Reg),
                 gen_hint!(vec!["sub"], [U32, RegisterU32], O::SubU32ImmU32Reg),
-                gen_hint!(vec!["sub"], [RegisterU32, U32], O::SubU32RegU32Imm),
                 gen_hint!(vec!["sub"], [RegisterU32, RegisterU32], O::SubU32RegU32Reg),
                 gen_hint!(vec!["mul"], [U32], O::MulU32Imm),
                 gen_hint!(vec!["mul"], [RegisterU32], O::MulU32Reg),

@@ -216,58 +216,6 @@ impl Cpu {
         self.registers.read_reg_u32_unchecked(&RegisterId::ESP)
     }
 
-    /// Handle a triggered interrupt.
-    ///
-    /// # Arguments
-    ///
-    /// * `int_code` - The type of interrupt to be triggered.
-    /// * `mem` - A mutable reference to the [`MemoryHandler`] connected to this CPU instance.
-    #[inline]
-    fn handle_interrupt(&mut self, int_code: u8, mem: &mut MemoryHandler) {
-        let is_masked =
-            (self.registers.read_reg_u32_unchecked(&RegisterId::EIM) & (int_code as u32)) == 0;
-
-        // Should we handle this interrupt?
-        // Exception interrupts have an interrupt code below 0x20 and are
-        // considered important enough that they can't be masked.
-        if is_masked && int_code >= EXCEPTION_INT_CUTOFF {
-            return;
-        }
-
-        // Get the base IVT address.
-        let ivt_base = self.registers.read_reg_u32_unchecked(&RegisterId::IDTR);
-
-        // Calculate the place within the interrupt vector we need to look.
-        let iv_addr = ivt_base + (int_code as u32 * 4);
-
-        // Get the handler address from the interrupt vector.
-        let iv_handler_addr = mem.get_u32(iv_addr as usize);
-        if iv_handler_addr == 0 {
-            // TODO - there might be something else we want to do here instead.
-            panic!("no handler has been specified for this interrupt code!");
-        }
-
-        // We will only save state when we are not already in an interrupt handler.
-        if !self.is_in_interrupt_handler {
-            // Want to preserve the state of the flags register.
-            mem.push_u32(self.get_flags());
-
-            // Once the interrupt handler has completed then we will jump back to the
-            // instruction directly following the one that triggered the exception.
-            // The return address will be pushed to the stack.
-            mem.push_u32(self.get_instruction_pointer());
-        }
-
-        // Indicate that we are currently within an interrupt handler.
-        self.is_in_interrupt_handler = true;
-
-        // Indicate that we have an unfinished interrupt.
-        self.last_interrupt_code = Some(int_code);
-
-        // Jump to the interrupt vector handler.
-        self.set_instruction_pointer(iv_handler_addr);
-    }
-
     /// Increment the instruction pointer (IP) register by a specified amount.
     #[inline(always)]
     fn increment_ip_register(&mut self, amount: usize) {
@@ -295,6 +243,8 @@ impl Cpu {
     ///
     /// * `value_1` - The first u32 value.
     /// * `value_2` - The second u32 value.
+    /// * `out_reg` - The destination u32 register.
+    /// * `privilege` - The privilege level of the command.
     ///
     /// # Returns
     ///
@@ -304,20 +254,28 @@ impl Cpu {
     ///
     /// This method affects the following flags: Sign (SF), Overflow (OF), Zero (ZF) and Parity (PF). Any other flags are undefined.
     #[inline]
-    fn perform_checked_add_u32(&mut self, value_1: u32, value_2: u32) -> u32 {
+    fn perform_checked_add_u32(
+        &mut self,
+        value_1: u32,
+        value_2: u32,
+        out_reg: &RegisterId,
+        privilege: &PrivilegeLevel,
+    ) {
         let (final_value, overflow) = value_1.overflowing_add(value_2);
 
         self.set_standard_flags_by_value(final_value, overflow);
 
-        final_value
+        self.write_reg_u32(out_reg, final_value, privilege);
     }
 
     /// Perform a checked subtraction of two u32 values.
     ///
     /// # Arguments
     ///
-    /// * `value_1` - The first u32 value.
-    /// * `value_2` - The second u32 value.
+    /// * `target_value` - The first u32 value.
+    /// * `sub_value` - The second u32 value.
+    /// * `out_reg` - The destination u32 register.
+    /// * `privilege` - The privilege level of the command.
     ///
     /// # Returns
     ///
@@ -327,12 +285,18 @@ impl Cpu {
     ///
     /// This method affects the following flags: Sign (SF), Overflow (OF), Zero (ZF) and Parity (PF). Any other flags are undefined.
     #[inline]
-    fn perform_checked_subtract_u32(&mut self, value_1: u32, value_2: u32) -> u32 {
-        let (final_value, overflow) = value_1.overflowing_sub(value_2);
+    fn perform_checked_subtract_u32(
+        &mut self,
+        target_value: u32,
+        sub_value: u32,
+        out_reg: &RegisterId,
+        privilege: &PrivilegeLevel,
+    ) {
+        let (final_value, overflow) = target_value.overflowing_sub(sub_value);
 
         self.set_standard_flags_by_value(final_value, overflow);
 
-        final_value
+        self.write_reg_u32(out_reg, final_value, privilege);
     }
 
     /// Perform a checked multiply of two u32 values.
@@ -350,7 +314,7 @@ impl Cpu {
     ///
     /// This method affects the following flags: Overflow (OF) and Carry (CF). Any other flags are undefined.
     #[inline]
-    fn perform_checked_mul_u32(&mut self, value_1: u32, value_2: u32) -> u32 {
+    fn perform_checked_mul_u32(&mut self, value_1: u32, value_2: u32) {
         let final_value = value_1.wrapping_mul(value_2);
 
         // The overflow and carry flags will be true if the upper bits 16
@@ -359,7 +323,7 @@ impl Cpu {
         self.set_flag_state(CpuFlag::OF, state);
         self.set_flag_state(CpuFlag::CF, state);
 
-        final_value
+        self.write_reg_u32_unchecked(&RegisterId::ER1, final_value);
     }
 
     /// Perform a bitwise and of two u32 values.
@@ -438,9 +402,13 @@ impl Cpu {
     /// # Note
     ///
     /// This method affects the following flags: none. All flags are undefined.
+    /// This method will trigger a DIVISION_BY_ZERO interrupt if the divisor is zero.
     #[inline]
-    pub fn perform_division_u32(&mut self, dividend: u32, divisor: u32) {
-        assert!(divisor != 0);
+    pub fn perform_division_u32(&mut self, dividend: u32, divisor: u32, mem: &mut MemoryHandler) {
+        if divisor == 0 {
+            self.trigger_interrupt(DIVIDE_BY_ZERO_INT, mem);
+            return;
+        }
 
         let quotient: u32;
         let modulo: u32;
@@ -828,89 +796,64 @@ impl Cpu {
             I::Nop => {}
 
             /******** [Arithmetic Instructions] ********/
-            I::AddU32ImmU32Reg(imm, reg) => {
-                let old_value = self.registers.read_reg_u32(reg, privilege);
-                let new_value = self.perform_checked_add_u32(old_value, *imm);
+            I::AddU32ImmU32Reg(imm, out_reg) => {
+                let old_value = self.registers.read_reg_u32(out_reg, privilege);
 
-                self.set_u32_accumulator(new_value);
+                self.perform_checked_add_u32(old_value, *imm, out_reg, privilege);
             }
             I::AddU32RegU32Reg(in_reg, out_reg) => {
                 let value1 = self.registers.read_reg_u32(in_reg, privilege);
                 let value2 = self.registers.read_reg_u32(out_reg, privilege);
-                let new_value = self.perform_checked_add_u32(value1, value2);
 
-                self.set_u32_accumulator(new_value);
+                self.perform_checked_add_u32(value1, value2, out_reg, privilege);
             }
-            I::SubU32ImmU32Reg(imm, reg) => {
-                let old_value = self.registers.read_reg_u32(reg, privilege);
-                let new_value = self.perform_checked_subtract_u32(old_value, *imm);
+            I::SubU32ImmU32Reg(imm, out_reg) => {
+                let target_val = self.registers.read_reg_u32(out_reg, privilege);
 
-                self.set_u32_accumulator(new_value);
+                self.perform_checked_subtract_u32(target_val, *imm, out_reg, privilege);
             }
-            I::SubU32RegU32Imm(reg, imm) => {
-                let old_value = self.registers.read_reg_u32(reg, privilege);
-                let new_value = self.perform_checked_subtract_u32(*imm, old_value);
+            I::SubU32RegU32Reg(target_reg, out_reg) => {
+                let sub_val = self.registers.read_reg_u32(target_reg, privilege);
+                let target_val = self.registers.read_reg_u32(out_reg, privilege);
 
-                self.set_u32_accumulator(new_value);
-            }
-            I::SubU32RegU32Reg(reg_1, reg_2) => {
-                let reg_1_val = self.registers.read_reg_u32(reg_1, privilege);
-                let reg_2_val = self.registers.read_reg_u32(reg_2, privilege);
-                let new_value = self.perform_checked_subtract_u32(reg_2_val, reg_1_val);
-
-                self.set_u32_accumulator(new_value);
+                self.perform_checked_subtract_u32(target_val, sub_val, out_reg, privilege);
             }
             I::MulU32Imm(imm) => {
-                let old_value = self.registers.read_reg_u32(&RegisterId::ER1, privilege);
-                let new_value = self.perform_checked_mul_u32(old_value, *imm);
+                let old_value = self.registers.read_reg_u32_unchecked(&RegisterId::ER1);
 
-                self.write_reg_u32(&RegisterId::ER1, new_value, privilege);
+                self.perform_checked_mul_u32(old_value, *imm);
             }
             I::MulU32Reg(reg) => {
-                let er1_val = self.registers.read_reg_u32(&RegisterId::ER1, privilege);
-                let other_reg_val = self.registers.read_reg_u32(reg, privilege);
-                let new_value = self.perform_checked_mul_u32(er1_val, other_reg_val);
+                let reg_er1_val = self.registers.read_reg_u32_unchecked(&RegisterId::ER1);
+                let reg_other_val = self.registers.read_reg_u32(reg, privilege);
 
-                self.write_reg_u32(&RegisterId::ER1, new_value, privilege);
+                self.perform_checked_mul_u32(reg_er1_val, reg_other_val);
             }
             I::DivU32Imm(divisor_imm) => {
-                if *divisor_imm == 0 {
-                    self.handle_interrupt(DIVIDE_BY_ZERO_INT, &mut com_bus.mem);
-                    return;
-                }
+                let dividend = self.registers.read_reg_u32_unchecked(&RegisterId::ER1);
 
-                let dividend = self.registers.read_reg_u32(&RegisterId::ER1, privilege);
-
-                self.perform_division_u32(dividend, *divisor_imm);
+                self.perform_division_u32(dividend, *divisor_imm, &mut com_bus.mem);
             }
             I::DivU32Reg(divisor_reg) => {
                 let divisor = self.registers.read_reg_u32(divisor_reg, privilege);
-                if divisor == 0 {
-                    self.handle_interrupt(DIVIDE_BY_ZERO_INT, &mut com_bus.mem);
-                    return;
-                }
-
                 let dividend = self.registers.read_reg_u32(&RegisterId::ER1, privilege);
 
-                self.perform_division_u32(dividend, divisor);
+                self.perform_division_u32(dividend, divisor, &mut com_bus.mem);
             }
             I::IncU32Reg(reg) => {
                 let value = self.registers.read_reg_u32(reg, privilege);
-                let new_value = self.perform_checked_add_u32(value, 1);
 
-                self.write_reg_u32(reg, new_value, privilege);
+                self.perform_checked_add_u32(value, 1, reg, privilege);
             }
             I::DecU32Reg(reg) => {
                 let value = self.registers.read_reg_u32(reg, privilege);
-                let new_value = self.perform_checked_subtract_u32(value, 1);
-
-                self.write_reg_u32(reg, new_value, privilege);
+                self.perform_checked_subtract_u32(value, 1, reg, privilege);
             }
             I::AndU32ImmU32Reg(imm, reg) => {
                 let value = self.registers.read_reg_u32(reg, privilege);
                 let new_value = self.perform_bitwise_and_u32(*imm, value);
 
-                self.set_u32_accumulator(new_value);
+                self.write_reg_u32(reg, new_value, privilege);
             }
 
             /******** [Bit Operation Instructions] ********/
@@ -985,7 +928,7 @@ impl Cpu {
                 self.pop_state(&mut com_bus.mem, StackArgType::U32);
             }
             I::Int(int_type) => {
-                self.handle_interrupt(*int_type, &mut com_bus.mem);
+                self.trigger_interrupt(*int_type, &mut com_bus.mem);
             }
             I::IntRet => {
                 self.is_in_interrupt_handler = false;
@@ -1118,92 +1061,74 @@ impl Cpu {
             I::OutF32Imm(value, port) => {
                 // out 0.1, 0xff
                 if com_bus.write_f32(*value, *port).is_err() {
-                    self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
+                    self.trigger_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
                 }
             }
             I::OutU32Imm(value, port) => {
                 // out 0xdeadbeef, 0xff
                 if com_bus.write_u32(*value, *port).is_err() {
-                    self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
+                    self.trigger_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
                 }
             }
             I::OutU32Reg(reg, port) => {
                 // out reg, 0xff
                 let value = self.registers.read_reg_u32(reg, privilege);
                 if com_bus.write_u32(value, *port).is_err() {
-                    self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
+                    self.trigger_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
                 }
             }
             I::OutU8Imm(value, port) => {
                 // out 0xff, 0xff
                 if com_bus.write_u8(*value, *port).is_err() {
-                    self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
+                    self.trigger_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
                 }
             }
             I::InU8Reg(port, reg) => {
                 // in 0xff, reg
-                match com_bus.read_u8(*port) {
-                    Err(_) => {
-                        self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
-                    }
-                    Ok(value) => {
-                        self.write_reg_u32(reg, value as u32, privilege);
-                    }
+                if let Ok(val) = com_bus.read_u8(*port) {
+                    self.write_reg_u32(reg, val as u32, privilege);
+                } else {
+                    self.trigger_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
                 }
             }
             I::InU8Mem(port, addr) => {
                 // in 0xff, &[addr]
-                match com_bus.read_u8(*port) {
-                    Err(_) => {
-                        self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
-                    }
-                    Ok(value) => {
-                        com_bus.mem.set(*addr as usize, value);
-                    }
+                if let Ok(val) = com_bus.read_u8(*port) {
+                    com_bus.mem.set(*addr as usize, val);
+                } else {
+                    self.trigger_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
                 }
             }
             I::InU32Reg(port, reg) => {
                 // in 0xff, reg
-                match com_bus.read_u32(*port) {
-                    Err(_) => {
-                        self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
-                    }
-                    Ok(value) => {
-                        self.write_reg_u32(reg, value, privilege);
-                    }
+                if let Ok(val) = com_bus.read_u32(*port) {
+                    self.write_reg_u32(reg, val, privilege);
+                } else {
+                    self.trigger_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
                 }
             }
             I::InU32Mem(port, addr) => {
                 // in 0xff, &[addr]
-                match com_bus.read_u32(*port) {
-                    Err(_) => {
-                        self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
-                    }
-                    Ok(value) => {
-                        com_bus.mem.set_u32(*addr as usize, value);
-                    }
+                if let Ok(val) = com_bus.read_u32(*port) {
+                    com_bus.mem.set_u32(*addr as usize, val);
+                } else {
+                    self.trigger_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
                 }
             }
             I::InF32Reg(port, reg) => {
                 // in 0xff, reg
-                match com_bus.read_f32(*port) {
-                    Err(_) => {
-                        self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
-                    }
-                    Ok(value) => {
-                        self.write_reg_f32(reg, value, privilege);
-                    }
+                if let Ok(val) = com_bus.read_f32(*port) {
+                    self.write_reg_f32(reg, val, privilege);
+                } else {
+                    self.trigger_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
                 }
             }
             I::InF32Mem(port, addr) => {
                 // in 0xff, &[addr]
-                match com_bus.read_f32(*port) {
-                    Err(_) => {
-                        self.handle_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
-                    }
-                    Ok(value) => {
-                        com_bus.mem.set_f32(*addr as usize, value);
-                    }
+                if let Ok(val) = com_bus.read_f32(*port) {
+                    com_bus.mem.set_f32(*addr as usize, val);
+                } else {
+                    self.trigger_interrupt(DEVICE_ERROR_INT, &mut com_bus.mem);
                 }
             }
 
@@ -1329,7 +1254,7 @@ impl Cpu {
             I::LoadIVTAddrU32Imm(addr) => {
                 // livt &[addr]
                 if !self.is_machine_mode {
-                    self.handle_interrupt(GENERAL_PROTECTION_FAULT_INT, &mut com_bus.mem);
+                    self.trigger_interrupt(GENERAL_PROTECTION_FAULT_INT, &mut com_bus.mem);
                     return;
                 }
 
@@ -1352,15 +1277,15 @@ impl Cpu {
             | I::Reserved7
             | I::Reserved8
             | I::Reserved9 => {
-                self.handle_interrupt(INVALID_OPCODE_INT, &mut com_bus.mem);
+                self.trigger_interrupt(INVALID_OPCODE_INT, &mut com_bus.mem);
             }
 
             /******** [Pseudo Instructions] ********/
             I::Label(_) => {
-                self.handle_interrupt(INVALID_OPCODE_INT, &mut com_bus.mem);
+                self.trigger_interrupt(INVALID_OPCODE_INT, &mut com_bus.mem);
             }
             I::Unknown(_id) => {
-                self.handle_interrupt(INVALID_OPCODE_INT, &mut com_bus.mem);
+                self.trigger_interrupt(INVALID_OPCODE_INT, &mut com_bus.mem);
             }
         };
     }
@@ -1466,6 +1391,58 @@ impl Cpu {
     #[inline(always)]
     fn set_u32_accumulator(&mut self, value: u32) {
         self.write_reg_u32_unchecked(&RegisterId::EAC, value);
+    }
+
+    /// Trigger and handle an interrupt.
+    ///
+    /// # Arguments
+    ///
+    /// * `int_code` - The type of interrupt to be triggered.
+    /// * `mem` - A mutable reference to the [`MemoryHandler`] connected to this CPU instance.
+    #[inline]
+    fn trigger_interrupt(&mut self, int_code: u8, mem: &mut MemoryHandler) {
+        let is_masked =
+            (self.registers.read_reg_u32_unchecked(&RegisterId::EIM) & (int_code as u32)) == 0;
+
+        // Should we handle this interrupt?
+        // Exception interrupts have an interrupt code below 0x20 and are
+        // considered important enough that they can't be masked.
+        if is_masked && int_code >= EXCEPTION_INT_CUTOFF {
+            return;
+        }
+
+        // Get the base IVT address.
+        let ivt_base = self.registers.read_reg_u32_unchecked(&RegisterId::IDTR);
+
+        // Calculate the place within the interrupt vector we need to look.
+        let iv_addr = ivt_base + (int_code as u32 * 4);
+
+        // Get the handler address from the interrupt vector.
+        let iv_handler_addr = mem.get_u32(iv_addr as usize);
+        if iv_handler_addr == 0 {
+            // TODO - there might be something else we want to do here instead.
+            panic!("no handler has been specified for this interrupt code!");
+        }
+
+        // We will only save state when we are not already in an interrupt handler.
+        if !self.is_in_interrupt_handler {
+            // Want to preserve the state of the flags register.
+            mem.push_u32(self.get_flags());
+
+            // Once the interrupt handler has completed then we will jump back to the
+            // instruction directly following the one that triggered the exception.
+            // The return address will be pushed to the stack.
+            mem.push_u32(self.get_instruction_pointer());
+        }
+
+        // Indicate that we are currently within an interrupt handler.
+        self.is_in_interrupt_handler = true;
+
+        // Indicate that we have an unfinished interrupt.
+        self.last_interrupt_code = Some(int_code);
+
+        // Jump to the interrupt vector handler.
+        self.set_instruction_pointer(iv_handler_addr);
     }
 
     /// Set the value of a specific f32 register.
@@ -2110,7 +2087,7 @@ mod tests_cpu {
                 assert_eq!(
                     v.cpu
                         .registers
-                        .get_register_u32(RegisterId::EAC)
+                        .get_register_u32(RegisterId::ER1)
                         .read_unchecked(),
                     0x5
                 );
@@ -2163,7 +2140,7 @@ mod tests_cpu {
                 assert_eq!(
                     v.cpu
                         .registers
-                        .get_register_u32(RegisterId::EAC)
+                        .get_register_u32(RegisterId::ER1)
                         .read_unchecked(),
                     0x69
                 );
@@ -2212,7 +2189,7 @@ mod tests_cpu {
                 assert_eq!(
                     v.cpu
                         .registers
-                        .get_register_u32(RegisterId::EAC)
+                        .get_register_u32(RegisterId::ER1)
                         .read_unchecked(),
                     0x5
                 );
@@ -2263,7 +2240,7 @@ mod tests_cpu {
                 assert_eq!(
                     v.cpu
                         .registers
-                        .get_register_u32(RegisterId::EAC)
+                        .get_register_u32(RegisterId::ER1)
                         .read_unchecked(),
                     105
                 );
@@ -2381,7 +2358,7 @@ mod tests_cpu {
                 assert_eq!(
                     v.cpu
                         .registers
-                        .get_register_u32(RegisterId::EAC)
+                        .get_register_u32(RegisterId::ER1)
                         .read_unchecked(),
                     105
                 );
@@ -2506,8 +2483,7 @@ mod tests_cpu {
                     AddU32ImmU32Reg(0x2, RegisterId::ER1),
                 ],
                 &[
-                    (RegisterId::ER1, 0x1),
-                    (RegisterId::EAC, 0x3),
+                    (RegisterId::ER1, 0x3),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -2520,8 +2496,7 @@ mod tests_cpu {
                     AddU32ImmU32Reg(0x2, RegisterId::ER1),
                 ],
                 &[
-                    (RegisterId::ER1, u32::MAX),
-                    (RegisterId::EAC, 0x1),
+                    (RegisterId::ER1, 0x1),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::OF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -2547,8 +2522,7 @@ mod tests_cpu {
                     AddU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[
-                    (RegisterId::ER1, 0x2),
-                    (RegisterId::EAC, 0x3),
+                    (RegisterId::ER1, 0x3),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -2563,11 +2537,7 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0x1, RegisterId::ER1),
                     AddU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
-                &[
-                    (RegisterId::ER1, 0x1),
-                    (RegisterId::EAC, 0x2),
-                    (RegisterId::EFL, 0x0),
-                ],
+                &[(RegisterId::ER1, 0x2), (RegisterId::EFL, 0x0)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ADD - CPU parity flag not correctly cleared",
@@ -2581,8 +2551,7 @@ mod tests_cpu {
                     AddU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[
-                    (RegisterId::ER1, 0b0111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::EAC, 0b1000_0000_0000_0000_0000_0000_0000_0000),
+                    (RegisterId::ER1, 0b1000_0000_0000_0000_0000_0000_0000_0000),
                     (
                         RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
@@ -2600,11 +2569,7 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0x1, RegisterId::ER1),
                     AddU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
-                &[
-                    (RegisterId::ER1, 0x1),
-                    (RegisterId::EAC, 0x2),
-                    (RegisterId::EFL, 0x0),
-                ],
+                &[(RegisterId::ER1, 0x2), (RegisterId::EFL, 0x0)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ADD - CPU signed flag not correctly cleared",
@@ -2624,11 +2589,7 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0x1, RegisterId::ER2),
                     AddU32RegU32Reg(RegisterId::ER1, RegisterId::ER2),
                 ],
-                &[
-                    (RegisterId::ER1, 0xf),
-                    (RegisterId::ER2, 0x1),
-                    (RegisterId::EAC, 0x10),
-                ],
+                &[(RegisterId::ER1, 0xf), (RegisterId::ER2, 0x10)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ADD - incorrect result value produced",
@@ -2641,8 +2602,7 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::ER1, u32::MAX),
-                    (RegisterId::ER2, 0x2),
-                    (RegisterId::EAC, 0x1),
+                    (RegisterId::ER2, 0x1),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::OF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -2670,8 +2630,7 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::ER1, 0x2),
-                    (RegisterId::ER2, 0x1),
-                    (RegisterId::EAC, 0x3),
+                    (RegisterId::ER2, 0x3),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -2686,11 +2645,7 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0x1, RegisterId::ER1),
                     AddU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
-                &[
-                    (RegisterId::ER1, 0x1),
-                    (RegisterId::EAC, 0x2),
-                    (RegisterId::EFL, 0x0),
-                ],
+                &[(RegisterId::ER1, 0x2), (RegisterId::EFL, 0x0)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "ADD - CPU parity flag not correctly cleared",
@@ -2706,8 +2661,8 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::ER1, 0b0111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::ER2, 0x1),
-                    (RegisterId::EAC, 0b1000_0000_0000_0000_0000_0000_0000_0000),
+                    //(RegisterId::ER2, 0x1),
+                    (RegisterId::ER2, 0b1000_0000_0000_0000_0000_0000_0000_0000),
                     (
                         RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
@@ -2728,8 +2683,8 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::ER1, 0x1),
-                    (RegisterId::ER2, 0x1),
-                    (RegisterId::EAC, 0x2),
+                    //(RegisterId::ER2, 0x1),
+                    (RegisterId::ER2, 0x2),
                     (RegisterId::EFL, 0x0),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -2750,7 +2705,7 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0x2, RegisterId::ER1),
                     SubU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
-                &[(RegisterId::ER1, 0x2), (RegisterId::EAC, 0x1)],
+                &[(RegisterId::ER1, 0x1)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SUB - incorrect result value produced",
@@ -2761,8 +2716,7 @@ mod tests_cpu {
                     SubU32ImmU32Reg(u32::MAX, RegisterId::ER1),
                 ],
                 &[
-                    (RegisterId::ER1, 0x2),
-                    (RegisterId::EAC, 0x3),
+                    (RegisterId::ER1, 0x3),
                     (
                         RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::PF]),
@@ -2791,8 +2745,7 @@ mod tests_cpu {
                     SubU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[
-                    (RegisterId::ER1, 0x4),
-                    (RegisterId::EAC, 0x3),
+                    (RegisterId::ER1, 0x3),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -2807,11 +2760,7 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0x2, RegisterId::ER1),
                     SubU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
-                &[
-                    (RegisterId::ER1, 0x2),
-                    (RegisterId::EAC, 0x1),
-                    (RegisterId::EFL, 0x0),
-                ],
+                &[(RegisterId::ER1, 0x1), (RegisterId::EFL, 0x0)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SUB - CPU parity flag not correctly cleared",
@@ -2825,8 +2774,7 @@ mod tests_cpu {
                     SubU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
                 &[
-                    (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::EAC, 0b1111_1111_1111_1111_1111_1111_1111_1110),
+                    (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1110),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::SF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -2841,125 +2789,7 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0x2, RegisterId::ER1),
                     SubU32ImmU32Reg(0x1, RegisterId::ER1),
                 ],
-                &[
-                    (RegisterId::ER1, 0x2),
-                    (RegisterId::EAC, 0x1),
-                    (RegisterId::EFL, 0x0),
-                ],
-                DEFAULT_U32_STACK_CAPACITY,
-                false,
-                "SUB - CPU signed flag not correctly cleared",
-            ),
-        ];
-
-        CpuTests::new(&tests).run_all();
-    }
-
-    /// Test subtraction of a u32 register from a u32 immediate instruction.
-    #[test]
-    fn test_sub_u32_reg_u32_imm() {
-        let tests = [
-            TestU32::new(
-                &[
-                    MovU32ImmU32Reg(0x2, RegisterId::ER1),
-                    SubU32RegU32Imm(RegisterId::ER1, 0x3),
-                ],
-                &[(RegisterId::ER1, 0x2), (RegisterId::EAC, 0x1)],
-                DEFAULT_U32_STACK_CAPACITY,
-                false,
-                "SUB - incorrect result value produced",
-            ),
-            TestU32::new(
-                &[
-                    MovU32ImmU32Reg(u32::MAX, RegisterId::ER1),
-                    SubU32RegU32Imm(RegisterId::ER1, 0x2),
-                ],
-                &[
-                    (RegisterId::ER1, u32::MAX),
-                    (RegisterId::EAC, 0x3),
-                    (
-                        RegisterId::EFL,
-                        CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::PF]),
-                    ),
-                ],
-                DEFAULT_U32_STACK_CAPACITY,
-                false,
-                "SUB - CPU flags not correctly set",
-            ),
-            TestU32::new(
-                &[SubU32RegU32Imm(RegisterId::ER1, 0)],
-                &[(
-                    RegisterId::EFL,
-                    CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
-                )],
-                DEFAULT_U32_STACK_CAPACITY,
-                false,
-                "SUB - CPU flags not correctly set",
-            ),
-            // Test the parity flag gets enabled.
-            TestU32::new(
-                &[
-                    // Clear every flag.
-                    MovU32ImmU32Reg(0x0, RegisterId::EFL),
-                    MovU32ImmU32Reg(0x1, RegisterId::ER1),
-                    SubU32RegU32Imm(RegisterId::ER1, 0x4),
-                ],
-                &[
-                    (RegisterId::ER1, 0x1),
-                    (RegisterId::EAC, 0x3),
-                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
-                ],
-                DEFAULT_U32_STACK_CAPACITY,
-                false,
-                "SUB - CPU parity flag not correctly set",
-            ),
-            // Test the parity flag gets cleared.
-            TestU32::new(
-                &[
-                    // Manually set the parity flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::PF]), RegisterId::EFL),
-                    MovU32ImmU32Reg(0x1, RegisterId::ER1),
-                    SubU32RegU32Imm(RegisterId::ER1, 0x2),
-                ],
-                &[
-                    (RegisterId::ER1, 0x1),
-                    (RegisterId::EAC, 0x1),
-                    (RegisterId::EFL, 0x0),
-                ],
-                DEFAULT_U32_STACK_CAPACITY,
-                false,
-                "SUB - CPU parity flag not correctly cleared",
-            ),
-            // Test the signed flag gets set.
-            TestU32::new(
-                &[
-                    // Clear every flag.
-                    MovU32ImmU32Reg(0x0, RegisterId::EFL),
-                    MovU32ImmU32Reg(0x1, RegisterId::ER1),
-                    SubU32RegU32Imm(RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                ],
-                &[
-                    (RegisterId::ER1, 0x1),
-                    (RegisterId::EAC, 0b1111_1111_1111_1111_1111_1111_1111_1110),
-                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::SF])),
-                ],
-                DEFAULT_U32_STACK_CAPACITY,
-                false,
-                "SUB - CPU signed flag not correctly set",
-            ),
-            // Test the signed flag gets cleared.
-            TestU32::new(
-                &[
-                    // Manually set the signed flag.
-                    MovU32ImmU32Reg(CpuFlag::compute_from(&[CpuFlag::SF]), RegisterId::EFL),
-                    MovU32ImmU32Reg(0x1, RegisterId::ER1),
-                    SubU32RegU32Imm(RegisterId::ER1, 0x2),
-                ],
-                &[
-                    (RegisterId::ER1, 0x1),
-                    (RegisterId::EAC, 0x1),
-                    (RegisterId::EFL, 0x0),
-                ],
+                &[(RegisterId::ER1, 0x1), (RegisterId::EFL, 0x0)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SUB - CPU signed flag not correctly cleared",
@@ -2979,11 +2809,7 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0xf, RegisterId::ER2),
                     SubU32RegU32Reg(RegisterId::ER1, RegisterId::ER2),
                 ],
-                &[
-                    (RegisterId::ER1, 0x1),
-                    (RegisterId::ER2, 0xf),
-                    (RegisterId::EAC, 0xe),
-                ],
+                &[(RegisterId::ER1, 0x1), (RegisterId::ER2, 0xe)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "SUB - incorrect result value produced",
@@ -2996,8 +2822,7 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::ER1, u32::MAX),
-                    (RegisterId::ER2, 0x2),
-                    (RegisterId::EAC, 0x3),
+                    (RegisterId::ER2, 0x3),
                     (
                         RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::OF, CpuFlag::PF]),
@@ -3028,8 +2853,7 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::ER1, 0x1),
-                    (RegisterId::ER2, 0x4),
-                    (RegisterId::EAC, 0x3),
+                    (RegisterId::ER2, 0x3),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -3047,8 +2871,7 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::ER1, 0x1),
-                    (RegisterId::ER2, 0x2),
-                    (RegisterId::EAC, 0x1),
+                    (RegisterId::ER2, 0x1),
                     (RegisterId::EFL, 0x0),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -3066,8 +2889,7 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::ER1, 0x1),
-                    (RegisterId::ER2, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::EAC, 0b1111_1111_1111_1111_1111_1111_1111_1110),
+                    (RegisterId::ER2, 0b1111_1111_1111_1111_1111_1111_1111_1110),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::SF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -3085,8 +2907,7 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::ER1, 0x1),
-                    (RegisterId::ER2, 0x2),
-                    (RegisterId::EAC, 0x1),
+                    (RegisterId::ER2, 0x1),
                     (RegisterId::EFL, 0x0),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -3475,7 +3296,7 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0x3, RegisterId::ER1),
                     AndU32ImmU32Reg(0x2, RegisterId::ER1),
                 ],
-                &[(RegisterId::ER1, 0x3), (RegisterId::EAC, 0x2)],
+                &[(RegisterId::ER1, 0x2)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "AND - incorrect result value produced",
@@ -3485,7 +3306,7 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0x2, RegisterId::ER1),
                     AndU32ImmU32Reg(0x3, RegisterId::ER1),
                 ],
-                &[(RegisterId::ER1, 0x2), (RegisterId::EAC, 0x2)],
+                &[(RegisterId::ER1, 0x2)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "AND - incorrect result value produced",
@@ -3496,8 +3317,7 @@ mod tests_cpu {
                     AndU32ImmU32Reg(0x0, RegisterId::ER1),
                 ],
                 &[
-                    (RegisterId::ER1, 0x2),
-                    (RegisterId::EAC, 0x0),
+                    (RegisterId::ER1, 0x0),
                     (
                         RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::ZF, CpuFlag::PF]),
@@ -3530,7 +3350,6 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::ER1, 0x3),
-                    (RegisterId::EAC, 0x3),
                     (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::PF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
@@ -3545,11 +3364,7 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0x3, RegisterId::ER1),
                     AndU32ImmU32Reg(0x2, RegisterId::ER1),
                 ],
-                &[
-                    (RegisterId::ER1, 0x3),
-                    (RegisterId::EAC, 0x2),
-                    (RegisterId::EFL, 0x0),
-                ],
+                &[(RegisterId::ER1, 0x2), (RegisterId::EFL, 0x0)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "AND - CPU parity flag not correctly cleared",
@@ -3564,7 +3379,6 @@ mod tests_cpu {
                 ],
                 &[
                     (RegisterId::ER1, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::EAC, 0b1111_1111_1111_1111_1111_1111_1111_1111),
                     (
                         RegisterId::EFL,
                         CpuFlag::compute_from(&[CpuFlag::SF, CpuFlag::PF]),
@@ -3582,11 +3396,7 @@ mod tests_cpu {
                     MovU32ImmU32Reg(0x2, RegisterId::ER1),
                     AndU32ImmU32Reg(0x2, RegisterId::ER1),
                 ],
-                &[
-                    (RegisterId::ER1, 0x2),
-                    (RegisterId::EAC, 0x2),
-                    (RegisterId::EFL, 0x0),
-                ],
+                &[(RegisterId::ER1, 0x2), (RegisterId::EFL, 0x0)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "AND - CPU signed flag not correctly cleared",
@@ -6253,23 +6063,26 @@ mod tests_cpu {
                     //
                     // The instruction 2 is _9 bytes_ in length
                     //      (4 for the instruction, 4 for the u32 immediate argument and 1 for the register ID argument).
-                    // The instruction 3 is _5 bytes_ in length
+                    // The instruction 3 is _6 bytes_ in length
+                    //      (4 for the instruction, 1 for the register ID argument, 1 for the register ID argument).
+                    // The instruction 4 is _5 bytes_ in length
                     //      (4 for the instruction and 1 for the register ID argument).
-                    // The instruction 4 is _9 bytes_ in length
+                    // The instruction 5 is _9 bytes_ in length
                     //      (4 for the instruction, 4 for the u32 argument and 1 for the register ID argument).
                     //
-                    // This means that we need to add 23 to the value of the CS register to point
+                    // This means that we need to add 29 to the value of the CS register to point
                     // to the start of the second move instruction.
                     //
                     // We expect that the first move instruction will be skipped entirely.
-                    AddU32ImmU32Reg(23, RegisterId::ECS),
-                    JumpAbsU32Reg(RegisterId::EAC),
+                    MovU32ImmU32Reg(29, RegisterId::ER1),
+                    AddU32RegU32Reg(RegisterId::ECS, RegisterId::ER1),
+                    JumpAbsU32Reg(RegisterId::ER1),
                     // This instruction should be skipped, so R1 should remain at the default value of 0.
-                    MovU32ImmU32Reg(0xf, RegisterId::ER1),
+                    MovU32ImmU32Reg(0xf, RegisterId::ER2),
                     // The jump should start execution here.
-                    MovU32ImmU32Reg(0xa, RegisterId::ER2),
+                    MovU32ImmU32Reg(0xa, RegisterId::ER3),
                 ],
-                &[(RegisterId::ER1, 0x0), (RegisterId::ER2, 0xa)],
+                &[(RegisterId::ER2, 0x0), (RegisterId::ER3, 0xa)],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "JMP - failed to execute JMP instruction",

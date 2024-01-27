@@ -358,12 +358,6 @@ impl MemoryHandler {
 
                 I::SubU32ImmU32Reg(imm, reg)
             }
-            O::SubU32RegU32Imm => {
-                let reg = Self::read_register_id(arg_bytes, &mut cursor);
-                let imm = Self::read_u32(arg_bytes, &mut cursor);
-
-                I::SubU32RegU32Imm(reg, imm)
-            }
             O::SubU32RegU32Reg => {
                 let reg_1 = Self::read_register_id(arg_bytes, &mut cursor);
                 let reg_2 = Self::read_register_id(arg_bytes, &mut cursor);

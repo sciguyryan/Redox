@@ -371,10 +371,6 @@ impl<'a> AsmParser<'a> {
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
-            O::SubU32RegU32Imm => I::SubU32RegU32Imm(
-                get_inner_arg!(args[0], RegisterU32),
-                get_inner_arg_and_cast!(args[1], UnsignedInt, u32),
-            ),
             O::SubU32RegU32Reg => I::SubU32RegU32Reg(
                 get_inner_arg!(args[0], RegisterU32),
                 get_inner_arg!(args[1], RegisterU32),
@@ -1283,7 +1279,6 @@ mod tests_asm_parsing {
                 O::AddU32ImmU32Reg => I::AddU32ImmU32Reg(0x123, ER2),
                 O::AddU32RegU32Reg => I::AddU32RegU32Reg(ER2, ER3),
                 O::SubU32ImmU32Reg => I::SubU32ImmU32Reg(0x123, ER2),
-                O::SubU32RegU32Imm => I::SubU32RegU32Imm(ER2, 0x123),
                 O::SubU32RegU32Reg => I::SubU32RegU32Reg(ER2, ER3),
                 O::MulU32Imm => I::MulU32Imm(0x123),
                 O::MulU32Reg => I::MulU32Reg(ER2),

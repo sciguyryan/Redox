@@ -33,8 +33,6 @@ pub enum Instruction {
     AddU32RegU32Reg(RegisterId, RegisterId),
     /// Subtract a u32 immediate from a u32 register. The result is stored in the accumulator register.
     SubU32ImmU32Reg(u32, RegisterId),
-    /// Subtract a u32 register from a u32 immediate. The result is stored in the accumulator register.
-    SubU32RegU32Imm(RegisterId, u32),
     /// Subtract a u32 register (A) from a u32 register (B). The result is stored in the accumulator register.
     SubU32RegU32Reg(RegisterId, RegisterId),
     /// Unsigned multiplication of the register ER1 by a u32 immediate. The result is stored in the register ER1.
@@ -49,7 +47,7 @@ pub enum Instruction {
     IncU32Reg(RegisterId),
     /// Decrement a u32 register.
     DecU32Reg(RegisterId),
-    /// Perform a logical AND operation on a u32 immediate and a u32 register.
+    /// Perform a logical AND operation on a u32 immediate and a u32 register. The resulting value is stored in the register.
     AndU32ImmU32Reg(u32, RegisterId),
 
     /******** [Bit Operation Instructions] ********/
@@ -236,9 +234,6 @@ impl Display for Instruction {
             }
             I::SubU32ImmU32Reg(imm, reg) => {
                 format!("sub 0x{imm:08x}, {reg}")
-            }
-            I::SubU32RegU32Imm(reg, imm) => {
-                format!("sub {reg}, 0x{imm:08x}")
             }
             I::SubU32RegU32Reg(reg_1, reg_2) => {
                 format!("sub {reg_1}, {reg_2}")
@@ -518,7 +513,6 @@ impl Instruction {
             O::AddU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
             O::AddU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
             O::SubU32ImmU32Reg => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
-            O::SubU32RegU32Imm => ARG_REG_ID_SIZE + ARG_U32_IMM_SIZE,
             O::SubU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
             O::MulU32Imm => ARG_U32_IMM_SIZE,
             O::MulU32Reg => ARG_REG_ID_SIZE,
