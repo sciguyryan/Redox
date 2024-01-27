@@ -3,7 +3,7 @@ use std::{collections::HashMap, num::ParseIntError, str::FromStr};
 use itertools::Itertools;
 use redox_core::{
     ins::{
-        expressions::{
+        expression::{
             Expression,
             {ExpressionArgs::*, ExpressionOperator::*},
         },
@@ -420,8 +420,10 @@ impl<'a> AsmParser<'a> {
             ),
 
             /******** [Branching Instructions] ********/
-            O::CallU32Imm => I::CallU32Imm(get_inner_arg_and_cast!(args[0], UnsignedInt, u32)),
-            O::CallU32Reg => I::CallU32Reg(get_inner_arg!(args[0], RegisterU32)),
+            O::CallAbsU32Imm => {
+                I::CallAbsU32Imm(get_inner_arg_and_cast!(args[0], UnsignedInt, u32))
+            }
+            O::CallAbsU32Reg => I::CallAbsU32Reg(get_inner_arg!(args[0], RegisterU32)),
             O::RetArgsU32 => I::RetArgsU32,
             O::Int => I::Int(get_inner_arg_and_cast!(args[0], UnsignedInt, u8)),
             O::IntRet => I::IntRet,
@@ -1051,7 +1053,7 @@ mod tests_asm_parsing {
             ),
             ParserTest::new(
                 "call :LABEL_1",
-                &[Instruction::CallU32Imm(DUMMY_LABEL_JUMP_ADDRESS as u32)],
+                &[Instruction::CallAbsU32Imm(DUMMY_LABEL_JUMP_ADDRESS as u32)],
                 false,
                 "failed to correctly parse instruction label.",
             ),
@@ -1073,7 +1075,7 @@ mod tests_asm_parsing {
         let tests = [
             ParserTest::new(
                 "call &0xdeadbeef ; this comment should be ignored.",
-                &[Instruction::CallU32Imm(0xdeadbeef)],
+                &[Instruction::CallAbsU32Imm(0xdeadbeef)],
                 false,
                 "failed to correctly parse instruction and comment.",
             ),
@@ -1256,7 +1258,7 @@ mod tests_asm_parsing {
     #[test]
     fn parse_instruction_round_trip() {
         use redox_core::{
-            ins::expressions::{Expression, ExpressionArgs::*, ExpressionOperator::*},
+            ins::expression::{Expression, ExpressionArgs::*, ExpressionOperator::*},
             reg::registers::RegisterId::*,
         };
 
@@ -1294,8 +1296,8 @@ mod tests_asm_parsing {
                 O::RightShiftU32RegU32Reg => I::RightShiftU32RegU32Reg(EBX, ECX),
                 O::ArithRightShiftU8ImmU32Reg => I::ArithRightShiftU8ImmU32Reg(31, EBX),
                 O::ArithRightShiftU32RegU32Reg => I::ArithRightShiftU32RegU32Reg(EBX, ECX),
-                O::CallU32Imm => I::CallU32Imm(0xdeafbeef),
-                O::CallU32Reg => I::CallU32Reg(RegisterId::EBX),
+                O::CallAbsU32Imm => I::CallAbsU32Imm(0xdeafbeef),
+                O::CallAbsU32Reg => I::CallAbsU32Reg(RegisterId::EBX),
                 O::RetArgsU32 => I::RetArgsU32,
                 O::Int => I::Int(0xff),
                 O::IntRet => I::IntRet,

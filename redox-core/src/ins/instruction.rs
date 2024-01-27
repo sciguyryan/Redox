@@ -69,10 +69,10 @@ pub enum Instruction {
     ArithRightShiftU32RegU32Reg(RegisterId, RegisterId),
 
     /******** [Branching Instructions] ********/
-    /// Call a subroutine by a provided u32 immediate address.
-    CallU32Imm(u32),
-    /// Call a subroutine by the address as specified by a u32 register.
-    CallU32Reg(RegisterId),
+    /// Call a subroutine by a provided absolute u32 immediate address.
+    CallAbsU32Imm(u32),
+    /// Call a subroutine by the absolute address as specified by a u32 register.
+    CallAbsU32Reg(RegisterId),
     /// Return from a subroutine that had zero or more u32 arguments supplied.
     RetArgsU32,
     /// Trigger a specific type of interrupt handler.
@@ -287,11 +287,11 @@ impl Display for Instruction {
             }
 
             /******** [Branching Instructions] ********/
-            I::CallU32Imm(addr) => {
+            I::CallAbsU32Imm(addr) => {
                 // TODO - apply labels to these jumps - either dynamically generated or via binary file metadata.
                 format!("call &0x{addr:08x}")
             }
-            I::CallU32Reg(reg) => {
+            I::CallAbsU32Reg(reg) => {
                 format!("call &{reg}")
             }
             I::RetArgsU32 => String::from("iret"),
@@ -533,8 +533,8 @@ impl Instruction {
             O::ArithRightShiftU32RegU32Reg => ARG_REG_ID_SIZE + ARG_REG_ID_SIZE,
 
             /******** [Branching Instructions] ********/
-            O::CallU32Imm => ARG_MEM_ADDR_SIZE,
-            O::CallU32Reg => ARG_REG_ID_SIZE,
+            O::CallAbsU32Imm => ARG_MEM_ADDR_SIZE,
+            O::CallAbsU32Reg => ARG_REG_ID_SIZE,
             O::RetArgsU32 => 0,
             O::Int => ARG_U8_IMM_SIZE,
             O::IntRet => 0,

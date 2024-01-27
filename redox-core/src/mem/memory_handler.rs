@@ -452,15 +452,15 @@ impl MemoryHandler {
             }
 
             /******** [Branching Instructions] ********/
-            O::CallU32Imm => {
+            O::CallAbsU32Imm => {
                 let addr = Self::read_u32(arg_bytes, &mut cursor);
 
-                I::CallU32Imm(addr)
+                I::CallAbsU32Imm(addr)
             }
-            O::CallU32Reg => {
+            O::CallAbsU32Reg => {
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
 
-                I::CallU32Reg(reg)
+                I::CallAbsU32Reg(reg)
             }
             O::RetArgsU32 => I::RetArgsU32,
             O::Int => {

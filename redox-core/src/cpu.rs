@@ -6,7 +6,7 @@ use hashbrown::HashMap;
 use crate::{
     com_bus::communication_bus::CommunicationBus,
     ins::{
-        expressions::{Expression, ExpressionArgs},
+        expression::{Expression, ExpressionArgs},
         instruction::Instruction,
     },
     mem::memory_handler::{MemoryHandler, StackArgType, SIZE_OF_F32, SIZE_OF_U32},
@@ -961,12 +961,12 @@ impl Cpu {
             }
 
             /******** [Branching Instructions] ********/
-            I::CallU32Imm(addr) => {
+            I::CallAbsU32Imm(addr) => {
                 // call 0xdeafbeef
                 // call :label
                 self.perform_call_jump(&mut com_bus.mem, *addr);
             }
-            I::CallU32Reg(reg) => {
+            I::CallAbsU32Reg(reg) => {
                 // call reg
                 // Get the value of the register.
                 let addr = self.registers.read_reg_u32(reg, privilege);
@@ -1607,7 +1607,7 @@ mod tests_cpu {
         compiler::bytecode_compiler::Compiler,
         cpu::{DEVICE_ERROR_INT, DIVIDE_BY_ZERO_INT, GENERAL_PROTECTION_FAULT_INT},
         ins::{
-            expressions::{Expression, ExpressionArgs, ExpressionOperator},
+            expression::{Expression, ExpressionArgs, ExpressionOperator},
             instruction::Instruction::{self, *},
         },
         mem,
@@ -2246,7 +2246,7 @@ mod tests_cpu {
             Instruction::PushU32Imm(3), // Starts at [base + 9]. Length = 8. This should remain in place.
             Instruction::PushU32Imm(2), // Starts at [base + 17]. Length = 8. Subroutine argument 1.
             Instruction::PushU32Imm(1), // Starts at [base + 25]. Length = 8. The number of arguments.
-            Instruction::CallU32Reg(RegisterId::E8X), // Starts at [base + 33]. Length = 5.
+            Instruction::CallAbsU32Reg(RegisterId::E8X), // Starts at [base + 33]. Length = 5.
             Instruction::AddU32ImmU32Reg(100, RegisterId::EAX), // Starts at [base + 38]. Length = 9.
             Instruction::Halt, // Starts at [base + 47]. Length = 4.
             /***** FUNC_AAAA - Subroutine starts here. *****/
@@ -2314,7 +2314,7 @@ mod tests_cpu {
             Instruction::MovU32ImmU32Reg(test_registers[6].1, test_registers[6].0), // Starts at [base + 54]. Length = 9.
             // The number of arguments for the subroutine.
             Instruction::PushU32Imm(0), // Starts at [base + 63]. Length = 8. The number of arguments.
-            Instruction::CallU32Imm(base_offset + 83), // Starts at [base + 71]. Length = 8.
+            Instruction::CallAbsU32Imm(base_offset + 83), // Starts at [base + 71]. Length = 8.
             Instruction::Halt,          // Starts at [base + 79]. Length = 4.
             /***** FUNC_AAAA - Subroutine starts here. *****/
             Instruction::MovU32ImmU32Reg(0, RegisterId::EBX), // Starts at [base + 83].
@@ -2359,11 +2359,11 @@ mod tests_cpu {
             Instruction::PushU32Imm(3), // Starts at [base]. Length = 8. This should remain in place.
             Instruction::PushU32Imm(2), // Starts at [base + 8]. Length = 8. Subroutine argument 1.
             Instruction::PushU32Imm(1), // Starts at [base + 16]. Length = 8. The number of arguments.
-            Instruction::CallU32Imm(base_offset + 36), // Starts at [base + 24]. Length = 8.
+            Instruction::CallAbsU32Imm(base_offset + 36), // Starts at [base + 24]. Length = 8.
             Instruction::Halt,          // Starts at [base + 32]. Length = 4.
             /***** FUNC_AAAA - Subroutine 1 starts here. *****/
             Instruction::PushU32Imm(0), // Starts at [base + 36]. Length = 8. The number of arguments.
-            Instruction::CallU32Imm(base_offset + 65), // Starts at [base + 44]. Length = 8.
+            Instruction::CallAbsU32Imm(base_offset + 65), // Starts at [base + 44]. Length = 8.
             Instruction::AddU32ImmU32Reg(5, RegisterId::EAX), // Starts at [base + 52]. Length = 9.
             Instruction::RetArgsU32,    // Starts at [base + 61]. Length = 4.
             /***** FUNC_BBBB - Subroutine 2 starts here. *****/
