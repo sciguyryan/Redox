@@ -455,12 +455,8 @@ impl Cpu {
             );
         }
 
-        self.registers
-            .get_register_u32_mut(RegisterId::ER1)
-            .write_unchecked(quotient);
-        self.registers
-            .get_register_u32_mut(RegisterId::ER4)
-            .write_unchecked(modulo);
+        self.write_reg_u32_unchecked(&RegisterId::ER1, quotient);
+        self.write_reg_u32_unchecked(&RegisterId::ER4, modulo);
     }
 
     /// Perform an arithmetic left-shift of two u32 values.
@@ -610,7 +606,6 @@ impl Cpu {
     ) {
         self.perform_bit_test_with_carry_flag(*value, bit);
 
-        // Set the bit state to the new state.
         utils::set_bit_state_inline(value, bit, new_state);
     }
 
@@ -979,7 +974,7 @@ impl Cpu {
                 self.perform_call_jump(&mut com_bus.mem, *addr);
             }
             I::CallU32Reg(reg) => {
-                // call %reg
+                // call reg
                 // Get the value of the register.
                 let addr = self.registers.read_reg_u32(reg, privilege);
                 self.perform_call_jump(&mut com_bus.mem, addr);
@@ -1006,7 +1001,7 @@ impl Cpu {
                 self.set_instruction_pointer(*addr);
             }
             I::JumpAbsU32Reg(reg) => {
-                // jmp %cs
+                // jmp cs
                 let shift_by = self.registers.read_reg_u32(reg, privilege);
 
                 // Set the instruction pointer to the jump address.
@@ -1081,7 +1076,6 @@ impl Cpu {
                 // push imm
                 com_bus.mem.push_f32(*imm);
 
-                // Update the stack pointer register.
                 self.registers
                     .get_register_u32_mut(RegisterId::ESP)
                     .subtract_unchecked(SIZE_OF_F32_LOCAL);
@@ -1090,7 +1084,6 @@ impl Cpu {
                 // push imm
                 com_bus.mem.push_u32(*imm);
 
-                // Update the stack pointer register.
                 self.registers
                     .get_register_u32_mut(RegisterId::ESP)
                     .subtract_unchecked(SIZE_OF_U32_LOCAL);
@@ -1100,29 +1093,22 @@ impl Cpu {
                 let value = self.registers.read_reg_u32(reg, privilege);
                 com_bus.mem.push_u32(value);
 
-                // Update the stack pointer register.
                 self.registers
                     .get_register_u32_mut(RegisterId::ESP)
                     .subtract_unchecked(SIZE_OF_U32_LOCAL);
             }
             I::PopF32ToF32Reg(reg) => {
                 // pop reg
-                self.registers
-                    .get_register_f32_mut(*reg)
-                    .write(com_bus.mem.pop_f32(), privilege);
+                self.write_reg_f32(reg, com_bus.mem.pop_f32(), privilege);
 
-                // Update the stack pointer register.
                 self.registers
                     .get_register_u32_mut(RegisterId::ESP)
                     .add_unchecked(SIZE_OF_F32_LOCAL);
             }
             I::PopU32ToU32Reg(reg) => {
                 // pop reg
-                self.registers
-                    .get_register_u32_mut(*reg)
-                    .write(com_bus.mem.pop_u32(), privilege);
+                self.write_reg_u32(reg, com_bus.mem.pop_u32(), privilege);
 
-                // Update the stack pointer register.
                 self.registers
                     .get_register_u32_mut(RegisterId::ESP)
                     .add_unchecked(SIZE_OF_U32_LOCAL);
@@ -1341,7 +1327,7 @@ impl Cpu {
                 im.write_unchecked(new_mask);
             }
             I::LoadIVTAddrU32Imm(addr) => {
-                // livt [addr]
+                // livt &[addr]
                 if !self.is_machine_mode {
                     self.handle_interrupt(GENERAL_PROTECTION_FAULT_INT, &mut com_bus.mem);
                     return;
@@ -1490,7 +1476,6 @@ impl Cpu {
     /// * `new_val` - The new value of the register.
     /// * `privilege` - The [`PrivilegeLevel`] with which the read request should be processed.
     #[inline(always)]
-    #[allow(dead_code)]
     fn write_reg_f32(&mut self, reg: &RegisterId, new_val: f32, privilege: &PrivilegeLevel) {
         self.registers
             .get_register_f32_mut(*reg)
