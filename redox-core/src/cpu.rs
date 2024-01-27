@@ -1383,16 +1383,6 @@ impl Cpu {
         self.write_reg_u32_unchecked(&RegisterId::ESP, value);
     }
 
-    /// Update the u32 accumulator (AC) register.
-    ///
-    /// # Arguments
-    ///
-    /// * `value` - The new value of the accumulator register.
-    #[inline(always)]
-    fn set_u32_accumulator(&mut self, value: u32) {
-        self.write_reg_u32_unchecked(&RegisterId::EAC, value);
-    }
-
     /// Trigger and handle an interrupt.
     ///
     /// # Arguments

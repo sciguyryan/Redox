@@ -19,7 +19,7 @@ use super::type_hints::InstructionHints;
 
 const F32_REGISTERS: [RegisterId; 2] = [RegisterId::FR1, RegisterId::FR2];
 
-const U32_REGISTERS: [RegisterId; 18] = [
+const U32_REGISTERS: [RegisterId; 17] = [
     RegisterId::ER1,
     RegisterId::ER2,
     RegisterId::ER3,
@@ -28,7 +28,6 @@ const U32_REGISTERS: [RegisterId; 18] = [
     RegisterId::ER6,
     RegisterId::ER7,
     RegisterId::ER8,
-    RegisterId::EAC,
     RegisterId::EIP,
     RegisterId::EBP,
     RegisterId::ESP,

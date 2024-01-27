@@ -49,20 +49,18 @@ pub enum RegisterId {
     FR2 = 30,
 
     // [ System Registers ] //
-    /// Accumulator register.
-    EAC = 100,
     /// Instruction pointer register.
-    EIP = 101,
+    EIP = 100,
     /// Stack base pointer - the pointer to the base of the current stack frame.
-    EBP = 102,
+    EBP = 101,
     /// Stack pointer register.
-    ESP = 103,
+    ESP = 102,
     /// CPU flags register.
-    EFL = 104,
+    EFL = 103,
     /// Interrupt mask register. Only the lowest order byte is used.
-    EIM = 105,
+    EIM = 104,
     /// Interrupt descriptor table register.
-    IDTR = 106,
+    IDTR = 105,
 
     // [ Segment Registers ] //
     /// Stack segment register.
@@ -88,7 +86,6 @@ impl FromStr for RegisterId {
             "ER8" => Ok(RegisterId::ER8),
             "FR1" => Ok(RegisterId::FR1),
             "FR2" => Ok(RegisterId::FR2),
-            "EAC" => Ok(RegisterId::EAC),
             "EIP" => Ok(RegisterId::EIP),
             "EBP" => Ok(RegisterId::EBP),
             "ESP" => Ok(RegisterId::ESP),
@@ -117,13 +114,12 @@ impl From<u8> for RegisterId {
             28 => RegisterId::ER8,
             29 => RegisterId::FR1,
             30 => RegisterId::FR2,
-            100 => RegisterId::EAC,
-            101 => RegisterId::EIP,
-            102 => RegisterId::EBP,
-            103 => RegisterId::ESP,
-            104 => RegisterId::EFL,
-            105 => RegisterId::EIM,
-            106 => RegisterId::IDTR,
+            100 => RegisterId::EIP,
+            101 => RegisterId::EBP,
+            102 => RegisterId::ESP,
+            103 => RegisterId::EFL,
+            104 => RegisterId::EIM,
+            105 => RegisterId::IDTR,
             200 => RegisterId::ESS,
             201 => RegisterId::ECS,
             202 => RegisterId::EDS,
@@ -145,7 +141,6 @@ impl Display for RegisterId {
             RegisterId::ER8 => "ER8",
             RegisterId::FR1 => "FR1",
             RegisterId::FR2 => "FR2",
-            RegisterId::EAC => "EAC",
             RegisterId::EIP => "EIP",
             RegisterId::EBP => "EFP",
             RegisterId::ESP => "ESP",
@@ -179,7 +174,6 @@ pub struct Registers {
     er8: RegisterU32,
 
     // [ System Registers ] //
-    eac: RegisterU32,
     eip: RegisterU32,
     ebp: RegisterU32,
     esp: RegisterU32,
@@ -216,7 +210,6 @@ impl Registers {
             er8: RegisterU32::new(RegisterId::ER8, rw, 0),
 
             // [ System Registers ] //
-            eac: RegisterU32::new(RegisterId::EAC, rw, 0),
             eip: RegisterU32::new(RegisterId::EIP, rw, BOOT_MEMORY_START as u32),
             ebp: RegisterU32::new(RegisterId::EBP, rpw, 0),
             esp: RegisterU32::new(RegisterId::ESP, rpw, 0),
@@ -255,7 +248,6 @@ impl Registers {
                 RegisterId::ER6 => u32_vec.push(&self.er6),
                 RegisterId::ER7 => u32_vec.push(&self.er7),
                 RegisterId::ER8 => u32_vec.push(&self.er8),
-                RegisterId::EAC => u32_vec.push(&self.eac),
                 RegisterId::EIP => u32_vec.push(&self.eip),
                 RegisterId::EBP => u32_vec.push(&self.ebp),
                 RegisterId::ESP => u32_vec.push(&self.esp),
@@ -295,7 +287,6 @@ impl Registers {
             | RegisterId::ER6
             | RegisterId::ER7
             | RegisterId::ER8
-            | RegisterId::EAC
             | RegisterId::EIP
             | RegisterId::EBP
             | RegisterId::ESP
@@ -328,7 +319,6 @@ impl Registers {
             RegisterId::ER6 => &self.er6,
             RegisterId::ER7 => &self.er7,
             RegisterId::ER8 => &self.er8,
-            RegisterId::EAC => &self.eac,
             RegisterId::EIP => &self.eip,
             RegisterId::EBP => &self.ebp,
             RegisterId::ESP => &self.esp,
@@ -364,7 +354,6 @@ impl Registers {
             | RegisterId::ER6
             | RegisterId::ER7
             | RegisterId::ER8
-            | RegisterId::EAC
             | RegisterId::EIP
             | RegisterId::EBP
             | RegisterId::ESP
@@ -397,7 +386,6 @@ impl Registers {
             RegisterId::ER6 => &mut self.er6,
             RegisterId::ER7 => &mut self.er7,
             RegisterId::ER8 => &mut self.er8,
-            RegisterId::EAC => &mut self.eac,
             RegisterId::EIP => &mut self.eip,
             RegisterId::EBP => &mut self.ebp,
             RegisterId::ESP => &mut self.esp,
