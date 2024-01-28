@@ -57,10 +57,12 @@ pub enum OpCode {
     /******** [Branching Instructions] ********/
     /// Call a subroutine at a specified absolute u32 immediate address.
     CallAbsU32Imm,
-    /// Call a subroutine at an absolute address as specified by a u32 register.
+    /// Call a subroutine at an absolute address as given by a u32 register.
     CallAbsU32Reg,
-    /// Call a subroutine at an address as specified by an offset from the address pointed to a u32 register.
-    CallRelU32Imm,
+    /// Call a subroutine at an address as given by an offset from the address pointed to a u32 register.
+    CallRelU32RegU32Offset,
+    /// Call a subroutine at an address as given by an offset from the ECS register.
+    CallRelCSU32Offset,
     /// Return from a subroutine that had zero or more u32 arguments supplied.
     RetArgsU32,
     /// Trigger a specific type of interrupt handler.
@@ -234,7 +236,8 @@ impl From<&Instruction> for OpCode {
             /******** [Branching Instructions] ********/
             I::CallAbsU32Imm(_) => O::CallAbsU32Imm,
             I::CallAbsU32Reg(_) => O::CallAbsU32Reg,
-            I::CallRelU32Imm(_, _) => O::CallRelU32Imm,
+            I::CallRelU32RegU32Offset(_, _) => O::CallRelU32RegU32Offset,
+            I::CallRelCSU32Offset(_) => O::CallRelCSU32Offset,
             I::RetArgsU32 => O::RetArgsU32,
             I::Int(_) => O::Int,
             I::IntRet => O::IntRet,

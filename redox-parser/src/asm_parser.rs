@@ -424,10 +424,13 @@ impl<'a> AsmParser<'a> {
                 I::CallAbsU32Imm(get_inner_arg_and_cast!(args[0], UnsignedInt, u32))
             }
             O::CallAbsU32Reg => I::CallAbsU32Reg(get_inner_arg!(args[0], RegisterU32)),
-            O::CallRelU32Imm => I::CallRelU32Imm(
+            O::CallRelU32RegU32Offset => I::CallRelU32RegU32Offset(
                 get_inner_arg_and_cast!(args[0], UnsignedInt, u32),
                 get_inner_arg!(args[1], RegisterU32),
             ),
+            O::CallRelCSU32Offset => {
+                I::CallRelCSU32Offset(get_inner_arg_and_cast!(args[0], UnsignedInt, u32))
+            }
             O::RetArgsU32 => I::RetArgsU32,
             O::Int => I::Int(get_inner_arg_and_cast!(args[0], UnsignedInt, u8)),
             O::IntRet => I::IntRet,
@@ -1302,7 +1305,8 @@ mod tests_asm_parsing {
                 O::ArithRightShiftU32RegU32Reg => I::ArithRightShiftU32RegU32Reg(EBX, ECX),
                 O::CallAbsU32Imm => I::CallAbsU32Imm(0xdeadbeef),
                 O::CallAbsU32Reg => I::CallAbsU32Reg(RegisterId::EBX),
-                O::CallRelU32Imm => I::CallRelU32Imm(0xdeadbeef, RegisterId::EBX),
+                O::CallRelU32RegU32Offset => I::CallRelU32RegU32Offset(0xdeadbeef, RegisterId::EBX),
+                O::CallRelCSU32Offset => I::CallRelCSU32Offset(0xdeadbeef),
                 O::RetArgsU32 => I::RetArgsU32,
                 O::Int => I::Int(0xff),
                 O::IntRet => I::IntRet,

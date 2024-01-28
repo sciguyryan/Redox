@@ -992,10 +992,20 @@ impl Cpu {
 
                 self.perform_call_jump(&mut com_bus.mem, addr);
             }
-            I::CallRelU32Imm(offset, base_reg) => {
+            I::CallRelU32RegU32Offset(offset, base_reg) => {
                 // call 0xdeadbeef, reg
                 // call &[reg + 0xdeadbeef]
                 self.perform_call_offset_jump(&mut com_bus.mem, base_reg, *offset, privilege);
+            }
+            I::CallRelCSU32Offset(offset) => {
+                // call :label - calls to labels will automatically be converted to callcs instructions when parsing.
+                // callcs 0xdeadbeef
+                self.perform_call_offset_jump(
+                    &mut com_bus.mem,
+                    &RegisterId::ECS,
+                    *offset,
+                    privilege,
+                );
             }
             I::RetArgsU32 => {
                 // iret
@@ -2261,6 +2271,53 @@ mod tests_cpu {
         });
     }
 
+    /// Test the call and return from ECS register with offset instruction.
+    #[test]
+    fn test_call_return_from_cs_with_offset() {
+        let instructions = &[
+            Instruction::PushU32Imm(3), // Starts at [ECS]. Length = 8. This should remain in place.
+            Instruction::PushU32Imm(2), // Starts at [ECS + 8]. Length = 8. Subroutine argument 1.
+            Instruction::PushU32Imm(1), // Starts at [ECS + 16]. Length = 8. The number of arguments.
+            Instruction::CallRelCSU32Offset(45), // Starts at [ECS + 24]. Length = 8.
+            Instruction::AddU32ImmU32Reg(100, RegisterId::EAX), // Starts at [ECS + 32]. Length = 9.
+            Instruction::Halt,          // Starts at [ECS + 41]. Length = 4.
+            /***** FUNC_AAAA - Subroutine starts here. *****/
+            Instruction::PushU32Imm(5), // Starts at [ECS + 45].
+            Instruction::PopU32ToU32Reg(RegisterId::EAX),
+            Instruction::RetArgsU32,
+        ];
+
+        let tests = [TestU32::new(
+            instructions,
+            &[],
+            DEFAULT_U32_STACK_CAPACITY,
+            false,
+            "CALLCS - failed to successfully execute CALLCS instruction",
+        )];
+
+        CpuTests::new(&tests).run_all_special(|id, vm| {
+            if let Some(mut v) = vm {
+                // The subroutine should set the value of the ER1 register to 5.
+                // After returning, 100 should be added to the value of ER1, the result moved to the accumulator.
+                assert_eq!(
+                    v.cpu
+                        .registers
+                        .get_register_u32(RegisterId::EAX)
+                        .read_unchecked(),
+                    105
+                );
+
+                // There should be one entry on the stack.
+                assert_eq!(v.com_bus.mem.pop_u32(), 3);
+
+                // The stack should now be empty.
+                assert_eq!(v.com_bus.mem.get_stack_frame_size(), 0);
+            } else {
+                panic!("failed to correctly execute test id {id}");
+            }
+        });
+    }
+
     /// Test the call and return with offset instruction.
     #[test]
     fn test_call_return_with_offset_reg() {
@@ -2268,9 +2325,9 @@ mod tests_cpu {
             Instruction::PushU32Imm(3), // Starts at [ECS]. Length = 8. This should remain in place.
             Instruction::PushU32Imm(2), // Starts at [ECS + 8]. Length = 8. Subroutine argument 1.
             Instruction::PushU32Imm(1), // Starts at [ECS + 16]. Length = 8. The number of arguments.
-            Instruction::CallRelU32Imm(46, RegisterId::ECS), // Starts at [ECS + 24]. Length = 9.
+            Instruction::CallRelU32RegU32Offset(46, RegisterId::ECS), // Starts at [ECS + 24]. Length = 9.
             Instruction::AddU32ImmU32Reg(100, RegisterId::EAX), // Starts at [ECS + 33]. Length = 9.
-            Instruction::Halt,          // Starts at [ECS + 42]. Length = 4.
+            Instruction::Halt,                                  // Starts at [ECS + 42]. Length = 4.
             /***** FUNC_AAAA - Subroutine starts here. *****/
             Instruction::PushU32Imm(5), // Starts at [ECS + 46].
             Instruction::PopU32ToU32Reg(RegisterId::EAX),
