@@ -462,6 +462,12 @@ impl MemoryHandler {
 
                 I::CallAbsU32Reg(reg)
             }
+            O::CallRelU32Imm => {
+                let offset = Self::read_u32(arg_bytes, &mut cursor);
+                let base_reg = Self::read_register_id(arg_bytes, &mut cursor);
+
+                I::CallRelU32Imm(offset, base_reg)
+            }
             O::RetArgsU32 => I::RetArgsU32,
             O::Int => {
                 let int_index = Self::read_u8(arg_bytes, &mut cursor);

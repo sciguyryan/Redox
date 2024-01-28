@@ -55,10 +55,12 @@ pub enum OpCode {
     ArithRightShiftU32RegU32Reg,
 
     /******** [Branching Instructions] ********/
-    /// Call a subroutine by a provided absolute u32 immediate address.
+    /// Call a subroutine at a specified absolute u32 immediate address.
     CallAbsU32Imm,
-    /// Call a subroutine by the absolute address as specified by a u32 register.
+    /// Call a subroutine at an absolute address as specified by a u32 register.
     CallAbsU32Reg,
+    /// Call a subroutine at an address as specified by an offset from the address pointed to a u32 register.
+    CallRelU32Imm,
     /// Return from a subroutine that had zero or more u32 arguments supplied.
     RetArgsU32,
     /// Trigger a specific type of interrupt handler.
@@ -232,6 +234,7 @@ impl From<&Instruction> for OpCode {
             /******** [Branching Instructions] ********/
             I::CallAbsU32Imm(_) => O::CallAbsU32Imm,
             I::CallAbsU32Reg(_) => O::CallAbsU32Reg,
+            I::CallRelU32Imm(_, _) => O::CallRelU32Imm,
             I::RetArgsU32 => O::RetArgsU32,
             I::Int(_) => O::Int,
             I::IntRet => O::IntRet,

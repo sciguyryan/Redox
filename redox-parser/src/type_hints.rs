@@ -145,6 +145,7 @@ impl<'a> InstructionHints<'a> {
                 /******** [Branching Instructions] ********/
                 gen_hint!(vec!["call"], [U32Pointer], O::CallAbsU32Imm),
                 gen_hint!(vec!["call"], [RegisterU32Pointer], O::CallAbsU32Reg),
+                gen_hint!(vec!["call"], [U32, RegisterU32Pointer], O::CallRelU32Imm),
                 gen_hint!(vec!["iret"], [], O::RetArgsU32),
                 gen_hint!(vec!["int"], [U8], O::Int),
                 gen_hint!(vec!["intret"], [], O::IntRet),

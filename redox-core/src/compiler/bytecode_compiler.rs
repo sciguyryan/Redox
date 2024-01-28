@@ -56,7 +56,8 @@ impl Compiler {
             | I::BitScanReverseU32MemU32Reg(imm, reg)
             | I::BitScanForwardU32MemU32Reg(imm, reg)
             | I::SubU32ImmU32Reg(imm, reg)
-            | I::AndU32ImmU32Reg(imm, reg) => {
+            | I::AndU32ImmU32Reg(imm, reg)
+            | I::CallRelU32Imm(imm, reg) => {
                 self.write_u32(imm);
                 self.write_register_id(&reg);
             }
@@ -323,8 +324,9 @@ mod tests_compiler {
                 O::RightShiftU32RegU32Reg => I::RightShiftU32RegU32Reg(EBX, ECX),
                 O::ArithRightShiftU8ImmU32Reg => I::ArithRightShiftU8ImmU32Reg(31, EBX),
                 O::ArithRightShiftU32RegU32Reg => I::ArithRightShiftU32RegU32Reg(EBX, ECX),
-                O::CallAbsU32Imm => I::CallAbsU32Imm(0xdeafbeed),
+                O::CallAbsU32Imm => I::CallAbsU32Imm(0xdeafbeef),
                 O::CallAbsU32Reg => I::CallAbsU32Reg(RegisterId::EBX),
+                O::CallRelU32Imm => I::CallRelU32Imm(0xdeafbeef, RegisterId::EBX),
                 O::RetArgsU32 => I::RetArgsU32,
                 O::Int => I::Int(0xff),
                 O::IntRet => I::IntRet,

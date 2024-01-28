@@ -514,6 +514,26 @@ impl Cpu {
         self.set_instruction_pointer(addr);
     }
 
+    /// Perform an call jump from a register value with an offset.
+    ///
+    /// # Arguments
+    ///
+    /// * `mem` - A mutable reference to the [`MemoryHandler`] connected to this CPU instance.
+    /// * `base_reg` - The register ID that will be used to obtain the base address.
+    /// * `offset` - The offset from the base address.
+    /// * `privilege` - The privilege level of the command.
+    fn perform_call_offset_jump(
+        &mut self,
+        mem: &mut MemoryHandler,
+        base_reg: &RegisterId,
+        offset: u32,
+        privilege: &PrivilegeLevel,
+    ) {
+        let base_addr = self.registers.read_reg_u32(base_reg, privilege);
+
+        self.perform_call_jump(mem, base_addr + offset);
+    }
+
     /// Perform a right-shift of a u32 value by a u8 value.
     ///
     /// # Arguments
@@ -963,14 +983,19 @@ impl Cpu {
             /******** [Branching Instructions] ********/
             I::CallAbsU32Imm(addr) => {
                 // call 0xdeafbeef
-                // call :label
                 self.perform_call_jump(&mut com_bus.mem, *addr);
             }
             I::CallAbsU32Reg(reg) => {
                 // call reg
                 // Get the value of the register.
                 let addr = self.registers.read_reg_u32(reg, privilege);
+
                 self.perform_call_jump(&mut com_bus.mem, addr);
+            }
+            I::CallRelU32Imm(offset, base_reg) => {
+                // call 0xdeadbeef, reg
+                // call &[reg + 0xdeadbeef]
+                self.perform_call_offset_jump(&mut com_bus.mem, base_reg, *offset, privilege);
             }
             I::RetArgsU32 => {
                 // iret
@@ -2230,6 +2255,53 @@ mod tests_cpu {
                 // There should be no indication of the last interrupt handler, since it
                 // should have completed.
                 assert_eq!(v.cpu.last_interrupt_code, None);
+            } else {
+                panic!("failed to correctly execute test id {id}");
+            }
+        });
+    }
+
+    /// Test the call and return with offset instruction.
+    #[test]
+    fn test_call_return_with_offset_reg() {
+        let instructions = &[
+            Instruction::PushU32Imm(3), // Starts at [ECS]. Length = 8. This should remain in place.
+            Instruction::PushU32Imm(2), // Starts at [ECS + 8]. Length = 8. Subroutine argument 1.
+            Instruction::PushU32Imm(1), // Starts at [ECS + 16]. Length = 8. The number of arguments.
+            Instruction::CallRelU32Imm(46, RegisterId::ECS), // Starts at [ECS + 24]. Length = 9.
+            Instruction::AddU32ImmU32Reg(100, RegisterId::EAX), // Starts at [ECS + 33]. Length = 9.
+            Instruction::Halt,          // Starts at [ECS + 42]. Length = 4.
+            /***** FUNC_AAAA - Subroutine starts here. *****/
+            Instruction::PushU32Imm(5), // Starts at [ECS + 46].
+            Instruction::PopU32ToU32Reg(RegisterId::EAX),
+            Instruction::RetArgsU32,
+        ];
+
+        let tests = [TestU32::new(
+            instructions,
+            &[],
+            DEFAULT_U32_STACK_CAPACITY,
+            false,
+            "CALL - failed to successfully execute CALL instruction",
+        )];
+
+        CpuTests::new(&tests).run_all_special(|id, vm| {
+            if let Some(mut v) = vm {
+                // The subroutine should set the value of the ER1 register to 5.
+                // After returning, 100 should be added to the value of ER1, the result moved to the accumulator.
+                assert_eq!(
+                    v.cpu
+                        .registers
+                        .get_register_u32(RegisterId::EAX)
+                        .read_unchecked(),
+                    105
+                );
+
+                // There should be one entry on the stack.
+                assert_eq!(v.com_bus.mem.pop_u32(), 3);
+
+                // The stack should now be empty.
+                assert_eq!(v.com_bus.mem.get_stack_frame_size(), 0);
             } else {
                 panic!("failed to correctly execute test id {id}");
             }
