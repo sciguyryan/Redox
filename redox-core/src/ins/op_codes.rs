@@ -186,19 +186,8 @@ pub enum OpCode {
     /// Halt the execution of the virtual machine.
     Halt = 65535,
 
-    // Anything above u32::MAX - 10 (0xfffffff5) is an invalid opcode. These are reserved for future or special use.
-    Reserved1 = u32::MAX - 10,
-    Reserved2,
-    Reserved3,
-    Reserved4,
-    Reserved5,
-    Reserved6,
-    Reserved7,
-    Reserved8,
-    Reserved9,
-
     /// A placeholder opcode for labels. These do not directly compile to anything and are for used for computing jumps. This should never be constructed directly.
-    Label,
+    Label = u32::MAX - 1,
     /// A placeholder for instances where the opcode isn't recognized. This should never be constructed directly.
     #[default]
     Unknown,
@@ -301,17 +290,6 @@ impl From<&Instruction> for OpCode {
             I::LoadIVTAddrU32Imm(_) => O::LoadIVTAddrU32Imm,
             I::MachineReturn => O::MachineReturn,
             I::Halt => O::Halt,
-
-            /******** [Reserved Instructions] ********/
-            I::Reserved1 => O::Reserved1,
-            I::Reserved2 => O::Reserved2,
-            I::Reserved3 => O::Reserved3,
-            I::Reserved4 => O::Reserved4,
-            I::Reserved5 => O::Reserved5,
-            I::Reserved6 => O::Reserved6,
-            I::Reserved7 => O::Reserved7,
-            I::Reserved8 => O::Reserved8,
-            I::Reserved9 => O::Reserved9,
 
             /******** [Pseudo Instructions] ********/
             I::Label(_) => O::Label,

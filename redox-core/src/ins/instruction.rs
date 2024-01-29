@@ -196,17 +196,6 @@ pub enum Instruction {
     /// Halt the execution of the processor.
     Halt,
 
-    /******** [Reserved Instructions] ********/
-    Reserved1,
-    Reserved2,
-    Reserved3,
-    Reserved4,
-    Reserved5,
-    Reserved6,
-    Reserved7,
-    Reserved8,
-    Reserved9,
-
     /******** [Pseudo Instructions] ********/
     /// A placeholder opcode for labels. These do not directly compile to anything and are intended on being a hint when compiling. This should never be constructed directly.
     Label(String),
@@ -476,17 +465,6 @@ impl Display for Instruction {
             I::MachineReturn => String::from("mret"),
             I::Halt => String::from("hlt"),
 
-            /******** [Reserved Instructions] ********/
-            I::Reserved1
-            | I::Reserved2
-            | I::Reserved3
-            | I::Reserved4
-            | I::Reserved5
-            | I::Reserved6
-            | I::Reserved7
-            | I::Reserved8
-            | I::Reserved9 => unreachable!("attempted to use a reserved instruction"),
-
             /******** [Pseudo Instructions] ********/
             I::Label(_label) => {
                 todo!();
@@ -615,17 +593,6 @@ impl Instruction {
             O::LoadIVTAddrU32Imm => ARG_MEM_ADDR_SIZE,
             O::MachineReturn | O::Halt => 0,
 
-            /******** [Reserved Instructions] ********/
-            O::Reserved1
-            | O::Reserved2
-            | O::Reserved3
-            | O::Reserved4
-            | O::Reserved5
-            | O::Reserved6
-            | O::Reserved7
-            | O::Reserved8
-            | O::Reserved9 => 0,
-
             /******** [Pseudo Instructions] ********/
             O::Label | O::Unknown => 0,
         }
@@ -639,16 +606,7 @@ impl Instruction {
     #[inline(always)]
     pub fn get_total_instruction_size(&self) -> usize {
         let instruction_size = match self {
-            Instruction::Reserved1
-            | Instruction::Reserved2
-            | Instruction::Reserved3
-            | Instruction::Reserved4
-            | Instruction::Reserved5
-            | Instruction::Reserved6
-            | Instruction::Reserved7
-            | Instruction::Reserved8
-            | Instruction::Reserved9
-            | Instruction::Label(_) => 0,
+            Instruction::Label(_) => 0,
             _ => INSTRUCTION_SIZE,
         };
         instruction_size + self.get_instruction_arg_size()

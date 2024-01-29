@@ -599,17 +599,6 @@ impl<'a> AsmParser<'a> {
             O::MachineReturn => I::MachineReturn,
             O::Halt => I::Halt,
 
-            /******** [Reserved Instructions] ********/
-            O::Reserved1 => unreachable!(),
-            O::Reserved2 => unreachable!(),
-            O::Reserved3 => unreachable!(),
-            O::Reserved4 => unreachable!(),
-            O::Reserved5 => unreachable!(),
-            O::Reserved6 => unreachable!(),
-            O::Reserved7 => unreachable!(),
-            O::Reserved8 => unreachable!(),
-            O::Reserved9 => unreachable!(),
-
             /******** [Pseudo Instructions] ********/
             O::Label => unreachable!(),
             O::Unknown => unreachable!(),
@@ -1352,16 +1341,7 @@ mod tests_asm_parsing {
                 O::Halt => I::Halt,
 
                 // We don't want to test constructing these instructions.
-                O::Reserved1
-                | O::Reserved2
-                | O::Reserved3
-                | O::Reserved4
-                | O::Reserved5
-                | O::Reserved6
-                | O::Reserved7
-                | O::Reserved8
-                | O::Reserved9
-                | O::Label
+                O::Label
                 | O::Unknown => continue,
             };
 

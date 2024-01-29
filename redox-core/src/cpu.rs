@@ -1353,19 +1353,6 @@ impl Cpu {
                 self.set_halted(true);
             }
 
-            /******** [Reserved Instructions] ********/
-            I::Reserved1
-            | I::Reserved2
-            | I::Reserved3
-            | I::Reserved4
-            | I::Reserved5
-            | I::Reserved6
-            | I::Reserved7
-            | I::Reserved8
-            | I::Reserved9 => {
-                self.trigger_interrupt(INVALID_OPCODE_INT, &mut com_bus.mem);
-            }
-
             /******** [Pseudo Instructions] ********/
             I::Label(_) => {
                 self.trigger_interrupt(INVALID_OPCODE_INT, &mut com_bus.mem);

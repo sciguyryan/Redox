@@ -203,19 +203,6 @@ impl Compiler {
             /******** [No Arguments] ********/
             I::Nop | I::IntRet | I::RetArgsU32 | I::MachineReturn | I::Halt => {}
 
-            /* These instructions are reserved for future use and shouldn't be constructed. */
-            I::Reserved1
-            | I::Reserved2
-            | I::Reserved3
-            | I::Reserved4
-            | I::Reserved5
-            | I::Reserved6
-            | I::Reserved7
-            | I::Reserved8
-            | I::Reserved9 => {
-                unreachable!();
-            }
-
             /* This pseudo-instruction shouldn't be constructed and exists as a compiler hint. */
             I::Label(_) => {
                 unreachable!();
@@ -387,16 +374,7 @@ mod tests_compiler {
                 O::Halt => I::Halt,
 
                 // We don't want to test constructing these instructions.
-                O::Reserved1
-                | O::Reserved2
-                | O::Reserved3
-                | O::Reserved4
-                | O::Reserved5
-                | O::Reserved6
-                | O::Reserved7
-                | O::Reserved8
-                | O::Reserved9
-                | O::Label
+                O::Label
                 | O::Unknown => continue,
             };
 

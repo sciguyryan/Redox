@@ -769,17 +769,6 @@ impl MemoryHandler {
             O::MachineReturn => I::MachineReturn,
             O::Halt => I::Halt,
 
-            /******** [Reserved Instructions] ********/
-            O::Reserved1 => I::Reserved1,
-            O::Reserved2 => I::Reserved2,
-            O::Reserved3 => I::Reserved3,
-            O::Reserved4 => I::Reserved4,
-            O::Reserved5 => I::Reserved5,
-            O::Reserved6 => I::Reserved6,
-            O::Reserved7 => I::Reserved7,
-            O::Reserved8 => I::Reserved8,
-            O::Reserved9 => I::Reserved9,
-
             /******** [Pseudo Instructions] ********/
             O::Label | O::Unknown => I::Unknown(opcode_id),
         }
