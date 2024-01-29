@@ -281,8 +281,9 @@ impl MemoryHandler {
             .expect("failed to get mapped memory segment for address");
 
         assert!(segment.can_read);
+        segment.assert_within_bounds(pos);
 
-        &segment.data[pos - segment.start]
+        unsafe { segment.data.get_unchecked(pos - segment.start) }
     }
 
     /// Attempt to read and clone a byte from memory.
@@ -295,13 +296,7 @@ impl MemoryHandler {
     ///
     /// A clone of the specific byte from memory.
     pub fn get_byte_clone(&self, pos: usize) -> u8 {
-        let segment = self
-            .get_mapped_segment_by_address(pos)
-            .expect("failed to get mapped memory segment for address");
-
-        assert!(segment.can_read);
-
-        segment.data[pos - segment.start]
+        *self.get_byte_ref(pos)
     }
 
     /// Attempt to read an instruction from memory.
@@ -975,7 +970,7 @@ impl MemoryHandler {
         segment.assert_within_bounds(end);
 
         // Translate the absolute address into the absolute local variant.
-        &segment.data[start..end]
+        unsafe { segment.data.get_unchecked(start..end) }
     }
 
     /// Attempt to clone a range of bytes from memory.
