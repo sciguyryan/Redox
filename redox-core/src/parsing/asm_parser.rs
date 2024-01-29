@@ -9,7 +9,7 @@ use crate::{
         instruction::Instruction,
         op_codes::OpCode,
     },
-    parse::type_hints::{ArgTypeHint, InstructionLookup},
+    parsing::type_hints::{ArgTypeHint, InstructionLookup},
     reg::registers::RegisterId,
 };
 use itertools::Itertools;
@@ -924,7 +924,7 @@ mod tests_asm_parsing {
 
     use crate::{
         ins::{instruction::Instruction, op_codes::OpCode},
-        parse::asm_parser::AsmParser,
+        parsing::asm_parser::AsmParser,
         reg::registers::RegisterId,
     };
 

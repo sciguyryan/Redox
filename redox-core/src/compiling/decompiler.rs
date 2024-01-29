@@ -23,7 +23,7 @@ impl Decompiler {
 #[cfg(test)]
 mod tests_compiler {
     use crate::{
-        compile::decompiler::Decompiler,
+        compiling::decompiler::Decompiler,
         ins::{instruction::Instruction, op_codes::OpCode},
     };
 

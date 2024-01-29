@@ -29,6 +29,7 @@
 			".\\Cargo.toml",
 			".\\Cargo.toml",
 			".\\redox-core\\Cargo.toml",
+			".\\redox-core\\Cargo.toml",
 			".\\redox-core\\Cargo.toml"
 		]
 	}

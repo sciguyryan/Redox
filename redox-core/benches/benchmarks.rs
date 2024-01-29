@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 
 use redox_core::{
-    compile::compiler::Compiler, ins::instruction::Instruction, reg::registers::RegisterId,
+    compiling::compiler::Compiler, ins::instruction::Instruction, reg::registers::RegisterId,
     vm::VirtualMachine, *,
 };
 

@@ -1,10 +1,10 @@
 #![crate_name = "redox_terminal"]
 
 use redox_core::{
-    compile::compiler::Compiler,
+    compiling::compiler::Compiler,
     ins::instruction::Instruction,
     mem,
-    parse::asm_parser::AsmParser,
+    parsing::asm_parser::AsmParser,
     reg::registers::RegisterId,
     vm::{self, VirtualMachine},
 };

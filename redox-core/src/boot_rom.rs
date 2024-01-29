@@ -1,5 +1,5 @@
 use crate::{
-    compile::compiler::Compiler,
+    compiling::compiler::Compiler,
     cpu::{
         DEVICE_ERROR_INT, DIVIDE_BY_ZERO_INT, GENERAL_PROTECTION_FAULT_INT, INVALID_OPCODE_INT,
         NON_MASKABLE_INT,
