@@ -638,6 +638,19 @@ impl Instruction {
     /// A usize giving the total size of the [`Instruction`], in bytes.
     #[inline(always)]
     pub fn get_total_instruction_size(&self) -> usize {
-        self.get_instruction_arg_size() + INSTRUCTION_SIZE
+        let instruction_size = match self {
+            Instruction::Reserved1
+            | Instruction::Reserved2
+            | Instruction::Reserved3
+            | Instruction::Reserved4
+            | Instruction::Reserved5
+            | Instruction::Reserved6
+            | Instruction::Reserved7
+            | Instruction::Reserved8
+            | Instruction::Reserved9
+            | Instruction::Label(_) => 0,
+            _ => INSTRUCTION_SIZE,
+        };
+        instruction_size + self.get_instruction_arg_size()
     }
 }
