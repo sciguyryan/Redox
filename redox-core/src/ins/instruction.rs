@@ -466,9 +466,7 @@ impl Display for Instruction {
             I::Halt => String::from("hlt"),
 
             /******** [Pseudo Instructions] ********/
-            I::Label(_label) => {
-                todo!();
-            }
+            I::Label(label) => label.to_string(),
             I::Unknown(id) => format!("UNKNOWN! ID = 0x{id:08x}"),
         };
         write!(f, "{asm_format}")

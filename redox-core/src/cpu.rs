@@ -1,7 +1,6 @@
 use core::fmt;
-use std::{arch::asm, panic, slice::Iter};
-
 use hashbrown::HashMap;
+use std::{arch::asm, panic, slice::Iter};
 
 use crate::{
     com_bus::communication_bus::CommunicationBus,

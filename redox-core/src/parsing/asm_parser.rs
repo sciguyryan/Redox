@@ -1,3 +1,5 @@
+use hashbrown::HashSet;
+use itertools::Itertools;
 use std::{num::ParseIntError, str::FromStr};
 
 use crate::{
@@ -12,7 +14,6 @@ use crate::{
     parsing::type_hints::{ArgTypeHint, InstructionLookup},
     reg::registers::RegisterId,
 };
-use itertools::Itertools;
 
 use super::type_hints::InstructionHints;
 
@@ -39,7 +40,7 @@ const U32_REGISTERS: [RegisterId; 17] = [
 ];
 
 /// A dummy label jump address used when handling a label.
-const DUMMY_LABEL_JUMP_ADDRESS: u128 = u32::MAX as u128;
+const DUMMY_LABEL_JUMP_ADDRESS: u128 = 0xfedcbaffffffffffffffffffffffffff;
 
 #[derive(Debug, Clone)]
 pub enum Argument {
@@ -94,9 +95,6 @@ pub struct AsmParser<'a> {
 
     /// A vector of the parsed instructions.
     pub parsed_instructions: Vec<Instruction>,
-
-    /// A vector containing any label instructions that were encountered.
-    pub labeled_instructions: Vec<(usize, usize, String)>,
 }
 
 impl<'a> AsmParser<'a> {
@@ -104,7 +102,6 @@ impl<'a> AsmParser<'a> {
         Self {
             hints: InstructionHints::new(),
             parsed_instructions: vec![],
-            labeled_instructions: Vec::new(),
         }
     }
 
@@ -114,14 +111,19 @@ impl<'a> AsmParser<'a> {
     ///
     /// * `string` - The string to be parsed.
     pub fn parse(&mut self, string: &str) {
-        // Clear the list of label instruction hints.
-        self.labeled_instructions = Vec::with_capacity(100);
+        let mut instructions = Vec::with_capacity(100);
+        let mut labeled_instructions = Vec::with_capacity(100);
+        for (i, line) in string.lines().filter(|l| !l.starts_with(';')).enumerate() {
+            let (ins, label) = self.parse_code_line(line);
+            instructions.push(ins);
 
-        // Split the string into lines.
-        let mut instructions = vec![];
-        for line in string.lines().filter(|l| !l.starts_with(';')) {
-            instructions.push(self.parse_code_line(line));
+            if let Some(l) = label {
+                labeled_instructions.push((i, l));
+            }
         }
+
+        // Switch any specifically labelled instructions, where required.
+        self.swap_labelled_instructions(&mut instructions, &labeled_instructions);
 
         self.parsed_instructions = instructions;
     }
@@ -134,8 +136,8 @@ impl<'a> AsmParser<'a> {
     ///
     /// # Returns
     ///
-    /// A parsed [`Instruction`] instance.
-    pub fn parse_code_line(&mut self, line: &str) -> Instruction {
+    /// A tuple containing the parsed [`Instruction`] instance an option containing the labelled argument, if present.
+    pub fn parse_code_line(&mut self, line: &str) -> (Instruction, Option<String>) {
         let raw_args = AsmParser::parse_instruction_line(line.trim_matches(' '));
 
         // Are we dealing with a label marker?
@@ -145,7 +147,7 @@ impl<'a> AsmParser<'a> {
                 panic!("invalid syntax - a label designator without a name!");
             }
 
-            return Instruction::Label(raw_args[0].to_string());
+            return (Instruction::Label(raw_args[0].to_string()), None);
         }
 
         // The name should always be the first argument we've extracted, the arguments should follow.
@@ -154,6 +156,7 @@ impl<'a> AsmParser<'a> {
         // Used to hold the parsed arguments and the hints for the argument types.
         let mut arguments = vec![];
         let mut argument_hints = vec![];
+        let mut label = None;
 
         let shortlist: Vec<InstructionLookup> = self
             .hints
@@ -273,10 +276,10 @@ impl<'a> AsmParser<'a> {
                     substring.len() > 1,
                     "invalid syntax - a label designator without a name!"
                 );
+                assert_eq!(i, 1, "invalid syntax - a label may only appear as the first argument of an instruction!");
 
                 // Hold the argument index and the label string for later processing.
-                self.labeled_instructions
-                    .push((i, arguments.len(), substring.to_string()));
+                label = Some(substring.to_string());
 
                 // We want to insert a dummy 32-bit address argument for now.
                 arguments.push(Argument::UnsignedInt(DUMMY_LABEL_JUMP_ADDRESS));
@@ -289,7 +292,7 @@ impl<'a> AsmParser<'a> {
             }
 
             if !value_found {
-                panic!("Failed to parse argument! argument = {substring}");
+                panic!("failed to parse argument! argument = {substring}");
             }
 
             argument_hints.push(hints);
@@ -326,8 +329,49 @@ impl<'a> AsmParser<'a> {
         let final_option = possible_matches.first().unwrap();
 
         // Build our instruction and push it to the list.
-        AsmParser::try_build_instruction(final_option.opcode, &arguments)
+        (
+            AsmParser::try_build_instruction(final_option.opcode, &arguments),
+            label,
+        )
     }
+
+    /// Swap instructions that have a label argument when needed.
+    ///
+    /// # Arguments
+    ///
+    /// * `instructions` - A slice of parsed [`Instruction`] instances.
+    /// * `labelled_instructions` - A slice of tuples, the first entry being the index of the labelled instruction and the second containing the label String.
+    #[inline]
+    fn swap_labelled_instructions(
+        &self,
+        instructions: &mut [Instruction],
+        labelled_instructions: &[(usize, String)],
+    ) {
+        let mut known_labels = HashSet::new();
+        for ins in instructions.iter() {
+            if let Instruction::Label(label) = ins {
+                known_labels.insert(label.clone());
+            }
+        }
+
+        for (index, label) in labelled_instructions {
+            // TODO - this will need to be updated when I add in the precompiled system subroutines.
+            if !known_labels.contains(label) {
+                panic!("an instruction contains a label that isn't present in the parsed code.");
+            }
+
+            let old_instruction = instructions.get(*index).unwrap();
+            let new_instruction = match old_instruction {
+                Instruction::CallAbsU32Imm(addr) => Instruction::CallRelCSU32Offset(*addr),
+                _ => {
+                    panic!("an instruction with an unexpected label argument. instruction = {old_instruction}")
+                }
+            };
+
+            instructions[*index] = new_instruction;
+        }
+    }
+
     /// Try to build an [`Instruction`] from an [`OpCode`] and a set of arguments.
     ///
     /// # Arguments
@@ -696,7 +740,7 @@ impl<'a> AsmParser<'a> {
                 Some((Argument::Expression(expr), ArgTypeHint::Expression))
             }
         } else {
-            panic!("Invalid expression syntax - {expr_substring}");
+            panic!("invalid expression syntax - {expr_substring}");
         }
     }
 
@@ -738,12 +782,12 @@ impl<'a> AsmParser<'a> {
                     }
                 } else if F32_REGISTERS.contains(&id) {
                     if is_pointer {
-                        panic!("It's not possible to use a f32 register as a pointer!")
+                        panic!("invalid syntax - attempting to use a floating-point register as a pointer.")
                     } else {
                         Some((Argument::RegisterF32(id), ArgTypeHint::RegisterF32))
                     }
                 } else {
-                    panic!("Unclassified register identifier = {id}");
+                    panic!("invalid syntax - the specified register identifier doesn't exist. identifier = {id}");
                 }
             }
             Err(_) => None,
@@ -1037,8 +1081,11 @@ mod tests_asm_parsing {
                 "failed to correctly parse label instruction.",
             ),
             ParserTest::new(
-                "call :LABEL_1",
-                &[Instruction::CallAbsU32Imm(DUMMY_LABEL_JUMP_ADDRESS as u32)],
+                "call :LABEL_1\r\n:LABEL_1",
+                &[
+                    Instruction::CallRelCSU32Offset(DUMMY_LABEL_JUMP_ADDRESS as u32),
+                    Instruction::Label(String::from(":LABEL_1")),
+                ],
                 false,
                 "failed to correctly parse instruction label.",
             ),
@@ -1201,6 +1248,13 @@ mod tests_asm_parsing {
                 &[],
                 true,
                 "succeeded in parsing instruction with invalid arguments.",
+            ),
+            // This is invalid because a label is referenced as the argument for the call instruction, but the label isn't present.
+            ParserTest::new(
+                "call :LABEL_1",
+                &[],
+                true,
+                "succeeded in parsing instruction with label argument, while target label doesn't exist.",
             ),
         ];
 
