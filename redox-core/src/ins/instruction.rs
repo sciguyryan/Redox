@@ -605,6 +605,7 @@ impl Instruction {
     /// A usize giving the total size of the [`Instruction`], in bytes.
     #[inline(always)]
     pub fn get_total_instruction_size(&self) -> usize {
+        // TODO - this is a placeholder setup until I implement the incremental extending instruction system.
         let instruction_size = match self {
             Instruction::Label(_) => 0,
             _ => INSTRUCTION_SIZE,

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, num::ParseIntError, str::FromStr};
+use std::{num::ParseIntError, str::FromStr};
 
 use crate::{
     ins::{
@@ -95,8 +95,8 @@ pub struct AsmParser<'a> {
     /// A vector of the parsed instructions.
     pub parsed_instructions: Vec<Instruction>,
 
-    /// A vector containing any label hints that were encountered.
-    pub labeled_instructions: HashMap<usize, (usize, String)>,
+    /// A vector containing any label instructions that were encountered.
+    pub labeled_instructions: Vec<(usize, usize, String)>,
 }
 
 impl<'a> AsmParser<'a> {
@@ -104,7 +104,7 @@ impl<'a> AsmParser<'a> {
         Self {
             hints: InstructionHints::new(),
             parsed_instructions: vec![],
-            labeled_instructions: HashMap::new(),
+            labeled_instructions: Vec::new(),
         }
     }
 
@@ -115,7 +115,7 @@ impl<'a> AsmParser<'a> {
     /// * `string` - The string to be parsed.
     pub fn parse(&mut self, string: &str) {
         // Clear the list of label instruction hints.
-        self.labeled_instructions = HashMap::with_capacity(string.lines().count());
+        self.labeled_instructions = Vec::with_capacity(100);
 
         // Split the string into lines.
         let mut instructions = vec![];
@@ -276,7 +276,7 @@ impl<'a> AsmParser<'a> {
 
                 // Hold the argument index and the label string for later processing.
                 self.labeled_instructions
-                    .insert(i, (arguments.len(), substring.to_string()));
+                    .push((i, arguments.len(), substring.to_string()));
 
                 // We want to insert a dummy 32-bit address argument for now.
                 arguments.push(Argument::UnsignedInt(DUMMY_LABEL_JUMP_ADDRESS));
@@ -1341,8 +1341,7 @@ mod tests_asm_parsing {
                 O::Halt => I::Halt,
 
                 // We don't want to test constructing these instructions.
-                O::Label
-                | O::Unknown => continue,
+                O::Label | O::Unknown => continue,
             };
 
             instructions.push(ins);

@@ -374,8 +374,7 @@ mod tests_compiler {
                 O::Halt => I::Halt,
 
                 // We don't want to test constructing these instructions.
-                O::Label
-                | O::Unknown => continue,
+                O::Label | O::Unknown => continue,
             };
 
             instructions_in.push(ins);
