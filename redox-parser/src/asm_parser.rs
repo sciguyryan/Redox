@@ -238,42 +238,32 @@ impl<'a> AsmParser<'a> {
                 value_found = true;
             }
 
-            // Could this be a floating-point value?
-            if substring.contains('.') {
-                // Was an address prefix used? This is invalid syntax since f32 values can't
-                // be used as pointers.
-                if is_pointer {
-                    panic!("invalid syntax - unable to use a 32-bit floating value as a pointer!");
-                }
-
-                // Could the argument could be a f32 immediate?
-                if let Some((arg, hint)) = AsmParser::try_parse_f32_immediate(substring, is_pointer)
-                {
-                    if !value_found {
-                        arguments.push(arg);
-                    }
-
-                    hints.push(hint);
-                    value_found = true;
-                }
-
-                // Could the argument could be a f64 immediate?
-                if let Some((arg, hint)) = AsmParser::try_parse_f64_immediate(substring, is_pointer)
-                {
-                    if !value_found {
-                        arguments.push(arg);
-                    }
-
-                    hints.push(hint);
-                    // TODO - Uncomment if further types are added below.
-                    //has_value_pushed = true;
-                }
-
-                // The argument was expected to be a valid floating-point value,
-                // but we failed to parse it as such. We can't go any further.
+            // Could the argument could be a f32 immediate?
+            if let Some((arg, hint)) = AsmParser::try_parse_f32_immediate(substring, is_pointer) {
                 if !value_found {
-                    panic!("Failed to parse floating-point value.");
+                    arguments.push(arg);
                 }
+
+                hints.push(hint);
+                value_found = true;
+            }
+
+            // Could the argument could be a f64 immediate?
+            if let Some((arg, hint)) = AsmParser::try_parse_f64_immediate(substring, is_pointer) {
+                if !value_found {
+                    arguments.push(arg);
+                }
+
+                hints.push(hint);
+                // TODO - Uncomment if further types are added below.
+                //has_value_pushed = true;
+            }
+
+            // The argument was expected to be a valid floating-point value,
+            // but we failed to parse it as such. We can't go any further.
+            if substring.contains('.') && !arguments.iter().any(|a| matches!(a, Argument::Float(_)))
+            {
+                panic!("failed to parse expected floating-point value.");
             }
 
             // Are we dealing with a label? These are placeholders that will be replaced with an
@@ -300,7 +290,7 @@ impl<'a> AsmParser<'a> {
             }
 
             if !value_found {
-                panic!("Unable to parse argument - argument = {substring}");
+                panic!("Failed to parse argument! argument = {substring}");
             }
 
             argument_hints.push(hints);
@@ -339,7 +329,6 @@ impl<'a> AsmParser<'a> {
         // Build our instruction and push it to the list.
         AsmParser::try_build_instruction(final_option.opcode, &arguments)
     }
-
     /// Try to build an [`Instruction`] from an [`OpCode`] and a set of arguments.
     ///
     /// # Arguments

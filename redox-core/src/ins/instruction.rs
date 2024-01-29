@@ -299,10 +299,10 @@ impl Display for Instruction {
                 format!("call &{reg}")
             }
             I::CallRelU32RegU32Offset(offset, reg) => {
-                format!("call 0x{offset:08x}, &{reg}")
+                format!("callr 0x{offset:08x}, &{reg}")
             }
             I::CallRelCSU32Offset(offset) => {
-                format!("callcs 0x{offset:08x}")
+                format!("callr 0x{offset:08x}")
             }
             I::RetArgsU32 => String::from("iret"),
             I::Int(int_code) => {
