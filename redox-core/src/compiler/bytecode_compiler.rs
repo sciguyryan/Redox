@@ -137,6 +137,7 @@ impl Compiler {
             | I::PushU32Reg(reg)
             | I::PopU32ToU32Reg(reg)
             | I::CallAbsU32Reg(reg)
+            | I::CallRelCSU32RegOffset(reg)
             | I::PopF32ToF32Reg(reg) => {
                 self.write_register_id(&reg);
             }
@@ -329,6 +330,7 @@ mod tests_compiler {
                 O::CallAbsU32Reg => I::CallAbsU32Reg(RegisterId::EBX),
                 O::CallRelU32RegU32Offset => I::CallRelU32RegU32Offset(0xdeadbeef, RegisterId::EBX),
                 O::CallRelCSU32Offset => I::CallRelCSU32Offset(0xdeadbeef),
+                O::CallRelCSU32RegOffset => I::CallRelCSU32RegOffset(RegisterId::EBX),
                 O::RetArgsU32 => I::RetArgsU32,
                 O::Int => I::Int(0xff),
                 O::IntRet => I::IntRet,

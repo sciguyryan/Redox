@@ -151,6 +151,7 @@ impl<'a> InstructionHints<'a> {
                     O::CallRelU32RegU32Offset
                 ),
                 gen_hint!(vec!["callr"], [U32], O::CallRelCSU32Offset),
+                gen_hint!(vec!["callr"], [RegisterU32], O::CallRelCSU32RegOffset),
                 gen_hint!(vec!["iret"], [], O::RetArgsU32),
                 gen_hint!(vec!["int"], [U8], O::Int),
                 gen_hint!(vec!["intret"], [], O::IntRet),

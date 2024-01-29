@@ -420,6 +420,9 @@ impl<'a> AsmParser<'a> {
             O::CallRelCSU32Offset => {
                 I::CallRelCSU32Offset(get_inner_arg_and_cast!(args[0], UnsignedInt, u32))
             }
+            O::CallRelCSU32RegOffset => {
+                I::CallRelCSU32RegOffset(get_inner_arg!(args[0], RegisterU32))
+            }
             O::RetArgsU32 => I::RetArgsU32,
             O::Int => I::Int(get_inner_arg_and_cast!(args[0], UnsignedInt, u8)),
             O::IntRet => I::IntRet,
@@ -1296,6 +1299,7 @@ mod tests_asm_parsing {
                 O::CallAbsU32Reg => I::CallAbsU32Reg(RegisterId::EBX),
                 O::CallRelU32RegU32Offset => I::CallRelU32RegU32Offset(0xdeadbeef, RegisterId::EBX),
                 O::CallRelCSU32Offset => I::CallRelCSU32Offset(0xdeadbeef),
+                O::CallRelCSU32RegOffset => I::CallRelCSU32RegOffset(RegisterId::EBX),
                 O::RetArgsU32 => I::RetArgsU32,
                 O::Int => I::Int(0xff),
                 O::IntRet => I::IntRet,

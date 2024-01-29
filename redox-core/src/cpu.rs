@@ -993,17 +993,28 @@ impl Cpu {
                 self.perform_call_jump(&mut com_bus.mem, addr);
             }
             I::CallRelU32RegU32Offset(offset, base_reg) => {
-                // call 0xdeadbeef, reg
-                // call &[reg + 0xdeadbeef]
+                // callr 0xdeadbeef, reg
+                // callr &[reg + 0xdeadbeef]
                 self.perform_call_offset_jump(&mut com_bus.mem, base_reg, *offset, privilege);
             }
             I::CallRelCSU32Offset(offset) => {
-                // call :label - calls to labels will automatically be converted to callcs instructions when parsing.
-                // callcs 0xdeadbeef
+                // call :label - calls to labels within the bounds of the program code block will automatically be converted.
+                // callr 0xdeadbeef
                 self.perform_call_offset_jump(
                     &mut com_bus.mem,
                     &RegisterId::ECS,
                     *offset,
+                    privilege,
+                );
+            }
+            I::CallRelCSU32RegOffset(reg) => {
+                // callr ebx
+                let offset = self.registers.read_reg_u32(reg, privilege);
+
+                self.perform_call_offset_jump(
+                    &mut com_bus.mem,
+                    &RegisterId::ECS,
+                    offset,
                     privilege,
                 );
             }

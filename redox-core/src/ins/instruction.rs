@@ -75,8 +75,10 @@ pub enum Instruction {
     CallAbsU32Reg(RegisterId),
     /// Call a subroutine at an address as given by an offset from the address pointed to a u32 register.
     CallRelU32RegU32Offset(u32, RegisterId),
-    /// Call a subroutine at an address as given by an offset from the ECS register.
+    /// Call a subroutine at an address as given the ECS register and offset by a u32 immediate.
     CallRelCSU32Offset(u32),
+    /// Call a subroutine at an address as given the ECS register and offset by the value of a u32 register.
+    CallRelCSU32RegOffset(RegisterId),
     /// Return from a subroutine that had zero or more u32 arguments supplied.
     RetArgsU32,
     /// Trigger a specific type of interrupt handler.
@@ -303,6 +305,9 @@ impl Display for Instruction {
             }
             I::CallRelCSU32Offset(offset) => {
                 format!("callr 0x{offset:08x}")
+            }
+            I::CallRelCSU32RegOffset(offset_reg) => {
+                format!("callr {offset_reg}")
             }
             I::RetArgsU32 => String::from("iret"),
             I::Int(int_code) => {
@@ -547,6 +552,7 @@ impl Instruction {
             O::CallAbsU32Reg => ARG_REG_ID_SIZE,
             O::CallRelU32RegU32Offset => ARG_U32_IMM_SIZE + ARG_REG_ID_SIZE,
             O::CallRelCSU32Offset => ARG_U32_IMM_SIZE,
+            O::CallRelCSU32RegOffset => ARG_REG_ID_SIZE,
             O::RetArgsU32 => 0,
             O::Int => ARG_U8_IMM_SIZE,
             O::IntRet => 0,

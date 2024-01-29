@@ -473,6 +473,11 @@ impl MemoryHandler {
 
                 I::CallRelCSU32Offset(offset)
             }
+            O::CallRelCSU32RegOffset => {
+                let offset_reg = Self::read_register_id(arg_bytes, &mut cursor);
+
+                I::CallRelCSU32RegOffset(offset_reg)
+            }
             O::RetArgsU32 => I::RetArgsU32,
             O::Int => {
                 let int_index = Self::read_u8(arg_bytes, &mut cursor);
