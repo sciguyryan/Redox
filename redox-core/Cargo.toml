@@ -5,7 +5,7 @@ authors = ["Ryan Jones-Ward <sciguyryan@gmail.com>"]
 edition = "2021"
 readme = "README.md"
 description = "A new toy virtual machine, assembler and compiler, written in Rust."
-license = "LGPL 2.1"
+license_file = "LICENSE"
 repository = "https://github.com/sciguyryan/Redox"
 homepage = "https://github.com/sciguyryan/Redox"
 
@@ -15,6 +15,7 @@ homepage = "https://github.com/sciguyryan/Redox"
 bitflags.workspace = true
 float-cmp.workspace = true
 hashbrown.workspace = true
+itertools.workspace = true
 num-traits.workspace = true
 num-derive.workspace = true
 prettytable.workspace = true

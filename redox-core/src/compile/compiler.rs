@@ -283,7 +283,7 @@ impl Default for Compiler {
 #[cfg(test)]
 mod tests_compiler {
     use crate::{
-        compiler::bytecode_decompiler::Decompiler,
+        compile::decompiler::Decompiler,
         ins::{instruction::Instruction, op_codes::OpCode},
         reg::registers::RegisterId,
     };

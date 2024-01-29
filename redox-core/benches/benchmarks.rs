@@ -1,8 +1,8 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 
 use redox_core::{
-    compiler::bytecode_compiler::Compiler, ins::instruction::Instruction,
-    reg::registers::RegisterId, vm::VirtualMachine, *,
+    compile::compiler::Compiler, ins::instruction::Instruction, reg::registers::RegisterId,
+    vm::VirtualMachine, *,
 };
 
 pub fn criterion_vm_creation(c: &mut Criterion) {

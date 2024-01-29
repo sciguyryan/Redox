@@ -1650,7 +1650,7 @@ mod tests_cpu {
 
     use crate::{
         com_bus::communication_bus::TEST_DEBUG_DEVICE_ID,
-        compiler::bytecode_compiler::Compiler,
+        compile::compiler::Compiler,
         cpu::{DEVICE_ERROR_INT, DIVIDE_BY_ZERO_INT, GENERAL_PROTECTION_FAULT_INT},
         ins::{
             expression::{Expression, ExpressionArgs, ExpressionOperator},

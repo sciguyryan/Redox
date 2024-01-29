@@ -1,13 +1,13 @@
 #![crate_name = "redox_terminal"]
 
 use redox_core::{
-    compiler::bytecode_compiler::Compiler,
+    compile::compiler::Compiler,
     ins::instruction::Instruction,
     mem,
+    parse::asm_parser::AsmParser,
     reg::registers::RegisterId,
     vm::{self, VirtualMachine},
 };
-use redox_parser::asm_parser::AsmParser;
 
 use std::{panic, time::Instant};
 

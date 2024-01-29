@@ -1,4 +1,4 @@
-use redox_core::ins::op_codes::OpCode;
+use crate::ins::op_codes::OpCode;
 
 #[allow(unused)]
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]

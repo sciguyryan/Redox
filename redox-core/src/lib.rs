@@ -3,11 +3,12 @@
 
 mod boot_rom;
 mod com_bus;
-pub mod compiler;
+pub mod compile;
 mod cpu;
 mod data_access_type;
 pub mod ins;
 pub mod mem;
+pub mod parse;
 mod privilege_level;
 pub mod reg;
 pub mod utils;

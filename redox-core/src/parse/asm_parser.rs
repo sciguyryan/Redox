@@ -1,7 +1,6 @@
 use std::{collections::HashMap, num::ParseIntError, str::FromStr};
 
-use itertools::Itertools;
-use redox_core::{
+use crate::{
     ins::{
         expression::{
             Expression,
@@ -10,10 +9,10 @@ use redox_core::{
         instruction::Instruction,
         op_codes::OpCode,
     },
+    parse::type_hints::{ArgTypeHint, InstructionLookup},
     reg::registers::RegisterId,
 };
-
-use crate::type_hints::{ArgTypeHint, InstructionLookup};
+use itertools::Itertools;
 
 use super::type_hints::InstructionHints;
 
@@ -921,15 +920,13 @@ impl<'a> Default for AsmParser<'a> {
 #[cfg(test)]
 mod tests_asm_parsing {
     use std::panic;
-
     use strum::IntoEnumIterator;
 
-    use redox_core::{
+    use crate::{
         ins::{instruction::Instruction, op_codes::OpCode},
+        parse::asm_parser::AsmParser,
         reg::registers::RegisterId,
     };
-
-    use crate::asm_parser::AsmParser;
 
     use super::DUMMY_LABEL_JUMP_ADDRESS;
 
@@ -1256,8 +1253,10 @@ mod tests_asm_parsing {
 
     #[test]
     fn parse_instruction_round_trip() {
-        use redox_core::{
+        use crate::{
             ins::expression::{Expression, ExpressionArgs::*, ExpressionOperator::*},
+            ins::instruction::Instruction as I,
+            ins::op_codes::OpCode as O,
             reg::registers::RegisterId::*,
         };
 
@@ -1266,9 +1265,6 @@ mod tests_asm_parsing {
             .pack();
 
         let mut instructions = Vec::new();
-
-        use redox_core::ins::instruction::Instruction as I;
-        use redox_core::ins::op_codes::OpCode as O;
 
         // This might seem a little long-winded, but it's done this way to ensure
         // that each time a new instruction is added that a corresponding entry
