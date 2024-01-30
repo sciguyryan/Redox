@@ -105,6 +105,40 @@ impl<'a> AsmParser<'a> {
         }
     }
 
+    /// Update calls that made use of relative jumps via labels.
+    ///
+    /// # Arguments
+    ///
+    /// * `instructions` - A slice of parsed [`Instruction`] instances.
+    /// * `labelled_instructions` - A slice of tuples, the first entry being the index of the labelled instruction and the second containing the label String.
+    #[inline]
+    fn calculate_set_relative_jumps(
+        instructions: &mut [Instruction],
+        labelled_instructions: &[(usize, String)],
+    ) {
+        println!("something will be done here... eventually...");
+    }
+
+    /// Handles any relative jump instructions that make use of labels.
+    ///
+    /// # Arguments
+    ///
+    /// * `instructions` - A slice of parsed [`Instruction`] instances.
+    /// * `labelled_instructions` - A slice of tuples, the first entry being the index of the labelled instruction and the second containing the label String.
+    #[inline]
+    fn handle_rel_branch_instructions(
+        instructions: &mut [Instruction],
+        labelled_instructions: &[(usize, String)],
+    ) {
+        // Swap any instructions that referenced local relative labels.
+        // These are any instruction that used a label within the parsed code block.
+        AsmParser::swap_relative_labelled_instructions(instructions, labelled_instructions);
+
+        // The next thing we need to do is to replace the temporary addresses for the
+        // calls and jumps that are relative within our code block.
+        AsmParser::calculate_set_relative_jumps(instructions, labelled_instructions);
+    }
+
     /// Parse an assembly file.
     ///
     /// # Arguments
@@ -122,8 +156,12 @@ impl<'a> AsmParser<'a> {
             }
         }
 
-        // Switch any specifically labelled instructions, where required.
-        self.swap_labelled_instructions(&mut instructions, &labeled_instructions);
+        // TODO - handle any system-level calls here. These need to be removed from
+        // TODO - the labelled instructions vector.
+        //AsmParser::handle_abs_branch_instructions(&mut instructions, &mut labeled_instructions);
+
+        // Handle any relative branch instructions that made use of labels.
+        AsmParser::handle_rel_branch_instructions(&mut instructions, &labeled_instructions);
 
         self.parsed_instructions = instructions;
     }
@@ -342,8 +380,7 @@ impl<'a> AsmParser<'a> {
     /// * `instructions` - A slice of parsed [`Instruction`] instances.
     /// * `labelled_instructions` - A slice of tuples, the first entry being the index of the labelled instruction and the second containing the label String.
     #[inline]
-    fn swap_labelled_instructions(
-        &self,
+    fn swap_relative_labelled_instructions(
         instructions: &mut [Instruction],
         labelled_instructions: &[(usize, String)],
     ) {
