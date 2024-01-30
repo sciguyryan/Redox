@@ -42,7 +42,7 @@ impl BootRom {
             // Call the setup code for the interrupt vector table.
             // This is a placeholder and it will be replaced further in this method.
             Instruction::PushU32Imm(0x0),
-            Instruction::CallAbsU32Imm(0xffffffff),
+            Instruction::CallAbsU32Imm(0xffffffff, String::from("")),
             // Load the interrupt descriptor table register with the IVT location in memory.
             Instruction::LoadIVTAddrU32Imm(DEFAULT_IVT_ADDRESS),
             // Enable CPU interrupts.
@@ -119,12 +119,13 @@ impl BootRom {
         // update that in our earlier call code. It will directly follow the last IVT handler.
         let index = final_instructions
             .iter()
-            .position(|e| *e == Instruction::CallAbsU32Imm(0xffffffff))
+            .position(|e| *e == Instruction::CallAbsU32Imm(0xffffffff, String::from("")))
             .expect("failed to find correct instruction");
 
         // Replace the dummy call instruction with one that has the correct
         // subroutine address.
-        final_instructions[index] = Instruction::CallAbsU32Imm(next_handler_pos as u32);
+        final_instructions[index] =
+            Instruction::CallAbsU32Imm(next_handler_pos as u32, String::from(""));
 
         // Return the compiled bytecode.
         Compiler::new().compile(&final_instructions).to_vec()

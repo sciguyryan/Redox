@@ -450,7 +450,7 @@ impl MemoryHandler {
             O::CallAbsU32Imm => {
                 let addr = Self::read_u32(arg_bytes, &mut cursor);
 
-                I::CallAbsU32Imm(addr)
+                I::CallAbsU32Imm(addr, String::default())
             }
             O::CallAbsU32Reg => {
                 let reg = Self::read_register_id(arg_bytes, &mut cursor);
@@ -466,12 +466,7 @@ impl MemoryHandler {
             O::CallRelCSU32Offset => {
                 let offset = Self::read_u32(arg_bytes, &mut cursor);
 
-                I::CallRelCSU32Offset(offset)
-            }
-            O::CallRelCSU32RegOffset => {
-                let offset_reg = Self::read_register_id(arg_bytes, &mut cursor);
-
-                I::CallRelCSU32RegOffset(offset_reg)
+                I::CallRelCSU32Offset(offset, String::default())
             }
             O::RetArgsU32 => I::RetArgsU32,
             O::Int => {

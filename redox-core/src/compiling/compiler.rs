@@ -100,8 +100,8 @@ impl Compiler {
             I::MulU32Imm(imm)
             | I::DivU32Imm(imm)
             | I::PushU32Imm(imm)
-            | I::CallAbsU32Imm(imm)
-            | I::CallRelCSU32Offset(imm)
+            | I::CallAbsU32Imm(imm, _)
+            | I::CallRelCSU32Offset(imm, _)
             | I::JumpAbsU32Imm(imm)
             | I::LoadIVTAddrU32Imm(imm) => {
                 self.write_u32(imm);
@@ -137,7 +137,6 @@ impl Compiler {
             | I::PushU32Reg(reg)
             | I::PopU32ToU32Reg(reg)
             | I::CallAbsU32Reg(reg)
-            | I::CallRelCSU32RegOffset(reg)
             | I::PopF32ToF32Reg(reg) => {
                 self.write_register_id(&reg);
             }
@@ -313,11 +312,10 @@ mod tests_compiler {
                 O::RightShiftU32RegU32Reg => I::RightShiftU32RegU32Reg(EBX, ECX),
                 O::ArithRightShiftU8ImmU32Reg => I::ArithRightShiftU8ImmU32Reg(31, EBX),
                 O::ArithRightShiftU32RegU32Reg => I::ArithRightShiftU32RegU32Reg(EBX, ECX),
-                O::CallAbsU32Imm => I::CallAbsU32Imm(0xdeadbeef),
+                O::CallAbsU32Imm => I::CallAbsU32Imm(0xdeadbeef, String::default()),
                 O::CallAbsU32Reg => I::CallAbsU32Reg(RegisterId::EBX),
                 O::CallRelU32RegU32Offset => I::CallRelU32RegU32Offset(0xdeadbeef, RegisterId::EBX),
-                O::CallRelCSU32Offset => I::CallRelCSU32Offset(0xdeadbeef),
-                O::CallRelCSU32RegOffset => I::CallRelCSU32RegOffset(RegisterId::EBX),
+                O::CallRelCSU32Offset => I::CallRelCSU32Offset(0xdeadbeef, String::default()),
                 O::RetArgsU32 => I::RetArgsU32,
                 O::Int => I::Int(0xff),
                 O::IntRet => I::IntRet,

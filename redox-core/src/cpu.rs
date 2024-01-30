@@ -980,7 +980,7 @@ impl Cpu {
             }
 
             /******** [Branching Instructions] ********/
-            I::CallAbsU32Imm(addr) => {
+            I::CallAbsU32Imm(addr, _) => {
                 // call 0xdeafbeef
                 self.perform_call_jump(&mut com_bus.mem, *addr);
             }
@@ -996,24 +996,13 @@ impl Cpu {
                 // callr &[reg + 0xdeadbeef]
                 self.perform_call_offset_jump(&mut com_bus.mem, base_reg, *offset, privilege);
             }
-            I::CallRelCSU32Offset(offset) => {
+            I::CallRelCSU32Offset(offset, _) => {
                 // call :label - calls to labels within the bounds of the program code block will automatically be converted.
                 // callr 0xdeadbeef
                 self.perform_call_offset_jump(
                     &mut com_bus.mem,
                     &RegisterId::ECS,
                     *offset,
-                    privilege,
-                );
-            }
-            I::CallRelCSU32RegOffset(reg) => {
-                // callr ebx
-                let offset = self.registers.read_reg_u32(reg, privilege);
-
-                self.perform_call_offset_jump(
-                    &mut com_bus.mem,
-                    &RegisterId::ECS,
-                    offset,
                     privilege,
                 );
             }
@@ -2275,9 +2264,9 @@ mod tests_cpu {
             Instruction::PushU32Imm(3), // Starts at [ECS]. Length = 8. This should remain in place.
             Instruction::PushU32Imm(2), // Starts at [ECS + 8]. Length = 8. Subroutine argument 1.
             Instruction::PushU32Imm(1), // Starts at [ECS + 16]. Length = 8. The number of arguments.
-            Instruction::CallRelCSU32Offset(45), // Starts at [ECS + 24]. Length = 8.
+            Instruction::CallRelCSU32Offset(45, String::default()), // Starts at [ECS + 24]. Length = 8.
             Instruction::AddU32ImmU32Reg(100, RegisterId::EAX), // Starts at [ECS + 32]. Length = 9.
-            Instruction::Halt,          // Starts at [ECS + 41]. Length = 4.
+            Instruction::Halt,                                  // Starts at [ECS + 41]. Length = 4.
             /***** FUNC_AAAA - Subroutine starts here. *****/
             Instruction::PushU32Imm(5), // Starts at [ECS + 45].
             Instruction::PopU32ToU32Reg(RegisterId::EAX),
@@ -2440,8 +2429,8 @@ mod tests_cpu {
             Instruction::MovU32ImmU32Reg(test_registers[6].1, test_registers[6].0), // Starts at [base + 54]. Length = 9.
             // The number of arguments for the subroutine.
             Instruction::PushU32Imm(0), // Starts at [base + 63]. Length = 8. The number of arguments.
-            Instruction::CallAbsU32Imm(base_offset + 83), // Starts at [base + 71]. Length = 8.
-            Instruction::Halt,          // Starts at [base + 79]. Length = 4.
+            Instruction::CallAbsU32Imm(base_offset + 83, String::from("")), // Starts at [base + 71]. Length = 8.
+            Instruction::Halt, // Starts at [base + 79]. Length = 4.
             /***** FUNC_AAAA - Subroutine starts here. *****/
             Instruction::MovU32ImmU32Reg(0, RegisterId::EBX), // Starts at [base + 83].
             Instruction::MovU32ImmU32Reg(0, RegisterId::ECX),
@@ -2485,13 +2474,13 @@ mod tests_cpu {
             Instruction::PushU32Imm(3), // Starts at [base]. Length = 8. This should remain in place.
             Instruction::PushU32Imm(2), // Starts at [base + 8]. Length = 8. Subroutine argument 1.
             Instruction::PushU32Imm(1), // Starts at [base + 16]. Length = 8. The number of arguments.
-            Instruction::CallAbsU32Imm(base_offset + 36), // Starts at [base + 24]. Length = 8.
-            Instruction::Halt,          // Starts at [base + 32]. Length = 4.
+            Instruction::CallAbsU32Imm(base_offset + 36, String::from("")), // Starts at [base + 24]. Length = 8.
+            Instruction::Halt, // Starts at [base + 32]. Length = 4.
             /***** FUNC_AAAA - Subroutine 1 starts here. *****/
             Instruction::PushU32Imm(0), // Starts at [base + 36]. Length = 8. The number of arguments.
-            Instruction::CallAbsU32Imm(base_offset + 65), // Starts at [base + 44]. Length = 8.
+            Instruction::CallAbsU32Imm(base_offset + 65, String::from("")), // Starts at [base + 44]. Length = 8.
             Instruction::AddU32ImmU32Reg(5, RegisterId::EAX), // Starts at [base + 52]. Length = 9.
-            Instruction::RetArgsU32,    // Starts at [base + 61]. Length = 4.
+            Instruction::RetArgsU32,                          // Starts at [base + 61]. Length = 4.
             /***** FUNC_BBBB - Subroutine 2 starts here. *****/
             Instruction::PushU32Imm(100), // Starts at [base + 65]. Length = 8. This should NOT be preserved.
             Instruction::PopU32ToU32Reg(RegisterId::EAX),

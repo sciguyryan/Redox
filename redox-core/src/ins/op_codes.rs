@@ -63,8 +63,6 @@ pub enum OpCode {
     CallRelU32RegU32Offset,
     /// Call a subroutine at an address as given the ECS register and offset by a u32 immediate.
     CallRelCSU32Offset,
-    /// Call a subroutine at an address as given the ECS register and offset by the value of a u32 register.
-    CallRelCSU32RegOffset,
     /// Return from a subroutine that had zero or more u32 arguments supplied.
     RetArgsU32,
     /// Trigger a specific type of interrupt handler.
@@ -225,11 +223,10 @@ impl From<&Instruction> for OpCode {
             I::ArithRightShiftU32RegU32Reg(_, _) => O::ArithRightShiftU32RegU32Reg,
 
             /******** [Branching Instructions] ********/
-            I::CallAbsU32Imm(_) => O::CallAbsU32Imm,
+            I::CallAbsU32Imm(_, _) => O::CallAbsU32Imm,
             I::CallAbsU32Reg(_) => O::CallAbsU32Reg,
             I::CallRelU32RegU32Offset(_, _) => O::CallRelU32RegU32Offset,
-            I::CallRelCSU32Offset(_) => O::CallRelCSU32Offset,
-            I::CallRelCSU32RegOffset(_) => O::CallRelCSU32RegOffset,
+            I::CallRelCSU32Offset(_, _) => O::CallRelCSU32Offset,
             I::RetArgsU32 => O::RetArgsU32,
             I::Int(_) => O::Int,
             I::IntRet => O::IntRet,
