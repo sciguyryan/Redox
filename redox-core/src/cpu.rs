@@ -2429,7 +2429,7 @@ mod tests_cpu {
             Instruction::MovU32ImmU32Reg(test_registers[6].1, test_registers[6].0), // Starts at [base + 54]. Length = 9.
             // The number of arguments for the subroutine.
             Instruction::PushU32Imm(0), // Starts at [base + 63]. Length = 8. The number of arguments.
-            Instruction::CallAbsU32Imm(base_offset + 83, String::from("")), // Starts at [base + 71]. Length = 8.
+            Instruction::CallAbsU32Imm(base_offset + 83, String::default()), // Starts at [base + 71]. Length = 8.
             Instruction::Halt, // Starts at [base + 79]. Length = 4.
             /***** FUNC_AAAA - Subroutine starts here. *****/
             Instruction::MovU32ImmU32Reg(0, RegisterId::EBX), // Starts at [base + 83].
@@ -2474,11 +2474,11 @@ mod tests_cpu {
             Instruction::PushU32Imm(3), // Starts at [base]. Length = 8. This should remain in place.
             Instruction::PushU32Imm(2), // Starts at [base + 8]. Length = 8. Subroutine argument 1.
             Instruction::PushU32Imm(1), // Starts at [base + 16]. Length = 8. The number of arguments.
-            Instruction::CallAbsU32Imm(base_offset + 36, String::from("")), // Starts at [base + 24]. Length = 8.
+            Instruction::CallAbsU32Imm(base_offset + 36, String::default()), // Starts at [base + 24]. Length = 8.
             Instruction::Halt, // Starts at [base + 32]. Length = 4.
             /***** FUNC_AAAA - Subroutine 1 starts here. *****/
             Instruction::PushU32Imm(0), // Starts at [base + 36]. Length = 8. The number of arguments.
-            Instruction::CallAbsU32Imm(base_offset + 65, String::from("")), // Starts at [base + 44]. Length = 8.
+            Instruction::CallAbsU32Imm(base_offset + 65, String::default()), // Starts at [base + 44]. Length = 8.
             Instruction::AddU32ImmU32Reg(5, RegisterId::EAX), // Starts at [base + 52]. Length = 9.
             Instruction::RetArgsU32,                          // Starts at [base + 61]. Length = 4.
             /***** FUNC_BBBB - Subroutine 2 starts here. *****/

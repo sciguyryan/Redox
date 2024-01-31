@@ -42,7 +42,7 @@ const U32_REGISTERS: [RegisterId; 17] = [
 const DUMMY_LABEL_JUMP_ADDRESS: u128 = u128::MAX;
 
 #[derive(Debug, Clone)]
-pub enum Argument {
+enum Argument {
     /// A f64 argument.
     Float(f64),
     /// A u128 argument.
@@ -53,6 +53,29 @@ pub enum Argument {
     RegisterU32(RegisterId),
     /// An expression argument.
     Expression(Expression),
+}
+
+/// The sections that can be found in an valid file.
+enum FileSection {
+    /// The text (code) section of an assembly file.
+    Text,
+    /// The data section of an assembly file, containing variables and reserved space.
+    Data,
+    /// The read-only data section of an assembly file, containing constants.
+    ReadOnlyData,
+}
+
+impl FromStr for FileSection {
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<FileSection, Self::Err> {
+        match input.to_lowercase().as_str() {
+            "text" => Ok(FileSection::Text),
+            "data" => Ok(FileSection::Data),
+            "rodata" => Ok(FileSection::ReadOnlyData),
+            _ => Err(()),
+        }
+    }
 }
 
 /// Cheekily get the inner value of an enum.
@@ -111,9 +134,31 @@ impl<'a> AsmParser<'a> {
     /// * `string` - The string to be parsed.
     pub fn parse(&mut self, string: &str) {
         let mut instructions = Vec::with_capacity(100);
-        for line in string.lines().filter(|l| !l.starts_with(';')) {
-            let ins = self.parse_code_line(line);
-            instructions.push(ins);
+
+        // Convert newlines into a single type and automatically
+        // allow lines ending with a \ to be treated as a singular line.
+        let sanitized = string.replace("\r\n", "\n").replace("\n\\", "");
+
+        // Default to the text section, in case no sections are specied at all.
+        let mut section = FileSection::Text;
+
+        for line in sanitized.lines() {
+            if line.starts_with(';') {
+                continue;
+            }
+
+            if line.starts_with(".section") {
+                section = AsmParser::parse_section_line(line);
+                continue;
+            }
+
+            match section {
+                FileSection::Text => {
+                    instructions.push(self.parse_code_line(line));
+                }
+                FileSection::Data => todo!(),
+                FileSection::ReadOnlyData => todo!(),
+            }
         }
 
         self.parsed_instructions = instructions;
@@ -128,7 +173,7 @@ impl<'a> AsmParser<'a> {
     /// # Returns
     ///
     /// A tuple containing the parsed [`Instruction`] instance an option containing the labelled argument, if present.
-    pub fn parse_code_line(&mut self, line: &str) -> Instruction {
+    fn parse_code_line(&mut self, line: &str) -> Instruction {
         let raw_args = AsmParser::parse_instruction_line(line.trim_matches(' '));
 
         // Are we dealing with a label marker?
@@ -321,6 +366,26 @@ impl<'a> AsmParser<'a> {
 
         // Build our instruction and push it to the list.
         AsmParser::try_build_instruction(final_option.opcode, &arguments, label)
+    }
+
+    /// Parse a section line of an ASM file.
+    ///
+    /// # Arguments
+    ///
+    /// * `line` - The line to be parsed.
+    ///
+    /// # Returns
+    ///
+    /// A [`FileSection`] instance if a valid one was specified. The method will panic otherwise.
+    #[inline]
+    fn parse_section_line(line: &str) -> FileSection {
+        assert!(line.len() >= 10);
+
+        if let Ok(section) = FileSection::from_str(&line[10..]) {
+            section
+        } else {
+            panic!("invalid assembly file section name - {}", &line[10..])
+        }
     }
 
     /// Try to build an [`Instruction`] from an [`OpCode`] and a set of arguments.
@@ -745,25 +810,24 @@ impl<'a> AsmParser<'a> {
     /// * `is_pointer` - Is this argument a pointer?
     #[inline]
     fn try_parse_register_id(string: &str, is_pointer: bool) -> Option<(Argument, ArgTypeHint)> {
-        match RegisterId::from_str(string) {
-            Ok(id) => {
-                if U32_REGISTERS.contains(&id) {
-                    if is_pointer {
-                        Some((Argument::RegisterU32(id), ArgTypeHint::RegisterU32Pointer))
-                    } else {
-                        Some((Argument::RegisterU32(id), ArgTypeHint::RegisterU32))
-                    }
-                } else if F32_REGISTERS.contains(&id) {
-                    if is_pointer {
-                        panic!("invalid syntax - attempting to use a floating-point register as a pointer.")
-                    } else {
-                        Some((Argument::RegisterF32(id), ArgTypeHint::RegisterF32))
-                    }
+        if let Ok(id) = RegisterId::from_str(string) {
+            if U32_REGISTERS.contains(&id) {
+                if is_pointer {
+                    Some((Argument::RegisterU32(id), ArgTypeHint::RegisterU32Pointer))
                 } else {
-                    panic!("invalid syntax - the specified register identifier doesn't exist. identifier = {id}");
+                    Some((Argument::RegisterU32(id), ArgTypeHint::RegisterU32))
                 }
+            } else if F32_REGISTERS.contains(&id) {
+                if is_pointer {
+                    panic!("invalid syntax - attempting to use a floating-point register as a pointer.")
+                } else {
+                    Some((Argument::RegisterF32(id), ArgTypeHint::RegisterF32))
+                }
+            } else {
+                panic!("invalid syntax - the specified register identifier doesn't exist. identifier = {id}");
             }
-            Err(_) => None,
+        } else {
+            None
         }
     }
 
@@ -1224,6 +1288,20 @@ mod tests_asm_parsing {
                 &[],
                 true,
                 "succeeded in parsing instruction with invalid arguments.",
+            ),
+            // This is invalid because there must be something after the section marker.
+            ParserTest::new(
+                ".section",
+                &[],
+                true,
+                "succeeded in parsing invalid section marker.",
+            ),
+            // This is invalid because the section marker isn't valid.
+            ParserTest::new(
+                ".section abc",
+                &[],
+                true,
+                "succeeded in parsing invalid section marker.",
             ),
         ];
 

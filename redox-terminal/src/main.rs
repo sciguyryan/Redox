@@ -4,7 +4,6 @@ use redox_core::{
     compiling::compiler::Compiler,
     ins::instruction::Instruction,
     mem,
-    parsing::asm_parser::AsmParser,
     reg::registers::RegisterId,
     vm::{self, VirtualMachine},
 };
@@ -67,12 +66,10 @@ fn main() {
         panic!("currently unsupported");
     }
 
-    let code = "call :LABEL_1\r\n:LABEL_1";
+    let code = "section .text\r\ncall :LABEL_1\r\n:LABEL_1";
 
-    let mut parser = AsmParser::new();
-    parser.parse(code);
-
-    println!("parsed = {:?}", parser.parsed_instructions);
+    let mut compiler = Compiler::new();
+    let bytes = compiler.compile_assembly(code);
     return;
 
     let instructions = &[

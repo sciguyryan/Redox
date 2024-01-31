@@ -1,5 +1,6 @@
 use crate::{
     ins::{instruction::Instruction, op_codes::OpCode},
+    parsing::asm_parser::AsmParser,
     reg::registers::RegisterId,
 };
 
@@ -28,6 +29,24 @@ impl Compiler {
         }
 
         &self.bytes
+    }
+
+    /// Compile an assembly file string.
+    ///
+    /// # Arguments
+    ///
+    /// * `assembly` - A string slice containing the string to be parsed and compiled.
+    ///
+    /// # Returns
+    ///
+    /// A slice of bytes containing the compiled bytecode.
+    pub fn compile_assembly(&mut self, assembly: &str) -> &[u8] {
+        let mut parser = AsmParser::new();
+        parser.parse(assembly);
+
+        println!("parsed = {:?}", parser.parsed_instructions);
+
+        &[]
     }
 
     /// Compile a single instruction into bytecode.

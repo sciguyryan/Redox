@@ -119,13 +119,13 @@ impl BootRom {
         // update that in our earlier call code. It will directly follow the last IVT handler.
         let index = final_instructions
             .iter()
-            .position(|e| *e == Instruction::CallAbsU32Imm(0xffffffff, String::from("")))
+            .position(|e| *e == Instruction::CallAbsU32Imm(0xffffffff, String::default()))
             .expect("failed to find correct instruction");
 
         // Replace the dummy call instruction with one that has the correct
         // subroutine address.
         final_instructions[index] =
-            Instruction::CallAbsU32Imm(next_handler_pos as u32, String::from(""));
+            Instruction::CallAbsU32Imm(next_handler_pos as u32, String::default());
 
         // Return the compiled bytecode.
         Compiler::new().compile(&final_instructions).to_vec()
