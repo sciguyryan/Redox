@@ -143,7 +143,7 @@ impl<'a> AsmParser<'a> {
         // Default to the text section, in case no sections are specified.
         let mut section = FileSection::Text;
 
-        for line in sanitized.lines() {
+        for line in sanitized.lines().map(|l| l.trim()) {
             if line.starts_with(';') {
                 continue;
             }
@@ -1108,16 +1108,15 @@ mod tests_asm_parsing {
 
     #[test]
     fn code_misc_tests() {
-        let tests = [
-            ParserTest::new(
-                "mov EAX,\\\r\nEBX",
-                &[
-                    Instruction::MovU32RegU32Reg(RegisterId::EAX, RegisterId::EBX),
-                ],
-                false,
-                "failed to correctly parse instruction.",
-            ),
-        ];
+        let tests = [ParserTest::new(
+            "mov eax,\\\r\nebx",
+            &[Instruction::MovU32RegU32Reg(
+                RegisterId::EAX,
+                RegisterId::EBX,
+            )],
+            false,
+            "failed to correctly parse instruction.",
+        )];
 
         ParserTests::new(&tests).run_all();
     }
@@ -1198,7 +1197,7 @@ mod tests_asm_parsing {
             ),
             // This is invalid because the argument to call must be an integer register or integer immediate pointer.
             ParserTest::new(
-                "call ER1",
+                "call eax",
                 &[],
                 true,
                 "succeeded in parsing instruction with invalid arguments.",
@@ -1212,14 +1211,14 @@ mod tests_asm_parsing {
             ),
             // This is invalid because the argument to call must be an integer register or integer immediate pointer.
             ParserTest::new(
-                "call &FP1",
+                "call &fr1",
                 &[],
                 true,
                 "succeeded in parsing instruction with invalid arguments.",
             ),
             // This is invalid because the register ID doesn't exist.
             ParserTest::new(
-                "call &AAA",
+                "call &aaa",
                 &[],
                 true,
                 "succeeded in parsing instruction with invalid arguments.",
@@ -1227,7 +1226,7 @@ mod tests_asm_parsing {
             // This is invalid because we have an open square bracket (indicating an expression) but no
             // closing one. This is invalid syntax.
             ParserTest::new(
-                "mov &[ER1*2, ER1",
+                "mov &[eax*2, eax",
                 &[],
                 true,
                 "succeeded in parsing instruction with invalid arguments.",
@@ -1235,14 +1234,14 @@ mod tests_asm_parsing {
             // This is invalid because we have a closing square bracket (indicating an expression) but no
             // opening one. This is invalid syntax.
             ParserTest::new(
-                "mov &ER1*2], ER1",
+                "mov &eax*2], eax",
                 &[],
                 true,
                 "succeeded in parsing instruction with invalid arguments.",
             ),
             // This is invalid because the expression containing an invalid register.
             ParserTest::new(
-                "mov &[ERQ*2], ER1",
+                "mov &[erq*2], eax",
                 &[],
                 true,
                 "succeeded in parsing instruction with invalid arguments.",
@@ -1250,35 +1249,35 @@ mod tests_asm_parsing {
             // This is invalid because the value is larger than supported by a u8 value.
             // In an expression we may only use u8 values.
             ParserTest::new(
-                "mov &[ER1*999], ER1",
+                "mov &[eax*999], eax",
                 &[],
                 true,
                 "succeeded in parsing instruction with invalid arguments.",
             ),
             // This is invalid because we can't use floats in expressions.
             ParserTest::new(
-                "mov &[ER1*1.0], ER1",
+                "mov &[eax*1.0], eax",
                 &[],
                 true,
                 "succeeded in parsing instruction with invalid arguments.",
             ),
             // This is invalid because we have an operator with nothing following it.
             ParserTest::new(
-                "mov &[ER1*], ER1",
+                "mov &[eax*], eax",
                 &[],
                 true,
                 "succeeded in parsing instruction with invalid arguments.",
             ),
             // This is invalid because we have an operator with nothing preceding it.
             ParserTest::new(
-                "mov &[*ER1], ER1",
+                "mov &[*eax], eax",
                 &[],
                 true,
                 "succeeded in parsing instruction with invalid arguments.",
             ),
             // This is invalid because we have an operator with nothing following it.
             ParserTest::new(
-                "mov &[ER1*ER2*], ER1",
+                "mov &[eax*ebx*], eax",
                 &[],
                 true,
                 "succeeded in parsing instruction with invalid arguments.",
@@ -1286,14 +1285,14 @@ mod tests_asm_parsing {
             // This is invalid because we have too many arguments within the expression.
             // We may, at most, have three values.
             ParserTest::new(
-                "mov &[ER1*ER2*ER3*ER4], ER1",
+                "mov &[eax*ebx*ecx*edx], eax",
                 &[],
                 true,
                 "succeeded in parsing instruction with invalid arguments.",
             ),
             // This is invalid because a single period is not a valid floating-point value.
             ParserTest::new(
-                "mov ., ER1",
+                "mov ., eax",
                 &[],
                 true,
                 "succeeded in parsing instruction with invalid arguments.",
@@ -1301,7 +1300,7 @@ mod tests_asm_parsing {
             // This is invalid because a number followed by single period with no following digits
             // is not a valid floating-point value.
             ParserTest::new(
-                "mov 1., ER1",
+                "mov 1., eax",
                 &[],
                 true,
                 "succeeded in parsing instruction with invalid arguments.",
@@ -1323,7 +1322,7 @@ mod tests_asm_parsing {
             // This is invalid because there should be a second function argument on the next line,
             // which is made inline by the \ symbol.
             ParserTest::new(
-                "mov EAX,\\\n",
+                "mov eax,\\\n",
                 &[],
                 true,
                 "succeeded in parsing invalid section marker.",
