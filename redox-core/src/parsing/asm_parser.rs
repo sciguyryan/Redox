@@ -41,6 +41,7 @@ const U32_REGISTERS: [RegisterId; 17] = [
 /// A dummy label jump address used when handling a label.
 const DUMMY_LABEL_JUMP_ADDRESS: u128 = u128::MAX;
 
+/// The types of arguments supported by an assembly instruction.
 #[derive(Debug, Clone)]
 enum Argument {
     /// A f64 argument.
@@ -137,9 +138,9 @@ impl<'a> AsmParser<'a> {
 
         // Convert newlines into a single type and automatically
         // allow lines ending with a \ to be treated as a singular line.
-        let sanitized = string.replace("\r\n", "\n").replace("\n\\", "");
+        let sanitized = string.replace("\r\n", "\n").replace("\\\n", "");
 
-        // Default to the text section, in case no sections are specied at all.
+        // Default to the text section, in case no sections are specified.
         let mut section = FileSection::Text;
 
         for line in sanitized.lines() {
@@ -376,7 +377,7 @@ impl<'a> AsmParser<'a> {
     ///
     /// # Returns
     ///
-    /// A [`FileSection`] instance if a valid one was specified. The method will panic otherwise.
+    /// A [`FileSection`] instance if a valid one was specified. This method will panic otherwise.
     #[inline]
     fn parse_section_line(line: &str) -> FileSection {
         assert!(line.len() >= 10);
@@ -1106,6 +1107,22 @@ mod tests_asm_parsing {
     }
 
     #[test]
+    fn code_misc_tests() {
+        let tests = [
+            ParserTest::new(
+                "mov EAX,\\\r\nEBX",
+                &[
+                    Instruction::MovU32RegU32Reg(RegisterId::EAX, RegisterId::EBX),
+                ],
+                false,
+                "failed to correctly parse instruction.",
+            ),
+        ];
+
+        ParserTests::new(&tests).run_all();
+    }
+
+    #[test]
     fn code_parser_labels() {
         let tests = [
             ParserTest::new(
@@ -1299,6 +1316,14 @@ mod tests_asm_parsing {
             // This is invalid because the section marker isn't valid.
             ParserTest::new(
                 ".section abc",
+                &[],
+                true,
+                "succeeded in parsing invalid section marker.",
+            ),
+            // This is invalid because there should be a second function argument on the next line,
+            // which is made inline by the \ symbol.
+            ParserTest::new(
+                "mov EAX,\\\n",
                 &[],
                 true,
                 "succeeded in parsing invalid section marker.",
