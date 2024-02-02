@@ -173,7 +173,7 @@ impl<'a> AsmParser<'a> {
     ///
     /// # Returns
     ///
-    /// A tuple containing the parsed [`Instruction`] instance an option containing the labelled argument, if present.
+    /// An [`Instruction`] instance.
     fn parse_code_line(&mut self, line: &str) -> Instruction {
         let raw_args = AsmParser::parse_instruction_line(line.trim_matches(' '));
 
@@ -191,8 +191,8 @@ impl<'a> AsmParser<'a> {
         let name = raw_args[0].to_lowercase();
 
         // Used to hold the parsed arguments and the hints for the argument types.
-        let mut arguments = vec![];
-        let mut argument_hints = vec![];
+        let mut arguments = Vec::with_capacity(5);
+        let mut argument_hints = Vec::with_capacity(10);
         let mut label = None;
 
         let shortlist: Vec<InstructionLookup> = self
@@ -211,7 +211,7 @@ impl<'a> AsmParser<'a> {
         // Do we have any arguments to process.
         for (i, raw_arg) in raw_args.iter().enumerate().skip(1) {
             let mut value_found = false;
-            let mut hints = vec![];
+            let mut hints = Vec::with_capacity(10);
 
             // This will track whether the argument is a pointer.
             let is_pointer = raw_arg.chars().nth(0).unwrap() == '&';
