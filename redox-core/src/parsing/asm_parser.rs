@@ -148,7 +148,7 @@ impl<'a> AsmParser<'a> {
                 continue;
             }
 
-            if line.starts_with(".section") {
+            if line.starts_with("section") {
                 section = AsmParser::parse_section_line(line);
                 continue;
             }
@@ -380,12 +380,12 @@ impl<'a> AsmParser<'a> {
     /// A [`FileSection`] instance if a valid one was specified. This method will panic otherwise.
     #[inline]
     fn parse_section_line(line: &str) -> FileSection {
-        assert!(line.len() >= 10);
+        assert!(line.len() >= 9);
 
-        if let Ok(section) = FileSection::from_str(&line[10..]) {
+        if let Ok(section) = FileSection::from_str(&line[9..]) {
             section
         } else {
-            panic!("invalid assembly file section name - {}", &line[10..])
+            panic!("invalid assembly file section name - {}", &line[9..])
         }
     }
 
@@ -1307,14 +1307,14 @@ mod tests_asm_parsing {
             ),
             // This is invalid because there must be something after the section marker.
             ParserTest::new(
-                ".section",
+                "section",
                 &[],
                 true,
                 "succeeded in parsing invalid section marker.",
             ),
             // This is invalid because the section marker isn't valid.
             ParserTest::new(
-                ".section abc",
+                "section abc",
                 &[],
                 true,
                 "succeeded in parsing invalid section marker.",
