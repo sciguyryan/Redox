@@ -1,17 +1,28 @@
+use hashbrown::HashMap;
+
 use crate::{
     ins::{instruction::Instruction, op_codes::OpCode},
     parsing::asm_parser::AsmParser,
     reg::registers::RegisterId,
 };
 
-pub struct Compiler {
+pub struct Compiler<'a> {
     /// A vector containing the compiled bytecode.
     bytes: Vec<u8>,
+
+    local_labels: Vec<String>,
+    global_labels: Vec<String>,
+    label_positions: HashMap<&'a str, usize>,
 }
 
-impl Compiler {
+impl<'a> Compiler<'a> {
     pub fn new() -> Self {
-        Self { bytes: Vec::new() }
+        Self {
+            bytes: Vec::new(),
+            local_labels: Vec::new(),
+            global_labels: Vec::new(),
+            label_positions: HashMap::new(),
+        }
     }
 
     /// Compile a sequence of instructions into bytecode.
@@ -44,9 +55,50 @@ impl Compiler {
         let mut parser = AsmParser::new();
         parser.parse(assembly);
 
-        println!("parsed = {:?}", parser.parsed_instructions);
+        let mut instructions = parser.parsed_instructions;
+
+        self.load_labels(&instructions);
+
+        self.calculate_label_positions(&instructions);
+
+        self.handle_labelled_instructions(&mut instructions);
 
         &[]
+    }
+
+    #[inline]
+    fn calculate_label_positions(&mut self, ins: &[Instruction]) {}
+
+    #[inline]
+    fn load_labels(&mut self, ins: &[Instruction]) {
+        self.local_labels = ins
+            .iter()
+            .filter_map(|i| {
+                if let Instruction::Label(l) = i {
+                    Some(l.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+    }
+
+    #[inline]
+    fn handle_labelled_instructions(&mut self, instructions: &mut [Instruction]) {
+        // Now we can check whether the labels are known and available.
+        for ins in instructions {
+            let check_label = match ins {
+                Instruction::CallAbsU32Imm(_, label) => Some(label),
+                Instruction::CallRelCSU32Offset(_, label) => Some(label),
+                _ => None,
+            };
+
+            if let Some(label) = check_label {
+                if !self.global_labels.contains(label) && !self.local_labels.contains(label) {
+                    panic!("invalid syntax - unknown label - {label}");
+                }
+            }
+        }
     }
 
     /// Compile a single instruction into bytecode.
@@ -279,7 +331,7 @@ impl Compiler {
     }
 }
 
-impl Default for Compiler {
+impl<'a> Default for Compiler<'a> {
     fn default() -> Self {
         Self::new()
     }
