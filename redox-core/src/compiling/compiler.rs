@@ -6,16 +6,16 @@ use crate::{
     reg::registers::RegisterId,
 };
 
-pub struct Compiler<'a> {
+pub struct Compiler {
     /// A vector containing the compiled bytecode.
     bytes: Vec<u8>,
 
     local_labels: Vec<String>,
     global_labels: Vec<String>,
-    label_positions: HashMap<&'a str, usize>,
+    label_positions: HashMap<String, usize>,
 }
 
-impl<'a> Compiler<'a> {
+impl Compiler {
     pub fn new() -> Self {
         Self {
             bytes: Vec::new(),
@@ -61,17 +61,35 @@ impl<'a> Compiler<'a> {
 
         self.calculate_label_positions(&instructions);
 
+        // TODO - optimizations should ideally go here.
+
+        // TODO - the calculate label positions method should be called here again.
+        // TODO - this is because the instructions may have changed, altering the relative positions of the labels.
+
         self.handle_labelled_instructions(&mut instructions);
 
         &[]
     }
 
     #[inline]
-    fn calculate_label_positions(&mut self, ins: &[Instruction]) {}
+    fn calculate_label_positions(&mut self, instructions: &[Instruction]) {
+        self.label_positions.clear();
+
+        let mut position = 0;
+        for ins in instructions {
+            if let Instruction::Label(l) = ins {
+                self.label_positions
+                    .entry(l.to_string())
+                    .or_insert(position);
+            }
+
+            position += ins.get_total_instruction_size();
+        }
+    }
 
     #[inline]
-    fn load_labels(&mut self, ins: &[Instruction]) {
-        self.local_labels = ins
+    fn load_labels(&mut self, instructions: &[Instruction]) {
+        self.local_labels = instructions
             .iter()
             .filter_map(|i| {
                 if let Instruction::Label(l) = i {
@@ -331,7 +349,7 @@ impl<'a> Compiler<'a> {
     }
 }
 
-impl<'a> Default for Compiler<'a> {
+impl Default for Compiler {
     fn default() -> Self {
         Self::new()
     }
