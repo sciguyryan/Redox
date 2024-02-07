@@ -71,6 +71,11 @@ impl Compiler {
         &[]
     }
 
+    /// Calculate the positions of the local labels within the provided instruction list.
+    ///
+    /// # Arguments
+    ///
+    /// * `instructions` - A slice of [`Instruction`]s that correspond to the instructions to be compiled.
     #[inline]
     fn calculate_label_positions(&mut self, instructions: &[Instruction]) {
         self.label_positions.clear();
@@ -87,6 +92,11 @@ impl Compiler {
         }
     }
 
+    /// Build a list of local labels found within the provided instruction list.
+    ///
+    /// # Arguments
+    ///
+    /// * `instructions` - A slice of [`Instruction`]s that correspond to the instructions to be compiled.
     #[inline]
     fn load_labels(&mut self, instructions: &[Instruction]) {
         self.local_labels = instructions
