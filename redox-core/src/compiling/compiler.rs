@@ -113,18 +113,21 @@ impl Compiler {
 
     #[inline]
     fn handle_labelled_instructions(&mut self, instructions: &mut [Instruction]) {
-        // Now we can check whether the labels are known and available.
         for ins in instructions {
-            let check_label = match ins {
-                Instruction::CallAbsU32Imm(_, label) => Some(label),
-                Instruction::CallRelCSU32Offset(_, label) => Some(label),
-                _ => None,
+            let label = match ins {
+                Instruction::CallAbsU32Imm(_, label) => label,
+                Instruction::CallRelCSU32Offset(_, label) => label,
+                _ => continue,
             };
 
-            if let Some(label) = check_label {
-                if !self.global_labels.contains(label) && !self.local_labels.contains(label) {
-                    panic!("invalid syntax - unknown label - {label}");
-                }
+            // Now we can check whether the labels are known.
+            // If a label is specified that doesn't exist then that is a syntax error.
+            if self.global_labels.contains(label) {
+                todo!();
+            } else if self.local_labels.contains(label) {
+                todo!();
+            } else {
+                panic!("invalid syntax - unknown label - {label}");
             }
         }
     }
