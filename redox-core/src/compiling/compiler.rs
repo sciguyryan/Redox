@@ -68,6 +68,8 @@ impl Compiler {
 
         self.handle_labelled_instructions(&mut instructions);
 
+        println!("{instructions:?}");
+
         &[]
     }
 
@@ -125,7 +127,21 @@ impl Compiler {
             if self.global_labels.contains(label) {
                 todo!();
             } else if self.local_labels.contains(label) {
-                todo!();
+                let label_position = self
+                    .label_positions
+                    .get(label)
+                    .expect("failed to find matching label");
+
+                // TODO - an optimization here might be to use a short call/jump instruction
+                // TODO - if the call address is close enough.
+
+                *ins = match ins {
+                    Instruction::CallAbsU32Imm(_, label) => {
+                        Instruction::CallRelCSU32Offset(*label_position as u32, label.clone())
+                    }
+                    Instruction::CallRelCSU32Offset(_, _) => ins.clone(),
+                    _ => panic!(),
+                }
             } else {
                 panic!("invalid syntax - unknown label - {label}");
             }
