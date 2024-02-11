@@ -139,7 +139,7 @@ impl Compiler {
                     Instruction::CallAbsU32Imm(_, label) => {
                         Instruction::CallRelCSU32Offset(*label_position as u32, label.clone())
                     }
-                    Instruction::CallRelCSU32Offset(_, _) => ins.clone(),
+                    Instruction::CallRelCSU32Offset(_, _) => continue,
                     _ => panic!(),
                 }
             } else {
