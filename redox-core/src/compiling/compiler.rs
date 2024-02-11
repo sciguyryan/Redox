@@ -140,7 +140,7 @@ impl Compiler {
                         Instruction::CallRelCSU32Offset(*label_position as u32, label.clone())
                     }
                     Instruction::CallRelCSU32Offset(_, _) => continue,
-                    _ => panic!(),
+                    _ => unreachable!("unexpected labelled instruction instance - {ins}"),
                 }
             } else {
                 panic!("invalid syntax - unknown label - {label}");
