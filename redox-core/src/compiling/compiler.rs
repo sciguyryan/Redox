@@ -127,10 +127,7 @@ impl Compiler {
             if self.global_labels.contains(label) {
                 todo!();
             } else if self.local_labels.contains(label) {
-                let label_position = self
-                    .label_positions
-                    .get(label)
-                    .expect("failed to find matching label");
+                let label_position = self.label_positions.get(label).unwrap();
 
                 // TODO - an optimization here might be to use a short call/jump instruction
                 // TODO - if the call address is close enough.
