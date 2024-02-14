@@ -12,7 +12,7 @@ homepage = "https://github.com/sciguyryan/Redox"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bitflags.workspace = true
+enumflags2.workspace = true
 float-cmp.workspace = true
 hashbrown.workspace = true
 itertools.workspace = true

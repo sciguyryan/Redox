@@ -1,8 +1,5 @@
-use bitflags::bitflags;
-use std::{
-    cmp::Ordering,
-    fmt::{self, Display},
-};
+use enumflags2::{bitflags, BitFlags};
+use std::cmp::Ordering;
 
 use crate::{
     cpu::CpuFlag, data_access_type::DataAccessType, privilege_level::PrivilegeLevel, utils,
@@ -10,26 +7,20 @@ use crate::{
 
 use super::registers::RegisterId;
 
-bitflags! {
-    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-    pub struct RegisterPermission: u8 {
-        /// None.
-        const N = 0b00000001;
-        /// Public read.
-        const R = 0b00000010;
-        /// Public write.
-        const W = 0b00000100;
-        /// Private read.
-        const PR = 0b00001000;
-        /// Private write.
-        const PW = 0b00010000;
-    }
-}
-
-impl Display for RegisterPermission {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
+#[bitflags]
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RegisterPermission {
+    /// None.
+    N = 0b00000001,
+    /// Public read.
+    R = 0b00000010,
+    /// Public write.
+    W = 0b00000100,
+    /// Private read.
+    PR = 0b00001000,
+    /// Private write.
+    PW = 0b00010000,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -37,13 +28,13 @@ pub struct RegisterU32 {
     /// The [`RegisterId`] of this register.
     pub id: RegisterId,
     /// The permissions of this register.
-    pub permissions: RegisterPermission,
+    pub permissions: BitFlags<RegisterPermission>,
     /// The value of this register.
     value: u32,
 }
 
 impl RegisterU32 {
-    pub fn new(id: RegisterId, permissions: RegisterPermission, value: u32) -> Self {
+    pub fn new(id: RegisterId, permissions: BitFlags<RegisterPermission>, value: u32) -> Self {
         Self {
             id,
             permissions,
@@ -204,8 +195,8 @@ impl RegisterU32 {
 
         // We need to check the read-write permissions on the specific register.
         let has_required_perms = match access_type {
-            DataAccessType::Read => permissions.intersects(RegisterPermission::R),
-            DataAccessType::Write => permissions.intersects(RegisterPermission::W),
+            DataAccessType::Read => permissions.contains(RegisterPermission::R),
+            DataAccessType::Write => permissions.contains(RegisterPermission::W),
         };
 
         if !has_required_perms {
@@ -238,13 +229,13 @@ pub struct RegisterF32 {
     /// The [`RegisterId`] of this register.
     pub id: RegisterId,
     /// The permissions of this register.
-    pub permissions: RegisterPermission,
+    pub permissions: BitFlags<RegisterPermission>,
     /// The value of this register.
     value: f32,
 }
 
 impl RegisterF32 {
-    pub fn new(id: RegisterId, permissions: RegisterPermission, value: f32) -> Self {
+    pub fn new(id: RegisterId, permissions: BitFlags<RegisterPermission>, value: f32) -> Self {
         Self {
             id,
             permissions,
@@ -315,8 +306,8 @@ impl RegisterF32 {
 
         // We need to check the read-write permissions on the specific register.
         let has_required_perms = match access_type {
-            DataAccessType::Read => permissions.intersects(RegisterPermission::R),
-            DataAccessType::Write => permissions.intersects(RegisterPermission::W),
+            DataAccessType::Read => permissions.contains(RegisterPermission::R),
+            DataAccessType::Write => permissions.contains(RegisterPermission::W),
         };
 
         if !has_required_perms {
@@ -365,6 +356,8 @@ mod tests_registers {
         panic,
     };
 
+    use enumflags2::BitFlags;
+
     use crate::{privilege_level::PrivilegeLevel, reg::registers::RegisterId};
 
     use super::{RegisterF32, RegisterPermission, RegisterU32};
@@ -383,7 +376,7 @@ mod tests_registers {
         pub initial_value: T,
         pub write_value: Option<T>,
         pub expected_value: T,
-        pub permissions: RegisterPermission,
+        pub permissions: BitFlags<RegisterPermission>,
         pub privilege: PrivilegeLevel,
         pub should_panic: bool,
         pub fail_message: String,
@@ -396,7 +389,7 @@ mod tests_registers {
             initial_value: T,
             write_value: Option<T>,
             expected_value: T,
-            permissions: &RegisterPermission,
+            permissions: &BitFlags<RegisterPermission>,
             context: PrivilegeLevel,
             should_panic: bool,
             fail_message: &str,
