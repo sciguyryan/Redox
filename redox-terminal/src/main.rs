@@ -66,10 +66,6 @@ fn main() {
         panic!("currently unsupported");
     }
 
-    let test = 1u32;
-    println!("{:?}", test.to_le_bytes());
-    return;
-
     let code = "section .text\r\ncall :LABEL_1\r\n:LABEL_1";
 
     let mut compiler = Compiler::new();
