@@ -3,7 +3,7 @@ use prettytable::{row, Table};
 
 use crate::{
     ins::{instruction::Instruction, op_codes::OpCode},
-    reg::registers::RegisterId,
+    reg::registers::RegisterId, utils,
 };
 
 use super::mapped_memory::MappedMemory;
@@ -12,7 +12,7 @@ use super::mapped_memory::MappedMemory;
 pub const MEGABYTE: usize = 1024 * 1024;
 
 /// The size of an instruction, in bytes.
-pub const SIZE_OF_INSTRUCTION: usize = 4;
+//pub const SIZE_OF_INSTRUCTION: usize = 4;
 /// The size of a u32 value, in bytes.
 pub const SIZE_OF_U32: usize = 4;
 /// The size of a f32 value, in bytes.
@@ -313,8 +313,29 @@ impl MemoryHandler {
         use Instruction as I;
         use OpCode as O;
 
+        let prefetch = self.get_range_clone(pos, 4);
+
+        let mut opcode_size = 1;
+        let mut opcode_bits: [u8; 4] = [0; 4];
+        opcode_bits[3] = prefetch[0];
+
+        if utils::is_bit_set_u8(prefetch[0], 8) {
+            opcode_bits[2] = prefetch[1];
+            opcode_size += 1;
+
+            if utils::is_bit_set_u8(prefetch[1], 8) {
+                opcode_bits[1] = prefetch[2];
+                opcode_size += 1;
+
+                if utils::is_bit_set_u8(prefetch[2], 8) {
+                    opcode_bits[0] = prefetch[3];
+                    opcode_size += 1;
+                }
+            }
+        }
+
         // Read the OpCode ID.
-        let opcode_id = self.get_u32(pos);
+        let opcode_id = u32::from_le_bytes(opcode_bits);
 
         // Validate the opcode is one of the ones we know about.
         // In the case we encounter an unrecognized opcode ID then we will
@@ -326,7 +347,7 @@ impl MemoryHandler {
 
         // We will assert here if we can't read enough bytes to meet the expected amount.
         // This means that subsequent "unsafe" reads are actually safe.
-        let arg_bytes = self.get_range_ptr(pos + SIZE_OF_INSTRUCTION, arg_len);
+        let arg_bytes = self.get_range_ptr(pos + opcode_size, arg_len);
 
         let mut cursor = 0;
 

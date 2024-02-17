@@ -10,31 +10,30 @@ use super::instruction::Instruction;
 )]
 pub enum OpCode {
     /// No Operation - an empty instruction.
-    Nop,
+    Nop = 0b0,
 
-    /******** [Arithmetic Instructions] ********/
     /// Add a u32 immediate to u32 register. The result is stored in the accumulator register.
-    AddU32ImmU32Reg,
+    AddU32ImmU32Reg = 0b0000000010000000,
     /// Add a u32 register to u32 register. The result is stored in the accumulator register.
-    AddU32RegU32Reg,
+    AddU32RegU32Reg = 0b0000000010000001,
     /// Subtract a u32 immediate from a u32 register. The result is stored in the accumulator register.
-    SubU32ImmU32Reg,
+    SubU32ImmU32Reg = 0b0000000010000010,
     /// Subtract a u32 register (A) from a u32 register (B). The result is stored in the accumulator register.
-    SubU32RegU32Reg,
+    SubU32RegU32Reg = 0b0000000010000011,
     /// Unsigned multiplication of the register ER1 by a u32 immediate. The result is stored in the register ER1.
-    MulU32Imm,
+    MulU32Imm = 0b0000000010000100,
     /// Unsigned multiplication of the register ER1 by a u32 register. The result is stored in the register ER1.
-    MulU32Reg,
+    MulU32Reg = 0b0000000010000101,
     /// Unsigned division of the register ER1 by a u32 immediate. The quotient is stored in the register ER1 and the modulo is stored in ER4.
-    DivU32Imm,
+    DivU32Imm = 0b0000000010000110,
     /// Unsigned division of the register ER1 by a u32 register. The quotient is stored in the register ER1 and the modulo is stored in ER4.
-    DivU32Reg,
+    DivU32Reg = 0b0000000010000111,
     /// Increment a u32 register.
-    IncU32Reg,
+    IncU32Reg = 0b0000000010001000,
     /// Decrement a u32 register.
-    DecU32Reg,
+    DecU32Reg = 0b0000000010001001,
     /// Perform a logical AND operation on a u32 immediate and a u32 register. The resulting value is stored in the register.
-    AndU32ImmU32Reg,
+    AndU32ImmU32Reg = 0b0000000010001010,
 
     /******** [Bit Operation Instructions] ********/
     /// Left-shift a u32 register by a u8 immediate. The result remains in the origin register.
