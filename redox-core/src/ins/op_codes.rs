@@ -3,37 +3,52 @@ use strum_macros::EnumIter;
 
 use super::instruction::Instruction;
 
+// TODO - these will need to be manually assigned once all of the instructions are assigned.
+
 /// The opcode for an instruction.
 #[repr(u32)]
 #[derive(
     Clone, Copy, Debug, Default, Eq, PartialOrd, Ord, PartialEq, Hash, FromPrimitive, EnumIter,
 )]
 pub enum OpCode {
+    // 1 BYTE OPCODES
     /// No Operation - an empty instruction.
     Nop = 0b0,
+    /// Push a f32 immediate value onto the stack.
+    PushF32Imm,
+    /// Push a u32 immediate value onto the stack.
+    PushU32Imm,
+    /// Push the value of a u32 register onto the stack.
+    PushU32Reg,
+    /// Pop a f32 value from the stack to a f32 register.
+    PopF32ToF32Reg,
+    /// Pop a u32 value from the stack to a u32 register.
+    PopU32ToU32Reg,
 
+    // 2 BYTE OPCODES
     /// Add a u32 immediate to u32 register. The result is stored in the accumulator register.
-    AddU32ImmU32Reg = 0b0000000010000000,
+    AddU32ImmU32Reg = 0b000000000010000000,
     /// Add a u32 register to u32 register. The result is stored in the accumulator register.
-    AddU32RegU32Reg = 0b0000000010000001,
+    AddU32RegU32Reg,
     /// Subtract a u32 immediate from a u32 register. The result is stored in the accumulator register.
-    SubU32ImmU32Reg = 0b0000000010000010,
+    SubU32ImmU32Reg,
     /// Subtract a u32 register (A) from a u32 register (B). The result is stored in the accumulator register.
-    SubU32RegU32Reg = 0b0000000010000011,
+    SubU32RegU32Reg,
     /// Unsigned multiplication of the register ER1 by a u32 immediate. The result is stored in the register ER1.
-    MulU32Imm = 0b0000000010000100,
-    /// Unsigned multiplication of the register ER1 by a u32 register. The result is stored in the register ER1.
-    MulU32Reg = 0b0000000010000101,
+    MulU32Imm,
+    /// Unsigned  of the register ER1 by a u32 register. The result is stored in the register ER1.
+    MulU32Reg,
     /// Unsigned division of the register ER1 by a u32 immediate. The quotient is stored in the register ER1 and the modulo is stored in ER4.
-    DivU32Imm = 0b0000000010000110,
+    DivU32Imm,
     /// Unsigned division of the register ER1 by a u32 register. The quotient is stored in the register ER1 and the modulo is stored in ER4.
-    DivU32Reg = 0b0000000010000111,
+    DivU32Reg,
     /// Increment a u32 register.
-    IncU32Reg = 0b0000000010001000,
+    IncU32Reg,
     /// Decrement a u32 register.
-    DecU32Reg = 0b0000000010001001,
+    DecU32Reg,
+
     /// Perform a logical AND operation on a u32 immediate and a u32 register. The resulting value is stored in the register.
-    AndU32ImmU32Reg = 0b0000000010001010,
+    AndU32ImmU32Reg,
 
     /******** [Bit Operation Instructions] ********/
     /// Left-shift a u32 register by a u8 immediate. The result remains in the origin register.
@@ -104,16 +119,6 @@ pub enum OpCode {
     ///
     /// The carry and zero flags may be set depending on the result and the overflow flag will always be cleared.
     ZeroHighBitsByIndexU32RegU32Imm,
-    /// Push a f32 immediate value onto the stack.
-    PushF32Imm,
-    /// Push a u32 immediate value onto the stack.
-    PushU32Imm,
-    /// Push the value of a u32 register onto the stack.
-    PushU32Reg,
-    /// Pop a f32 value from the stack to a f32 register.
-    PopF32ToF32Reg,
-    /// Pop a u32 value from the stack to a u32 register.
-    PopU32ToU32Reg,
 
     /******** [IO Instructions] ********/
     /// Output a f32 immediate value to a specific port.

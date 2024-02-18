@@ -3,12 +3,10 @@ use std::fmt::{self, Display, Formatter};
 #[cfg(test)]
 use strum_macros::EnumIter;
 
-use crate::{ins::expression::Expression, reg::registers::RegisterId};
+use crate::{ins::expression::Expression, reg::registers::RegisterId, utils};
 
 use super::op_codes::OpCode;
 
-/// The size of the instruction, in bytes.
-const INSTRUCTION_SIZE: usize = 4;
 /// The size of a f32 argument, in bytes.
 const ARG_F32_IMM_SIZE: usize = 4;
 /// The size of a u32 argument, in bytes.
@@ -607,8 +605,24 @@ impl Instruction {
         // TODO - this is a placeholder setup until I implement the incremental extending instruction system.
         let instruction_size = match self {
             Instruction::Label(_) => 0,
-            _ => INSTRUCTION_SIZE,
+            _ => {
+                let mut opcode_size = 1;
+                let op: OpCode = self.into();
+                let op_id = op as u32;
+
+                if utils::is_bit_set(op_id, 7) {
+                    opcode_size += 1;
+                    if utils::is_bit_set(op_id, 15) {
+                        opcode_size += 1;
+                        if utils::is_bit_set(op_id, 23) {
+                            opcode_size += 1;
+                        }
+                    }
+                }
+                opcode_size
+            },
         };
+
         instruction_size + self.get_instruction_arg_size()
     }
 }

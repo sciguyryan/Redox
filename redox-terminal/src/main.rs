@@ -66,21 +66,22 @@ fn main() {
         panic!("currently unsupported");
     }
 
-    let code = "section .text\r\ncall :LABEL_1\r\n:LABEL_1";
+    /*let code = "section .text\r\ncall :LABEL_1\r\n:LABEL_1";
 
     let mut compiler = Compiler::new();
     let bytes = compiler.compile_assembly(code);
-    return;
+    return;*/
 
     let instructions = &[
-        // Indicate that we want to make a seeded random number generator.
+        Instruction::AddU32RegU32Reg(RegisterId::EAX, RegisterId::EAX)
+        /*// Indicate that we want to make a seeded random number generator.
         Instruction::OutU8Imm(0x1, 0x0),
         // Specify our seed.
         Instruction::OutU32Imm(0xdeadbeef, 0x0),
         // Read a PRNG from the device.
         Instruction::InU32Reg(0x0, RegisterId::EAX),
         Instruction::PushU32Imm(0xdeadbeef),
-        Instruction::Halt,
+        Instruction::Halt,*/
     ];
 
     let mut compiler = Compiler::new();

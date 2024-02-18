@@ -3,7 +3,7 @@ use hashbrown::HashMap;
 use crate::{
     ins::{instruction::Instruction, op_codes::OpCode},
     parsing::asm_parser::AsmParser,
-    reg::registers::RegisterId,
+    reg::registers::RegisterId, utils,
 };
 
 pub struct Compiler {
@@ -335,7 +335,29 @@ impl Compiler {
     ///
     /// * `opcode` - The [`OpCode`] to be written.
     fn write_opcode(&mut self, opcode: OpCode) {
-        self.write_u32(opcode as u32);
+        let op = opcode as u32;
+        let bits = op.to_le_bytes();
+
+        if utils::is_bit_set(op, 23) {
+            // 4 byte opcodes
+            self.write_u8(bits[0]);
+            self.write_u8(bits[1]);
+            self.write_u8(bits[2]);
+            self.write_u8(bits[3]);
+        } else if utils::is_bit_set(op, 15) {
+            // 3 byte opcodes
+            self.write_u8(bits[0]);
+            self.write_u8(bits[1]);
+            self.write_u8(bits[2]);
+        } else if utils::is_bit_set(op, 7) {
+            // 2 byte opcodes
+            println!("compiler.rs - write_opcode - {bits:?}");
+            self.write_u8(bits[0]);
+            self.write_u8(bits[1]);
+        } else {
+            // 1 byte opcodes
+            self.write_u8(bits[0]);
+        }
     }
 
     /// Write a register ID into the byte sequence.
