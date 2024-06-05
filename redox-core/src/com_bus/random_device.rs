@@ -9,7 +9,7 @@ use super::{
 
 thread_local! {
     static PRNG: RefCell<Xoshiro256Plus> = RefCell::new(Xoshiro256Plus::from_entropy());
-    static CRNG: RefCell<OsRng> = RefCell::new(OsRng);
+    static CRNG: RefCell<OsRng> = const { RefCell::new(OsRng) };
 }
 
 #[derive(PartialEq, Eq)]
