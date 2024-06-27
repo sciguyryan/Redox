@@ -66,11 +66,12 @@ fn main() {
         panic!("currently unsupported");
     }
 
-    let code = "section .text\r\ncall :LABEL_1\r\n:LABEL_1";
+    let code = "section .text\r\npush 0\r\ncall :LABEL_1\r\nhlt\r\n:LABEL_1\r\nmov 0xdeadbeef, EAX\r\niret";
 
     let mut compiler = Compiler::new();
-    let bytes = compiler.compile_assembly(code);
-    return;
+    let data = compiler.compile_assembly(code);
+
+    println!("{data:?}");
 
     let instructions = &[
         // Indicate that we want to make a seeded random number generator.
@@ -83,8 +84,8 @@ fn main() {
         Instruction::Halt,
     ];
 
-    let mut compiler = Compiler::new();
-    let data = compiler.compile(instructions);
+    /*let mut compiler = Compiler::new();
+    let data = compiler.compile(instructions);*/
 
     let mut vm = VirtualMachine::new(
         vm::MIN_USER_SEGMENT_SIZE,

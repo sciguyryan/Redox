@@ -70,7 +70,9 @@ impl Compiler {
 
         println!("{instructions:?}");
 
-        &[]
+        self.compile(&instructions);
+
+        &self.bytes
     }
 
     /// Calculate the positions of the local labels within the provided instruction list.
@@ -156,6 +158,16 @@ impl Compiler {
     /// A vector of u8 bytes containing the compiled data in byte form.
     fn compile_instruction(&mut self, instruction: &Instruction) {
         use Instruction as I;
+
+        // We don't need to do anything with labels.
+        if matches!(instruction, I::Label(_)) {
+            return;
+        }
+
+        // This pseudo-instruction shouldn't be constructed and exists to preserve the provided opcode when debugging.
+        if let I::Unknown(imm) = instruction {
+            unreachable!("invalid opcode id {imm}");
+        };
 
         // First, we push the bytes for the opcode.
         self.write_opcode(OpCode::from(instruction));
@@ -317,15 +329,8 @@ impl Compiler {
             /******** [No Arguments] ********/
             I::Nop | I::IntRet | I::RetArgsU32 | I::MachineReturn | I::Halt => {}
 
-            /* This pseudo-instruction shouldn't be constructed and exists as a compiler hint. */
-            I::Label(_) => {
-                unreachable!();
-            }
-
-            /* This pseudo-instruction shouldn't be constructed and exists to preserve the provided opcode when debugging. */
-            I::Unknown(imm) => {
-                unreachable!("invalid opcode id {imm}");
-            }
+            /* These are specifically handled above. */
+            I::Label(_) | I::Unknown(_) => {}
         }
     }
 
