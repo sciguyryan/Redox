@@ -830,7 +830,6 @@ impl Cpu {
     pub fn run(&mut self, com_bus: &mut CommunicationBus) {
         while !self.is_halted {
             let ins = self.fetch_decode_next_instruction(com_bus);
-            eprintln!("ins = {ins}");
             self.run_instruction(com_bus, &ins);
         }
     }

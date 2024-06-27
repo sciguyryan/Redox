@@ -1,7 +1,7 @@
 #![crate_name = "redox_terminal"]
 
 use redox_core::{
-    compiling::compiler::Compiler,
+    compiling::{compiler::Compiler, decompiler::Decompiler},
     ins::instruction::Instruction,
     mem,
     reg::registers::RegisterId,
@@ -73,7 +73,7 @@ fn main() {
 
     println!("{data:?}");
 
-    let instructions = &[
+    /*let instructions = &[
         // Indicate that we want to make a seeded random number generator.
         Instruction::OutU8Imm(0x1, 0x0),
         // Specify our seed.
@@ -84,7 +84,7 @@ fn main() {
         Instruction::Halt,
     ];
 
-    /*let mut compiler = Compiler::new();
+    let mut compiler = Compiler::new();
     let data = compiler.compile(instructions);*/
 
     let mut vm = VirtualMachine::new(
@@ -95,7 +95,7 @@ fn main() {
     );
 
     println!("----------[Instructions]----------");
-    for ins in instructions {
+    for ins in Decompiler::decompile(data) {
         println!("{ins}");
     }
     println!();
