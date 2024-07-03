@@ -1029,10 +1029,10 @@ impl Cpu {
             }
             I::JumpAbsU32Reg(reg) => {
                 // jmp cs
-                let shift_by = self.registers.read_reg_u32(reg, privilege);
+                let addr = self.registers.read_reg_u32(reg, privilege);
 
                 // Set the instruction pointer to the jump address.
-                self.set_instruction_pointer(shift_by);
+                self.set_instruction_pointer(addr);
             }
 
             /******** [Data Instructions] ********/
@@ -2162,16 +2162,16 @@ mod tests_cpu {
 
         let instructions = &[
             // Write the handler address into the IVT.
-            Instruction::MovU32ImmMemSimple(base_offset + 44, 255 * 4), // Starts at [base]. Length = 12.
+            Instruction::MovU32ImmMemSimple(base_offset + 33, 255 * 4), // Starts at [base]. Length = 10.
             // Mask every interrupt.
-            Instruction::MovU32ImmU32Reg(0, RegisterId::EIM), // Starts at [base + 12]. Length = 9.
+            Instruction::MovU32ImmU32Reg(0, RegisterId::EIM), // Starts at [base + 10]. Length = 7.
             // And now unmask the specific interrupt we want to enable.
-            Instruction::UnmaskInterrupt(0xff), // Starts at [base + 21]. Length = 5.
-            Instruction::Int(0xff),             // Starts at [base + 26]. Length = 5.
-            Instruction::AddU32ImmU32Reg(0x5, RegisterId::EAX), // Starts at [base + 31]. Length = 9.
-            Instruction::Halt, // Starts at [base + 40]. Length = 4.
+            Instruction::UnmaskInterrupt(0xff), // Starts at [base + 17]. Length = 4.
+            Instruction::Int(0xff),             // Starts at [base + 21]. Length = 3.
+            Instruction::AddU32ImmU32Reg(0x5, RegisterId::EAX), // Starts at [base + 24]. Length = 7.
+            Instruction::Halt, // Starts at [base + 31]. Length = 2.
             /***** INT_FF - Interrupt handler for interrupt 0xff starts here. *****/
-            Instruction::MovU32ImmU32Reg(0x64, RegisterId::EAX), // Starts at [base + 44]. Length = 9.
+            Instruction::MovU32ImmU32Reg(0x64, RegisterId::EAX), // Starts at [base + 33].
             Instruction::IntRet,
         ];
 
@@ -2261,14 +2261,14 @@ mod tests_cpu {
     #[test]
     fn test_call_return_from_cs_with_offset() {
         let instructions = &[
-            Instruction::PushU32Imm(3), // Starts at [ECS]. Length = 8. This should remain in place.
-            Instruction::PushU32Imm(2), // Starts at [ECS + 8]. Length = 8. Subroutine argument 1.
-            Instruction::PushU32Imm(1), // Starts at [ECS + 16]. Length = 8. The number of arguments.
-            Instruction::CallRelCSU32Offset(45, String::default()), // Starts at [ECS + 24]. Length = 8.
-            Instruction::AddU32ImmU32Reg(100, RegisterId::EAX), // Starts at [ECS + 32]. Length = 9.
-            Instruction::Halt,                                  // Starts at [ECS + 41]. Length = 4.
+            Instruction::PushU32Imm(3), // Starts at [ECS]. Length = 5. This should remain in place.
+            Instruction::PushU32Imm(2), // Starts at [ECS + 5]. Length = 5. Subroutine argument 1.
+            Instruction::PushU32Imm(1), // Starts at [ECS + 10]. Length = 5. The number of arguments.
+            Instruction::CallRelCSU32Offset(30, String::default()), // Starts at [ECS + 15]. Length = 6.
+            Instruction::AddU32ImmU32Reg(100, RegisterId::EAX), // Starts at [ECS + 21]. Length = 7.
+            Instruction::Halt,                                  // Starts at [ECS + 28]. Length = 2.
             /***** FUNC_AAAA - Subroutine starts here. *****/
-            Instruction::PushU32Imm(5), // Starts at [ECS + 45].
+            Instruction::PushU32Imm(5), // Starts at [ECS + 30].
             Instruction::PopU32ToU32Reg(RegisterId::EAX),
             Instruction::RetArgsU32,
         ];
@@ -2308,14 +2308,14 @@ mod tests_cpu {
     #[test]
     fn test_call_return_with_offset_reg() {
         let instructions = &[
-            Instruction::PushU32Imm(3), // Starts at [ECS]. Length = 8. This should remain in place.
-            Instruction::PushU32Imm(2), // Starts at [ECS + 8]. Length = 8. Subroutine argument 1.
-            Instruction::PushU32Imm(1), // Starts at [ECS + 16]. Length = 8. The number of arguments.
-            Instruction::CallRelU32RegU32Offset(46, RegisterId::ECS), // Starts at [ECS + 24]. Length = 9.
-            Instruction::AddU32ImmU32Reg(100, RegisterId::EAX), // Starts at [ECS + 33]. Length = 9.
-            Instruction::Halt,                                  // Starts at [ECS + 42]. Length = 4.
+            Instruction::PushU32Imm(3), // Starts at [ECS]. Length = 5. This should remain in place.
+            Instruction::PushU32Imm(2), // Starts at [ECS + 5]. Length = 5. Subroutine argument 1.
+            Instruction::PushU32Imm(1), // Starts at [ECS + 10]. Length = 5. The number of arguments.
+            Instruction::CallRelU32RegU32Offset(31, RegisterId::ECS), // Starts at [ECS + 15]. Length = 7.
+            Instruction::AddU32ImmU32Reg(100, RegisterId::EAX), // Starts at [ECS + 22]. Length = 7.
+            Instruction::Halt,                                  // Starts at [ECS + 29]. Length = 2.
             /***** FUNC_AAAA - Subroutine starts here. *****/
-            Instruction::PushU32Imm(5), // Starts at [ECS + 46].
+            Instruction::PushU32Imm(5), // Starts at [ECS + 31].
             Instruction::PopU32ToU32Reg(RegisterId::EAX),
             Instruction::RetArgsU32,
         ];
@@ -2357,17 +2357,17 @@ mod tests_cpu {
         let base_offset = vm::MIN_USER_SEGMENT_SIZE as u32;
 
         let instructions = &[
-            Instruction::MovU32ImmU32Reg(base_offset + 51, RegisterId::E8X), // Starts at [base]. Length = 9. This should remain in place.
-            Instruction::PushU32Imm(3), // Starts at [base + 9]. Length = 8. This should remain in place.
-            Instruction::PushU32Imm(2), // Starts at [base + 17]. Length = 8. Subroutine argument 1.
-            Instruction::PushU32Imm(1), // Starts at [base + 25]. Length = 8. The number of arguments.
-            Instruction::CallAbsU32Reg(RegisterId::E8X), // Starts at [base + 33]. Length = 5.
-            Instruction::AddU32ImmU32Reg(100, RegisterId::EAX), // Starts at [base + 38]. Length = 9.
-            Instruction::Halt, // Starts at [base + 47]. Length = 4.
+            Instruction::MovU32ImmU32Reg(base_offset + 34, RegisterId::E8X), // Starts at [base]. Length = 7. This should remain in place.
+            Instruction::PushU32Imm(3), // Starts at [base + 7]. Length = 5. This should remain in place.
+            Instruction::PushU32Imm(2), // Starts at [base + 12]. Length = 5. Subroutine argument 1.
+            Instruction::PushU32Imm(1), // Starts at [base + 17]. Length = 5. The number of arguments.
+            Instruction::CallAbsU32Reg(RegisterId::E8X), // Starts at [base + 22]. Length = 3.
+            Instruction::AddU32ImmU32Reg(100, RegisterId::EAX), // Starts at [base + 25]. Length = 7.
+            Instruction::Halt, // Starts at [base + 32]. Length = 2.
             /***** FUNC_AAAA - Subroutine starts here. *****/
-            Instruction::PushU32Imm(5), // Starts at [base + 51]. Length = 8.
-            Instruction::PopU32ToU32Reg(RegisterId::EAX), // Starts at [base + 59]. Length = 5.
-            Instruction::RetArgsU32,    // Starts at [base + 64]. Length = 4.
+            Instruction::PushU32Imm(5), // Starts at [base + 34]. Length = 5.
+            Instruction::PopU32ToU32Reg(RegisterId::EAX), // Starts at [base + 39]. Length = 2.
+            Instruction::RetArgsU32,    // Starts at [base + 41]. Length = 2.
         ];
 
         let tests = [TestU32::new(
@@ -2420,19 +2420,19 @@ mod tests_cpu {
         ];
 
         let instructions = &[
-            Instruction::MovU32ImmU32Reg(test_registers[0].1, test_registers[0].0), // Starts at [base]. Length = 9.
-            Instruction::MovU32ImmU32Reg(test_registers[1].1, test_registers[1].0), // Starts at [base + 9]. Length = 9.
-            Instruction::MovU32ImmU32Reg(test_registers[2].1, test_registers[2].0), // Starts at [base + 18]. Length = 9.
-            Instruction::MovU32ImmU32Reg(test_registers[3].1, test_registers[3].0), // Starts at [base + 27]. Length = 9.
-            Instruction::MovU32ImmU32Reg(test_registers[4].1, test_registers[4].0), // Starts at [base + 36]. Length = 9.
-            Instruction::MovU32ImmU32Reg(test_registers[5].1, test_registers[5].0), // Starts at [base + 45]. Length = 9.
-            Instruction::MovU32ImmU32Reg(test_registers[6].1, test_registers[6].0), // Starts at [base + 54]. Length = 9.
+            Instruction::MovU32ImmU32Reg(test_registers[0].1, test_registers[0].0), // Starts at [base]. Length = 7.
+            Instruction::MovU32ImmU32Reg(test_registers[1].1, test_registers[1].0), // Starts at [base + 7]. Length = 7.
+            Instruction::MovU32ImmU32Reg(test_registers[2].1, test_registers[2].0), // Starts at [base + 14]. Length = 7.
+            Instruction::MovU32ImmU32Reg(test_registers[3].1, test_registers[3].0), // Starts at [base + 21]. Length = 7.
+            Instruction::MovU32ImmU32Reg(test_registers[4].1, test_registers[4].0), // Starts at [base + 28]. Length = 7.
+            Instruction::MovU32ImmU32Reg(test_registers[5].1, test_registers[5].0), // Starts at [base + 35]. Length = 7.
+            Instruction::MovU32ImmU32Reg(test_registers[6].1, test_registers[6].0), // Starts at [base + 42]. Length = 7.
             // The number of arguments for the subroutine.
-            Instruction::PushU32Imm(0), // Starts at [base + 63]. Length = 8. The number of arguments.
-            Instruction::CallAbsU32Imm(base_offset + 83, String::default()), // Starts at [base + 71]. Length = 8.
-            Instruction::Halt, // Starts at [base + 79]. Length = 4.
+            Instruction::PushU32Imm(0), // Starts at [base + 49]. Length = 5. The number of arguments.
+            Instruction::CallAbsU32Imm(base_offset + 62, String::default()), // Starts at [base + 54]. Length = 6.
+            Instruction::Halt, // Starts at [base + 60]. Length = 2.
             /***** FUNC_AAAA - Subroutine starts here. *****/
-            Instruction::MovU32ImmU32Reg(0, RegisterId::EBX), // Starts at [base + 83].
+            Instruction::MovU32ImmU32Reg(0, RegisterId::EBX), // Starts at [base + 62].
             Instruction::MovU32ImmU32Reg(0, RegisterId::ECX),
             Instruction::MovU32ImmU32Reg(0, RegisterId::EDX),
             Instruction::MovU32ImmU32Reg(0, RegisterId::E5X),
@@ -2471,18 +2471,18 @@ mod tests_cpu {
         let base_offset = vm::MIN_USER_SEGMENT_SIZE as u32;
 
         let instructions = &[
-            Instruction::PushU32Imm(3), // Starts at [base]. Length = 8. This should remain in place.
-            Instruction::PushU32Imm(2), // Starts at [base + 8]. Length = 8. Subroutine argument 1.
-            Instruction::PushU32Imm(1), // Starts at [base + 16]. Length = 8. The number of arguments.
-            Instruction::CallAbsU32Imm(base_offset + 36, String::default()), // Starts at [base + 24]. Length = 8.
-            Instruction::Halt, // Starts at [base + 32]. Length = 4.
+            Instruction::PushU32Imm(3), // Starts at [base]. Length = 5. This should remain in place.
+            Instruction::PushU32Imm(2), // Starts at [base + 5]. Length = 5. Subroutine argument 1.
+            Instruction::PushU32Imm(1), // Starts at [base + 10]. Length = 5. The number of arguments.
+            Instruction::CallAbsU32Imm(base_offset + 24, String::default()), // Starts at [base + 15]. Length = 6.
+            Instruction::Halt, // Starts at [base + 21]. Length = 2.
             /***** FUNC_AAAA - Subroutine 1 starts here. *****/
-            Instruction::PushU32Imm(0), // Starts at [base + 36]. Length = 8. The number of arguments.
-            Instruction::CallAbsU32Imm(base_offset + 65, String::default()), // Starts at [base + 44]. Length = 8.
-            Instruction::AddU32ImmU32Reg(5, RegisterId::EAX), // Starts at [base + 52]. Length = 9.
-            Instruction::RetArgsU32,                          // Starts at [base + 61]. Length = 4.
+            Instruction::PushU32Imm(0), // Starts at [base + 23]. Length = 5. The number of arguments.
+            Instruction::CallAbsU32Imm(base_offset + 43, String::default()), // Starts at [base + 28]. Length = 6.
+            Instruction::AddU32ImmU32Reg(5, RegisterId::EAX), // Starts at [base + 34]. Length = 7.
+            Instruction::RetArgsU32,                          // Starts at [base + 41]. Length = 2.
             /***** FUNC_BBBB - Subroutine 2 starts here. *****/
-            Instruction::PushU32Imm(100), // Starts at [base + 65]. Length = 8. This should NOT be preserved.
+            Instruction::PushU32Imm(100), // Starts at [base + 43]. Length = 5. This should NOT be preserved.
             Instruction::PopU32ToU32Reg(RegisterId::EAX),
             Instruction::RetArgsU32,
         ];
@@ -6178,7 +6178,7 @@ mod tests_cpu {
                     // start of the second move instruction.
                     //
                     // We expect that the first move instruction will be skipped entirely.
-                    JumpAbsU32Imm(base_offset + 17),
+                    JumpAbsU32Imm(base_offset + 13),
                     // This instruction should be skipped, so R1 should remain at the default value of 0.
                     MovU32ImmU32Reg(0xf, RegisterId::E5X),
                     // The jump should start execution here.
@@ -6210,20 +6210,20 @@ mod tests_cpu {
                     // The address is calculated as follows:
                     // Move the value of the code segment register into R8.
                     //
-                    // The instruction 2 is _9 bytes_ in length
-                    //      (4 for the instruction, 4 for the u32 immediate argument and 1 for the register ID argument).
-                    // The instruction 3 is _6 bytes_ in length
-                    //      (4 for the instruction, 1 for the register ID argument, 1 for the register ID argument).
-                    // The instruction 4 is _5 bytes_ in length
-                    //      (4 for the instruction and 1 for the register ID argument).
-                    // The instruction 5 is _9 bytes_ in length
-                    //      (4 for the instruction, 4 for the u32 argument and 1 for the register ID argument).
+                    // The instruction 2 is _7 bytes_ in length
+                    //      (2 for the instruction, 4 for the u32 immediate argument and 1 for the register ID argument).
+                    // The instruction 3 is _4 bytes_ in length
+                    //      (2 for the instruction, 1 for the register ID argument, 1 for the register ID argument).
+                    // The instruction 4 is _3 bytes_ in length
+                    //      (2 for the instruction and 1 for the register ID argument).
+                    // The instruction 5 is _7 bytes_ in length
+                    //      (2 for the instruction, 4 for the u32 argument and 1 for the register ID argument).
                     //
-                    // This means that we need to add 29 to the value of the CS register to point
+                    // This means that we need to add 21 to the value of the CS register to point
                     // to the start of the second move instruction.
                     //
                     // We expect that the first move instruction will be skipped entirely.
-                    MovU32ImmU32Reg(29, RegisterId::E5X),
+                    MovU32ImmU32Reg(21, RegisterId::E5X),
                     AddU32RegU32Reg(RegisterId::ECS, RegisterId::E5X),
                     JumpAbsU32Reg(RegisterId::E5X),
                     // This instruction should be skipped, so R1 should remain at the default value of 0.

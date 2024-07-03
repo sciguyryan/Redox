@@ -33,7 +33,7 @@ impl MappedMemory {
     /// * `end` - The ending memory location.
     #[inline(always)]
     pub fn assert_within_bounds(&self, end: usize) {
-        assert!(end <= self.len());
+        assert!(end <= self.end);
     }
 
     /// Check whether a range can completely exist within this memory segment.

@@ -3,12 +3,10 @@ use std::fmt::{self, Display, Formatter};
 #[cfg(test)]
 use strum_macros::EnumIter;
 
-use crate::{ins::expression::Expression, reg::registers::RegisterId};
+use crate::{ins::expression::Expression, reg::registers::RegisterId, utils};
 
 use super::op_codes::OpCode;
 
-/// The size of the instruction, in bytes.
-const INSTRUCTION_SIZE: usize = 4;
 /// The size of a f32 argument, in bytes.
 const ARG_F32_IMM_SIZE: usize = 4;
 /// The size of a u32 argument, in bytes.
@@ -25,6 +23,16 @@ const ARG_REG_ID_SIZE: usize = 1;
 pub enum Instruction {
     /// No operation.
     Nop,
+    /// Push a f32 immediate value onto the stack.
+    PushF32Imm(f32),
+    /// Push a u32 immediate value onto the stack.
+    PushU32Imm(u32),
+    /// Push the value of a u32 register onto the stack.
+    PushU32Reg(RegisterId),
+    /// Pop a f32 value from the stack to a f32 register.
+    PopF32ToF32Reg(RegisterId),
+    /// Pop a u32 value from the stack to a u32 register.
+    PopU32ToU32Reg(RegisterId),
 
     /******** [Arithmetic Instructions] ********/
     /// Add a u32 immediate to u32 register. The result is stored in the accumulator register.
@@ -115,16 +123,6 @@ pub enum Instruction {
     ZeroHighBitsByIndexU32Reg(RegisterId, RegisterId, RegisterId),
     /// Zero the high bits of the source value starting from a specified index.
     ZeroHighBitsByIndexU32RegU32Imm(u32, RegisterId, RegisterId),
-    /// Push a f32 immediate value onto the stack.
-    PushF32Imm(f32),
-    /// Push a u32 immediate value onto the stack.
-    PushU32Imm(u32),
-    /// Push the value of a u32 register onto the stack.
-    PushU32Reg(RegisterId),
-    /// Pop a f32 value from the stack to a f32 register.
-    PopF32ToF32Reg(RegisterId),
-    /// Pop a u32 value from the stack to a u32 register.
-    PopU32ToU32Reg(RegisterId),
 
     /******** [IO Instructions] ********/
     /// Output a f32 immediate value to a specific port.
@@ -604,10 +602,23 @@ impl Instruction {
     /// A usize giving the total size of the [`Instruction`], in bytes.
     #[inline(always)]
     pub fn get_total_instruction_size(&self) -> usize {
-        // TODO - this is a placeholder setup until I implement the incremental extending instruction system.
+        let mut opcode_size = 1;
+        let op_id = (Into::<OpCode>::into(self)) as u32;
+
         let instruction_size = match self {
             Instruction::Label(_) => 0,
-            _ => INSTRUCTION_SIZE,
+            _ => {
+                if utils::is_bit_set(op_id, 7) {
+                    opcode_size += 1;
+                    if utils::is_bit_set(op_id, 15) {
+                        opcode_size += 1;
+                        if utils::is_bit_set(op_id, 23) {
+                            opcode_size += 1;
+                        }
+                    }
+                }
+                opcode_size
+            }
         };
         instruction_size + self.get_instruction_arg_size()
     }

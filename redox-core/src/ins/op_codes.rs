@@ -9,31 +9,43 @@ use super::instruction::Instruction;
     Clone, Copy, Debug, Default, Eq, PartialOrd, Ord, PartialEq, Hash, FromPrimitive, EnumIter,
 )]
 pub enum OpCode {
+    /* 1 BYTE INSTRUCTIONS - reserved for very common instructions. */
     /// No Operation - an empty instruction.
-    Nop = 0b0,
+    Nop = 0b0000_0000_0000_0000,
+    /// Push a f32 immediate value onto the stack.
+    PushF32Imm = 0b0000_0000_0000_0001,
+    /// Push a u32 immediate value onto the stack.
+    PushU32Imm = 0b0000_0000_0000_0010,
+    /// Push the value of a u32 register onto the stack.
+    PushU32Reg = 0b0000_0000_0000_0011,
+    /// Pop a f32 value from the stack to a f32 register.
+    PopF32ToF32Reg = 0b0000_0000_0000_0100,
+    /// Pop a u32 value from the stack to a u32 register.
+    PopU32ToU32Reg = 0b0000_0000_0000_0101,
 
+    /* 2 BYTE INSTRUCTIONS - reserved for common instructions. */
     /// Add a u32 immediate to u32 register. The result is stored in the accumulator register.
-    AddU32ImmU32Reg = 0b0000000010000000,
+    AddU32ImmU32Reg = 0b0000_0000_1000_0000,
     /// Add a u32 register to u32 register. The result is stored in the accumulator register.
-    AddU32RegU32Reg = 0b0000000010000001,
+    AddU32RegU32Reg = 0b0000_0000_1000_0001,
     /// Subtract a u32 immediate from a u32 register. The result is stored in the accumulator register.
-    SubU32ImmU32Reg = 0b0000000010000010,
+    SubU32ImmU32Reg = 0b0000_0000_1000_0010,
     /// Subtract a u32 register (A) from a u32 register (B). The result is stored in the accumulator register.
-    SubU32RegU32Reg = 0b0000000010000011,
+    SubU32RegU32Reg = 0b0000_0000_1000_0011,
     /// Unsigned multiplication of the register ER1 by a u32 immediate. The result is stored in the register ER1.
-    MulU32Imm = 0b0000000010000100,
+    MulU32Imm = 0b0000_0000_1000_0100,
     /// Unsigned multiplication of the register ER1 by a u32 register. The result is stored in the register ER1.
-    MulU32Reg = 0b0000000010000101,
+    MulU32Reg = 0b0000_0000_1000_0101,
     /// Unsigned division of the register ER1 by a u32 immediate. The quotient is stored in the register ER1 and the modulo is stored in ER4.
-    DivU32Imm = 0b0000000010000110,
+    DivU32Imm = 0b0000_0000_1000_0110,
     /// Unsigned division of the register ER1 by a u32 register. The quotient is stored in the register ER1 and the modulo is stored in ER4.
-    DivU32Reg = 0b0000000010000111,
+    DivU32Reg = 0b0000_0000_1000_0111,
     /// Increment a u32 register.
-    IncU32Reg = 0b0000000010001000,
+    IncU32Reg = 0b0000_0000_1000_1000,
     /// Decrement a u32 register.
-    DecU32Reg = 0b0000000010001001,
+    DecU32Reg = 0b0000_0000_1000_1001,
     /// Perform a logical AND operation on a u32 immediate and a u32 register. The resulting value is stored in the register.
-    AndU32ImmU32Reg = 0b0000000010001010,
+    AndU32ImmU32Reg = 0b0000_0000_1000_1010,
 
     /******** [Bit Operation Instructions] ********/
     /// Left-shift a u32 register by a u8 immediate. The result remains in the origin register.
@@ -104,16 +116,6 @@ pub enum OpCode {
     ///
     /// The carry and zero flags may be set depending on the result and the overflow flag will always be cleared.
     ZeroHighBitsByIndexU32RegU32Imm,
-    /// Push a f32 immediate value onto the stack.
-    PushF32Imm,
-    /// Push a u32 immediate value onto the stack.
-    PushU32Imm,
-    /// Push the value of a u32 register onto the stack.
-    PushU32Reg,
-    /// Pop a f32 value from the stack to a f32 register.
-    PopF32ToF32Reg,
-    /// Pop a u32 value from the stack to a u32 register.
-    PopU32ToU32Reg,
 
     /******** [IO Instructions] ********/
     /// Output a f32 immediate value to a specific port.
@@ -183,11 +185,28 @@ pub enum OpCode {
     /// Halt the execution of the virtual machine.
     Halt = 65535,
 
+    /* 3 BYTE INSTRUCTIONS */
+
+
+    /* 4 BYTE INSTRUCTIONS */
+
+
+    /* SPECIAL BYTE INSTRUCTIONS */
     /// A placeholder opcode for labels. These do not directly compile to anything and are for used for computing jumps. This should never be constructed directly.
-    Label = u32::MAX - 1,
+    Label = 0b1111_1111_1111_1111_1111_1111_1111_1110,
     /// A placeholder for instances where the opcode isn't recognized. This should never be constructed directly.
     #[default]
-    Unknown,
+    Unknown = 0b1111_1111_1111_1111_1111_1111_1111_1111,
+}
+
+impl OpCode {
+    /// Returns `true` if the op code is [`SubU32ImmU32Reg`].
+    ///
+    /// [`SubU32ImmU32Reg`]: OpCode::SubU32ImmU32Reg
+    #[must_use]
+    pub fn is_sub_u32_imm_u32_reg(&self) -> bool {
+        matches!(self, Self::SubU32ImmU32Reg)
+    }
 }
 
 impl From<&Instruction> for OpCode {

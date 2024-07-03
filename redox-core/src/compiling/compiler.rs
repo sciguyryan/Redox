@@ -4,6 +4,7 @@ use crate::{
     ins::{instruction::Instruction, op_codes::OpCode},
     parsing::asm_parser::AsmParser,
     reg::registers::RegisterId,
+    utils,
 };
 
 pub struct Compiler {
@@ -47,11 +48,12 @@ impl Compiler {
     /// # Arguments
     ///
     /// * `assembly` - A string slice containing the string to be parsed and compiled.
+    /// * `optimize` - Should optimizations be performed on the assembly during compilation?
     ///
     /// # Returns
     ///
     /// A slice of bytes containing the compiled bytecode.
-    pub fn compile_assembly(&mut self, assembly: &str) -> &[u8] {
+    pub fn compile_assembly(&mut self, assembly: &str, optimize: bool) -> &[u8] {
         let mut parser = AsmParser::new();
         parser.parse(assembly);
 
@@ -61,14 +63,16 @@ impl Compiler {
 
         self.calculate_label_positions(&instructions);
 
-        // TODO - optimizations should ideally go here.
+        if optimize {
+            // TODO - optimizations should ideally go here.
+        }
 
         // TODO - the calculate label positions method should be called here again.
         // TODO - this is because the instructions may have changed, altering the relative positions of the labels.
 
         self.handle_labelled_instructions(&mut instructions);
 
-        println!("{instructions:?}");
+        //println!("{instructions:?}");
 
         self.compile(&instructions);
 
@@ -340,7 +344,28 @@ impl Compiler {
     ///
     /// * `opcode` - The [`OpCode`] to be written.
     fn write_opcode(&mut self, opcode: OpCode) {
-        self.write_u32(opcode as u32);
+        let op = opcode as u32;
+        let bits = op.to_le_bytes();
+
+        if utils::is_bit_set(op, 23) {
+            // 4 byte opcodes
+            self.write_u8(bits[0]);
+            self.write_u8(bits[1]);
+            self.write_u8(bits[2]);
+            self.write_u8(bits[3]);
+        } else if utils::is_bit_set(op, 15) {
+            // 3 byte opcodes
+            self.write_u8(bits[0]);
+            self.write_u8(bits[1]);
+            self.write_u8(bits[2]);
+        } else if utils::is_bit_set(op, 7) {
+            // 2 byte opcodes
+            self.write_u8(bits[0]);
+            self.write_u8(bits[1]);
+        } else {
+            // 1 byte opcodes
+            self.write_u8(bits[0]);
+        }
     }
 
     /// Write a register ID into the byte sequence.

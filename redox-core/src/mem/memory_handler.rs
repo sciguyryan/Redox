@@ -4,6 +4,7 @@ use prettytable::{row, Table};
 use crate::{
     ins::{instruction::Instruction, op_codes::OpCode},
     reg::registers::RegisterId,
+    utils,
 };
 
 use super::mapped_memory::MappedMemory;
@@ -234,7 +235,7 @@ impl MemoryHandler {
     }
 
     /// Completely clear the type hints vector.
-    fn clear_stack_type_hints(&mut self) {
+    pub fn clear_stack_type_hints(&mut self) {
         #[cfg(feature = "stack-type-hints")]
         {
             self.debug_stack_type_hints.clear();
@@ -258,7 +259,6 @@ impl MemoryHandler {
         while cursor < end {
             let ins = self.get_instruction(cursor);
             let size = ins.get_total_instruction_size();
-
             instructions.push(ins);
             cursor += size;
         }
@@ -313,8 +313,27 @@ impl MemoryHandler {
         use Instruction as I;
         use OpCode as O;
 
+        let mut pos = pos;
+        let mut opcode_bytes: [u8; 4] = [self.get_byte_clone(pos), 0, 0, 0];
+        pos += 1;
+
+        if utils::is_bit_set_u8(opcode_bytes[0], 7) {
+            opcode_bytes[1] = self.get_byte_clone(pos);
+            pos += 1;
+
+            if utils::is_bit_set_u8(opcode_bytes[1], 7) {
+                opcode_bytes[2] = self.get_byte_clone(pos);
+                pos += 1;
+
+                if utils::is_bit_set_u8(opcode_bytes[2], 7) {
+                    opcode_bytes[3] = self.get_byte_clone(pos);
+                    pos += 1;
+                }
+            }
+        }
+
         // Read the OpCode ID.
-        let opcode_id = self.get_u32(pos);
+        let opcode_id = u32::from_le_bytes(opcode_bytes);
 
         // Validate the opcode is one of the ones we know about.
         // In the case we encounter an unrecognized opcode ID then we will
@@ -326,7 +345,7 @@ impl MemoryHandler {
 
         // We will assert here if we can't read enough bytes to meet the expected amount.
         // This means that subsequent "unsafe" reads are actually safe.
-        let arg_bytes = self.get_range_ptr(pos + SIZE_OF_INSTRUCTION, arg_len);
+        let arg_bytes = self.get_range_ptr(pos, arg_len);
 
         let mut cursor = 0;
 
@@ -1325,6 +1344,16 @@ impl MemoryHandler {
         self.clear_stack_type_hints();
         self.stack_pointer = self.stack_segment_end;
         self.stack_base_pointer = self.stack_pointer;
+    }
+
+    /// Write a u32 value into memory.
+    ///
+    /// # Arguments
+    ///
+    /// * `pos` - The position of the first byte to be written into memory.
+    /// * `value` - The value to be written into memory.
+    pub fn remove_memory_region_by_name(&mut self, name: &str) {
+        self.mapped_memory.retain(|r| r.name != name);
     }
 
     /// Write a u32 value into memory.
