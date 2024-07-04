@@ -9,21 +9,27 @@ use super::instruction::Instruction;
     Clone, Copy, Debug, Default, Eq, PartialOrd, Ord, PartialEq, Hash, FromPrimitive, EnumIter,
 )]
 pub enum OpCode {
-    /* 1 BYTE INSTRUCTIONS - reserved for very common instructions. */
+    /*
+     * 1 BYTE INSTRUCTIONS - reserved for very common instructions.
+     * 0b0000_0000_0000_0000_0000_0000_0000_0000 to 0b0000_0000_0000_0000_0000_0000_0111_1111
+     */
     /// No Operation - an empty instruction.
-    Nop = 0b0000_0000_0000_0000,
+    Nop = 0b0000_0000,
     /// Push a f32 immediate value onto the stack.
-    PushF32Imm = 0b0000_0000_0000_0001,
+    PushF32Imm = 0b0000_0001,
     /// Push a u32 immediate value onto the stack.
-    PushU32Imm = 0b0000_0000_0000_0010,
+    PushU32Imm = 0b0000_0010,
     /// Push the value of a u32 register onto the stack.
-    PushU32Reg = 0b0000_0000_0000_0011,
+    PushU32Reg = 0b0000_0011,
     /// Pop a f32 value from the stack to a f32 register.
-    PopF32ToF32Reg = 0b0000_0000_0000_0100,
+    PopF32ToF32Reg = 0b0000_0100,
     /// Pop a u32 value from the stack to a u32 register.
-    PopU32ToU32Reg = 0b0000_0000_0000_0101,
+    PopU32ToU32Reg = 0b0000_0101,
 
-    /* 2 BYTE INSTRUCTIONS - reserved for common instructions. */
+    /*
+     * 2 BYTE INSTRUCTIONS - reserved for common instructions.
+     * 0b0000_0000_0000_0000_0000_0000_1000_0000 to 0b0000_0000_0000_0000_0111_1111_1111_1111
+     */
     /// Add a u32 immediate to u32 register. The result is stored in the accumulator register.
     AddU32ImmU32Reg = 0b0000_0000_1000_0000,
     /// Add a u32 register to u32 register. The result is stored in the accumulator register.
@@ -171,27 +177,31 @@ pub enum OpCode {
 
     /******** [Special Instructions] ********/
     /// Mask a specific interrupt.
-    MaskInterrupt,
+    MaskInterrupt = 0b1111_1111_1111_1011,
     /// Unmask a specific interrupt.
-    UnmaskInterrupt,
+    UnmaskInterrupt = 0b1111_1111_1111_1100,
     /// Set the location of the interrupt vector table.
     ///
     /// # Note
     ///
     /// This can only be done in machine mode.
-    LoadIVTAddrU32Imm,
+    LoadIVTAddrU32Imm = 0b1111_1111_1111_1101,
     /// Machine-mode return - downgrade the privilege level of the processor.
-    MachineReturn = 65534,
+    MachineReturn = 0b1111_1111_1111_1110,
     /// Halt the execution of the virtual machine.
-    Halt = 65535,
+    Halt = 0b1111_1111_1111_1111,
 
-    /* 3 BYTE INSTRUCTIONS */
+    /*
+     * 3 BYTE INSTRUCTIONS
+     * 0b0000_0000_0000_0000_1000_0000_1000_0000 to 0b0000_0000_0111_1111_1111_1111_1111_1111
+     */
 
 
-    /* 4 BYTE INSTRUCTIONS */
-
-
-    /* SPECIAL BYTE INSTRUCTIONS */
+    /*
+     * 4 BYTE INSTRUCTIONS
+     * 0b0000_0000_1000_0000_1000_0000_1000_0000 to 0b1111_1111_1111_1111_1111_1111_1111_1111
+     */
+    /******** [Special Pseudo Instructions] ********/
     /// A placeholder opcode for labels. These do not directly compile to anything and are for used for computing jumps. This should never be constructed directly.
     Label = 0b1111_1111_1111_1111_1111_1111_1111_1110,
     /// A placeholder for instances where the opcode isn't recognized. This should never be constructed directly.
