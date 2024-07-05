@@ -65,21 +65,19 @@ fn main() {
     if cfg!(target_endian = "big") {
         panic!("currently unsupported");
     }
+
     let code = "section .text\r\npush 0\r\ncall :LABEL_1\r\nhlt\r\n:LABEL_1\r\nmov 0xdeadbeef, EAX\r\niret";
     let mut compiler = Compiler::new();
     let data = compiler.compile_assembly(code, true);
 
     /*let instructions = &[
-        /*// Indicate that we want to make a seeded random number generator.
+        // Indicate that we want to make a seeded random number generator.
         Instruction::OutU8Imm(0x1, 0x0),
         // Specify our seed.
         Instruction::OutU32Imm(0xdeadbeef, 0x0),
         // Read a PRNG from the device.
         Instruction::InU32Reg(0x0, RegisterId::EAX),
         Instruction::PushU32Imm(0xdeadbeef),
-        Instruction::Halt,*/
-        Instruction::MovU32ImmU32Reg(0x1, RegisterId::EAX),
-        //Instruction::AddU32ImmU32Reg(0x2, RegisterId::EAX),
         Instruction::Halt,
     ];
 

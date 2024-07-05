@@ -7,11 +7,14 @@ use crate::{
     utils,
 };
 
+use super::executable::Executable;
+
 pub struct Compiler {
     /// A vector containing the compiled bytecode.
     bytes: Vec<u8>,
 
     local_labels: Vec<String>,
+    data_labels: Vec<String>,
     global_labels: Vec<String>,
     label_positions: HashMap<String, usize>,
 }
@@ -21,6 +24,7 @@ impl Compiler {
         Self {
             bytes: Vec::new(),
             local_labels: Vec::new(),
+            data_labels: Vec::new(),
             global_labels: Vec::new(),
             label_positions: HashMap::new(),
         }
@@ -57,6 +61,12 @@ impl Compiler {
         let mut parser = AsmParser::new();
         parser.parse(assembly);
 
+        // TODO - the data section(s) should be compiled first because their size, once computed, is invariant.
+        // TODO - references to the contained data may be made in the labels found within the code.
+        // TODO - the data items should be added as labels to the data_labels list.
+
+        // TODO - all labelled jumps MUST to be offset by the size of the data sections!
+
         let mut instructions = parser.parsed_instructions;
 
         self.load_labels(&instructions);
@@ -64,7 +74,7 @@ impl Compiler {
         self.calculate_label_positions(&instructions);
 
         if optimize {
-            // TODO - optimizations should ideally go here.
+            // TODO - optimizations should go here.
         }
 
         // TODO - the calculate label positions method should be called here again.
@@ -75,6 +85,9 @@ impl Compiler {
         //println!("{instructions:?}");
 
         self.compile(&instructions);
+
+        // TODO - package the bytecode into an executable.
+        let executable = Executable::new();
 
         &self.bytes
     }
