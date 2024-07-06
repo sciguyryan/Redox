@@ -1,7 +1,7 @@
 // The structure of the executable file is as follows:
-// [READ-ONLY DATA]
-// [DATA]
 // [CODE]
+// [DATA]
+// [READ-ONLY DATA]
 
 pub struct Executable {}
 
