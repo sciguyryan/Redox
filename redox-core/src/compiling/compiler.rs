@@ -65,20 +65,29 @@ impl Compiler {
         // TODO - references to the contained data may be made in the labels found within the code.
         // TODO - the data items should be added as labels to the data_labels list.
 
-        // TODO - all labelled jumps MUST to be offset by the size of the data sections!
-
         let mut instructions = parser.parsed_instructions;
 
-        self.load_labels(&instructions);
-
-        self.calculate_label_positions(&instructions);
+        self.load_code_labels(&instructions);
+        self.calculate_code_label_positions(&instructions);
 
         if optimize {
             // TODO - optimizations should go here.
+            // TODO - an optimization here might be to use a short call/jump instruction
+            // TODO - if the call address is close enough, for example.
+
+            // TODO - the calculate label positions method should be called here again.
+            // TODO - this is because the instructions may have changed, altering the relative positions of the labels.
         }
 
-        // TODO - the calculate label positions method should be called here again.
-        // TODO - this is because the instructions may have changed, altering the relative positions of the labels.
+        // We now need to preemptively compile the core data. This is because we need to know the length
+        // of the code segment.
+        self.compile(&instructions);
+        let code_segment_len = self.bytes.len();
+
+        if optimize {
+            // TODO - a second optimization pass should go here to optimize any labels
+            // TODO - related to the data section.
+        }
 
         self.handle_labelled_instructions(&mut instructions);
 
@@ -98,7 +107,7 @@ impl Compiler {
     ///
     /// * `instructions` - A slice of [`Instruction`]s that correspond to the instructions to be compiled.
     #[inline]
-    fn calculate_label_positions(&mut self, instructions: &[Instruction]) {
+    fn calculate_code_label_positions(&mut self, instructions: &[Instruction]) {
         self.label_positions.clear();
 
         let mut position = 0;
@@ -119,7 +128,7 @@ impl Compiler {
     ///
     /// * `instructions` - A slice of [`Instruction`]s that correspond to the instructions to be compiled.
     #[inline]
-    fn load_labels(&mut self, instructions: &[Instruction]) {
+    fn load_code_labels(&mut self, instructions: &[Instruction]) {
         self.local_labels = instructions
             .iter()
             .filter_map(|i| {
@@ -148,9 +157,6 @@ impl Compiler {
             } else if self.local_labels.contains(label) {
                 let label_position = self.label_positions.get(label).unwrap();
 
-                // TODO - an optimization here might be to use a short call/jump instruction
-                // TODO - if the call address is close enough.
-
                 *ins = match ins {
                     Instruction::CallAbsU32Imm(_, label) => {
                         Instruction::CallRelCSU32Offset(*label_position as u32, label.clone())
@@ -158,6 +164,8 @@ impl Compiler {
                     Instruction::CallRelCSU32Offset(_, _) => continue,
                     _ => unreachable!("unexpected labelled instruction instance - {ins}"),
                 }
+            } else if self.data_labels.contains(label) {
+                todo!();
             } else {
                 panic!("invalid syntax - unknown label - {label}");
             }
