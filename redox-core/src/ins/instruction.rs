@@ -622,4 +622,13 @@ impl Instruction {
         };
         instruction_size + self.get_instruction_arg_size()
     }
+
+    /// Compute the total size of an [`Instruction`] slice.
+    pub fn total_size_of_instructions(instructions: &[Instruction]) -> usize {
+        let mut size = 0;
+        for ins in instructions {
+            size += ins.get_total_instruction_size();
+        }
+        size
+    }
 }

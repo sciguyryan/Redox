@@ -55,7 +55,7 @@ impl BootRom {
 
         // Calculate the position of the start of the interrupt vector.
         let mut next_handler_pos =
-            BOOT_MEMORY_START + BootRom::total_size_of_instructions(&boot_instructions);
+            BOOT_MEMORY_START + Instruction::total_size_of_instructions(&boot_instructions);
 
         // NOTE - in the instances where we are building a custom interrupt handler
         // we would need to use the intret instruction to mark the end of the handler subroutine.
@@ -107,7 +107,7 @@ impl BootRom {
             final_instructions.extend_from_slice(&instructions);
 
             // Advance the next handler location.
-            next_handler_pos += BootRom::total_size_of_instructions(&instructions);
+            next_handler_pos += Instruction::total_size_of_instructions(&instructions);
         }
 
         // Add the return instruction from our IVT initialization subroutine and add
@@ -129,14 +129,5 @@ impl BootRom {
 
         // Return the compiled bytecode.
         Compiler::new().compile(&final_instructions).to_vec()
-    }
-
-    /// Compute the total size of an [`Instruction`] slice.
-    fn total_size_of_instructions(instructions: &[Instruction]) -> usize {
-        let mut size = 0;
-        for ins in instructions {
-            size += ins.get_total_instruction_size();
-        }
-        size
     }
 }

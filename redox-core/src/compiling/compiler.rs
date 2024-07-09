@@ -79,11 +79,13 @@ impl Compiler {
             // TODO - this is because the instructions may have changed, altering the relative positions of the labels.
         }
 
-        // We now need to preemptively compile the core data. This is because we need to know the length
-        // of the code segment.
-        self.compile(&instructions);
-        let code_segment_len = self.bytes.len();
+        // We now need to calculate the length of the instructions.
+        let code_segment_len = Instruction::total_size_of_instructions(&instructions);
 
+        // TODO - this is a placeholder for the moment.
+        self.calculate_data_label_positions(code_segment_len);
+
+        // TODO - do we care enough to do this?
         if optimize {
             // TODO - a second optimization pass should go here to optimize any labels
             // TODO - related to the data section.
@@ -100,6 +102,14 @@ impl Compiler {
 
         &self.bytes
     }
+
+    /// Calculate the positions of the local data labels within the provided instruction list.
+    ///
+    /// # Arguments
+    ///
+    /// * `instructions` - A slice of [`Instruction`]s that correspond to the instructions to be compiled.
+    #[inline]
+    fn calculate_data_label_positions(&mut self, data_segment_len: usize) {}
 
     /// Calculate the positions of the local labels within the provided instruction list.
     ///
