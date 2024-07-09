@@ -23,6 +23,8 @@ rand.workspace = true
 rand_xoshiro.workspace = true
 strum.workspace = true
 strum_macros.workspace = true
+unescape.workspace = true
+unicode-segmentation.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]

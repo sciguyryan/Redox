@@ -157,7 +157,7 @@ impl<'a> AsmParser<'a> {
                 FileSection::Text => {
                     instructions.push(self.parse_code_line(line));
                 }
-                FileSection::Data => todo!(),
+                FileSection::Data => self.parse_data_line(line),
                 FileSection::ReadOnlyData => todo!(),
             }
         }
@@ -369,6 +369,68 @@ impl<'a> AsmParser<'a> {
         AsmParser::try_build_instruction(final_option.opcode, &arguments, label)
     }
 
+    /// Parse a data line of an assembly file.
+    ///
+    /// # Arguments
+    ///
+    /// * `line` - A code line to be parsed.
+    fn parse_data_line(&mut self, line: &str) {
+        use unicode_segmentation::UnicodeSegmentation;
+
+        let graphemes: Vec<&str> = line.graphemes(true).collect();
+
+        let mut in_quoted_string = false;
+
+        let mut escaped_args = vec![];
+        let mut buffer = String::new();
+        for (i, g) in graphemes.iter().enumerate() {
+            let is_escaped = i > 0 && graphemes[i - 1] == "\\";
+
+            if !is_escaped && (*g == "\"" || *g == "'") {
+                // We have reached the end of a quoted segment.
+                if in_quoted_string {
+                    AsmParser::push_buffer_if_not_empty(&mut buffer, &mut escaped_args);
+                }
+
+                in_quoted_string = !in_quoted_string;
+                continue;
+            }
+
+            if !in_quoted_string && (*g == " " || *g == "\t" || *g == ",") {
+                // We have reached the end of a segment.
+                if !buffer.is_empty() {
+                    AsmParser::push_buffer_if_not_empty(&mut buffer, &mut escaped_args);
+                }
+
+                continue;
+            }
+
+            buffer.push_str(g);
+        }
+
+        assert!(
+            !in_quoted_string,
+            "invalid syntax - closing quotation mark not present for line: {line}."
+        );
+
+        // Push the final argument to the list.
+        AsmParser::push_buffer_if_not_empty(&mut buffer, &mut escaped_args);
+
+        assert!(
+            escaped_args.len() >= 3,
+            "invalid syntax - insufficient arguments for line: {line}."
+        );
+
+        // Now we want to ensure we correctly handle any escape sequences.
+        let mut arguments = vec![];
+        for argument in escaped_args {
+            let un = unescape::unescape(&argument).unwrap_or(argument);
+            arguments.push(un);
+        }
+
+        println!("{arguments:?}");
+    }
+
     /// Parse a section line of an ASM file.
     ///
     /// # Arguments
@@ -387,6 +449,22 @@ impl<'a> AsmParser<'a> {
         } else {
             panic!("invalid assembly file section name - {}", &line[9..])
         }
+    }
+
+    /// Push a string buffer onto an string argument vector.
+    ///
+    /// # Arguments
+    ///
+    /// * `arg` - The argument string.
+    /// * `vec` - The vector that the argument should be pushed too, if it isn't empty.
+    #[inline]
+    fn push_buffer_if_not_empty(arg: &mut String, vec: &mut Vec<String>) {
+        if arg.is_empty() {
+            return;
+        }
+
+        vec.push(arg.clone());
+        arg.clear();
     }
 
     /// Try to build an [`Instruction`] from an [`OpCode`] and a set of arguments.

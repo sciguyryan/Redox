@@ -18,6 +18,8 @@ rand_xoshiro = "0.6.0"
 strum = "0.26.3"
 strum_macros = "0.26.4"
 thiserror = "1.0.61"
+unescape = "0.1.0"
+unicode-segmentation = "1.11.0"
 winres = "0.1.12"
 
 [profile.dev]

@@ -66,7 +66,15 @@ fn main() {
         panic!("currently unsupported");
     }
 
-    let code = "section .text\r\npush 0\r\ncall :LABEL_1\r\nhlt\r\n:LABEL_1\r\nmov 0xdeadbeef, EAX\r\niret";
+    let code = "section .data
+    banana  db  \"apples\"
+    section .text
+    push 0
+    call :LABEL_1
+    hlt
+    :LABEL_1
+    mov 0xdeadbeef, EAX
+    iret";
     let mut compiler = Compiler::new();
     let data = compiler.compile_assembly(code, true);
 
