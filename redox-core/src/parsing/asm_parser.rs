@@ -59,6 +59,7 @@ enum Argument {
 /// The supported data declaration command types.
 #[derive(Debug, Clone)]
 enum DataDeclarationType {
+    // Declare a byte storage block.
     DB,
 }
 
@@ -448,10 +449,26 @@ impl<'a> AsmParser<'a> {
             }
         });
 
-        let declarationType = DataDeclarationType::try_from(arguments[1].as_str());
-        println!("{declarationType:?}");
+        let label = &arguments[0];
+        let declaration_args = &arguments[2..];
+        let declaration_type = DataDeclarationType::try_from(arguments[1].as_str())
+            .expect("invalid syntax - failed to identify data declaration type");
 
-        println!("{arguments:?}");
+        let mut storage = vec![];
+        match declaration_type {
+            DataDeclarationType::DB => {
+                for arg in declaration_args {
+                    AsmParser::try_parse_data_byte_declaration_args(arg, &mut storage);
+                }
+            }
+        }
+
+        println!("label = {label}, declaration_type = {declaration_type:?}, storage = {storage:?}");
+    }
+
+    fn try_parse_data_byte_declaration_args(arg: &str, bytes: &mut Vec<u8>) {
+        println!("argument: {}", arg);
+        bytes.push(0);
     }
 
     /// Parse a section line of an ASM file.
@@ -981,15 +998,15 @@ impl<'a> AsmParser<'a> {
         // I can't imagine these would be used much... but why not?
         if string.starts_with("0b") {
             // Binary.
-            let stripped = string.strip_prefix("0b").expect("");
+            let stripped = string.strip_prefix("0b").unwrap();
             u8::from_str_radix(stripped, 2)
         } else if string.starts_with("0o") {
             // Octal.
-            let stripped = string.strip_prefix("0o").expect("");
+            let stripped = string.strip_prefix("0o").unwrap();
             u8::from_str_radix(stripped, 8)
         } else if string.starts_with("0x") {
             // Hex.
-            let stripped = string.strip_prefix("0x").expect("");
+            let stripped = string.strip_prefix("0x").unwrap();
             u8::from_str_radix(stripped, 16)
         } else {
             string.parse::<u8>()
@@ -1006,15 +1023,15 @@ impl<'a> AsmParser<'a> {
         // I can't imagine these would be used much... but why not?
         if string.starts_with("0b") {
             // Binary.
-            let stripped = string.strip_prefix("0b").expect("");
+            let stripped = string.strip_prefix("0b").unwrap();
             u32::from_str_radix(stripped, 2)
         } else if string.starts_with("0o") {
             // Octal.
-            let stripped = string.strip_prefix("0o").expect("");
+            let stripped = string.strip_prefix("0o").unwrap();
             u32::from_str_radix(stripped, 8)
         } else if string.starts_with("0x") {
             // Hex.
-            let stripped = string.strip_prefix("0x").expect("");
+            let stripped = string.strip_prefix("0x").unwrap();
             u32::from_str_radix(stripped, 16)
         } else {
             string.parse::<u32>()
