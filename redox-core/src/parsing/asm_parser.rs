@@ -56,6 +56,25 @@ enum Argument {
     Expression(Expression),
 }
 
+/// The supported data declaration command types.
+#[derive(Debug, Clone)]
+enum DataDeclarationType {
+    DB,
+}
+
+impl TryFrom<&str> for DataDeclarationType {
+    type Error = ();
+
+    fn try_from(string: &str) -> Result<Self, Self::Error> {
+        match string.to_lowercase().as_str() {
+            "db" => Ok(DataDeclarationType::DB),
+            _ => {
+                panic!("invalid syntax - an unrecognized data declaration {string}");
+            }
+        }
+    }
+}
+
 /// The sections that can be found in an valid file.
 enum FileSection {
     /// The text (code) section of an assembly file.
@@ -380,7 +399,6 @@ impl<'a> AsmParser<'a> {
         let graphemes: Vec<&str> = line.graphemes(true).collect();
 
         let mut in_quoted_string = false;
-
         let mut escaped_args = vec![];
         let mut buffer = String::new();
         for (i, g) in graphemes.iter().enumerate() {
@@ -422,11 +440,16 @@ impl<'a> AsmParser<'a> {
         );
 
         // Now we want to ensure we correctly handle any escape sequences.
-        let mut arguments = vec![];
-        for argument in escaped_args {
-            let un = unescape::unescape(&argument).unwrap_or(argument);
-            arguments.push(un);
-        }
+        // We don't want to do this for the label or declaration type arguments.
+        let mut arguments = escaped_args.clone();
+        (2..escaped_args.len()).for_each(|i| {
+            if let Some(s) = unescape::unescape(&arguments[i]) {
+                arguments[i] = s;
+            }
+        });
+
+        let declarationType = DataDeclarationType::try_from(arguments[1].as_str());
+        println!("{declarationType:?}");
 
         println!("{arguments:?}");
     }
