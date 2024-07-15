@@ -59,7 +59,7 @@ enum Argument {
 /// The supported data declaration command types.
 #[derive(Debug, Clone)]
 enum DataDeclarationType {
-    // Declare a byte storage block.
+    /// Declare a byte storage block.
     DB,
 }
 
@@ -406,7 +406,9 @@ impl<'a> AsmParser<'a> {
             let is_escaped = i > 0 && graphemes[i - 1] == "\\";
 
             if !is_escaped && (*g == "\"" || *g == "'") {
-                // We have reached the end of a quoted segment.
+                buffer.push_str(g);
+
+                // We have reached the end of a quoted argument.
                 if in_quoted_string {
                     AsmParser::push_buffer_if_not_empty(&mut buffer, &mut escaped_args);
                 }
@@ -416,7 +418,7 @@ impl<'a> AsmParser<'a> {
             }
 
             if !in_quoted_string && (*g == " " || *g == "\t" || *g == ",") {
-                // We have reached the end of a segment.
+                // We have reached the end of an argument.
                 if !buffer.is_empty() {
                     AsmParser::push_buffer_if_not_empty(&mut buffer, &mut escaped_args);
                 }
@@ -450,25 +452,22 @@ impl<'a> AsmParser<'a> {
         });
 
         let label = &arguments[0];
-        let declaration_args = &arguments[2..];
+        let args = &arguments[2..];
         let declaration_type = DataDeclarationType::try_from(arguments[1].as_str())
             .expect("invalid syntax - failed to identify data declaration type");
 
         let mut storage = vec![];
         match declaration_type {
             DataDeclarationType::DB => {
-                for arg in declaration_args {
+                for arg in args {
                     AsmParser::try_parse_data_byte_declaration_args(arg, &mut storage);
                 }
             }
         }
 
         println!("label = {label}, declaration_type = {declaration_type:?}, storage = {storage:?}");
-    }
 
-    fn try_parse_data_byte_declaration_args(arg: &str, bytes: &mut Vec<u8>) {
-        println!("argument: {}", arg);
-        bytes.push(0);
+        println!("{:?}", String::from_utf8(storage));
     }
 
     /// Parse a section line of an ASM file.
@@ -804,6 +803,25 @@ impl<'a> AsmParser<'a> {
             O::Label => unreachable!(),
             O::Unknown => unreachable!(),
         }
+    }
+
+    /// Try to parse a data byte declaration statement.
+    ///
+    /// # Arguments
+    ///
+    /// * `arg` - A string slice containing the argument.
+    /// * `bytes` - The output vector, into which the final bytes will be appended.
+    fn try_parse_data_byte_declaration_args(arg: &str, bytes: &mut Vec<u8>) {
+        // Are we handling a string of characters?
+        if arg.starts_with('\'') || arg.starts_with('"') {
+            // Since the parser will validate we have matching opening and closing brackets we can
+            // assume the final character is a closing quotation mark too.
+            // TODO - should a substring of length 0 be considered an error?
+            bytes.extend_from_slice(arg[1..arg.len() - 1].as_bytes());
+            return;
+        }
+
+        println!("argument: {}", arg);
     }
 
     /// Try to parse an expression.
