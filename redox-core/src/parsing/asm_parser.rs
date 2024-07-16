@@ -466,8 +466,7 @@ impl<'a> AsmParser<'a> {
         }
 
         println!("label = {label}, declaration_type = {declaration_type:?}, storage = {storage:?}");
-
-        println!("{:?}", String::from_utf8(storage));
+        //println!("{:?}", String::from_utf8(storage));
     }
 
     /// Parse a section line of an ASM file.
@@ -821,7 +820,13 @@ impl<'a> AsmParser<'a> {
             return;
         }
 
-        println!("argument: {}", arg);
+        // Are we handling a byte literal?
+        if let Ok(val) = AsmParser::try_parse_u8_immediate(arg) {
+            bytes.push(val);
+            return;
+        }
+
+        panic!("invalid syntax - unrecognized byte declaration - {arg}");
     }
 
     /// Try to parse an expression.
