@@ -67,7 +67,8 @@ fn main() {
     }
 
     let code = "section .data
-    banana  db  \"apples\",0xff
+    banana  db  \"apples\"
+    waffles  db  \"waffles\"
     section .text
     push 0
     call :LABEL_1

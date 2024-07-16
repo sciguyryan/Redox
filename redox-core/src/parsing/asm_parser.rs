@@ -3,18 +3,18 @@ use std::{num::ParseIntError, str::FromStr};
 
 use crate::{
     ins::{
-        expression::{
-            Expression,
-            {ExpressionArgs::*, ExpressionOperator::*},
-        },
+        expression::{Expression, ExpressionArgs::*, ExpressionOperator::*},
         instruction::Instruction,
         op_codes::OpCode,
     },
-    parsing::type_hints::{ArgTypeHint, InstructionLookup},
+    parsing::{
+        data_declaration::DataDeclarationType,
+        type_hints::{ArgTypeHint, InstructionLookup},
+    },
     reg::registers::RegisterId,
 };
 
-use super::type_hints::InstructionHints;
+use super::{data_declaration::DataDeclaration, type_hints::InstructionHints};
 
 const F32_REGISTERS: [RegisterId; 2] = [RegisterId::FR1, RegisterId::FR2];
 
@@ -54,26 +54,6 @@ enum Argument {
     RegisterU32(RegisterId),
     /// An expression argument.
     Expression(Expression),
-}
-
-/// The supported data declaration command types.
-#[derive(Debug, Clone)]
-enum DataDeclarationType {
-    /// Declare a byte storage block.
-    DB,
-}
-
-impl TryFrom<&str> for DataDeclarationType {
-    type Error = ();
-
-    fn try_from(string: &str) -> Result<Self, Self::Error> {
-        match string.to_lowercase().as_str() {
-            "db" => Ok(DataDeclarationType::DB),
-            _ => {
-                panic!("invalid syntax - an unrecognized data declaration {string}");
-            }
-        }
-    }
 }
 
 /// The sections that can be found in an valid file.
@@ -138,6 +118,9 @@ pub struct AsmParser<'a> {
 
     /// A vector of the parsed instructions.
     pub parsed_instructions: Vec<Instruction>,
+
+    /// A vector of the parsed data declarations.
+    pub parsed_data_declarations: Vec<DataDeclaration>,
 }
 
 impl<'a> AsmParser<'a> {
@@ -145,6 +128,7 @@ impl<'a> AsmParser<'a> {
         Self {
             hints: InstructionHints::new(),
             parsed_instructions: vec![],
+            parsed_data_declarations: vec![],
         }
     }
 
@@ -155,6 +139,8 @@ impl<'a> AsmParser<'a> {
     /// * `string` - The string to be parsed.
     pub fn parse(&mut self, string: &str) {
         let mut instructions = Vec::with_capacity(100);
+        let mut data_declarations = Vec::<DataDeclaration>::with_capacity(100);
+        let mut read_only_data_declarations = Vec::<DataDeclaration>::with_capacity(100);
 
         // Convert newlines into a single type and automatically
         // allow lines ending with a \ to be treated as a singular line.
@@ -177,12 +163,27 @@ impl<'a> AsmParser<'a> {
                 FileSection::Text => {
                     instructions.push(self.parse_code_line(line));
                 }
-                FileSection::Data => self.parse_data_line(line),
-                FileSection::ReadOnlyData => todo!(),
+                FileSection::Data => {
+                    let (label, decl_type, bytes) = self.parse_data_line(line);
+
+                    if data_declarations.iter().any(|d| d.label == label)
+                        || read_only_data_declarations.iter().any(|d| d.label == label)
+                    {
+                        panic!("invalid syntax - a duplicate label with the name of {label}.");
+                    }
+
+                    data_declarations.push(DataDeclaration::new(decl_type, label, bytes));
+                }
+                FileSection::ReadOnlyData => {
+                    todo!();
+                }
             }
         }
 
         self.parsed_instructions = instructions;
+        self.parsed_data_declarations = data_declarations;
+
+        println!("{:#?}", self.parsed_data_declarations);
     }
 
     /// Parse a code line of an assembly file.
@@ -394,7 +395,7 @@ impl<'a> AsmParser<'a> {
     /// # Arguments
     ///
     /// * `line` - A code line to be parsed.
-    fn parse_data_line(&mut self, line: &str) {
+    fn parse_data_line(&mut self, line: &str) -> (String, DataDeclarationType, Vec<u8>) {
         use unicode_segmentation::UnicodeSegmentation;
 
         let graphemes: Vec<&str> = line.graphemes(true).collect();
@@ -467,6 +468,8 @@ impl<'a> AsmParser<'a> {
 
         println!("label = {label}, declaration_type = {declaration_type:?}, storage = {storage:?}");
         //println!("{:?}", String::from_utf8(storage));
+
+        (label.clone(), declaration_type, storage)
     }
 
     /// Parse a section line of an ASM file.
