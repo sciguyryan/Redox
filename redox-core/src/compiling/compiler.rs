@@ -13,7 +13,7 @@ pub struct Compiler {
     /// A vector containing the compiled bytecode.
     bytes: Vec<u8>,
 
-    local_labels: Vec<String>,
+    code_labels: Vec<String>,
     data_labels: Vec<String>,
     global_labels: Vec<String>,
     label_positions: HashMap<String, usize>,
@@ -23,7 +23,7 @@ impl Compiler {
     pub fn new() -> Self {
         Self {
             bytes: Vec::new(),
-            local_labels: Vec::new(),
+            code_labels: Vec::new(),
             data_labels: Vec::new(),
             global_labels: Vec::new(),
             label_positions: HashMap::new(),
@@ -139,7 +139,7 @@ impl Compiler {
     /// * `instructions` - A slice of [`Instruction`]s that correspond to the instructions to be compiled.
     #[inline]
     fn load_code_labels(&mut self, instructions: &[Instruction]) {
-        self.local_labels = instructions
+        self.code_labels = instructions
             .iter()
             .filter_map(|i| {
                 if let Instruction::Label(l) = i {
@@ -164,7 +164,7 @@ impl Compiler {
             // If a label is specified that doesn't exist then that is a syntax error.
             if self.global_labels.contains(label) {
                 todo!();
-            } else if self.local_labels.contains(label) {
+            } else if self.code_labels.contains(label) {
                 let label_position = self.label_positions.get(label).unwrap();
 
                 *ins = match ins {
