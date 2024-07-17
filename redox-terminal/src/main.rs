@@ -66,10 +66,7 @@ fn main() {
         panic!("currently unsupported");
     }
 
-    let code = "section .data
-    banana  db  \"apples\"
-    waffles  db  \"waffles\"
-    section .text
+    let code = "section .text
     push 0
     call :LABEL_1
     hlt

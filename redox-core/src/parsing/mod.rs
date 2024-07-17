@@ -1,3 +1,3 @@
 pub mod asm_parser;
-mod data_declaration;
+pub mod data_declaration;
 mod type_hints;
