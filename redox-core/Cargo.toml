@@ -5,7 +5,6 @@ authors = ["Ryan Jones-Ward <sciguyryan@gmail.com>"]
 edition = "2021"
 readme = "README.md"
 license = "LGPL-2.1-only"
-license-file = "LICENSE"
 description = "A new toy virtual machine, assembler and compiler, written in Rust."
 repository = "https://github.com/sciguyryan/Redox"
 homepage = "https://github.com/sciguyryan/Redox"
