@@ -7,26 +7,22 @@ use crate::{
     utils,
 };
 
-use super::executable::Executable;
+use super::{
+    executable::Executable,
+    labels::{LabelEntry, LabelType},
+};
 
 pub struct Compiler {
     /// A vector containing the compiled bytecode.
     bytes: Vec<u8>,
-
-    code_labels: Vec<String>,
-    data_labels: Vec<String>,
-    global_labels: Vec<String>,
-    label_positions: HashMap<String, usize>,
+    labels: HashMap<String, LabelEntry>,
 }
 
 impl Compiler {
     pub fn new() -> Self {
         Self {
             bytes: Vec::new(),
-            code_labels: Vec::new(),
-            data_labels: Vec::new(),
-            global_labels: Vec::new(),
-            label_positions: HashMap::new(),
+            labels: HashMap::new(),
         }
     }
 
@@ -118,14 +114,14 @@ impl Compiler {
     /// * `instructions` - A slice of [`Instruction`]s that correspond to the instructions to be compiled.
     #[inline]
     fn calculate_code_label_positions(&mut self, instructions: &[Instruction]) {
-        self.label_positions.clear();
-
         let mut position = 0;
         for ins in instructions {
             if let Instruction::Label(l) = ins {
-                self.label_positions
-                    .entry(l.to_string())
-                    .or_insert(position);
+                let entry = self
+                    .labels
+                    .get_mut(l)
+                    .unwrap_or_else(|| panic!("failed to get label {l}"));
+                entry.position = position;
             }
 
             position += ins.get_total_instruction_size();
@@ -139,16 +135,16 @@ impl Compiler {
     /// * `instructions` - A slice of [`Instruction`]s that correspond to the instructions to be compiled.
     #[inline]
     fn load_code_labels(&mut self, instructions: &[Instruction]) {
-        self.code_labels = instructions
-            .iter()
-            .filter_map(|i| {
-                if let Instruction::Label(l) = i {
-                    Some(l.clone())
-                } else {
-                    None
+        for ins in instructions {
+            if let Instruction::Label(l) = ins {
+                if self.labels.contains_key(l) {
+                    panic!("a label has already been declared with the name {l}");
                 }
-            })
-            .collect();
+
+                self.labels
+                    .insert(l.clone(), LabelEntry::new(LabelType::Code, l.clone(), 0));
+            }
+        }
     }
 
     #[inline]
@@ -160,24 +156,30 @@ impl Compiler {
                 _ => continue,
             };
 
-            // Now we can check whether the labels are known.
-            // If a label is specified that doesn't exist then that is a syntax error.
-            if self.global_labels.contains(label) {
-                todo!();
-            } else if self.code_labels.contains(label) {
-                let label_position = self.label_positions.get(label).unwrap();
+            if label.is_empty() {
+                continue;
+            }
 
-                *ins = match ins {
-                    Instruction::CallAbsU32Imm(_, label) => {
-                        Instruction::CallRelCSU32Offset(*label_position as u32, label.clone())
-                    }
-                    Instruction::CallRelCSU32Offset(_, _) => continue,
-                    _ => unreachable!("unexpected labelled instruction instance - {ins}"),
-                }
-            } else if self.data_labels.contains(label) {
-                todo!();
+            // Attempt to get the label entry.
+            // If a label has been used but has not been defined then that is a syntax error.
+            let label_entry = if let Some(l) = self.labels.get(label) {
+                l
             } else {
-                panic!("invalid syntax - unknown label - {label}");
+                panic!("syntax error - no label with the name of {label} has been defined.");
+            };
+
+            match label_entry.label_type {
+                LabelType::Code => {
+                    *ins = match ins {
+                        Instruction::CallAbsU32Imm(_, label) => {
+                            Instruction::CallRelCSU32Offset(label_entry.position as u32, label.clone())
+                        }
+                        Instruction::CallRelCSU32Offset(_, _) => continue,
+                        _ => unreachable!("unexpected labelled instruction instance - {ins}"),
+                    }
+                },
+                LabelType::Data => todo!(),
+                LabelType::Global => todo!(),
             }
         }
     }
