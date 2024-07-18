@@ -168,20 +168,34 @@ impl Compiler {
                 panic!("syntax error - no label with the name of {label} has been defined.");
             };
 
+            let position = label_entry.position as u32;
+
             match label_entry.label_type {
                 LabelType::Code => {
-                    *ins = match ins {
-                        Instruction::CallAbsU32Imm(_, label) => Instruction::CallRelCSU32Offset(
-                            label_entry.position as u32,
-                            label.clone(),
-                        ),
-                        Instruction::CallRelCSU32Offset(_, _) => continue,
-                        _ => unreachable!("unexpected labelled instruction instance - {ins}"),
+                    if let Some(i) =
+                        Compiler::maybe_rewrite_code_labelled_instruction(ins, position)
+                    {
+                        *ins = i;
                     }
                 }
                 LabelType::Data => todo!(),
                 LabelType::Global => todo!(),
             }
+        }
+    }
+
+    #[inline]
+    fn maybe_rewrite_code_labelled_instruction(
+        ins: &Instruction,
+        label_position: u32,
+    ) -> Option<Instruction> {
+        match ins {
+            Instruction::CallAbsU32Imm(_, label) => Some(Instruction::CallRelCSU32Offset(
+                label_position,
+                label.clone(),
+            )),
+            Instruction::CallRelCSU32Offset(_, _) => None,
+            _ => unreachable!("unexpected labelled instruction - {ins}"),
         }
     }
 
