@@ -27,6 +27,7 @@ impl Compiler {
         }
     }
 
+    #[inline]
     fn assert_label_does_not_exist(&self, label: &String) {
         assert!(
             !self.labels.contains_key(label),
@@ -72,6 +73,8 @@ impl Compiler {
 
         // Now load the code labels.
         self.load_code_labels(&instructions);
+
+        println!("labels = {:?}", self.labels);
 
         if optimize {
             // TODO - optimizations should go here.
@@ -137,7 +140,7 @@ impl Compiler {
 
             self.labels.insert(
                 d.label.clone(),
-                LabelEntry::new(LabelType::Code, d.label.clone(), position),
+                LabelEntry::new(LabelType::Data, d.label.clone(), position),
             );
 
             position += d.bytes.len();

@@ -66,7 +66,9 @@ fn main() {
         panic!("currently unsupported");
     }
 
-    let code = "section .text
+    let code = "section .data
+    test db 'bananas'
+    section .text
     push 0
     call :LABEL_1
     hlt
