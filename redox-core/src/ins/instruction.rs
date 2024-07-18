@@ -289,16 +289,16 @@ impl Display for Instruction {
                 format!("call &{reg}")
             }
             I::CallRelU32RegU32Offset(offset, reg) => {
-                format!("callr 0x{offset:08x}, &{reg}")
+                format!("call.r 0x{offset:08x}, &{reg}")
             }
             I::CallRelCSU32Offset(offset, label) => {
                 if label.is_empty() {
-                    format!("callr 0x{offset:08x}")
+                    format!("call.r 0x{offset:08x}")
                 } else {
-                    format!("callr {label}")
+                    format!("call.r {label}")
                 }
             }
-            I::RetArgsU32 => String::from("iret"),
+            I::RetArgsU32 => String::from("ret.i"),
             I::Int(int_code) => {
                 format!("int 0x{int_code:02x}")
             }

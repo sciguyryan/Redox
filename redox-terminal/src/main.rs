@@ -74,7 +74,7 @@ fn main() {
     hlt
     :LABEL_1
     mov 0xdeadbeef, EAX
-    iret";
+    ret.i";
     let mut compiler = Compiler::new();
     let data = compiler.compile_assembly(code, true);
 
