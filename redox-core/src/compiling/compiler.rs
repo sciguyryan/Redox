@@ -15,6 +15,7 @@ use super::{
 pub struct Compiler {
     /// A vector containing the compiled bytecode.
     bytes: Vec<u8>,
+    /// A [`HashMap`] containing the known labels, and their associated [`LabelEntry`].
     labels: HashMap<String, LabelEntry>,
 }
 
@@ -24,6 +25,13 @@ impl Compiler {
             bytes: Vec::new(),
             labels: HashMap::new(),
         }
+    }
+
+    fn assert_label_does_not_exist(&self, label: &String) {
+        assert!(
+            !self.labels.contains_key(label),
+            "a label has already been declared with the name {label}"
+        );
     }
 
     /// Compile a sequence of instructions into bytecode.
@@ -62,6 +70,7 @@ impl Compiler {
 
         let mut instructions = parser.parsed_instructions;
 
+        // Now load the code labels.
         self.load_code_labels(&instructions);
 
         if optimize {
@@ -72,12 +81,6 @@ impl Compiler {
             // TODO - the calculate label positions method should be called here again.
             // TODO - this is because the instructions may have changed, altering the relative positions of the labels.
         }
-
-        // We now need to calculate the length of the instructions.
-        let code_segment_len = Instruction::total_size_of_instructions(&instructions);
-
-        // TODO - this is a placeholder for the moment.
-        self.calculate_data_label_positions(code_segment_len);
 
         // TODO - do we care enough to do this?
         if optimize {
@@ -97,18 +100,6 @@ impl Compiler {
         &self.bytes
     }
 
-    /// Calculate the positions of the local data labels within the provided instruction list.
-    ///
-    /// # Arguments
-    ///
-    /// * `instructions` - A slice of [`Instruction`]s that correspond to the instructions to be compiled.
-    #[inline]
-    fn calculate_data_label_positions(&mut self, data_segment_len: usize) {}
-
-    fn assert_label_does_not_exist(&self, label: &String) {
-        assert!(!self.labels.contains_key(label), "a label has already been declared with the name {label}");
-    }
-
     /// Build a list of code labels found within the provided instruction list and compute their location relative to the start of the code block.
     ///
     /// # Arguments
@@ -122,8 +113,10 @@ impl Compiler {
             if let Instruction::Label(l) = ins {
                 self.assert_label_does_not_exist(l);
 
-                self.labels
-                    .insert(l.clone(), LabelEntry::new(LabelType::Code, l.clone(), position));
+                self.labels.insert(
+                    l.clone(),
+                    LabelEntry::new(LabelType::Code, l.clone(), position),
+                );
             }
 
             position += ins.get_total_instruction_size();
@@ -142,8 +135,10 @@ impl Compiler {
         for d in data_declarations {
             self.assert_label_does_not_exist(&d.label);
 
-            self.labels
-                .insert(d.label.clone(), LabelEntry::new(LabelType::Code, d.label.clone(), position));
+            self.labels.insert(
+                d.label.clone(),
+                LabelEntry::new(LabelType::Code, d.label.clone(), position),
+            );
 
             position += d.bytes.len();
         }
@@ -173,13 +168,14 @@ impl Compiler {
             match label_entry.label_type {
                 LabelType::Code => {
                     *ins = match ins {
-                        Instruction::CallAbsU32Imm(_, label) => {
-                            Instruction::CallRelCSU32Offset(label_entry.position as u32, label.clone())
-                        }
+                        Instruction::CallAbsU32Imm(_, label) => Instruction::CallRelCSU32Offset(
+                            label_entry.position as u32,
+                            label.clone(),
+                        ),
                         Instruction::CallRelCSU32Offset(_, _) => continue,
                         _ => unreachable!("unexpected labelled instruction instance - {ins}"),
                     }
-                },
+                }
                 LabelType::Data => todo!(),
                 LabelType::Global => todo!(),
             }
