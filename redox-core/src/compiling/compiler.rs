@@ -2,7 +2,7 @@ use hashbrown::HashMap;
 
 use crate::{
     ins::{instruction::Instruction, op_codes::OpCode},
-    parsing::asm_parser::AsmParser,
+    parsing::{asm_parser::AsmParser, data_declaration::DataDeclaration},
     reg::registers::RegisterId,
     utils,
 };
@@ -57,14 +57,12 @@ impl Compiler {
         let mut parser = AsmParser::new();
         parser.parse(assembly);
 
-        // TODO - the data section(s) should be compiled first because their size, once computed, is invariant.
-        // TODO - references to the contained data may be made in the labels found within the code.
-        // TODO - the data items should be added as labels to the data_labels list.
+        // Load the data labels first.
+        self.load_data_labels(&parser.parsed_data_declarations);
 
         let mut instructions = parser.parsed_instructions;
 
         self.load_code_labels(&instructions);
-        self.calculate_code_label_positions(&instructions);
 
         if optimize {
             // TODO - optimizations should go here.
@@ -107,43 +105,47 @@ impl Compiler {
     #[inline]
     fn calculate_data_label_positions(&mut self, data_segment_len: usize) {}
 
-    /// Calculate the positions of the local labels within the provided instruction list.
-    ///
-    /// # Arguments
-    ///
-    /// * `instructions` - A slice of [`Instruction`]s that correspond to the instructions to be compiled.
-    #[inline]
-    fn calculate_code_label_positions(&mut self, instructions: &[Instruction]) {
-        let mut position = 0;
-        for ins in instructions {
-            if let Instruction::Label(l) = ins {
-                let entry = self
-                    .labels
-                    .get_mut(l)
-                    .unwrap_or_else(|| panic!("failed to get label {l}"));
-                entry.position = position;
-            }
-
-            position += ins.get_total_instruction_size();
-        }
+    fn assert_label_does_not_exist(&self, label: &String) {
+        assert!(!self.labels.contains_key(label), "a label has already been declared with the name {label}");
     }
 
-    /// Build a list of local labels found within the provided instruction list.
+    /// Build a list of code labels found within the provided instruction list and compute their location relative to the start of the code block.
     ///
     /// # Arguments
     ///
     /// * `instructions` - A slice of [`Instruction`]s that correspond to the instructions to be compiled.
     #[inline]
     fn load_code_labels(&mut self, instructions: &[Instruction]) {
+        let mut position = 0;
+
         for ins in instructions {
             if let Instruction::Label(l) = ins {
-                if self.labels.contains_key(l) {
-                    panic!("a label has already been declared with the name {l}");
-                }
+                self.assert_label_does_not_exist(l);
 
                 self.labels
-                    .insert(l.clone(), LabelEntry::new(LabelType::Code, l.clone(), 0));
+                    .insert(l.clone(), LabelEntry::new(LabelType::Code, l.clone(), position));
             }
+
+            position += ins.get_total_instruction_size();
+        }
+    }
+
+    /// Build a list of data labels found within the provided code and compute their location relative to the start of the data block.
+    ///
+    /// # Arguments
+    ///
+    /// * `data_declarations` - A slice of [`DataDeclaration`]s that correspond to the compiled data declarations.
+    #[inline]
+    fn load_data_labels(&mut self, data_declarations: &[DataDeclaration]) {
+        let mut position = 0;
+
+        for d in data_declarations {
+            self.assert_label_does_not_exist(&d.label);
+
+            self.labels
+                .insert(d.label.clone(), LabelEntry::new(LabelType::Code, d.label.clone(), position));
+
+            position += d.bytes.len();
         }
     }
 
