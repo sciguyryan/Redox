@@ -74,21 +74,16 @@ impl Compiler {
         // Now load the code labels.
         self.load_code_labels(&instructions);
 
-        println!("labels = {:?}", self.labels);
+        //println!("labels = {:#?}", self.labels);
 
         if optimize {
             // TODO - optimizations should go here.
             // TODO - an optimization here might be to use a short call/jump instruction
             // TODO - if the call address is close enough, for example.
 
-            // TODO - the calculate label positions method should be called here again.
-            // TODO - this is because the instructions may have changed, altering the relative positions of the labels.
-        }
-
-        // TODO - do we care enough to do this?
-        if optimize {
-            // TODO - a second optimization pass should go here to optimize any labels
-            // TODO - related to the data section.
+            // TODO - the calculate code label positions method should be called here again.
+            // TODO - this is because the instructions may have changed, altering the relative
+            // TODO - positions of the code labels.
         }
 
         self.handle_labelled_instructions(&mut instructions);
