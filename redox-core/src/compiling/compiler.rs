@@ -157,9 +157,7 @@ impl Compiler {
 
             // Attempt to get the label entry.
             // If a label has been used but has not been defined then that is a syntax error.
-            let label_entry = if let Some(l) = self.labels.get(label) {
-                l
-            } else {
+            let Some(label_entry) = self.labels.get(label) else {
                 panic!("syntax error - no label with the name of {label} has been defined.");
             };
 

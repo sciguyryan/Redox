@@ -93,7 +93,7 @@ pub struct InstructionHints<'a> {
     pub hints: Vec<InstructionLookup<'a>>,
 }
 
-impl<'a> InstructionHints<'a> {
+impl InstructionHints<'_> {
     pub fn new() -> Self {
         use ArgTypeHint::*;
         use OpCode as O;
@@ -276,7 +276,7 @@ impl<'a> InstructionHints<'a> {
     }
 }
 
-impl<'a> Default for InstructionHints<'a> {
+impl Default for InstructionHints<'_> {
     fn default() -> Self {
         Self::new()
     }

@@ -82,33 +82,33 @@ impl FromStr for FileSection {
 /// Cheekily get the inner value of an enum.
 macro_rules! get_inner_arg {
     ($target:expr, $enum:path) => {{
-        if let $enum(a) = $target {
-            a
-        } else {
+        let $enum(a) = $target else {
             unreachable!();
-        }
+        };
+
+        a
     }};
 }
 
 /// Cheekily get the inner value of an enum, with casting.
 macro_rules! get_inner_arg_and_cast {
     ($target:expr, $enum:path, $cast:ident) => {{
-        if let $enum(a) = $target {
-            a as $cast
-        } else {
+        let $enum(a) = $target else {
             unreachable!();
-        }
+        };
+
+        a as $cast
     }};
 }
 
 /// Cheekily get and pack an inner enum expression.
 macro_rules! get_inner_expr_arg {
     ($target:expr) => {{
-        if let Argument::Expression(expr) = &$target {
-            expr.pack()
-        } else {
+        let Argument::Expression(expr) = &$target else {
             unreachable!()
-        }
+        };
+
+        expr.pack()
     }};
 }
 
@@ -485,11 +485,11 @@ impl<'a> AsmParser<'a> {
     fn parse_section_line(line: &str) -> FileSection {
         assert!(line.len() >= 9);
 
-        if let Ok(section) = FileSection::from_str(&line[9..]) {
-            section
-        } else {
+        let Ok(section) = FileSection::from_str(&line[9..]) else {
             panic!("invalid assembly file section name - {}", &line[9..])
-        }
+        };
+
+        section
     }
 
     /// Push a string buffer onto an string argument vector.
@@ -1126,7 +1126,7 @@ impl<'a> AsmParser<'a> {
     }
 }
 
-impl<'a> Default for AsmParser<'a> {
+impl Default for AsmParser<'_> {
     fn default() -> Self {
         Self::new()
     }
