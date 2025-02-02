@@ -93,7 +93,7 @@ pub struct InstructionHints<'a> {
     pub hints: Vec<InstructionLookup<'a>>,
 }
 
-impl<'a> InstructionHints<'a> {
+impl InstructionHints<'_> {
     pub fn new() -> Self {
         use ArgTypeHint::*;
         use OpCode as O;
@@ -146,12 +146,12 @@ impl<'a> InstructionHints<'a> {
                 gen_hint!(vec!["call"], [U32Pointer], O::CallAbsU32Imm),
                 gen_hint!(vec!["call"], [RegisterU32Pointer], O::CallAbsU32Reg),
                 gen_hint!(
-                    vec!["callr"],
+                    vec!["call.r"],
                     [U32, RegisterU32Pointer],
                     O::CallRelU32RegU32Offset
                 ),
-                gen_hint!(vec!["callr"], [U32], O::CallRelCSU32Offset),
-                gen_hint!(vec!["iret"], [], O::RetArgsU32),
+                gen_hint!(vec!["call.r"], [U32], O::CallRelCSU32Offset),
+                gen_hint!(vec!["ret.i"], [], O::RetArgsU32),
                 gen_hint!(vec!["int"], [U8], O::Int),
                 gen_hint!(vec!["intret"], [], O::IntRet),
                 gen_hint!(vec!["jmp"], [U32Pointer], O::JumpAbsU32Imm),
@@ -276,7 +276,7 @@ impl<'a> InstructionHints<'a> {
     }
 }
 
-impl<'a> Default for InstructionHints<'a> {
+impl Default for InstructionHints<'_> {
     fn default() -> Self {
         Self::new()
     }

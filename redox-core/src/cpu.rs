@@ -1753,9 +1753,9 @@ mod tests_cpu {
             // Did the test registers match their expected values?
             self.expected_changed_registers
                 .iter()
-                .for_each(|(id, expected_value)| {
+                .for_each(|(id, &expected_value)| {
                     let actual_value = vm.cpu.registers.read_reg_f32_unchecked(id);
-                    if *expected_value != actual_value {
+                    if expected_value != actual_value {
                         table.add_row(row![
                             id,
                             format!("{expected_value}"),
@@ -1899,9 +1899,9 @@ mod tests_cpu {
             // Did the test registers match their expected values?
             self.expected_changed_registers
                 .iter()
-                .for_each(|(id, expected_value)| {
+                .for_each(|(id, &expected_value)| {
                     let actual_value = vm.cpu.registers.read_reg_u32_unchecked(id);
-                    if *expected_value != actual_value {
+                    if expected_value != actual_value {
                         table.add_row(row![
                             id,
                             format!("{expected_value}"),
