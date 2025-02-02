@@ -27,7 +27,7 @@ impl Default for TestDebugDevice {
 }
 
 impl ComBusIO for TestDebugDevice {
-    fn read_u8(&self) -> DeviceResult<u8> {
+    fn read_u8(&mut self) -> DeviceResult<u8> {
         if self.should_fail[0] {
             return DeviceResult::Err(DeviceError::OperationNotSupported);
         }
@@ -35,7 +35,7 @@ impl ComBusIO for TestDebugDevice {
         Ok(u8::MAX)
     }
 
-    fn read_u32(&self) -> DeviceResult<u32> {
+    fn read_u32(&mut self) -> DeviceResult<u32> {
         if self.should_fail[1] {
             return DeviceResult::Err(DeviceError::OperationNotSupported);
         }
@@ -43,7 +43,7 @@ impl ComBusIO for TestDebugDevice {
         Ok(u32::MAX)
     }
 
-    fn read_f32(&self) -> DeviceResult<f32> {
+    fn read_f32(&mut self) -> DeviceResult<f32> {
         if self.should_fail[2] {
             return DeviceResult::Err(DeviceError::OperationNotSupported);
         }
