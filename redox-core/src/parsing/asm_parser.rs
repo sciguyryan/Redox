@@ -402,7 +402,7 @@ impl<'a> AsmParser<'a> {
 
         let mut in_quoted_string = false;
         let mut escaped_args = vec![];
-        let mut buffer = String::new();
+        let mut buffer = String::with_capacity(graphemes.len());
         for (i, g) in graphemes.iter().enumerate() {
             let is_escaped = i > 0 && graphemes[i - 1] == "\\";
 
