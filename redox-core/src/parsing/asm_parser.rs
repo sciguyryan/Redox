@@ -1077,7 +1077,7 @@ impl<'a> AsmParser<'a> {
         let mut end_pos = 0;
 
         let graphemes: Vec<&str> = line.graphemes(true).collect();
-        let len = graphemes.len();
+        let max = graphemes.len() - 1;
 
         for (i, g) in graphemes.iter().enumerate() {
             // What type of grapheme are we dealing with?
@@ -1093,7 +1093,7 @@ impl<'a> AsmParser<'a> {
             }
 
             // We always want to be sure to catch the last grapheme.
-            if i == len - 1 {
+            if i == max {
                 segment_end = true;
                 end_pos += 1;
             }
