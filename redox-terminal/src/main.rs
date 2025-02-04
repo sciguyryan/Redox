@@ -114,7 +114,7 @@ fn main() {
     println!("----------[CPU]----------");
     println!("Code successfully executed in {elapsed} ns!");
     println!();
-    println!("Machine Mode? {}", vm.cpu.is_machine_mode);
+    println!("Machine Mode? {}", vm.cpu.is_in_machine_mode());
     println!(
         "Stack Frame Size: {}",
         vm.com_bus.mem.get_stack_frame_size()

@@ -83,13 +83,13 @@ pub struct Cpu {
     /// The registers associated with this CPU.
     pub registers: Registers,
     // Is the CPU currently halted?
-    pub is_halted: bool,
-    /// Is the CPU currently running in machine mode (superuser)?
-    pub is_machine_mode: bool,
+    is_halted: bool,
+    /// The current machine execution mode.
+    privilege_level: PrivilegeLevel,
     /// Is the CPU currently in an interrupt handler?
-    pub is_in_interrupt_handler: bool,
+    is_in_interrupt_handler: bool,
     /// The last interrupt handler that was "active" (i.e. was not terminated with intret).
-    pub last_interrupt_code: Option<u8>,
+    last_interrupt_code: Option<u8>,
     /// The decoded expressions cache.
     decode_expression_cache: HashMap<u32, Expression>,
 }
@@ -99,7 +99,7 @@ impl Cpu {
         Self {
             registers: Registers::default(),
             is_halted: false,
-            is_machine_mode: true,
+            privilege_level: PrivilegeLevel::Machine,
             is_in_interrupt_handler: false,
             last_interrupt_code: None,
             decode_expression_cache: HashMap::new(),
@@ -196,11 +196,7 @@ impl Cpu {
     /// A [`PrivilegeLevel`] giving the current privilege level of the processor.
     #[inline(always)]
     fn get_privilege(&self) -> PrivilegeLevel {
-        if self.is_machine_mode {
-            PrivilegeLevel::Machine
-        } else {
-            PrivilegeLevel::User
-        }
+        self.privilege_level
     }
 
     /// Fetch and decode the next instruction to be executed.
@@ -249,10 +245,16 @@ impl Cpu {
     /// * `flag` - The [`CpuFlag`] to check.
     #[allow(unused)]
     #[inline(always)]
-    fn is_cpu_flag_set(&self, flag: &CpuFlag) -> bool {
+    fn is_flag_set(&self, flag: &CpuFlag) -> bool {
         // Get the current CPU flags.
         let flags = self.registers.read_reg_u32_unchecked(&RegisterId::EFL);
         utils::is_bit_set(flags, *flag as u8)
+    }
+
+    /// Check whether the CPU is currently in machine mode.
+    #[inline(always)]
+    pub fn is_in_machine_mode(&self) -> bool {
+        self.privilege_level == PrivilegeLevel::Machine
     }
 
     /// Perform a checked add of two u32 values.
@@ -1327,7 +1329,7 @@ impl Cpu {
             }
             I::LoadIVTAddrU32Imm(addr) => {
                 // livt &addr
-                if !self.is_machine_mode {
+                if !self.is_in_machine_mode() {
                     self.trigger_interrupt(GENERAL_PROTECTION_FAULT_INT, &mut com_bus.mem);
                     return;
                 }
@@ -1335,7 +1337,7 @@ impl Cpu {
                 self.write_reg_u32_unchecked(&RegisterId::IDTR, *addr);
             }
             I::MachineReturn => {
-                self.set_machine_mode(false);
+                self.set_privilege_level(PrivilegeLevel::User);
             }
             I::Halt => {
                 self.set_halted(true);
@@ -1394,14 +1396,14 @@ impl Cpu {
         self.write_reg_u32_unchecked(&RegisterId::EIP, value);
     }
 
-    /// Set the machine mode privilege level of the processor.
+    /// Set the privilege level of the CPU.
     ///
     /// # Arguments
     ///
-    /// * `state` - Whether the CPU should be running in machine mode or not.
+    /// * `level` - The new privilege level of the CPU.
     #[inline(always)]
-    fn set_machine_mode(&mut self, state: bool) {
-        self.is_machine_mode = state;
+    fn set_privilege_level(&mut self, level: PrivilegeLevel) {
+        self.privilege_level = level;
     }
 
     /// Update the various segment registers in the CPU.
@@ -2595,7 +2597,7 @@ mod tests_cpu {
         CpuTests::new(&tests).run_all_special(|id, vm| {
             if let Some(v) = vm {
                 assert!(
-                    !v.cpu.is_machine_mode,
+                    !v.cpu.is_in_machine_mode(),
                     "Test {id} Failed - machine is still in machine mode after executing mret instruction!"
                 );
             } else {
