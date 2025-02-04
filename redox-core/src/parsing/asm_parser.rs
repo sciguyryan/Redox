@@ -268,7 +268,7 @@ impl<'a> AsmParser<'a> {
                 value_found = true;
             }
 
-            // Could the argument be a u8 immediate.
+            // Could the argument be a u8 immediate?
             if let Ok(val) = AsmParser::try_parse_u8_immediate(substring) {
                 if !value_found {
                     arguments.push(Argument::UnsignedInt(val as u128));
@@ -283,7 +283,7 @@ impl<'a> AsmParser<'a> {
                 value_found = true;
             }
 
-            // Could the argument could be a u32 immediate.
+            // Could the argument could be a u32 immediate?
             if let Ok(val) = AsmParser::try_parse_u32_immediate(substring) {
                 if !value_found {
                     arguments.push(Argument::UnsignedInt(val as u128));
