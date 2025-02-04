@@ -1,5 +1,6 @@
 use itertools::Itertools;
 use std::{num::ParseIntError, str::FromStr};
+use unicode_segmentation::UnicodeSegmentation;
 
 use crate::{
     ins::{
@@ -229,7 +230,7 @@ impl<'a> AsmParser<'a> {
             "unable to find an instruction that matches the name."
         );
 
-        // Do we have any arguments to process.
+        // Do we have any arguments to process?
         for (i, raw_arg) in raw_args.iter().enumerate().skip(1) {
             let mut value_found = false;
             let mut hints = Vec::with_capacity(10);
@@ -396,8 +397,6 @@ impl<'a> AsmParser<'a> {
     ///
     /// * `line` - A code line to be parsed.
     fn parse_data_line(&mut self, line: &str) -> (String, DataDeclarationType, Vec<u8>) {
-        use unicode_segmentation::UnicodeSegmentation;
-
         let graphemes: Vec<&str> = line.graphemes(true).collect();
 
         let mut in_quoted_string = false;
@@ -1077,37 +1076,37 @@ impl<'a> AsmParser<'a> {
         let mut start_pos = 0;
         let mut end_pos = 0;
 
-        let chars = line.chars().collect_vec();
-        let len = chars.len();
+        let graphemes: Vec<&str> = line.graphemes(true).collect();
+        let len = graphemes.len();
 
-        for (i, c) in chars.iter().enumerate() {
-            // What type of character are we dealing with?
-            match c {
-                ' ' | ',' => {
+        for (i, g) in graphemes.iter().enumerate() {
+            // What type of grapheme are we dealing with?
+            match *g {
+                " " | "," => {
                     segment_end = true;
                 }
-                ';' => {
+                ";" => {
                     skip_to_end = true;
                     segment_end = true;
                 }
                 _ => {}
             }
 
-            // We always want to be sure to catch the last character.
+            // We always want to be sure to catch the last grapheme.
             if i == len - 1 {
                 segment_end = true;
                 end_pos += 1;
             }
 
             if segment_end {
-                let string = &line[start_pos..end_pos];
+                let string = &graphemes[start_pos..end_pos].join("");
 
                 // If we have a non-empty string then we can add it to our processing list.
                 if !string.is_empty() {
                     segments.push(string.to_string());
                 }
 
-                // Skip over the current character to the next one.
+                // Skip over the current grapheme to the next one.
                 start_pos = end_pos + 1;
 
                 // Start a new segment.
@@ -1269,7 +1268,7 @@ mod tests_asm_parsing {
     fn code_parser_labels() {
         let tests = [
             ParserTest::new(
-                "nop\r\n:LABEL_1",
+                "nop\n:LABEL_1",
                 &[
                     Instruction::Nop,
                     Instruction::Label(String::from(":LABEL_1")),
@@ -1278,7 +1277,13 @@ mod tests_asm_parsing {
                 "failed to correctly parse label instruction.",
             ),
             ParserTest::new(
-                "call :LABEL_1\r\n:LABEL_1",
+                "nop\n:🏴󠁧󠁢󠁷󠁬󠁳󠁿",
+                &[Instruction::Nop, Instruction::Label(String::from(":🏴󠁧󠁢󠁷󠁬󠁳󠁿"))],
+                false,
+                "failed to correctly parse label instruction.",
+            ),
+            ParserTest::new(
+                "call :LABEL_1\n:LABEL_1",
                 &[
                     Instruction::CallAbsU32Imm(
                         DUMMY_LABEL_JUMP_ADDRESS as u32,
@@ -1290,8 +1295,26 @@ mod tests_asm_parsing {
                 "failed to correctly parse instruction label.",
             ),
             ParserTest::new(
+                "call :🏴󠁧󠁢󠁷󠁬󠁳󠁿\n:🏴󠁧󠁢󠁷󠁬󠁳󠁿",
+                &[
+                    Instruction::CallAbsU32Imm(
+                        DUMMY_LABEL_JUMP_ADDRESS as u32,
+                        String::from(":🏴󠁧󠁢󠁷󠁬󠁳󠁿"),
+                    ),
+                    Instruction::Label(String::from(":🏴󠁧󠁢󠁷󠁬󠁳󠁿")),
+                ],
+                false,
+                "failed to correctly parse instruction label.",
+            ),
+            ParserTest::new(
                 ":LABEL_1 EVERYTHING HERE SHOULD BE IGNORED",
                 &[Instruction::Label(String::from(":LABEL_1"))],
+                false,
+                "failed to correctly parse label instruction.",
+            ),
+            ParserTest::new(
+                ":🏴󠁧󠁢󠁷󠁬󠁳󠁿 EVERYTHING HERE SHOULD BE IGNORED",
+                &[Instruction::Label(String::from(":🏴󠁧󠁢󠁷󠁬󠁳󠁿"))],
                 false,
                 "failed to correctly parse label instruction.",
             ),
