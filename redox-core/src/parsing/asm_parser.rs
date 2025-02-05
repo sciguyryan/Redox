@@ -1251,8 +1251,10 @@ mod tests_asm_parsing {
 
     #[test]
     fn code_misc_tests() {
-        let tests = [ParserTest::new(
-            "mov eax,\\\nebx",
+        let tests = [
+            // Testing line continuation.
+            ParserTest::new(
+            "mov eax,\\\r\nebx",
             &[Instruction::MovU32RegU32Reg(
                 RegisterId::EAX,
                 RegisterId::EBX,
