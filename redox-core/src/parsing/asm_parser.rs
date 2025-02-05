@@ -1252,7 +1252,7 @@ mod tests_asm_parsing {
     #[test]
     fn code_misc_tests() {
         let tests = [ParserTest::new(
-            "mov eax,\\\r\nebx",
+            "mov eax,\\\nebx",
             &[Instruction::MovU32RegU32Reg(
                 RegisterId::EAX,
                 RegisterId::EBX,
@@ -1335,13 +1335,13 @@ mod tests_asm_parsing {
                 "failed to correctly parse instruction and comment.",
             ),
             ParserTest::new(
-                "nop\r\n;this should be ignored\r\nnop",
+                "nop\n;this should be ignored\nnop",
                 &[Instruction::Nop, Instruction::Nop],
                 false,
                 "failed to correctly parse instruction and comment.",
             ),
             ParserTest::new(
-                "nop\r\n;nop\r\nnop",
+                "nop\n;nop\nnop",
                 &[Instruction::Nop, Instruction::Nop],
                 false,
                 "failed to correctly parse instruction and comment.",
