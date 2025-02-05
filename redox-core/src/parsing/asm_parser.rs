@@ -124,7 +124,7 @@ pub struct AsmParser<'a> {
     pub parsed_data_declarations: Vec<DataDeclaration>,
 }
 
-impl<'a> AsmParser<'a> {
+impl AsmParser<'_> {
     pub fn new() -> Self {
         Self {
             hints: InstructionHints::new(),
@@ -217,12 +217,11 @@ impl<'a> AsmParser<'a> {
         let mut argument_hints = Vec::with_capacity(10);
         let mut label = None;
 
-        let shortlist: Vec<InstructionLookup> = self
+        let shortlist: Vec<&InstructionLookup<'_>> = self
             .hints
             .hints
             .iter()
             .filter(|h| h.names.contains(&name.as_str()))
-            .cloned()
             .collect();
 
         assert!(
@@ -363,7 +362,7 @@ impl<'a> AsmParser<'a> {
             .multi_cartesian_product()
             .collect_vec();
 
-        let mut possible_matches: Vec<&InstructionLookup<'a>> = if !arguments.is_empty() {
+        let mut possible_matches: Vec<&&InstructionLookup<'_>> = if !arguments.is_empty() {
             shortlist
                 .iter()
                 .filter(|sl| arg_permutations.iter().any(|perm| sl.args == *perm))
