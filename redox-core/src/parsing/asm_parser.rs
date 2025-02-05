@@ -1099,11 +1099,11 @@ impl<'a> AsmParser<'a> {
             }
 
             if segment_end {
-                let string = &graphemes[start_pos..end_pos].join("");
+                let string = graphemes[start_pos..end_pos].join("");
 
                 // If we have a non-empty string then we can add it to our processing list.
                 if !string.is_empty() {
-                    segments.push(string.to_string());
+                    segments.push(string);
                 }
 
                 // Skip over the current grapheme to the next one.
