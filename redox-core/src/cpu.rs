@@ -449,6 +449,8 @@ impl Cpu {
         let quotient: u32;
         let modulo: u32;
 
+        // This allows us to compute the quotient and modulo at once, avoiding doing two
+        // separate operations here.
         unsafe {
             asm!(
                 "xor edx, edx", // Clear the EDX register before attempting to load a new value into it.
@@ -718,24 +720,22 @@ impl Cpu {
 
         let value = self.registers.read_reg_u32(source_reg, privilege);
 
-        let final_value: u32;
-        if is_x86_feature_detected!("bmi2") {
-            // We can use the inbuilt assembly instruction here for added performance gains.
-            unsafe {
-                asm!(
-                    "bzhi {0:e}, {1:e}, {2:e}",
-                    out(reg) final_value,
-                    in(reg) value,
-                    in(reg) index,
-                );
-            }
-        } else {
-            final_value = if index > 0 {
-                value & ((1 << index) - 1)
+        let mut final_value: u32 = 0;
+        if index > 0 {
+            if is_x86_feature_detected!("bmi2") {
+                // We can use the inbuilt assembly instruction here for added performance gains.
+                unsafe {
+                    asm!(
+                        "bzhi {0:e}, {1:e}, {2:e}",
+                        out(reg) final_value,
+                        in(reg) value,
+                        in(reg) index,
+                    );
+                }
             } else {
-                value
-            };
-        };
+                final_value = value & ((1 << index) - 1)
+            }
+        }
 
         self.set_flag_state(CpuFlag::SF, utils::is_bit_set(final_value, 31));
         self.set_flag_state(CpuFlag::ZF, final_value == 0);
