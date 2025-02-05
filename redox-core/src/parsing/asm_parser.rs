@@ -1250,18 +1250,55 @@ mod tests_asm_parsing {
     }
 
     #[test]
+    fn section_parser_tests() {
+        let tests = [
+            // The text section is a valid section.
+            ParserTest::new(
+                "section .text",
+                &[],
+                false,
+                "failed to parse valid section.",
+            ),
+            // The section label should be automatically converted to lowercase, which renders it correct.
+            ParserTest::new(
+                "section .TEXT",
+                &[],
+                false,
+                "failed to parse valid section.",
+            ),
+            // This is invalid because there must be something after the section marker.
+            ParserTest::new(
+                "section",
+                &[],
+                true,
+                "succeeded in parsing invalid section marker.",
+            ),
+            // This is invalid because the section marker isn't valid.
+            ParserTest::new(
+                "section abc",
+                &[],
+                true,
+                "succeeded in parsing invalid section marker.",
+            ),
+        ];
+
+        ParserTests::new(&tests).run_all();
+    }
+
+    #[test]
     fn code_misc_tests() {
         let tests = [
             // Testing line continuation.
             ParserTest::new(
-            "mov eax,\\\r\nebx",
-            &[Instruction::MovU32RegU32Reg(
-                RegisterId::EAX,
-                RegisterId::EBX,
-            )],
-            false,
-            "failed to correctly parse instruction.",
-        )];
+                "mov eax,\\\r\nebx",
+                &[Instruction::MovU32RegU32Reg(
+                    RegisterId::EAX,
+                    RegisterId::EBX,
+                )],
+                false,
+                "failed to correctly parse instruction.",
+            ),
+        ];
 
         ParserTests::new(&tests).run_all();
     }
@@ -1474,27 +1511,13 @@ mod tests_asm_parsing {
                 true,
                 "succeeded in parsing instruction with invalid arguments.",
             ),
-            // This is invalid because there must be something after the section marker.
-            ParserTest::new(
-                "section",
-                &[],
-                true,
-                "succeeded in parsing invalid section marker.",
-            ),
-            // This is invalid because the section marker isn't valid.
-            ParserTest::new(
-                "section abc",
-                &[],
-                true,
-                "succeeded in parsing invalid section marker.",
-            ),
             // This is invalid because there should be a second function argument on the next line,
             // which is made inline by the \ symbol.
             ParserTest::new(
                 "mov eax,\\\n",
                 &[],
                 true,
-                "succeeded in parsing invalid section marker.",
+                "succeeded in parsing of continuation operator with nothing following it.",
             ),
         ];
 
