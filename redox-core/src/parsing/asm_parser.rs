@@ -444,16 +444,15 @@ impl<'a> AsmParser<'a> {
 
         // Now we want to ensure we correctly handle any escape sequences.
         // We don't want to do this for the label or declaration type arguments.
-        let mut arguments = escaped_args.clone();
-        (2..escaped_args.len()).for_each(|i| {
-            if let Some(s) = unescape::unescape(&arguments[i]) {
-                arguments[i] = s;
+        escaped_args.iter_mut().skip(2).for_each(|arg| {
+            if let Some(s) = unescape::unescape(arg) {
+                *arg = s
             }
         });
 
-        let label = &arguments[0];
-        let args = &arguments[2..];
-        let declaration_type = DataDeclarationType::try_from(arguments[1].as_str())
+        let label = &escaped_args[0];
+        let args = &escaped_args[2..];
+        let declaration_type = DataDeclarationType::try_from(escaped_args[1].as_str())
             .expect("invalid syntax - failed to identify data declaration type");
 
         let mut storage = vec![];
