@@ -277,9 +277,7 @@ impl Cpu {
     #[inline]
     fn perform_checked_add_u32(&mut self, value_1: u32, value_2: u32, out_reg: &RegisterId) {
         let (new_value, overflow) = value_1.overflowing_add(value_2);
-
         self.set_standard_flags_by_value(new_value, overflow);
-
         self.write_reg_u32(out_reg, new_value);
     }
 
@@ -306,9 +304,7 @@ impl Cpu {
         out_reg: &RegisterId,
     ) {
         let (new_value, overflow) = target_value.overflowing_sub(sub_value);
-
         self.set_standard_flags_by_value(new_value, overflow);
-
         self.write_reg_u32(out_reg, new_value);
     }
 
@@ -336,7 +332,7 @@ impl Cpu {
         self.set_flag_state(CpuFlag::OF, state);
         self.set_flag_state(CpuFlag::CF, state);
 
-        self.write_reg_u32_unchecked(&RegisterId::EAX, new_value);
+        self.write_reg_u32(&RegisterId::EAX, new_value);
     }
 
     /// Perform a bitwise and of two u32 values.
@@ -359,13 +355,11 @@ impl Cpu {
     #[inline]
     fn perform_bitwise_and_u32(&mut self, value_1: u32, value_2: u32, out_reg: &RegisterId) {
         let new_value = value_1 & value_2;
-
         self.set_flag_state(CpuFlag::SF, utils::is_bit_set(new_value, 31));
         self.set_flag_state(CpuFlag::ZF, new_value == 0);
         self.set_flag_state(CpuFlag::OF, false);
         self.set_flag_state(CpuFlag::PF, Cpu::calculate_lowest_byte_parity(new_value));
         self.set_flag_state(CpuFlag::CF, false);
-
         self.write_reg_u32(out_reg, new_value);
     }
 
@@ -388,6 +382,8 @@ impl Cpu {
     /// The Overflow (OF) flag will only be affected by 1-bit shifts. Any other flags are undefined.
     #[inline]
     fn perform_checked_left_shift_u32(&mut self, value: u32, shift_by: u8, out_reg: &RegisterId) {
+        // TODO - note that this condition should have been optimised away by the compiler.
+        // TODO - if we complete that, this check can be removed.
         if shift_by == 0 {
             return;
         }
@@ -402,7 +398,6 @@ impl Cpu {
         }
         self.set_flag_state(CpuFlag::CF, utils::is_bit_set(value, (32 - shift_by) & 1));
         self.set_flag_state(CpuFlag::PF, Cpu::calculate_lowest_byte_parity(new_value));
-
         self.write_reg_u32(out_reg, new_value);
     }
 
@@ -440,8 +435,8 @@ impl Cpu {
             );
         }
 
-        self.write_reg_u32_unchecked(&RegisterId::EAX, quotient);
-        self.write_reg_u32_unchecked(&RegisterId::EDX, modulo);
+        self.write_reg_u32(&RegisterId::EAX, quotient);
+        self.write_reg_u32(&RegisterId::EDX, modulo);
     }
 
     /// Perform an arithmetic left-shift of two u32 values.
@@ -474,7 +469,6 @@ impl Cpu {
         self.set_flag_state(CpuFlag::OF, false);
         self.set_flag_state(CpuFlag::CF, false);
         self.set_flag_state(CpuFlag::PF, Cpu::calculate_lowest_byte_parity(new_value));
-
         self.write_reg_u32(out_reg, new_value);
     }
 
@@ -508,7 +502,6 @@ impl Cpu {
         offset: u32,
     ) {
         let base_addr = self.read_reg_u32(base_reg);
-
         self.perform_call_jump(mem, base_addr + offset);
     }
 
@@ -531,6 +524,8 @@ impl Cpu {
     /// The Overflow (OF) flag will always be cleared. Any other flags are undefined.
     #[inline]
     fn perform_right_shift_u32(&mut self, value: u32, shift_by: u8, out_reg: &RegisterId) {
+        // TODO - note that this condition should have been optimised away by the compiler.
+        // TODO - if we complete that, this check can be removed.
         if shift_by == 0 {
             return;
         }
@@ -546,7 +541,6 @@ impl Cpu {
         // Since we are working in little-Endian the lowest bit has the lowest index.
         self.set_flag_state(CpuFlag::CF, utils::is_bit_set(value, 0));
         self.set_flag_state(CpuFlag::PF, Cpu::calculate_lowest_byte_parity(new_value));
-
         self.write_reg_u32(out_reg, new_value);
     }
 
@@ -580,7 +574,6 @@ impl Cpu {
         self.set_flag_state(CpuFlag::OF, false);
         self.set_flag_state(CpuFlag::CF, false);
         self.set_flag_state(CpuFlag::PF, Cpu::calculate_lowest_byte_parity(new_value));
-
         self.write_reg_u32(out_reg, new_value);
     }
 
@@ -621,7 +614,6 @@ impl Cpu {
         new_state: bool,
     ) {
         self.perform_bit_test_with_carry_flag(*value, bit);
-
         utils::set_bit_state_inline(value, bit, new_state);
     }
 
@@ -639,7 +631,6 @@ impl Cpu {
     #[inline]
     fn perform_forward_bit_search(&mut self, value: u32) -> u32 {
         self.set_flag_state(CpuFlag::ZF, value == 0);
-
         value.trailing_zeros()
     }
 
@@ -657,7 +648,6 @@ impl Cpu {
     #[inline]
     fn perform_reverse_bit_search(&mut self, value: u32) -> u32 {
         self.set_flag_state(CpuFlag::ZF, value == 0);
-
         value.leading_zeros()
     }
 
@@ -682,9 +672,7 @@ impl Cpu {
     ) {
         assert!(index <= 31);
 
-        let value = self
-            .registers
-            .read_reg_u32(source_reg, &self.privilege_level);
+        let value = self.read_reg_u32(source_reg);
 
         let mut final_value: u32 = 0;
         if index > 0 {
@@ -713,7 +701,6 @@ impl Cpu {
         // The overflow flag is always cleared.
         self.set_flag_state(CpuFlag::OF, false);
 
-        // Write the value to the output register.
         self.write_reg_u32(out_reg, final_value);
     }
 
@@ -1012,7 +999,6 @@ impl Cpu {
             I::SwapU32RegU32Reg(reg_1, reg_2) => {
                 let reg_1_val = self.read_reg_u32(reg_1);
                 let reg_2_val = self.read_reg_u32(reg_2);
-
                 self.write_reg_u32(reg_1, reg_2_val);
                 self.write_reg_u32(reg_2, reg_1_val);
             }
@@ -1021,7 +1007,6 @@ impl Cpu {
             }
             I::MovU32RegU32Reg(in_reg, out_reg) => {
                 let value = self.read_reg_u32(in_reg);
-
                 self.write_reg_u32(out_reg, value);
             }
             I::MovU32ImmMemSimple(imm, addr) => {
@@ -1029,38 +1014,32 @@ impl Cpu {
             }
             I::MovU32RegMemSimple(reg, addr) => {
                 let value = self.read_reg_u32(reg);
-
                 com_bus.mem.set_u32(*addr as usize, value);
             }
             I::MovMemU32RegSimple(addr, reg) => {
                 let value = com_bus.mem.get_u32(*addr as usize);
-
                 self.write_reg_u32(reg, value);
             }
             I::MovU32RegPtrU32RegSimple(in_reg, out_reg) => {
                 let address = self.read_reg_u32(in_reg) as usize;
                 let value = com_bus.mem.get_u32(address);
-
                 self.write_reg_u32(out_reg, value);
             }
             I::MovU32ImmMemExpr(imm, expr) => {
                 // mov imm, &[addr] - move immediate to address.
                 let addr = self.decode_evaluate_u32_expression(expr);
-
                 com_bus.mem.set_u32(addr as usize, *imm);
             }
             I::MovMemExprU32Reg(expr, reg) => {
                 // mov &[addr], register - move value at address to register.
                 let addr = self.decode_evaluate_u32_expression(expr);
                 let value = com_bus.mem.get_u32(addr as usize);
-
                 self.write_reg_u32(reg, value);
             }
             I::MovU32RegMemExpr(reg, expr) => {
                 // mov &reg, &[addr] - move value of a register to an address.
                 let addr = self.decode_evaluate_u32_expression(expr);
                 let value = self.read_reg_u32(reg);
-
                 com_bus.mem.set_u32(addr as usize, value);
             }
             I::ZeroHighBitsByIndexU32Reg(index_reg, source_reg, out_reg) => {
@@ -1075,32 +1054,27 @@ impl Cpu {
             I::PushF32Imm(imm) => {
                 // push imm
                 com_bus.mem.push_f32(*imm);
-
                 self.decrease_sp_register_by(SIZE_OF_F32_LOCAL);
             }
             I::PushU32Imm(imm) => {
                 // push imm
                 com_bus.mem.push_u32(*imm);
-
                 self.decrease_sp_register_by(SIZE_OF_U32_LOCAL);
             }
             I::PushU32Reg(reg) => {
                 // push reg
                 let value = self.read_reg_u32(reg);
                 com_bus.mem.push_u32(value);
-
                 self.decrease_sp_register_by(SIZE_OF_U32_LOCAL);
             }
             I::PopF32ToF32Reg(reg) => {
                 // pop reg
                 self.write_reg_f32(reg, com_bus.mem.pop_f32());
-
                 self.increase_sp_register_by(SIZE_OF_F32_LOCAL);
             }
             I::PopU32ToU32Reg(reg) => {
                 // pop reg
                 self.write_reg_u32(reg, com_bus.mem.pop_u32());
-
                 self.increase_sp_register_by(SIZE_OF_U32_LOCAL);
             }
 
@@ -1212,8 +1186,6 @@ impl Cpu {
                 // Read the value and set the carry flag state, set the bit.
                 let mut value = self.read_reg_u32(reg);
                 self.perform_bit_test_with_carry_flag_with_set(&mut value, *bit % 32, true);
-
-                // Write the value back to the register.
                 self.write_reg_u32(reg, value);
             }
             I::BitTestSetU32Mem(bit, addr) => {
@@ -1228,62 +1200,53 @@ impl Cpu {
                 // bsr in_reg, out_reg
                 let value = self.read_reg_u32(in_reg);
                 let index = self.perform_reverse_bit_search(value);
-
                 self.write_reg_u32(out_reg, index);
             }
             I::BitScanReverseU32MemU32Reg(addr, reg) => {
                 // bsr &[addr], reg
                 let value = com_bus.mem.get_u32(*addr as usize);
                 let index = self.perform_reverse_bit_search(value);
-
                 self.write_reg_u32(reg, index);
             }
             I::BitScanReverseU32RegMemU32(reg, out_addr) => {
                 // bsr reg, &[out_addr]
                 let value = self.read_reg_u32(reg);
                 let index = self.perform_reverse_bit_search(value);
-
                 com_bus.mem.set_u32(*out_addr as usize, index);
             }
             I::BitScanReverseU32MemU32Mem(in_addr, out_addr) => {
                 // bsr &[in_addr], &[out_addr]
                 let value = com_bus.mem.get_u32(*in_addr as usize);
                 let index = self.perform_reverse_bit_search(value);
-
                 com_bus.mem.set_u32(*out_addr as usize, index);
             }
             I::BitScanForwardU32RegU32Reg(in_reg, out_reg) => {
                 // bsf in_reg, out_reg
                 let value = self.read_reg_u32(in_reg);
                 let index = self.perform_forward_bit_search(value);
-
                 self.write_reg_u32(out_reg, index);
             }
             I::BitScanForwardU32MemU32Reg(addr, reg) => {
                 // bsf &[addr], reg
                 let value = com_bus.mem.get_u32(*addr as usize);
                 let index = self.perform_forward_bit_search(value);
-
                 self.write_reg_u32(reg, index);
             }
             I::BitScanForwardU32RegMemU32(reg, out_addr) => {
                 // bsf reg, &[out_addr]
                 let value = self.read_reg_u32(reg);
                 let index = self.perform_forward_bit_search(value);
-
                 com_bus.mem.set_u32(*out_addr as usize, index);
             }
             I::BitScanForwardU32MemU32Mem(in_addr, out_addr) => {
                 // bsf &[in_addr], &[out_addr]
                 let value = com_bus.mem.get_u32(*in_addr as usize);
                 let index = self.perform_forward_bit_search(value);
-
                 com_bus.mem.set_u32(*out_addr as usize, index);
             }
             I::ByteSwapU32(reg) => {
                 // bswap reg
                 let value = self.read_reg_u32(reg).swap_bytes();
-
                 self.write_reg_u32(reg, value);
             }
 
@@ -1304,7 +1267,6 @@ impl Cpu {
                     self.trigger_interrupt(GENERAL_PROTECTION_FAULT_INT, &mut com_bus.mem);
                     return;
                 }
-
                 self.write_reg_u32_unchecked(&RegisterId::IDTR, *addr);
             }
             I::MachineReturn => {
