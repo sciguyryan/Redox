@@ -1242,6 +1242,77 @@ mod tests_asm_parsing {
     }
 
     #[test]
+    fn test_escape_sequences() {
+        // I don't know -why- you would write these like this... but you can!
+        let tests = [
+            // The text section is a valid section, but the escape sequences are escaped.
+            ParserTest::new(
+                "section \\u002E\\u0074\\u0065\\u0078\\u0074",
+                &[],
+                false,
+                "failed to parse valid section.",
+            ),
+            // The text section is a valid section.
+            ParserTest::new(
+                "section \u{002E}\u{0074}\u{0065}\u{0078}\u{0074}",
+                &[],
+                false,
+                "failed to parse valid section.",
+            ),
+            // This is equitant to the unescaped string.
+            ParserTest::new(
+                "\\u006E\\u006F\\u0070",
+                &[Instruction::Nop],
+                false,
+                "failed to escaped NOP instruction.",
+            ),
+            // This is equitant to the unescaped string.
+            ParserTest::new(
+                "\u{006E}\u{006F}\u{0070}",
+                &[Instruction::Nop],
+                false,
+                "failed to escaped NOP instruction.",
+            ),
+
+            // This is equitant to the unescaped string.
+            ParserTest::new(
+                "nop\n:\\u004C\\u0041\\u0042\\u0045\\u004C\\u005F\\u0031",
+                &[
+                    Instruction::Nop,
+                    Instruction::Label(String::from(":LABEL_1")),
+                ],
+                false,
+                "failed to parse label instruction.",
+            ),
+            ParserTest::new(
+                "nop\n:\u{004C}\u{0041}\u{0042}\u{0045}\u{004C}\u{005F}\u{0031}",
+                &[
+                    Instruction::Nop,
+                    Instruction::Label(String::from(":LABEL_1")),
+                ],
+                false,
+                "failed to parse label instruction.",
+            ),
+            // This is equitant to the unescaped string.
+            ParserTest::new(
+                "nop\n:\\u00f0\\u009f\\u008f\\u00b4\\u00f3\\u00a0\\u0081\\u00a7\\u00f3\\u00a0\\u0081\\u00a2\\u00f3\\u00a0\\u0081\\u00b7\\u00f3\\u00a0\\u0081\\u00ac\\u00f3\\u00a0\\u0081\\u00b3\\u00f3\\u00a0\\u0081\\u00bf",
+                &[Instruction::Nop, Instruction::Label(String::from(":🏴󠁧󠁢󠁷󠁬󠁳󠁿"))],
+                false,
+                "failed to correctly parse label instruction.",
+            ),
+            // This is equitant to the unescaped string.
+            ParserTest::new(
+                "nop\n:\u{00f0}\u{009f}\u{008f}\u{00b4}\u{00f3}\u{00a0}\u{0081}\u{00a7}\u{00f3}\u{00a0}\u{0081}\u{00a2}\u{00f3}\u{00a0}\u{0081}\u{00b7}\u{00f3}\u{00a0}\u{0081}\u{00ac}\u{00f3}\u{00a0}\u{0081}\u{00b3}\u{00f3}\u{00a0}\u{0081}\u{00bf}",
+                &[Instruction::Nop, Instruction::Label(String::from(":🏴󠁧󠁢󠁷󠁬󠁳󠁿"))],
+                false,
+                "failed to correctly parse label instruction.",
+            ),
+        ];
+
+        ParserTests::new(&tests).run_all();
+    }
+
+    #[test]
     fn section_parser_tests() {
         let tests = [
             // The text section is a valid section.
@@ -1254,14 +1325,6 @@ mod tests_asm_parsing {
             // The section label should be automatically converted to lowercase, which renders it correct.
             ParserTest::new(
                 "section .TEXT",
-                &[],
-                false,
-                "failed to parse valid section.",
-            ),
-            // The text section is a valid section.
-            // I don't know -why- you would write it like this... but you can.
-            ParserTest::new(
-                "section \\u002E\\u0074\\u0065\\u0078\\u0074",
                 &[],
                 false,
                 "failed to parse valid section.",
@@ -1298,14 +1361,6 @@ mod tests_asm_parsing {
                 false,
                 "failed to correctly parse instruction.",
             ),
-            // I don't know -why- you would write it like this... but you can.
-            // This is equitant to the unescaped string.
-            ParserTest::new(
-                "\\u006E\\u006F\\u0070",
-                &[Instruction::Nop],
-                false,
-                "failed to escaped NOP instruction.",
-            ),
         ];
 
         ParserTests::new(&tests).run_all();
@@ -1323,27 +1378,8 @@ mod tests_asm_parsing {
                 false,
                 "failed to correctly parse label instruction.",
             ),
-            // I don't know -why- you would write it like this... but you can.
-            // This is equitant to the unescaped string.
-            ParserTest::new(
-                "nop\n:\\u004C\\u0041\\u0042\\u0045\\u004C\\u005F\\u0031",
-                &[
-                    Instruction::Nop,
-                    Instruction::Label(String::from(":LABEL_1")),
-                ],
-                false,
-                "failed to parse label instruction.",
-            ),
             ParserTest::new(
                 "nop\n:🏴󠁧󠁢󠁷󠁬󠁳󠁿",
-                &[Instruction::Nop, Instruction::Label(String::from(":🏴󠁧󠁢󠁷󠁬󠁳󠁿"))],
-                false,
-                "failed to correctly parse label instruction.",
-            ),
-            // I don't know -why- you would write it like this... but you can.
-            // This is equitant to the unescaped string.
-            ParserTest::new(
-                "nop\n:\\u00f0\\u009f\\u008f\\u00b4\\u00f3\\u00a0\\u0081\\u00a7\\u00f3\\u00a0\\u0081\\u00a2\\u00f3\\u00a0\\u0081\\u00b7\\u00f3\\u00a0\\u0081\\u00ac\\u00f3\\u00a0\\u0081\\u00b3\\u00f3\\u00a0\\u0081\\u00bf",
                 &[Instruction::Nop, Instruction::Label(String::from(":🏴󠁧󠁢󠁷󠁬󠁳󠁿"))],
                 false,
                 "failed to correctly parse label instruction.",
