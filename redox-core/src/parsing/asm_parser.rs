@@ -141,7 +141,7 @@ impl AsmParser<'_> {
     pub fn parse(&mut self, string: &str) {
         let mut instructions = Vec::with_capacity(100);
         let mut data_declarations = Vec::<DataDeclaration>::with_capacity(100);
-        let mut read_only_data_declarations = Vec::<DataDeclaration>::with_capacity(100);
+        let read_only_data_declarations = Vec::<DataDeclaration>::with_capacity(100);
 
         // Convert newlines into a single type and automatically
         // allow lines ending with a \ to be treated as a singular line.
@@ -810,7 +810,7 @@ impl AsmParser<'_> {
             // Since the parser will validate we have matching opening and closing brackets we can
             // assume the final character is a closing quotation mark too.
             // TODO - should a substring of length 0 be considered an error?
-            bytes.extend_from_slice(arg[1..arg.len() - 1].as_bytes());
+            bytes.extend_from_slice(&arg.as_bytes()[1..arg.len() - 1]);
             return;
         }
 
