@@ -2,7 +2,7 @@
 name = "redox_core"
 version = "0.1.0"
 authors = ["Ryan Jones-Ward <sciguyryan@gmail.com>"]
-edition = "2021"
+edition = "2024"
 readme = "README.md"
 license = "LGPL-2.1-only"
 description = "A new toy virtual machine, assembler and compiler, written in Rust."
