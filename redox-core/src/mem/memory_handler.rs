@@ -918,16 +918,16 @@ impl MemoryHandler {
         // have sufficient elements in order to build the f32 value.
         // Note that this works with little-Endian and would need to be adjusted
         // should big-Endian be supported natively.
-        let value = unsafe {
-            std::mem::transmute::<[u8; 4], f32>([
+        
+
+        unsafe {
+            f32::from_ne_bytes([
                 *bytes.get_unchecked(0),
                 *bytes.get_unchecked(1),
                 *bytes.get_unchecked(2),
                 *bytes.get_unchecked(3),
             ])
-        };
-
-        value
+        }
     }
 
     /// Attempt to read a u32 value from memory.
@@ -948,16 +948,16 @@ impl MemoryHandler {
         // have sufficient elements in order to build the u32 value.
         // Note that this works with little-Endian and would need to be adjusted
         // should big-Endian be supported natively.
-        let value = unsafe {
-            std::mem::transmute::<[u8; 4], u32>([
+        
+
+        unsafe {
+            u32::from_ne_bytes([
                 *bytes.get_unchecked(0),
                 *bytes.get_unchecked(1),
                 *bytes.get_unchecked(2),
                 *bytes.get_unchecked(3),
             ])
-        };
-
-        value
+        }
     }
 
     /// Attempt to get a pointer to a range of bytes within memory.
@@ -1233,7 +1233,7 @@ impl MemoryHandler {
         // Note that this works with little-Endian and would need to be adjusted
         // should big-Endian be supported natively.
         let value = unsafe {
-            std::mem::transmute::<[u8; 4], f32>([
+            f32::from_ne_bytes([
                 *bytes.get_unchecked(*cursor),
                 *bytes.get_unchecked(*cursor + 1),
                 *bytes.get_unchecked(*cursor + 2),
@@ -1259,7 +1259,7 @@ impl MemoryHandler {
         // Note that this works with little-Endian and would need to be adjusted
         // should big-Endian be supported natively.
         let value = unsafe {
-            std::mem::transmute::<[u8; 4], u32>([
+            u32::from_ne_bytes([
                 *bytes.get_unchecked(*cursor),
                 *bytes.get_unchecked(*cursor + 1),
                 *bytes.get_unchecked(*cursor + 2),

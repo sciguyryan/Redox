@@ -7,6 +7,12 @@
 
 pub struct Executable {}
 
+impl Default for Executable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Executable {
     pub fn new() -> Self {
         Self {}

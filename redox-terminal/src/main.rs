@@ -2,9 +2,7 @@
 
 use redox_core::{
     compiling::{compiler::Compiler, decompiler::Decompiler},
-    ins::instruction::Instruction,
     mem,
-    reg::registers::RegisterId,
     vm::{self, VirtualMachine},
 };
 

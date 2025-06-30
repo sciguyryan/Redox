@@ -367,7 +367,7 @@ impl AsmParser<'_> {
         let mut possible_matches: Vec<&&InstructionLookup<'_>> = if !arguments.is_empty() {
             shortlist
                 .iter()
-                .filter(|sl| arg_permutations.iter().any(|perm| sl.args == *perm))
+                .filter(|sl| arg_permutations.contains(&sl.args))
                 .collect()
         } else {
             shortlist.iter().collect()
