@@ -4,33 +4,5 @@
 			"path": "."
 		}
 	],
-	"settings": {
-		"rust-analyzer.linkedProjects": [
-			".\\Cargo.toml",
-			".\\Cargo.toml",
-			".\\Cargo.toml",
-			".\\Cargo.toml",
-			".\\Cargo.toml",
-			".\\Cargo.toml",
-			".\\Cargo.toml",
-			".\\Cargo.toml",
-			".\\Cargo.toml",
-			".\\Cargo.toml",
-			".\\Cargo.toml",
-			".\\Cargo.toml",
-			".\\Cargo.toml",
-			".\\Cargo.toml",
-			".\\Cargo.toml",
-			".\\Cargo.toml",
-			".\\Cargo.toml",
-			".\\Cargo.toml",
-			".\\Cargo.toml",
-			".\\Cargo.toml",
-			".\\Cargo.toml",
-			".\\Cargo.toml",
-			".\\redox-core\\Cargo.toml",
-			".\\redox-core\\Cargo.toml",
-			".\\redox-core\\Cargo.toml"
-		]
-	}
+	"settings": {}
 }
