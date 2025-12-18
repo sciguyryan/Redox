@@ -1,9 +1,9 @@
 use crate::{
-    boot_rom::{BootRom, BOOT_MEMORY_LENGTH, BOOT_MEMORY_START, BOOT_REGION_NAME},
+    boot_rom::{BOOT_MEMORY_LENGTH, BOOT_MEMORY_START, BOOT_REGION_NAME, BootRom},
     com_bus::communication_bus::CommunicationBus,
     cpu::Cpu,
     ins::instruction::Instruction,
-    mem::memory_handler::{MemoryHandler, MEGABYTE},
+    mem::memory_handler::{MEGABYTE, MemoryHandler},
 };
 
 /// The smallest permitted size of the user memory segment.

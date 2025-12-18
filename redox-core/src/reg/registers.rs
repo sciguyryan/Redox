@@ -1,5 +1,5 @@
 use core::fmt;
-use prettytable::{row, Table};
+use prettytable::{Table, row};
 use std::{fmt::Display, str::FromStr};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;

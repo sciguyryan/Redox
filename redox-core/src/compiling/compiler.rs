@@ -12,6 +12,20 @@ use super::{
     labels::{LabelEntry, LabelType},
 };
 
+// TODO - if I were ever to continue work on this project, I would probably rework things as follows:
+// TODO - 1. Split out some of the logic. Rather than compiling directly into machine code
+// TODO -      output a more structured intermediate language (IL) representation first,
+// TODO -      then have a separate step that converts that into machine code.
+// TODO -    This would make optimizations easier too.
+// TODO - 2. Rework how jumps and calls are handled. Currently, they are absolute addresses (sort of).
+// TODO -    This makes it difficult to insert or remove instructions without having to recalculate
+// TODO -      all the jump and call addresses. Instead, use relative addressing or labels that
+// TODO -      can be resolved after the initial IL compilation pass.
+// TODO -    We would ideally want to change the bytecode too, to allow short and long jumps (including registers).
+// TODO - 3. Implement optimizations such as peephole optimizations, dead code elimination, constant folding, etc.
+// TODO -    This would need to be done prior to the IL -> bytecode compilation step to minimise the work
+// TODO -    needed when adjusting jump and call addresses.
+
 pub struct Compiler {
     /// A vector containing the compiled bytecode.
     bytes: Vec<u8>,
@@ -579,7 +593,9 @@ mod tests_compiler {
             .enumerate()
         {
             if original != decompiled {
-                eprintln!("instruction {i} did not correctly round-trip. Expected = {original}, Actual = {decompiled}");
+                eprintln!(
+                    "instruction {i} did not correctly round-trip. Expected = {original}, Actual = {decompiled}"
+                );
                 success = false;
             }
         }

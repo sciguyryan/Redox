@@ -336,7 +336,10 @@ impl AsmParser<'_> {
                     substring.len() > 1,
                     "invalid syntax - a label designator without a name!"
                 );
-                assert_eq!(i, 1, "invalid syntax - a label may only appear as the first argument of an instruction!");
+                assert_eq!(
+                    i, 1,
+                    "invalid syntax - a label may only appear as the first argument of an instruction!"
+                );
 
                 // Hold the argument index and the label string for later processing.
                 label = Some(substring.to_string());
@@ -955,12 +958,16 @@ impl AsmParser<'_> {
                 }
             } else if F32_REGISTERS.contains(&id) {
                 if is_pointer {
-                    panic!("invalid syntax - attempting to use a floating-point register as a pointer.")
+                    panic!(
+                        "invalid syntax - attempting to use a floating-point register as a pointer."
+                    )
                 } else {
                     Some((Argument::RegisterF32(id), ArgTypeHint::RegisterF32))
                 }
             } else {
-                panic!("invalid syntax - the specified register identifier doesn't exist. identifier = {id}");
+                panic!(
+                    "invalid syntax - the specified register identifier doesn't exist. identifier = {id}"
+                );
             }
         } else {
             None
@@ -1273,7 +1280,6 @@ mod tests_asm_parsing {
                 false,
                 "failed to escaped NOP instruction.",
             ),
-
             // This is equitant to the unescaped string.
             ParserTest::new(
                 "nop\n:\\u004C\\u0041\\u0042\\u0045\\u004C\\u005F\\u0031",

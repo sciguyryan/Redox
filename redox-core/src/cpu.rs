@@ -8,7 +8,7 @@ use crate::{
         expression::{Expression, ExpressionArgs},
         instruction::Instruction,
     },
-    mem::memory_handler::{MemoryHandler, StackArgType, SIZE_OF_F32, SIZE_OF_U32},
+    mem::memory_handler::{MemoryHandler, SIZE_OF_F32, SIZE_OF_U32, StackArgType},
     privilege_level::PrivilegeLevel,
     reg::registers::{RegisterId, Registers},
     utils,
@@ -1553,7 +1553,7 @@ impl From<CpuFlag> for u8 {
 #[cfg(test)]
 mod tests_cpu {
     use hashbrown::HashMap;
-    use prettytable::{row, Table};
+    use prettytable::{Table, row};
     use std::panic;
 
     use crate::{
@@ -1937,20 +1937,25 @@ mod tests_cpu {
     /// Test writing to a valid port with a valid data types.
     #[test]
     fn test_writing_port_valid_data_types() {
-        let tests = [TestU32::new(
-            &[OutU8Imm(0x0, TEST_DEBUG_DEVICE_ID), OutU32Imm(0x0, TEST_DEBUG_DEVICE_ID)],
-            &[],
-            DEFAULT_U32_STACK_CAPACITY,
-            false,
-            "OUT - failed to successfully execute OUT instruction with a valid port and data type",
-        ),
-        TestU32::new(
-            &[OutU32Reg(RegisterId::EAX, TEST_DEBUG_DEVICE_ID)],
-            &[],
-            DEFAULT_U32_STACK_CAPACITY,
-            false,
-            "OUT - failed to successfully execute OUT instruction with a valid port and data type",
-        )];
+        let tests = [
+            TestU32::new(
+                &[
+                    OutU8Imm(0x0, TEST_DEBUG_DEVICE_ID),
+                    OutU32Imm(0x0, TEST_DEBUG_DEVICE_ID),
+                ],
+                &[],
+                DEFAULT_U32_STACK_CAPACITY,
+                false,
+                "OUT - failed to successfully execute OUT instruction with a valid port and data type",
+            ),
+            TestU32::new(
+                &[OutU32Reg(RegisterId::EAX, TEST_DEBUG_DEVICE_ID)],
+                &[],
+                DEFAULT_U32_STACK_CAPACITY,
+                false,
+                "OUT - failed to successfully execute OUT instruction with a valid port and data type",
+            ),
+        ];
 
         CpuTests::new(&tests).run_all();
     }
@@ -4629,7 +4634,11 @@ mod tests_cpu {
                     // Check that the value was written by reading it back into a register.
                     MovMemU32RegSimple(0x8 + 0x8, RegisterId::E8X),
                 ],
-                &[(RegisterId::E5X, 0x8), (RegisterId::E6X, 0x8), (RegisterId::E8X, 0x123)],
+                &[
+                    (RegisterId::E5X, 0x8),
+                    (RegisterId::E6X, 0x8),
+                    (RegisterId::E8X, 0x123),
+                ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOV - value not correctly moved from memory to register with expression - two registers",
@@ -4676,7 +4685,11 @@ mod tests_cpu {
                     // Check that the value was written by reading it back into a register.
                     MovMemU32RegSimple(0x2 * 0x8, RegisterId::E8X),
                 ],
-                &[(RegisterId::E5X, 0x2), (RegisterId::E6X, 0x8), (RegisterId::E8X, 0x123)],
+                &[
+                    (RegisterId::E5X, 0x2),
+                    (RegisterId::E6X, 0x8),
+                    (RegisterId::E8X, 0x123),
+                ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOV - value not correctly moved from memory to register - using multiplication",
@@ -4700,7 +4713,11 @@ mod tests_cpu {
                     // Check that the value was written by reading it back into a register.
                     MovMemU32RegSimple(0x1a - 0x4, RegisterId::E8X),
                 ],
-                &[(RegisterId::E5X, 0x1a), (RegisterId::E6X, 0x4), (RegisterId::E8X, 0x123)],
+                &[
+                    (RegisterId::E5X, 0x1a),
+                    (RegisterId::E6X, 0x4),
+                    (RegisterId::E8X, 0x123),
+                ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "MOV - value not correctly moved from memory to register - using subtraction",
@@ -5396,10 +5413,7 @@ mod tests_cpu {
         let tests = [
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::E5X,
-                    ),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::E5X),
                     BitTestResetU32Reg(0x0, RegisterId::E5X),
                 ],
                 &[
@@ -5412,24 +5426,17 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(
-                        0b1111_1111_1111_1111_1111_1111_1111_1110,
-                        RegisterId::E5X,
-                    ),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1110, RegisterId::E5X),
                     BitTestResetU32Reg(0x0, RegisterId::E5X),
                 ],
                 &[(RegisterId::E5X, 0b1111_1111_1111_1111_1111_1111_1111_1110)],
-
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BTR - incorrect result produced from the bit-test instruction - carry flag set",
             ),
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::E5X,
-                    ),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::E5X),
                     // The modulo of the bit should be taken, meaning the 0th bit should be tested.
                     BitTestResetU32Reg(0x20, RegisterId::E5X),
                 ],
@@ -5452,24 +5459,21 @@ mod tests_cpu {
         let tests = [
             TestU32::new(
                 &[
-                    MovU32ImmMemSimple(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        0x0,
-                    ),
+                    MovU32ImmMemSimple(0b1111_1111_1111_1111_1111_1111_1111_1111, 0x0),
                     BitTestResetU32Mem(0x0, 0x0),
                     MovMemU32RegSimple(0x0, RegisterId::E8X),
                 ],
-                &[(RegisterId::E8X, 0b1111_1111_1111_1111_1111_1111_1111_1110), (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF]))],
+                &[
+                    (RegisterId::E8X, 0b1111_1111_1111_1111_1111_1111_1111_1110),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
+                ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BTR - incorrect result produced from the bit-test instruction - carry flag not set",
             ),
             TestU32::new(
                 &[
-                    MovU32ImmMemSimple(
-                        0b1111_1111_1111_1111_1111_1111_1111_1110,
-                        0x0,
-                    ),
+                    MovU32ImmMemSimple(0b1111_1111_1111_1111_1111_1111_1111_1110, 0x0),
                     BitTestResetU32Mem(0x0, 0x0),
                     MovMemU32RegSimple(0x0, RegisterId::E8X),
                 ],
@@ -5480,15 +5484,15 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[
-                    MovU32ImmMemSimple(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        0x0,
-                    ),
+                    MovU32ImmMemSimple(0b1111_1111_1111_1111_1111_1111_1111_1111, 0x0),
                     // The modulo of the bit should be taken, meaning the 0th bit should be tested.
                     BitTestResetU32Mem(0x20, 0x0),
                     MovMemU32RegSimple(0x0, RegisterId::E8X),
                 ],
-                &[(RegisterId::E8X, 0b1111_1111_1111_1111_1111_1111_1111_1110), (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF]))],
+                &[
+                    (RegisterId::E8X, 0b1111_1111_1111_1111_1111_1111_1111_1110),
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
+                ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BTR - incorrect result produced from the bit-test instruction - carry flag not set",
@@ -5504,10 +5508,7 @@ mod tests_cpu {
         let tests = [
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::EAX,
-                    ),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::EAX),
                     BitTestSetU32Reg(0x0, RegisterId::EAX),
                 ],
                 &[
@@ -5520,24 +5521,17 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(
-                        0b1111_1111_1111_1111_1111_1111_1111_1110,
-                        RegisterId::EAX,
-                    ),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1110, RegisterId::EAX),
                     BitTestSetU32Reg(0x0, RegisterId::EAX),
                 ],
                 &[(RegisterId::EAX, 0b1111_1111_1111_1111_1111_1111_1111_1111)],
-
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
                 "BTS - incorrect result produced from the bit-test instruction - carry flag set",
             ),
             TestU32::new(
                 &[
-                    MovU32ImmU32Reg(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        RegisterId::EAX,
-                    ),
+                    MovU32ImmU32Reg(0b1111_1111_1111_1111_1111_1111_1111_1111, RegisterId::EAX),
                     // The modulo of the bit should be taken, meaning the 0th bit should be tested.
                     BitTestSetU32Reg(0x20, RegisterId::EAX),
                 ],
@@ -5560,16 +5554,13 @@ mod tests_cpu {
         let tests = [
             TestU32::new(
                 &[
-                    MovU32ImmMemSimple(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        0x0,
-                    ),
+                    MovU32ImmMemSimple(0b1111_1111_1111_1111_1111_1111_1111_1111, 0x0),
                     BitTestSetU32Mem(0x0, 0x0),
                     MovMemU32RegSimple(0x0, RegisterId::E8X),
                 ],
                 &[
                     (RegisterId::E8X, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF]))
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,
@@ -5577,10 +5568,7 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[
-                    MovU32ImmMemSimple(
-                        0b1111_1111_1111_1111_1111_1111_1111_1110,
-                        0x0,
-                    ),
+                    MovU32ImmMemSimple(0b1111_1111_1111_1111_1111_1111_1111_1110, 0x0),
                     BitTestSetU32Mem(0x0, 0x0),
                     MovMemU32RegSimple(0x0, RegisterId::E8X),
                 ],
@@ -5591,17 +5579,14 @@ mod tests_cpu {
             ),
             TestU32::new(
                 &[
-                    MovU32ImmMemSimple(
-                        0b1111_1111_1111_1111_1111_1111_1111_1111,
-                        0x0,
-                    ),
+                    MovU32ImmMemSimple(0b1111_1111_1111_1111_1111_1111_1111_1111, 0x0),
                     // The modulo of the bit should be taken, meaning the 0th bit should be tested.
                     BitTestSetU32Mem(0x20, 0x0),
                     MovMemU32RegSimple(0x0, RegisterId::E8X),
                 ],
                 &[
                     (RegisterId::E8X, 0b1111_1111_1111_1111_1111_1111_1111_1111),
-                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF]))
+                    (RegisterId::EFL, CpuFlag::compute_from(&[CpuFlag::CF])),
                 ],
                 DEFAULT_U32_STACK_CAPACITY,
                 false,

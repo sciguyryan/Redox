@@ -1,4 +1,4 @@
-use enumflags2::{bitflags, BitFlags};
+use enumflags2::{BitFlags, bitflags};
 use std::cmp::Ordering;
 
 use crate::{
@@ -200,7 +200,10 @@ impl RegisterU32 {
         };
 
         if !has_required_perms {
-            panic!("attempted to access register without the correct security context and access flags. Register = {:?}, Access Type = {access_type:?}, permissions = {permissions}.", self.id);
+            panic!(
+                "attempted to access register without the correct security context and access flags. Register = {:?}, Access Type = {access_type:?}, permissions = {permissions}.",
+                self.id
+            );
         }
     }
 }
@@ -311,7 +314,10 @@ impl RegisterF32 {
         };
 
         if !has_required_perms {
-            panic!("attempted to access register without the correct security context or access flags. Register = {:?}, Access Type = {access_type:?}, permissions = {permissions}.", self.id);
+            panic!(
+                "attempted to access register without the correct security context or access flags. Register = {:?}, Access Type = {access_type:?}, permissions = {permissions}.",
+                self.id
+            );
         }
     }
 }

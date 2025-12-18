@@ -347,7 +347,10 @@ mod tests_opcodes {
             // Get the opcode from the instruction.
             let op_from_ins: OpCode = ins.into();
             if op_from_ins != *op {
-                eprintln!("instruction {ins} has an opcode mismatch - expected {op_from_ins:?} but got {:?}", *op);
+                eprintln!(
+                    "instruction {ins} has an opcode mismatch - expected {op_from_ins:?} but got {:?}",
+                    *op
+                );
                 success = false;
             }
         }

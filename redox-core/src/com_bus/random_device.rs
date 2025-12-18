@@ -1,4 +1,4 @@
-use rand::{rngs::OsRng, Rng, SeedableRng, TryRngCore};
+use rand::{Rng, SeedableRng, TryRngCore, rngs::OsRng};
 use rand_xoshiro::Xoshiro256Plus;
 
 use super::{

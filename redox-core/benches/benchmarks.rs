@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 
 use redox_core::{
     compiling::compiler::Compiler, ins::instruction::Instruction, reg::registers::RegisterId,

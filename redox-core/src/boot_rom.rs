@@ -5,7 +5,7 @@ use crate::{
         NON_MASKABLE_INT,
     },
     ins::instruction::Instruction,
-    mem::memory_handler::{MemoryHandler, MEGABYTE},
+    mem::memory_handler::{MEGABYTE, MemoryHandler},
     reg::registers::RegisterId,
 };
 
@@ -54,6 +54,7 @@ impl BootRom {
         ];
 
         // Calculate the position of the start of the interrupt vector.
+        // NOTE - this is with respect to the start of the process block, not global zero.
         let mut next_handler_pos =
             BOOT_MEMORY_START + Instruction::total_size_of_instructions(&boot_instructions);
 

@@ -1,5 +1,5 @@
 use num_traits::FromPrimitive;
-use prettytable::{row, Table};
+use prettytable::{Table, row};
 
 use crate::{
     ins::{instruction::Instruction, op_codes::OpCode},
@@ -189,10 +189,12 @@ impl MemoryHandler {
         // Check whether we have a memory-mapped segment that would intersect
         // with this one. We don't want to allow segments to cross like this.
         let end = start + length;
-        assert!(!self
-            .mapped_memory
-            .iter()
-            .any(|m| (start >= m.start && end <= m.end) || (start <= m.end && m.start <= end)));
+        assert!(
+            !self
+                .mapped_memory
+                .iter()
+                .any(|m| (start >= m.start && end <= m.end) || (start <= m.end && m.start <= end))
+        );
 
         self.mapped_memory
             .push(MappedMemory::new(start, length, can_read, can_write, name));
@@ -918,7 +920,6 @@ impl MemoryHandler {
         // have sufficient elements in order to build the f32 value.
         // Note that this works with little-Endian and would need to be adjusted
         // should big-Endian be supported natively.
-        
 
         unsafe {
             f32::from_ne_bytes([
@@ -948,7 +949,6 @@ impl MemoryHandler {
         // have sufficient elements in order to build the u32 value.
         // Note that this works with little-Endian and would need to be adjusted
         // should big-Endian be supported natively.
-        
 
         unsafe {
             u32::from_ne_bytes([
@@ -1418,7 +1418,9 @@ impl MemoryHandler {
 
             table.printstd();
         } else {
-            println!("WARNING: debug stack type hints are disabled. A raw view of stack memory will be displayed.");
+            println!(
+                "WARNING: debug stack type hints are disabled. A raw view of stack memory will be displayed."
+            );
             println!("{:?}", self.get_stack_segment_storage());
         }
     }
@@ -1428,7 +1430,7 @@ impl MemoryHandler {
 mod tests_memory {
     use crate::ins::instruction::Instruction;
 
-    use super::{MemoryHandler, MEGABYTE};
+    use super::{MEGABYTE, MemoryHandler};
 
     fn fill_memory_sequential(mem: &mut MemoryHandler) {
         for (i, byte) in &mut mem

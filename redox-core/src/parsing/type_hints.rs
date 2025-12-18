@@ -83,9 +83,7 @@ impl<'a> InstructionLookup<'a> {
 }
 
 macro_rules! gen_hint {
-    ($names:expr, $args:expr, $op:expr) => {{
-        InstructionLookup::new($names, $args.to_vec(), $op)
-    }};
+    ($names:expr, $args:expr, $op:expr) => {{ InstructionLookup::new($names, $args.to_vec(), $op) }};
 }
 
 #[derive(Debug, Clone)]
