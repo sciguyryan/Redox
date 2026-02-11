@@ -1,4 +1,4 @@
-use rand::{Rng, SeedableRng, TryRngCore, rngs::OsRng};
+use rand::{RngExt, SeedableRng};
 use rand_xoshiro::Xoshiro256Plus;
 
 use super::{
@@ -21,8 +21,6 @@ pub struct RandomDevice {
     mode: RandomMode,
     /// The pseudorandom number generator.
     prng: Xoshiro256Plus,
-    /// The Cryptographically secure RNG generator.
-    crng: OsRng,
 }
 
 impl RandomDevice {
@@ -31,8 +29,7 @@ impl RandomDevice {
             // By default we initialize the random number generator using entropy.
             is_initialized: true,
             mode: RandomMode::Crypto,
-            prng: Xoshiro256Plus::from_os_rng(),
-            crng: OsRng,
+            prng: secure_seeded_xoroshiro256(),
         }
     }
 }
@@ -51,10 +48,7 @@ impl ComBusIO for RandomDevice {
 
         Ok(match self.mode {
             RandomMode::Crypto => {
-                let mut arr: [u8; 1] = [0; 1];
-                self.crng
-                    .try_fill_bytes(&mut arr)
-                    .expect("failed to get u8");
+                let arr: [u8; 1] = secure_random_bytes();
                 arr[0]
             }
             RandomMode::Pseudorandom => self.prng.random::<u8>(),
@@ -67,7 +61,7 @@ impl ComBusIO for RandomDevice {
         }
 
         Ok(match self.mode {
-            RandomMode::Crypto => self.crng.try_next_u32().expect("failed to get u32"),
+            RandomMode::Crypto => secure_random_u32(),
             RandomMode::Pseudorandom => self.prng.random::<u32>(),
         })
     }
@@ -79,14 +73,13 @@ impl ComBusIO for RandomDevice {
 
         Ok(match self.mode {
             RandomMode::Crypto => {
-                // We want to weed out any potential infinities or NaN's,
-                // and we'll iterate until we find one.
-                let mut value = f32::INFINITY;
-                while !value.is_finite() {
-                    let v = self.crng.try_next_u32().expect("failed to get u32");
-                    value = f32::from_bits(v);
-                }
-                value
+                // Construct a f32 value from scratch using a u32 base value, to avoid NANs and infinities.
+                let val = secure_random_u32();
+                let sign = val & 0x8000_0000;
+                let exponent = val & 0x7F80_0000; // Top 8 bits, capped to 0–254/
+                let mantissa = val & 0x007F_FFFF;
+
+                f32::from_bits(sign | exponent | mantissa)
             }
             RandomMode::Pseudorandom => self.prng.random::<f32>(),
         })
@@ -105,7 +98,7 @@ impl ComBusIO for RandomDevice {
             }
             1 => {
                 // Standard mode - a PRNG derived from entropy.
-                self.prng = Xoshiro256Plus::from_os_rng();
+                self.prng = secure_seeded_xoroshiro256();
                 self.mode = RandomMode::Pseudorandom;
                 self.is_initialized = true;
             }
@@ -135,6 +128,34 @@ impl ComBusIO for RandomDevice {
     fn write_f32(&mut self, _value: f32) -> DeviceResult<()> {
         DeviceResult::Err(DeviceError::OperationNotSupported)
     }
+}
+
+/// Fill an array of a given length with securely generated random bytes.
+#[inline]
+fn secure_random_bytes<const N: usize>() -> [u8; N] {
+    let mut arr = [0u8; N];
+    getrandom::fill(&mut arr).expect("failed to generate random bytes");
+    arr
+}
+
+/// Generate a 32-bit value.
+#[inline]
+fn secure_random_u32() -> u32 {
+    let buff: [u8; 4] = secure_random_bytes();
+    return u32::from_le_bytes(buff);
+}
+
+/// Generate a 64-bit value.
+#[inline]
+fn secure_random_u64() -> u64 {
+    let buff: [u8; 8] = secure_random_bytes();
+    return u64::from_le_bytes(buff);
+}
+
+/// Create a securely seeded Xoshiro256Plus PRNG.
+#[inline]
+fn secure_seeded_xoroshiro256() -> Xoshiro256Plus {
+    Xoshiro256Plus::seed_from_u64(secure_random_u64())
 }
 
 #[cfg(test)]
